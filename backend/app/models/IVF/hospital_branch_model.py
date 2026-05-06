@@ -33,6 +33,7 @@ class HospitalBranch(Base):
     # Relationships
     hospital = relationship("Hospital", back_populates="branches")
     tanks = relationship("Tank", back_populates="branch", cascade="all, delete-orphan")
+    incubators = relationship("Incubator", back_populates="branch", cascade="all, delete-orphan")
     patient_crylocks = relationship("PatientCrylockInfo", back_populates="branch", cascade="all, delete-orphan")
     
     # Audit Trail

@@ -7,7 +7,7 @@ and setup alert config
 -------------------------------
 
 tanks -
-capacity_liters | empty_weight_kg(tank_min_capacity_reading should be sync) | full_weight_kg(tank_max_capacity_reading should be sync) | static_evap_rate_l_per_day in tank
+ empty_weight_kg(tank_min_capacity_reading should be sync) | full_weight_kg(tank_max_capacity_reading should be sync) | 
 
 ln2_iot_device - 
  id | tank_id (SCHANGE) | device_id (SCHANGE) | tank_max_capacity_reading (SCHANGE)| tank_min_capacity_reading (SCHANGE)| closed_noise_margin_kg_per_h | open_rate_min_kg_per_h | refill_threshold_kg | window_minutes | window_min_points | consecutive_windows_for_state | spike_tolerance_kg | spike_max_duration_s | lid_weight_min_kg | lid_weight_max_kg | lid_confirm_stable_points | low_level_threshold_kg | low_level_consecutive_readings | canister_weight_kg | canister_tolerance_kg | product_change_max_kg | precaution_level_pct 

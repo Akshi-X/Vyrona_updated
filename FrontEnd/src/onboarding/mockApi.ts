@@ -5,7 +5,7 @@ import controlTowerData from "./mocks/control-tower-data.json";
 import liveFeedFrames from "./mocks/live-feed-data.json";
 
 // ── Cached real profile (fetched once when mocks enable) ──────────────────────
-let cachedProfile: { user_id: string; first_name: string; last_name: string; role: string } | null = null;
+let cachedProfile: { user_id: string; first_name: string; last_name: string; role: string; department?: string | null } | null = null;
 
 // ── Mutable in-memory alert state (reset each time mocks are enabled) ────────
 // Allows the acknowledge action to update alert status within the same session.
@@ -54,6 +54,84 @@ const KPI_UNIT_MAP: Record<string, string> = {
     shock:                   "g",
 };
 
+// ── Quality WebSocket frames ────────────────────────────────────────────────
+// Cycled through every 4 seconds for the Quality Tracking chart and
+// Quality Parameters table on the /track/:patientId page.
+// Frames alternate between all-normal and one-violation so the anomaly
+// toggle also has something to show.
+const QUALITY_FEED_FRAMES = [
+    {
+        temperature: 37.1, humidity: 62, ph_level: 7.3, o2_level: 95, co2_level: 5.1, agitation: 4,
+        thresholds: {
+            temperature: { min: 35, max: 39, unit: " °C" },
+            humidity:    { min: 50, max: 75, unit: " %" },
+            ph_level:    { min: 7.0, max: 7.6, unit: "" },
+            o2_level:    { min: 90, max: 100, unit: " %" },
+            co2_level:   { min: 3, max: 8, unit: " %" },
+            agitation:   { min: 0, max: 20, unit: " %" },
+        },
+        threshold_violations: { temperature: false, humidity: false, ph_level: false, o2_level: false, co2_level: false, agitation: false },
+        violated_parameters: [],
+        quality_loss: 2, quality_status: "Normal", quality_percentage: 98,
+    },
+    {
+        temperature: 37.4, humidity: 64, ph_level: 7.2, o2_level: 94, co2_level: 5.4, agitation: 6,
+        thresholds: {
+            temperature: { min: 35, max: 39, unit: " °C" },
+            humidity:    { min: 50, max: 75, unit: " %" },
+            ph_level:    { min: 7.0, max: 7.6, unit: "" },
+            o2_level:    { min: 90, max: 100, unit: " %" },
+            co2_level:   { min: 3, max: 8, unit: " %" },
+            agitation:   { min: 0, max: 20, unit: " %" },
+        },
+        threshold_violations: { temperature: false, humidity: false, ph_level: false, o2_level: false, co2_level: false, agitation: false },
+        violated_parameters: [],
+        quality_loss: 3, quality_status: "Normal", quality_percentage: 97,
+    },
+    {
+        temperature: 39.8, humidity: 61, ph_level: 7.1, o2_level: 93, co2_level: 5.7, agitation: 8,
+        thresholds: {
+            temperature: { min: 35, max: 39, unit: " °C" },
+            humidity:    { min: 50, max: 75, unit: " %" },
+            ph_level:    { min: 7.0, max: 7.6, unit: "" },
+            o2_level:    { min: 90, max: 100, unit: " %" },
+            co2_level:   { min: 3, max: 8, unit: " %" },
+            agitation:   { min: 0, max: 20, unit: " %" },
+        },
+        threshold_violations: { temperature: true, humidity: false, ph_level: false, o2_level: false, co2_level: false, agitation: false },
+        violated_parameters: ["temperature"],
+        quality_loss: 12, quality_status: "Warning", quality_percentage: 88,
+    },
+    {
+        temperature: 37.9, humidity: 63, ph_level: 7.4, o2_level: 96, co2_level: 4.8, agitation: 5,
+        thresholds: {
+            temperature: { min: 35, max: 39, unit: " °C" },
+            humidity:    { min: 50, max: 75, unit: " %" },
+            ph_level:    { min: 7.0, max: 7.6, unit: "" },
+            o2_level:    { min: 90, max: 100, unit: " %" },
+            co2_level:   { min: 3, max: 8, unit: " %" },
+            agitation:   { min: 0, max: 20, unit: " %" },
+        },
+        threshold_violations: { temperature: false, humidity: false, ph_level: false, o2_level: false, co2_level: false, agitation: false },
+        violated_parameters: [],
+        quality_loss: 4, quality_status: "Normal", quality_percentage: 96,
+    },
+    {
+        temperature: 37.2, humidity: 65, ph_level: 6.8, o2_level: 88, co2_level: 5.2, agitation: 7,
+        thresholds: {
+            temperature: { min: 35, max: 39, unit: " °C" },
+            humidity:    { min: 50, max: 75, unit: " %" },
+            ph_level:    { min: 7.0, max: 7.6, unit: "" },
+            o2_level:    { min: 90, max: 100, unit: " %" },
+            co2_level:   { min: 3, max: 8, unit: " %" },
+            agitation:   { min: 0, max: 20, unit: " %" },
+        },
+        threshold_violations: { temperature: false, humidity: false, ph_level: true, o2_level: true, co2_level: false, agitation: false },
+        violated_parameters: ["ph_level", "o2_level"],
+        quality_loss: 18, quality_status: "Warning", quality_percentage: 82,
+    },
+];
+
 // ── Fake WebSocket ──────────────────────────────────────────────────────────
 // Intercepts all WebSocket connections during onboarding so the real server
 // never receives requests (which would error out for mock tank IDs / branches).
@@ -82,6 +160,8 @@ class FakeWebSocket {
 
     private feedTimer: ReturnType<typeof setInterval> | null = null;
     private feedIndex = 0;
+    private qualityFeedTimer: ReturnType<typeof setInterval> | null = null;
+    private qualityFeedIndex = 0;
 
     constructor(url: string | URL) {
         this.url = url.toString();
@@ -93,17 +173,20 @@ class FakeWebSocket {
     }
 
     send(data: unknown) {
-        // Parse subscription request; start live feed when client subscribes with a tank_id
         try {
             const msg = typeof data === "string" ? JSON.parse(data) : data;
-            if (msg && typeof msg === "object" && "tank_id" in msg) {
-                this.startLiveFeed(Number(msg.tank_id) || 60);
+            if (msg && typeof msg === "object") {
+                if ("tank_id" in msg) {
+                    this.startLiveFeed(Number(msg.tank_id) || 60);
+                } else if ("patient_id" in msg) {
+                    this.startQualityFeed(String(msg.patient_id));
+                }
             }
         } catch { /* ignore non-JSON sends */ }
     }
 
     private startLiveFeed(tankId: number) {
-        if (this.feedTimer !== null) return; // already running
+        if (this.feedTimer !== null) return;
         const frames = liveFeedFrames as Array<Record<string, number>>;
         this.feedTimer = setInterval(() => {
             if (this.feedIndex >= frames.length || this.readyState !== 1) {
@@ -126,6 +209,22 @@ class FakeWebSocket {
         }, 5000);
     }
 
+    private startQualityFeed(patientId: string) {
+        if (this.qualityFeedTimer !== null) return;
+        // Send first frame immediately, then every 4 seconds
+        const emit = () => {
+            if (this.readyState !== 1) return;
+            const i = this.qualityFeedIndex++;
+            // Cycle through a small set of pre-defined frames for variety
+            const frames = QUALITY_FEED_FRAMES;
+            const frame = frames[i % frames.length];
+            const message = { ...frame, patient_id: patientId, timestamp: new Date().toISOString() };
+            this.onmessage?.(new MessageEvent("message", { data: JSON.stringify(message) }));
+        };
+        setTimeout(emit, 600); // first frame quickly
+        this.qualityFeedTimer = setInterval(emit, 4000);
+    }
+
     private stopLiveFeed() {
         if (this.feedTimer !== null) {
             clearInterval(this.feedTimer);
@@ -133,8 +232,16 @@ class FakeWebSocket {
         }
     }
 
+    private stopQualityFeed() {
+        if (this.qualityFeedTimer !== null) {
+            clearInterval(this.qualityFeedTimer);
+            this.qualityFeedTimer = null;
+        }
+    }
+
     close(_code?: number, _reason?: string) {
         this.stopLiveFeed();
+        this.stopQualityFeed();
         this.readyState = 3; // CLOSED
         this.onclose?.(new CloseEvent("close", { wasClean: true, code: 1000 }));
     }
@@ -206,7 +313,10 @@ function shiftKpiHistoryToNow(data: typeof dashboardData.ivfKpiHistory24H) {
 
 // ── Enable / disable ────────────────────────────────────────────────────────
 
-export const enableOnboardingMocks = () => {
+export const enableOnboardingMocks = (department: string = "IVF") => {
+    // Persist the real user's department so Dashboard and Sidebar initialise correctly.
+    try { localStorage.setItem("department", department.toUpperCase()); } catch {}
+
     // Deep-clone so mutations don't bleed across sessions
     mockTankAlerts = JSON.parse(JSON.stringify(dashboardData.ivfTankAlerts));
     mockTankChatMessages = JSON.parse(JSON.stringify(dashboardData.ivfTankChatMessages));
@@ -272,7 +382,7 @@ export const enableOnboardingMocks = () => {
         if (endpoint.startsWith("/api/profile")) {
             try {
                 const profile = await userService.getProfileForOnboarding();
-                return { ...profile, real_role: profile.role, role: "Admin" };
+                return { ...profile, real_role: profile.role, role: "Admin", department: department };
             } catch {
                 return undefined;
             }
@@ -365,6 +475,46 @@ export const enableOnboardingMocks = () => {
         // Ongoing treatments table data.
         if (endpoint.startsWith("/api/patients/ongoing")) {
             return dashboardData.ongoingTreatments;
+        }
+
+        // Database page — all detailed patients.
+        if (endpoint.startsWith("/api/patients/detailed")) {
+            return dashboardData.cgtDetailedPatients;
+        }
+
+        // CGT Track page — single patient by ID.
+        if (endpoint.match(/^\/api\/patients\/[^/]+$/) && (!options?.method || options.method === "GET")) {
+            return dashboardData.cgtPatient;
+        }
+
+        // CGT Track page — patient stage.
+        if (endpoint.match(/^\/api\/patients\/[^/]+\/stage$/)) {
+            return dashboardData.cgtPatientStage;
+        }
+
+        // CGT Track page — patient tasks.
+        if (endpoint.match(/^\/api\/patients\/[^/]+\/tasks$/)) {
+            return dashboardData.cgtPatientTasks;
+        }
+
+        // CGT Track page — document checklist.
+        if (endpoint.match(/^\/api\/shipment\/document-checklist\//)) {
+            return dashboardData.cgtDocumentChecklist;
+        }
+
+        // CGT Track page — 3PL logistics players.
+        if (endpoint.match(/^\/api\/shipment\/3pl-players\//)) {
+            return dashboardData.cgt3PLPlayers;
+        }
+
+        // CGT Track page — transport time comparison.
+        if (endpoint.match(/^\/api\/shipment\/transport-time-comparison\//)) {
+            return dashboardData.cgtTransportTimeComparison;
+        }
+
+        // CGT Track page — historic lane risk assessment.
+        if (endpoint.startsWith("/api/lane-risk-assessment")) {
+            return dashboardData.cgtLaneRiskAssessment;
         }
 
         // IVF embryo tracking filters and table data.
@@ -945,6 +1095,7 @@ export const enableOnboardingMocks = () => {
 export const disableOnboardingMocks = () => {
     BaseApiService.setMockEnabled(false);
     BaseApiService.setMockResolver(undefined);
+    // OnboardingShell restores previousDepartment in its own cleanup — nothing to do here.
 
     // Restore original WebSocket
     if (typeof window !== "undefined" && (window as any).__onboardingOriginalWebSocket) {

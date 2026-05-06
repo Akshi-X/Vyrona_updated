@@ -51,14 +51,17 @@ const isDropdown = (item: NavItem): item is NavGroup =>
 const DASHBOARD_CHILD_PATHS = [
     "/dashboard",
     "/ivf-track-shipment",
-    "/incubator-tracking",
-    "/embryo-grading",
+    // "/incubator-tracking",
+    // "/embryo-grading",
 ];
 
 const isDashboardRoute = (pathname: string) =>
     DASHBOARD_CHILD_PATHS.some(
         (p) => pathname === p || pathname.startsWith(p + "/"),
     );
+
+const isAlertConfigRoute = (pathname: string) =>
+    pathname === "/alert-setting" || pathname.startsWith("/alert-setting/");
 
 // ── Nav item definitions ───────────────────────────────────────────────────────
 
@@ -70,14 +73,22 @@ const ALL_NAV_ITEMS: NavItem[] = [
         children: [
             { label: "Overview",                  path: "/dashboard"          },
             { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
-            { label: "Incubator Tracking",         path: "/incubator-tracking" },
-            { label: "Embryo Grading",             path: "/embryo-grading"     },
+            // { label: "Incubator Tracking",         path: "/incubator-tracking" },
+            // { label: "Embryo Grading",             path: "/embryo-grading"     },
         ],
     },
     { icon: DatabaseIconWhite,    label: "Database",            path: "/database"      },
     { icon: ControlTowerIconWhite, label: "Control Tower",      path: "/control-tower" },
     { icon: "", lucideIcon: Users,    label: "Users",            path: "/users"         },
-{ icon: CriticalAlertsIcon,   label: "Alert Configuration", path: "/alert-setting" },
+    {
+        icon: CriticalAlertsIcon,
+        label: "Alert Config",
+        dropdown: true,
+        children: [
+            { label: "Cryotanks",  path: "/alert-setting" },
+            { label: "Incubators", path: "/alert-setting?direction=incubators" },
+        ],
+    },
     { icon: "", lucideIcon: Download, label: "Reports",         path: "/reports"       },
     { icon: ContainersIcon,       label: "Refill log",          path: "/refill-log"    },
 ];
@@ -94,6 +105,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
 
     const [sidebarHeight, setSidebarHeight] = useState(window.innerHeight);
     const [dashboardOpen, setDashboardOpen] = useState(false);
+    const [alertConfigOpen, setAlertConfigOpen] = useState(false);
     const [userDepartment, setUserDepartment] = useState<string | null>(() => {
         const dept = localStorage.getItem("department");
         return dept ? dept.toUpperCase() : null;
@@ -133,14 +145,17 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     // ── Filter nav items by role / department ──────────────────────────────────
 
     const isIVF = (userDepartment ?? "").toUpperCase() === "IVF";
+    const isCGT = (userDepartment ?? "").toUpperCase() === "CGT";
 
     const navigationItems = ALL_NAV_ITEMS.filter((item) => {
         if (item.label === "Pending approvals")
             return userRole === "Admin" || userRole === "Pharma_admin";
         if (item.label === "Users")
-            return isOnboarding || userRole === "Admin" || userRole === "Manager";
-        if (item.label === "Alert Configuration")
-            return isIVF ;
+            return !isCGT && (isOnboarding || userRole === "Admin" || userRole === "Manager");
+        if (item.label === "Refill log")
+            return !isCGT;
+        if (item.label === "Alert Config")
+            return isIVF;
         if (item.label === "Reports")
             return isIVF;
         if (item.label === "Database")
@@ -148,6 +163,16 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         if (item.label === "Control Tower" && userRole === "User" && !isOnboarding)
             return !isIVF;
         return true;
+    }).map((item) => {
+        // Filter dropdown children by department
+        if (isDropdown(item)) {
+            const filtered = item.children.filter((child) => {
+                if (child.path === "/ivf-track-shipment") return isIVF;
+                return true;
+            });
+            return { ...item, children: filtered };
+        }
+        return item;
     });
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -203,27 +228,57 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 <nav className="flex flex-col gap-[18px] px-6 pb-2 flex-1 overflow-y-auto relative z-10 scrollbar-none">
                     {navigationItems.map((item, index) => {
                         if (isDropdown(item)) {
-                            const active = isDashboardRoute(resolvedPathname);
+                            const isDashboard = item.label === "Dashboard";
+                            const isAlertConfig = item.label === "Alert Config";
+                            const active = isDashboard
+                                ? isDashboardRoute(resolvedPathname)
+                                : isAlertConfig
+                                  ? isAlertConfigRoute(resolvedPathname)
+                                  : false;
+                            const isOpen = isDashboard ? dashboardOpen : isAlertConfig ? alertConfigOpen : false;
+                            const setOpen = isDashboard ? setDashboardOpen : isAlertConfig ? setAlertConfigOpen : () => {};
+
+                            const getChildActive = (child: NavChild) => {
+                                if (child.path.includes("?")) {
+                                    const [p, q] = child.path.split("?");
+                                    return location.pathname === resolvePath(p) && location.search === `?${q}`;
+                                }
+                                const resolved = resolvePath(child.path);
+                                const siblingQueryActive = item.children
+                                    .filter((s) => s.path !== child.path && s.path.includes("?"))
+                                    .some((s) => location.search === `?${s.path.split("?")[1]}`);
+                                return (
+                                    (location.pathname === resolved || location.pathname.startsWith(resolved + "/")) &&
+                                    !siblingQueryActive
+                                );
+                            };
+
                             return (
                                 <div key={index} className="flex flex-col gap-0.5">
                                     <button
-                                        onClick={() => setDashboardOpen((o) => !o)}
+                                        id={isAlertConfig ? "onboarding-sidebar-alert-setting" : undefined}
+                                        onClick={() => setOpen((o: boolean) => !o)}
                                         className={`h-auto w-full justify-between gap-4 px-3 py-[7px] rounded-[10px] flex items-center transition-colors ${
                                             active
                                                 ? "bg-white/20"
-                                                : dashboardOpen
+                                                : isOpen
                                                   ? "bg-white/10"
                                                   : "bg-transparent hover:bg-white/10"
                                         }`}
                                     >
                                         <div className="flex items-center gap-4">
-                                            <img src={DashboardIconWhite} alt="" className="w-5 h-5" />
+                                            <img
+                                                src={item.icon}
+                                                alt=""
+                                                className="w-5 h-5"
+                                                style={isAlertConfig ? { filter: "brightness(0) saturate(100%) invert(100%)" } : undefined}
+                                            />
                                             <span className="font-semibold text-xs md:text-sm text-white">
                                                 {item.label}
                                             </span>
                                         </div>
                                         <svg
-                                            className={`w-4 h-4 flex-shrink-0 transition-transform text-white/90 ${dashboardOpen ? "rotate-180" : ""}`}
+                                            className={`w-4 h-4 flex-shrink-0 transition-transform text-white/90 ${isOpen ? "rotate-180" : ""}`}
                                             fill="none"
                                             viewBox="0 0 24 24"
                                             stroke="currentColor"
@@ -232,18 +287,15 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                         </svg>
                                     </button>
 
-                                    {dashboardOpen && (
+                                    {isOpen && (
                                         <div className="flex flex-col gap-[18px] border-l-2 border-white/20 ml-4 pl-3 my-1.5">
                                             {item.children.map((child, ci) => {
-                                                const resolvedChild = resolvePath(child.path);
-                                                const childActive =
-                                                    location.pathname === resolvedChild ||
-                                                    location.pathname.startsWith(resolvedChild + "/");
+                                                const childActive = getChildActive(child);
                                                 return (
                                                     <button
                                                         key={ci}
                                                         onClick={() => {
-                                                            setDashboardOpen(true);
+                                                            setOpen(true);
                                                             handleNavigation(child.path);
                                                         }}
                                                         className={`h-auto w-full justify-start pr-3 py-2 rounded-[10px] flex items-center text-left transition-colors pl-5 ${ci === 0 ? "mt-2" : ""} ${
@@ -281,13 +333,13 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
 
                         const needsInvert =
                             (label === "Pending approvals" ||
-                             label === "Alert Configuration" ||
+                             label === "Alert Config" ||
                              label === "Refill log") && !isActive;
 
                         return (
                             <button
                                 key={index}
-                                id={label === "Control Tower" ? "onboarding-sidebar-control-tower" : label === "Alert Configuration" ? "onboarding-sidebar-alert-setting" : label === "Refill log" ? "onboarding-sidebar-refill-log" : label === "Reports" ? "onboarding-sidebar-reports" : label === "Users" ? "onboarding-sidebar-users" : undefined}
+                                id={label === "Control Tower" ? "onboarding-sidebar-control-tower" : label === "Refill log" ? "onboarding-sidebar-refill-log" : label === "Reports" ? "onboarding-sidebar-reports" : label === "Users" ? "onboarding-sidebar-users" : undefined}
                                 onClick={() => handleNavigation(path)}
                                 className={`h-auto w-full justify-start gap-4 px-3 py-[7px] rounded-[10px] flex items-center ${
                                     isActive ? "bg-white" : "bg-transparent hover:bg-white/10"
