@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setIsAuthenticated(false);
             setRememberMe(false);
             rememberMeRef.current = false;
-            localStorage.removeItem("user_role");
+            localStorage.clear();
         }, timeoutDuration);
     }, [isAuthenticated]);
 
@@ -136,7 +136,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     setIsAuthenticated(false);
                     setRememberMe(false);
                     rememberMeRef.current = false;
-                    localStorage.removeItem("user_role");
+                    localStorage.clear();
                 }, timeoutDuration);
             } else {
                 // Inactivity-based 1-hour timeout when remember me is disabled
@@ -349,8 +349,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUserRole(undefined);
         setOnboardingCompleted(undefined);
         setIsAuthenticated(false);
-        localStorage.removeItem("user_role");
-        localStorage.removeItem("onboarding_completed");
+        localStorage.clear();
     };
 
     const value: AuthContextType = {
