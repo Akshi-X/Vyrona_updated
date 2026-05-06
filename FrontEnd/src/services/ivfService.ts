@@ -655,7 +655,7 @@ export class IvfService extends BaseApiService {
     }
 
     /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank. */
-    async getKpiConfigList(id: number, type: "tank" | "incubator" = "tank"): Promise<{
+    async getKpiConfigList(id: number, type: "tank" | "incubator" = "tank", chamberId?: string | null): Promise<{
         tank_id?: number;
         incubator_id?: number;
         tank_code?: string;
@@ -664,7 +664,8 @@ export class IvfService extends BaseApiService {
         hospital_id: number | null;
         config: Array<KpiConfigRow>;
     }> {
-        const param = type === "incubator" ? `incubator_id=${encodeURIComponent(id)}` : `tank_id=${encodeURIComponent(id)}`;
+        let param = type === "incubator" ? `incubator_id=${encodeURIComponent(id)}` : `tank_id=${encodeURIComponent(id)}`;
+        if (type === "incubator" && chamberId) param += `&chamber_id=${encodeURIComponent(chamberId)}`;
         return await this.request(
             `/api/ivf/quality/kpi-config/list?${param}`,
             { method: "GET" },
@@ -734,6 +735,28 @@ export class IvfService extends BaseApiService {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tank_ids: tankIds, configs }),
+        });
+    }
+
+    async bulkUpsertKpiConfigForIncubator(
+        incubatorId: number,
+        chamberId: string | null,
+        configs: Array<{
+            kpi_name: string;
+            alert_name?: string | null;
+            min?: number | null;
+            max?: number | null;
+            unit?: string | null;
+            alert_type?: string | null;
+            cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
+            status?: boolean;
+        }>,
+    ): Promise<{ updated: number; created: number }> {
+        return await this.request("/api/ivf/quality/kpi-config/bulk-incubator", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ incubator_id: incubatorId, chamber_id: chamberId, configs }),
         });
     }
 
