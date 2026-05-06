@@ -54,6 +54,10 @@ from .ivf_schema import (
     ActiveTankItem,
     BranchTanks,
     ActiveCanistersResponse,
+    # Active Incubators schemas
+    ActiveIncubatorItem,
+    BranchIncubators,
+    ActiveIncubatorsResponse,
     # Embryo Tracking schemas
     EmbryoTrackingItem,
     EmbryoTrackingResponse
@@ -114,6 +118,10 @@ __all__ = [
     "ActiveTankItem",
     "BranchTanks",
     "ActiveCanistersResponse",
+    # Active Incubators schemas
+    "ActiveIncubatorItem",
+    "BranchIncubators",
+    "ActiveIncubatorsResponse",
     # Embryo Tracking schemas
     "EmbryoTrackingItem",
     "EmbryoTrackingResponse"

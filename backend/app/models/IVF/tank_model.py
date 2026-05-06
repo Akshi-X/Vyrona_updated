@@ -21,7 +21,7 @@ class Tank(Base):
     tank_id_arc = Column(String(255), nullable=True, comment="Tank ID from ARC API (e.g., '5471')")
     capacity_liters = Column(Numeric(10, 2), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    status = Column(SQLEnum(CanisterStatus, values_callable=lambda obj: [e.value for e in obj], name='tank_status'), 
+    status = Column(SQLEnum(CanisterStatus, values_callable=lambda obj: [e.value for e in obj], name='tank_status'),
                     default=CanisterStatus.SAFE, nullable=False, comment="Tank status (safe, risk, critical)")
     tive_device_id = Column(
         String(255),

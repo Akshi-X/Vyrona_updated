@@ -22,9 +22,16 @@ class KpiConfig(Base):
     tank_id = Column(
         Integer,
         ForeignKey("tanks.tank_id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
+    incubator_id = Column(
+        Integer,
+        ForeignKey("incubators.incubator_id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    chamber_id = Column(String(255), nullable=True)
 
     kpi_name = Column(
         String(255),
