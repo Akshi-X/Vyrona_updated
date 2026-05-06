@@ -133,15 +133,13 @@ const KpiTile = ({ icon, label, value, tooltip, muted = false, danger = false, l
         <div className="flex flex-col">
           <span className={`text-[11px] font-medium ${danger ? 'text-[#B91C1C]' : 'text-gray-500'}`}>{label}</span>
           <span className={`text-[15px] font-semibold ${danger ? 'text-[#DC2626]' : muted ? 'text-gray-400' : 'text-black'}`}>{value}</span>
-          {timestamp && <span className="text-[10px] mt-0.5">{timestamp}</span>}
         </div>
       </div>
     )}
-    {tooltip && (
+    {(tooltip || timestamp) && (
       <div className="absolute left-1/2 top-full z-50 mt-2 w-max max-w-60 -translate-x-1/2 rounded-lg border border-[#E7E1E1] bg-white px-3 py-2 text-center opacity-0 shadow-lg transition-opacity duration-200 pointer-events-none group-hover:opacity-100">
-        <div className="text-xs font-semibold text-black">
-          {tooltip}
-        </div>
+        {tooltip && <div className="text-xs font-semibold text-black">{tooltip}</div>}
+        {timestamp && <div className={`text-xs text-gray-500 ${tooltip ? 'mt-1' : ''}`}>{timestamp}</div>}
         <div className="absolute bottom-full left-1/2 h-0 w-0 -translate-x-1/2 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
       </div>
     )}
