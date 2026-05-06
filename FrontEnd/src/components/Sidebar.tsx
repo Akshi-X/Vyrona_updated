@@ -104,6 +104,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const isOnboarding = isOnboardingCtx || location.pathname.startsWith("/onboarding");
 
     const [sidebarHeight, setSidebarHeight] = useState(window.innerHeight);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [dashboardOpen, setDashboardOpen] = useState(false);
     const [alertConfigOpen, setAlertConfigOpen] = useState(false);
     const [userDepartment, setUserDepartment] = useState<string | null>(() => {
@@ -384,13 +385,37 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
 
                 {/* Logout */}
                 <button
-                    onClick={onLogout}
+                    onClick={() => setShowLogoutConfirm(true)}
                     className="h-auto flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 hover:bg-white/10 flex-shrink-0 relative z-10"
                 >
                     <img src={LogoutIcon} alt="" className="w-5 h-5" />
                     <span className="font-bold text-white text-xs md:text-sm">Log Out</span>
                 </button>
             </aside>
+
+            {/* Logout confirmation dialog */}
+            {showLogoutConfirm && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4">
+                    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
+                        <h2 className="text-base font-semibold text-gray-800 mb-2">Confirm Logout</h2>
+                        <p className="text-sm text-gray-500 mb-6">Are you sure you want to log out?</p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowLogoutConfirm(false)}
+                                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => { setShowLogoutConfirm(false); onLogout(); }}
+                                className="px-4 py-2 text-sm rounded-lg bg-[#6b1176] text-white hover:bg-[#8a2a95] transition-colors"
+                            >
+                                Logout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };
