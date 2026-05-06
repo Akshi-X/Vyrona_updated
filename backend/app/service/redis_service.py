@@ -16,6 +16,7 @@ _redis_client: Optional[redis.Redis] = None
 _pubsub: Optional[redis.client.PubSub] = None
 _ln2_pubsub: Optional[redis.client.PubSub] = None  # Separate pubsub for LN2 readings (do not disturb quality channel)
 _tank_kpi_pubsub: Optional[redis.client.PubSub] = None  # Tank KPI readings for Quality Tracking tabbed graph
+_incubator_kpi_pubsub: Optional[redis.client.PubSub] = None  # Incubator KPI readings for live graph
 
 
 def get_redis() -> redis.Redis:
@@ -128,9 +129,24 @@ def get_tank_kpi_pubsub() -> redis.client.PubSub:
     return _tank_kpi_pubsub
 
 
+def get_incubator_kpi_pubsub() -> redis.client.PubSub:
+    """Get or create Redis pubsub for incubator KPI readings (Incubator Quality Tracking live graph)."""
+    global _incubator_kpi_pubsub
+    if _incubator_kpi_pubsub is None:
+        try:
+            r = get_redis()
+            _incubator_kpi_pubsub = r.pubsub()
+            _incubator_kpi_pubsub.subscribe("incubator_kpi_readings_channel")
+            logger.info("Redis pub/sub subscription established for incubator_kpi_readings_channel")
+        except Exception as e:
+            logger.error(f"Failed to create incubator KPI pub/sub connection: {e}")
+            raise
+    return _incubator_kpi_pubsub
+
+
 def reset_redis_connection():
     """Reset Redis connections (useful for reconnection)"""
-    global _redis_client, _pubsub, _ln2_pubsub, _tank_kpi_pubsub
+    global _redis_client, _pubsub, _ln2_pubsub, _tank_kpi_pubsub, _incubator_kpi_pubsub
     if _pubsub:
         try:
             _pubsub.close()
@@ -149,5 +165,6 @@ def reset_redis_connection():
     _pubsub = None
     _ln2_pubsub = None
     _tank_kpi_pubsub = None
+    _incubator_kpi_pubsub = None
     _redis_client = None
 

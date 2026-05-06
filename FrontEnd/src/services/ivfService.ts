@@ -319,6 +319,29 @@ export class IvfService extends BaseApiService {
         });
     }
 
+    async getActiveIncubators(branchName?: string): Promise<{
+        branches: Array<{
+            branch_id: number;
+            branch_name: string;
+            incubators: Array<{
+                incubator_id: number;
+                incubator_code?: string | null;
+                external_id?: string | null;
+                type?: string | null;
+                chamber_r?: number | null;
+                chamber_c?: number | null;
+                updated_at?: string | null;
+            }>;
+        }>;
+        total: number;
+    }> {
+        const params = new URLSearchParams();
+        if (branchName) params.set("branch_name", branchName);
+        const qs = params.toString();
+        const endpoint = `/api/ivf/control_tower/active_incubators${qs ? `?${qs}` : ""}`;
+        return await this.request(endpoint, { method: "GET" });
+    }
+
     async getReservoirs(): Promise<{
         reservoirs: Array<{
             reservoir_id: number;
@@ -552,6 +575,81 @@ export class IvfService extends BaseApiService {
     }> {
         return await this.request(
             `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-history-date?date=${encodeURIComponent(date)}`,
+            { method: "GET" },
+        );
+    }
+
+    /** Get KPI limits config for an incubator chamber (for threshold lines on the chart). */
+    async getIncubatorKpiConfig(incubatorId: number, chamberId?: string): Promise<{
+        incubator_id: number;
+        incubator_code: string;
+        chamber_id?: string | null;
+        branch_id?: number | null;
+        branch_name?: string | null;
+        kpi_limits: Record<string, Record<string, { min?: number | null; max?: number | null; alert_type?: string | null }>>;
+    }> {
+        const params = new URLSearchParams();
+        if (chamberId != null) params.set("chamber_id", chamberId);
+        const qs = params.toString();
+        return await this.request(
+            `/api/ivf/quality/incubators/${encodeURIComponent(incubatorId)}/kpi-config${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+        );
+    }
+
+    /** Get incubator KPI history for Quality Tracking chart. Same duration_minutes semantics as tank endpoint. */
+    async getIncubatorKpiHistory(
+        incubatorId: number,
+        chamberId?: string,
+        durationMinutes?: number,
+    ): Promise<{
+        incubator_id: number;
+        incubator_code: string;
+        chamber_id: string;
+        kpi_series: Record<string, Array<{
+            timestamp: string;
+            value: number;
+            avg?: number;
+            min?: number;
+            max?: number;
+            count?: number;
+            unit: string;
+        }>>;
+    }> {
+        const params = new URLSearchParams();
+        if (chamberId != null) params.set("chamber_id", chamberId);
+        if (durationMinutes != null && durationMinutes > 0) params.set("duration_minutes", String(durationMinutes));
+        const qs = params.toString();
+        return await this.request(
+            `/api/ivf/quality/incubators/${encodeURIComponent(incubatorId)}/kpi-history${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+        );
+    }
+
+    /** Get incubator KPI history from a specific IST date to now. */
+    async getIncubatorKpiHistoryByDate(
+        incubatorId: number,
+        date: string,
+        chamberId?: string,
+    ): Promise<{
+        incubator_id: number;
+        incubator_code: string;
+        chamber_id: string;
+        kpi_series: Record<string, Array<{
+            timestamp: string;
+            value: number;
+            avg?: number;
+            min?: number;
+            max?: number;
+            count?: number;
+            unit: string;
+        }>>;
+    }> {
+        const params = new URLSearchParams();
+        params.set("date", date);
+        if (chamberId != null) params.set("chamber_id", chamberId);
+        return await this.request(
+            `/api/ivf/quality/incubators/${encodeURIComponent(incubatorId)}/kpi-history-date?${params.toString()}`,
             { method: "GET" },
         );
     }

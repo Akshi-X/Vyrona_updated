@@ -15,7 +15,9 @@ class Readings(Base):
     hospital_id = Column(Integer, ForeignKey("hospitals.hospital_id"), nullable=False, index=True)
     branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id"), nullable=False, index=True)
     device_id = Column(Integer, nullable=True, index=True)
-    tank_id = Column(Integer, ForeignKey("tanks.tank_id", ondelete="CASCADE"), nullable=False, index=True)
+    tank_id = Column(Integer, ForeignKey("tanks.tank_id", ondelete="CASCADE"), nullable=True, index=True)
+    incubator_id = Column(Integer, ForeignKey("incubators.incubator_id", ondelete="CASCADE"), nullable=True, index=True)
+    chamber_id = Column(String, nullable=True, index=True)
 
     kpi_config_id = Column(
         Integer,
@@ -37,4 +39,5 @@ class Readings(Base):
     __table_args__ = (
         Index("idx_readings_tank_timestamp", "tank_id", "timestamp"),
         Index("idx_readings_kpi_config_timestamp", "kpi_config_id", "timestamp"),
+        Index("idx_readings_incubator_chamber_ts", "incubator_id", "chamber_id", "timestamp"),
     )
