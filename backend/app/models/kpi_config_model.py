@@ -3,7 +3,7 @@ KPI configuration per tank — defines limits and thresholds for visualization a
 Used for GET kpi-config (nested kpi_limits) and for linking Readings.
 """
 
-from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, Numeric, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String
 from sqlalchemy.orm import relationship
 
 from app.config.database import Base
@@ -54,6 +54,17 @@ class KpiConfig(Base):
         default=60,
         server_default="60",
         comment="Cooldown period in minutes between repeated alerts for this KPI config. Default 60 minutes.",
+    )
+
+    unack_escalation_threshold = Column(
+        Integer,
+        nullable=True,
+        comment="N consecutive unacknowledged alerts that trigger escalation email to admins/managers. NULL = disabled.",
+    )
+    last_escalation_sent_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Last time an escalation email was sent for this KPI. Prevents re-escalation spam.",
     )
 
     status = Column(Boolean, nullable=False, default=True)

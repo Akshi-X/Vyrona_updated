@@ -861,6 +861,7 @@ def create_kpi_config(
         unit=body.get("unit"),
         alert_type=body.get("alert_type"),
         cooldown_minutes=int(body["cooldown_minutes"]) if body.get("cooldown_minutes") is not None else None,
+        unack_escalation_threshold=int(body["unack_escalation_threshold"]) if body.get("unack_escalation_threshold") is not None else None,
         status=body.get("status", True),
     )
     db.commit()
@@ -891,6 +892,7 @@ def create_kpi_config(
         "cooldown_minutes": int(row.cooldown_minutes)
         if row.cooldown_minutes is not None
         else 60,
+        "unack_escalation_threshold": row.unack_escalation_threshold,
         "status": bool(row.status),
     }
 
@@ -974,6 +976,9 @@ def update_kpi_config(
         cooldown_minutes=int(body["cooldown_minutes"])
         if body.get("cooldown_minutes") is not None
         else None,
+        unack_escalation_threshold=int(body["unack_escalation_threshold"])
+        if body.get("unack_escalation_threshold") is not None
+        else None,
         status=body.get("status"),
     )
     if not row:
@@ -1012,6 +1017,7 @@ def update_kpi_config(
         "cooldown_minutes": int(row.cooldown_minutes)
         if row.cooldown_minutes is not None
         else 60,
+        "unack_escalation_threshold": row.unack_escalation_threshold,
         "status": bool(row.status),
     }
 
