@@ -34,6 +34,13 @@ REMEMBER_ME_SESSION_DURATION_MINUTES = 540  # 9 hours
 #   - Frontend (React) handles idle timeout detection
 NO_REMEMBER_ME_SESSION_DURATION_MINUTES = 60  # 1 hour
 
+# Integration / HMS API JWT
+# Long-lived tokens issued via /api/external/integration/auth/login,
+# handed out-of-band to external HMS systems and used as Bearer auth on
+# /api/external/hms/patient-cryolock.
+INTEGRATION_TOKEN_EXPIRY_DAYS = 365
+INTEGRATION_TOKEN_PURPOSE = "hms_integration"
+
 # Account Locking (Brute Force Protection)
 MAX_LOGIN_ATTEMPTS = 5  # Lock account after 5 failed attempts
 ACCOUNT_LOCK_DURATION_MINUTES = 30  # Lock for 30 minutes

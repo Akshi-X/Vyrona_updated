@@ -936,6 +936,20 @@ export default function EmbryoGradingPage() {
                       </p>
                     )}
                   </div>
+                  {selectedEmbryo && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/embryo-grading/${selectedEmbryo.hisNumber}/advanced`, {
+                        state: {
+                          embryo: selectedEmbryo,
+                          logs: selectedEmbryologyLogs,
+                        },
+                      })}
+                      className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] transition-colors"
+                    >
+                      Start Embryo Grading
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6">
