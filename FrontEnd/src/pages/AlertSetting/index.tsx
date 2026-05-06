@@ -921,6 +921,7 @@ export default function AlertSetting() {
             alert_type?: string | null;
             lid_state?: string;
             cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
         }
     > => {
         const next: Record<
@@ -931,6 +932,7 @@ export default function AlertSetting() {
                 alert_type?: string | null;
                 lid_state?: string;
                 cooldown_minutes?: number;
+                unack_escalation_threshold?: number | null;
             }
         > = {};
 
@@ -1251,6 +1253,7 @@ export default function AlertSetting() {
             alert_type?: string | null;
             lid_state?: string;
             cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
         },
     ) => {
         setDraftConfig((prev) => {
@@ -1288,6 +1291,7 @@ export default function AlertSetting() {
             alert_type?: string | null;
             lid_state?: string;
             cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
         },
     ) => {
         setMultiDraftConfig((prev) => {
@@ -1328,6 +1332,7 @@ export default function AlertSetting() {
                 unit: string | null;
                 alert_type: string | null;
                 cooldown_minutes?: number;
+                unack_escalation_threshold?: number | null;
                 status?: boolean;
             }> = [];
             for (const kpiName of activeKpiNames) {
@@ -1454,6 +1459,7 @@ export default function AlertSetting() {
                     unit: string | null;
                     alert_type: string | null;
                     cooldown_minutes?: number;
+                    unack_escalation_threshold?: number | null;
                     status?: boolean;
                 }> = [];
 
