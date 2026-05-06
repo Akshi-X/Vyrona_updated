@@ -14,7 +14,7 @@
     "last_login": "2026-04-10T08:30:00.000Z",
     "created_at": "2026-01-12T09:10:00.000Z",
     "updated_at": "2026-04-09T10:45:00.000Z",
-    "department": "IVF",
+    "department": "CGT",
     "hospital_id": 2,
     "branch_id": 4
   },
@@ -12427,5 +12427,229 @@
       "hospitalName": "Iris Fertility",
       "branchName": "Chennai"
     }
-  ]
+  ],
+  "cgtPatient": {
+    "id": "PT-092",
+    "patient_name": "Sarah Mitchell",
+    "condition": "Therapy A",
+    "therapy_id": "THR-2026-001",
+    "insurance_provider": "BlueCross Shield",
+    "insurance_type": "PPO",
+    "hospital_name": "City Care Hospital",
+    "location": "Bangalore",
+    "provider_id": "PRV-001",
+    "pharma_id": 1,
+    "created_by": "admin",
+    "updated_by": null,
+    "created_at": "2026-03-01T09:00:00.000Z",
+    "updated_at": "2026-04-10T08:00:00.000Z"
+  },
+  "cgtPatientStage": {
+    "patient_id": "PT-092",
+    "stage": "Packaging",
+    "reengineering_status": false
+  },
+  "cgtPatientTasks": {
+    "tasks": [
+      {
+        "task_id": "TSK-CGT-001",
+        "title": "Review cold chain packaging report",
+        "description": "Check packaging compliance for PT-092 shipment batch.",
+        "assignee_id": "USR-ONB-001",
+        "assignee": { "user_id": "USR-ONB-001", "first_name": "Avery", "last_name": "Reed", "role": "Admin" },
+        "created_by": { "user_id": "USR-ONB-001", "first_name": "Avery", "last_name": "Reed", "role": "Admin" },
+        "due_date": "2026-05-05",
+        "priority": "High",
+        "status": "Pending",
+        "patient_id": "PT-092",
+        "created_at": "2026-04-28T09:00:00.000Z"
+      },
+      {
+        "task_id": "TSK-CGT-002",
+        "title": "Confirm therapy stage transition",
+        "description": "Validate that PT-092 has moved from Preparation to Packaging stage.",
+        "assignee_id": "USR-ONB-001",
+        "assignee": { "user_id": "USR-ONB-001", "first_name": "Avery", "last_name": "Reed", "role": "Admin" },
+        "created_by": { "user_id": "USR-ONB-001", "first_name": "Avery", "last_name": "Reed", "role": "Admin" },
+        "due_date": "2026-05-03",
+        "priority": "Medium",
+        "status": "In Progress",
+        "patient_id": "PT-092",
+        "created_at": "2026-04-25T11:00:00.000Z"
+      }
+    ],
+    "total": 2
+  },
+  "cgtDocumentChecklist": {
+    "items": [
+      { "stage": "Collection", "actual": 3, "needed": 3, "missed": 0 },
+      { "stage": "Preparation", "actual": 4, "needed": 5, "missed": 1, "missing_documents": ["QC Sign-off Form"] },
+      { "stage": "Packaging", "actual": 2, "needed": 4, "missed": 2, "missing_documents": ["Shipping Label", "Cold Chain Certificate"] }
+    ],
+    "total_items": 12,
+    "non_compliance_percentage": 25.0
+  },
+  "cgtDetailedPatients": [
+    {
+      "patient_id": "PT-001",
+      "condition": "Therapy A",
+      "hospital": "City Care Hospital",
+      "location": "Bangalore",
+      "provider_name": "CryoLogix",
+      "stage": "Apheresis",
+      "treatment_status": "ongoing",
+      "docs_report": ""
+    },
+    {
+      "patient_id": "PT-014",
+      "condition": "Therapy B",
+      "hospital": "Sunrise Medical Center",
+      "location": "Mumbai",
+      "provider_name": "BioTransit",
+      "stage": "Cryopreservation",
+      "treatment_status": "ongoing",
+      "docs_report": ""
+    },
+    {
+      "patient_id": "PT-027",
+      "condition": "Therapy A",
+      "hospital": "Global Health Institute",
+      "location": "Delhi",
+      "provider_name": "CryoLogix",
+      "stage": "Transportation",
+      "treatment_status": "ongoing",
+      "docs_report": ""
+    },
+    {
+      "patient_id": "PT-042",
+      "condition": "Therapy C",
+      "hospital": "Apollo Specialty",
+      "location": "Chennai",
+      "provider_name": "MedFreight",
+      "stage": "Reengineering",
+      "treatment_status": "ongoing",
+      "docs_report": ""
+    },
+    {
+      "patient_id": "PT-058",
+      "condition": "Therapy B",
+      "hospital": "Fortis Cancer Centre",
+      "location": "Pune",
+      "provider_name": "BioTransit",
+      "stage": "Reinfusion",
+      "treatment_status": "ongoing",
+      "docs_report": ""
+    },
+    {
+      "patient_id": "PT-063",
+      "condition": "Therapy A",
+      "hospital": "City Care Hospital",
+      "location": "Bangalore",
+      "provider_name": "CryoLogix",
+      "stage": "Reinfusion",
+      "treatment_status": "after_care",
+      "docs_report": ""
+    },
+    {
+      "patient_id": "PT-071",
+      "condition": "Therapy C",
+      "hospital": "Sunrise Medical Center",
+      "location": "Mumbai",
+      "provider_name": "MedFreight",
+      "stage": "Scheduled",
+      "treatment_status": "ongoing",
+      "docs_report": ""
+    },
+    {
+      "patient_id": "PT-085",
+      "condition": "Therapy B",
+      "hospital": "Global Health Institute",
+      "location": "Delhi",
+      "provider_name": "BioTransit",
+      "stage": "Apheresis",
+      "treatment_status": "ongoing",
+      "docs_report": ""
+    },
+    {
+      "patient_id": "PT-092",
+      "condition": "Therapy A",
+      "hospital": "City Care Hospital",
+      "location": "Bangalore",
+      "provider_name": "CryoLogix",
+      "stage": "Packaging",
+      "treatment_status": "ongoing",
+      "docs_report": ""
+    },
+    {
+      "patient_id": "PT-103",
+      "condition": "Therapy D",
+      "hospital": "Apollo Specialty",
+      "location": "Hyderabad",
+      "provider_name": "MedFreight",
+      "stage": "Cryopreservation",
+      "treatment_status": "failure",
+      "docs_report": ""
+    }
+  ],
+  "cgt3PLPlayers": [
+    {
+      "player_name": "CryoLogix",
+      "modes": "Air",
+      "source": "City Care Hospital, Bangalore",
+      "destination": "NovaBio Pharma, Mumbai",
+      "departure_time": "2026-04-20T06:00:00Z",
+      "arrival_time": "2026-04-20T09:30:00Z",
+      "handover_time": "2026-04-20T10:00:00Z",
+      "ln2_refill": "No",
+      "warehouse": null
+    },
+    {
+      "player_name": "BioTransit",
+      "modes": "Road",
+      "source": "NovaBio Pharma, Mumbai",
+      "destination": "Reinfusion Center, Pune",
+      "departure_time": "2026-04-21T08:00:00Z",
+      "arrival_time": "2026-04-21T11:45:00Z",
+      "handover_time": "2026-04-21T12:00:00Z",
+      "ln2_refill": "Yes",
+      "warehouse": "Cold Store Hub, Pune"
+    }
+  ],
+  "cgtTransportTimeComparison": [
+    {
+      "source_location": "Bangalore",
+      "destination_location": "Mumbai",
+      "scheduled_time": "4h",
+      "actual_time": "3h"
+    },
+    {
+      "source_location": "Mumbai",
+      "destination_location": "Pune",
+      "scheduled_time": "3h",
+      "actual_time": "4h"
+    }
+  ],
+  "cgtLaneRiskAssessment": {
+    "patient_id": "PT-092",
+    "total_risk_factors": 3,
+    "last_updated": "2026-04-20T10:00:00Z",
+    "status": "assessed",
+    "factors": [
+      {
+        "risk_factor": "Temperature Deviation",
+        "risk_contributors": ["Cold chain break", "Delayed handover", "Ambient exposure", ""],
+        "risk_scale": "3.2 (Moderate)"
+      },
+      {
+        "risk_factor": "Transit Delay",
+        "risk_contributors": ["Traffic congestion", "Flight delay", "", ""],
+        "risk_scale": "4.1 (Excellent)"
+      },
+      {
+        "risk_factor": "Documentation Gap",
+        "risk_contributors": ["Missing QC sign-off", "Late certification", "Incomplete labelling", ""],
+        "risk_scale": "2.5 (Poor)"
+      }
+    ]
+  }
 }

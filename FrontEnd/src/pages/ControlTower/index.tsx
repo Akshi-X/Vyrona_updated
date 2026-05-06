@@ -895,7 +895,7 @@ const ControlTower = () => {
                                                                     <div className="min-w-0 text-left overflow-hidden">
                                                                         {route?.patientId ? (
                                                                             <Link
-                                                                                to={`/track/${route.patientId}`}
+                                                                                to={`${isOnboarding ? "/onboarding" : ""}/track/${route.patientId}`}
                                                                                 className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
                                                                                 onClick={(
                                                                                     e,
