@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Thermometer } from 'lucide-react';
 import { ivfService } from '../../services/ivfService';
-import MockQualityTrackingChart from './MockQualityTrackingChart';
+import IncubatorQualityTrackingChart from './IncubatorQualityTrackingChart';
 import MockContainerDataTable from './MockContainerDataTable';
 import PageLayout from '../../components/PageLayout';
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
@@ -23,17 +23,14 @@ type IllustrationMetrics = {
   humidity: string;
 };
 
-function normalizeTankId(rawId?: string): string | null {
-  if (!rawId) return null;
-  const match = rawId.match(/\d+/);
-  return match?.[0] ?? null;
-}
-
-function getMockIllustrationMetrics(hasIncubator: boolean): IllustrationMetrics {
-  if (!hasIncubator) {
-    return { temp: '—', co2: '—', ph: '—', humidity: '—' };
+function generateChambers(chamberR: number, chamberC: number): string[] {
+  const chambers: string[] = [];
+  for (let r = 0; r < chamberR; r++) {
+    for (let c = 1; c <= chamberC; c++) {
+      chambers.push(`${String.fromCharCode(65 + r)}${c}`);
+    }
   }
-  return { temp: '37.1°C', co2: '6.0%', ph: '7.35', humidity: '95%' };
+  return chambers;
 }
 
 function IncubatorIllustrationPanel({ metrics }: { metrics: IllustrationMetrics }) {
@@ -294,13 +291,18 @@ function IncubatorIllustrationPanel({ metrics }: { metrics: IllustrationMetrics 
 
 export default function IncubatorDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const normalizedTankId = normalizeTankId(id);
-  const hasIncubatorId = Boolean(normalizedTankId);
+  const incubatorId = id ? parseInt(id, 10) : NaN;
+  const hasIncubatorId = !isNaN(incubatorId);
   const navigate = useNavigate();
   const { userRole } = useAuth();
+
   const [incubatorCode, setIncubatorCode] = useState<string>('-');
   const [branchName, setBranchName] = useState<string>('-');
-  const illustrationMetrics = getMockIllustrationMetrics(hasIncubatorId);
+  const [chambers, setChambers] = useState<string[]>([]);
+  const [chamberId, setChamberId] = useState<string>('');
+  const [illustrationMetrics, setIllustrationMetrics] = useState<IllustrationMetrics>({
+    temp: '—', co2: '—', ph: '—', humidity: '—',
+  });
 
   // Actions state
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
@@ -314,7 +316,36 @@ export default function IncubatorDetailPage() {
 
   const criticalAlertsCount = criticalAlerts.filter((a) => a.acknowledged_at == null).length;
   const myTasksCount = myTasks.filter((t) => t.status === 'Not started' || t.status === 'In progress').length;
-  const resolvedTankCode = incubatorCode !== '-' ? incubatorCode : '';
+  const resolvedCode = incubatorCode !== '-' ? incubatorCode : '';
+
+  // Fetch incubator metadata (code, branch, chambers)
+  useEffect(() => {
+    if (!hasIncubatorId) return;
+    ivfService.getActiveIncubators().then((res) => {
+      for (const branch of res.branches) {
+        const found = branch.incubators.find((inc) => inc.incubator_id === incubatorId);
+        if (found) {
+          setIncubatorCode(found.incubator_code || `I${incubatorId}`);
+          setBranchName(branch.branch_name);
+          const r = found.chamber_r ?? 1;
+          const c = found.chamber_c ?? 1;
+          const generated = generateChambers(r, c);
+          setChambers(generated);
+          setChamberId(generated[0] ?? '');
+          return;
+        }
+      }
+    }).catch(() => {});
+  }, [incubatorId, hasIncubatorId]);
+
+  const handleLatestValues = (vals: Record<string, number | string>) => {
+    setIllustrationMetrics({
+      temp: vals['incubator_temp'] != null ? `${vals['incubator_temp']}°C` : '—',
+      co2: vals['incubator_co2'] != null ? `${vals['incubator_co2']}%` : '—',
+      ph: vals['incubator_ph'] != null ? String(vals['incubator_ph']) : '—',
+      humidity: vals['incubator_humidity'] != null ? `${vals['incubator_humidity']}%` : '—',
+    });
+  };
 
   const fetchCriticalAlerts = async () => {
     setLoadingAlerts(true);
@@ -357,102 +388,6 @@ export default function IncubatorDetailPage() {
     fetchMyTasks();
     userService.getProfile().then(setCurrentUser).catch(() => {});
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!normalizedTankId) return;
-    const code = `T${normalizedTankId}`;
-    setIncubatorCode(code);
-    const branchMap: Record<string, string> = {
-      '34': 'Egmore',
-      '10': 'Tambaram',
-      '20': 'Tambaram',
-      '30': 'Tambaram',
-      '50': 'Tambaram',
-    };
-    setBranchName(branchMap[normalizedTankId] || 'Unknown');
-
-    const getTankKey = (tankId: string | number) => String(tankId).match(/\d+/)?.[0] || String(tankId);
-    const getTankNumber = (tankId: string | number) => Number(getTankKey(tankId)) || 0;
-
-    const origGetTankKpiConfig = ivfService.getTankKpiConfig.bind(ivfService);
-    const origGetKpiHistory = ivfService.getKpiHistory.bind(ivfService);
-    const origGetCanisterTrackingDetails = ivfService.getCanisterTrackingDetails?.bind(ivfService);
-    const origUpdateGobletColor = ivfService.updateGobletColor?.bind(ivfService);
-    const origUpdateCryolockColor = ivfService.updateCryolockColor?.bind(ivfService);
-    const origMarkEmbryoTransfer = ivfService.markEmbryoTransfer?.bind(ivfService);
-    const origMarkInTransitWithShipment = ivfService.markInTransitWithShipment?.bind(ivfService);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ivfService.getTankKpiConfig = async (tankId: string | number): Promise<any> => {
-      const tankKey = getTankKey(tankId);
-      return { tank_id: getTankNumber(tankId), tank_code: `T${tankKey}`, branch_name: branchMap[tankKey] || 'Unknown', kpi_limits: {} };
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ivfService.getKpiHistory = async (tankId: string | number): Promise<any> => {
-      const tankKey = getTankKey(tankId);
-      return {
-        tank_code: `T${tankKey}`,
-        tank_id: getTankNumber(tankId),
-        kpi_series: {
-          ln2_level: [
-            { timestamp: new Date().toISOString(), value: 78, unit: '%' },
-            { timestamp: new Date(Date.now() - 60000).toISOString(), value: 77.9, unit: '%' },
-          ],
-          temp_internal: [
-            { timestamp: new Date().toISOString(), value: 37, unit: '°C' },
-            { timestamp: new Date(Date.now() - 60000).toISOString(), value: 36.8, unit: '°C' },
-          ],
-          temp_external: [
-            { timestamp: new Date().toISOString(), value: 5, unit: '°C' },
-            { timestamp: new Date(Date.now() - 60000).toISOString(), value: 5.2, unit: '°C' },
-          ],
-          ln2_evaporation_rate: [
-            { timestamp: new Date().toISOString(), value: 1.2, unit: 'kg/h' },
-            { timestamp: new Date(Date.now() - 60000).toISOString(), value: 1.19, unit: 'kg/h' },
-          ],
-          shock: [
-            { timestamp: new Date().toISOString(), value: 0, unit: '' },
-            { timestamp: new Date(Date.now() - 60000).toISOString(), value: 0, unit: '' },
-          ],
-          tive_battery_percentage: [
-            { timestamp: new Date().toISOString(), value: 92, unit: '%' },
-            { timestamp: new Date(Date.now() - 60000).toISOString(), value: 92, unit: '%' },
-          ],
-          ln2_lid_state: [
-            { timestamp: new Date().toISOString(), value: 1, unit: '' },
-            { timestamp: new Date(Date.now() - 60000).toISOString(), value: 1, unit: '' },
-          ],
-        },
-      };
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ivfService.getCanisterTrackingDetails = async (canisterNumber: string | number): Promise<any> => {
-      const tankKey = getTankKey(canisterNumber);
-      return {
-        data: [{ hisNumber: 'HIS001', cryolockNum: 'CL001', canisterNum: 1, tankCode: `T${tankKey}`, caneCode: 'CANE-1', gobletColor: 'Blue', cryolockColor: 'Red', dateOfVitrification: '2024-03-01', siteName: branchMap[tankKey] || 'Unknown', status: 'Stored', embryoGrading: '4AA', description: null }],
-        total: 1,
-      };
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ivfService.updateGobletColor = async (): Promise<any> => ({ success: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ivfService.updateCryolockColor = async (): Promise<any> => ({ success: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ivfService.markEmbryoTransfer = async (): Promise<any> => ({ success: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ivfService.markInTransitWithShipment = async (): Promise<any> => ({ success: true });
-
-    return () => {
-      ivfService.getTankKpiConfig = origGetTankKpiConfig;
-      ivfService.getKpiHistory = origGetKpiHistory;
-      if (origGetCanisterTrackingDetails) ivfService.getCanisterTrackingDetails = origGetCanisterTrackingDetails;
-      if (origUpdateGobletColor) ivfService.updateGobletColor = origUpdateGobletColor;
-      if (origUpdateCryolockColor) ivfService.updateCryolockColor = origUpdateCryolockColor;
-      if (origMarkEmbryoTransfer) ivfService.markEmbryoTransfer = origMarkEmbryoTransfer;
-      if (origMarkInTransitWithShipment) ivfService.markInTransitWithShipment = origMarkInTransitWithShipment;
-    };
-  }, [normalizedTankId]);
 
   const pageActions = (
     <div className="flex items-center gap-6">
@@ -537,13 +472,41 @@ export default function IncubatorDetailPage() {
           </div>
         </div>
 
+        {/* Chamber selector */}
+        {chambers.length > 1 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-gray-500 font-medium">Chamber:</span>
+            {chambers.map((ch) => (
+              <button
+                key={ch}
+                type="button"
+                onClick={() => setChamberId(ch)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                  ch === chamberId
+                    ? 'bg-[#6B1176] text-white border-[#6B1176]'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-[#6B1176] hover:text-[#6B1176]'
+                }`}
+              >
+                {ch}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Row 1: Live graph on KPIs (left) | Visual representation of incubator (right) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="h-full min-h-80 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-            {hasIncubatorId ? (
-              <MockQualityTrackingChart />
+            {hasIncubatorId && chamberId ? (
+              <IncubatorQualityTrackingChart
+                incubatorId={incubatorId}
+                chamberId={chamberId}
+                incubatorCode={incubatorCode !== '-' ? incubatorCode : undefined}
+                onLatestValues={handleLatestValues}
+              />
             ) : (
-              <div className="h-64 flex items-center justify-center text-gray-400">Select an incubator</div>
+              <div className="h-64 flex items-center justify-center text-gray-400">
+                {hasIncubatorId ? 'Loading chamber info...' : 'Select an incubator'}
+              </div>
             )}
           </div>
           <div className="min-h-80 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
@@ -595,9 +558,9 @@ export default function IncubatorDetailPage() {
         tasks={myTasks.map((task) => ({
           id: task.id.toString(),
           patientId: task.patient_id || 'N/A',
-          tankCode: (task.tank_code && String(task.tank_code).trim()) || resolvedTankCode || undefined,
+          tankCode: (task.tank_code && String(task.tank_code).trim()) || resolvedCode || undefined,
           tankId: task.tank_id ?? undefined,
-          canisterNumber: task.canister_number || resolvedTankCode || 'N/A',
+          canisterNumber: task.canister_number || resolvedCode || 'N/A',
           taskName: task.task_name,
           description: task.description || '',
           assigneeBy: task.created_by
@@ -615,7 +578,7 @@ export default function IncubatorDetailPage() {
         currentUserName={currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : ''}
         currentUserId={currentUser?.user_id ?? ''}
         userRole={userRole || currentUser?.role || ''}
-        defaultCanisterNumber={resolvedTankCode}
+        defaultCanisterNumber={resolvedCode}
         onTaskCreated={fetchMyTasks}
         onAdd={() => {}}
         onEdit={async (task: MyTask) => {
