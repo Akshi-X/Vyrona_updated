@@ -284,6 +284,8 @@ export const router = createBrowserRouter([
             { path: "/onboarding/embryo-grading/:his/advanced",          element: <><AdvancedEmbryoGradingPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking/:id",                element: <><IncubatorDetailPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/track/:patientId",                      element: <><TrackPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/database",                               element: <><Database /><ActiveOnboardingLevel /></> },
             // Catch-all: any unknown /onboarding/* path → dashboard
             { path: "/onboarding/*",             element: <Navigate to="/onboarding/dashboard" replace /> },
         ],

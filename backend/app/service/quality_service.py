@@ -716,8 +716,10 @@ class QualityService:
         self,
         hospital_id: int,
         branch_id: int,
-        tank_id: int,
-        kpi_name: str,
+        tank_id: Optional[int] = None,
+        incubator_id: Optional[int] = None,
+        chamber_id: Optional[str] = None,
+        kpi_name: str = "",
         alert_name: Optional[str] = None,
         min_val: Optional[float] = None,
         max_val: Optional[float] = None,
@@ -727,12 +729,15 @@ class QualityService:
         unack_escalation_threshold: Optional[int] = None,
         status: bool = True,
     ) -> KpiConfig:
-        """Create a KpiConfig row. Validates tank belongs to branch."""
-        self.validate_tank_belongs_to_branch(tank_id, branch_id)
+        """Create a KpiConfig row for a tank or incubator."""
+        if tank_id is not None:
+            self.validate_tank_belongs_to_branch(tank_id, branch_id)
         row = KpiConfig(
             hospital_id=hospital_id,
             branch_id=branch_id,
             tank_id=tank_id,
+            incubator_id=incubator_id,
+            chamber_id=chamber_id,
             kpi_name=kpi_name.strip(),
             alert_name=alert_name.strip() if alert_name else None,
             min=min_val,

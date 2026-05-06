@@ -288,7 +288,7 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
           src={PatientSummaryIcon}
         />
       }
-      containerClassName="w-3/5"
+      containerClassName="w-full max-w-[750px]"
       loading={loading}
       dataLength={summary ? 1 : 0}
       emptyText={error || "No summary available for this patient"}
