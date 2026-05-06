@@ -3,6 +3,7 @@ import { useOnboarding } from "../../contexts/OnboardingContext";
 import { useTourNavContext } from "../../contexts/TourNavContext";
 import { useTour } from "@reactour/tour";
 import { Lock } from "lucide-react";
+import { onboardingService } from "../../services/onboardingService";
 
 interface OnboardingTimelineProps {
     onStart?: () => void;
@@ -38,10 +39,40 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
           })()
         : false;
 
+    const allCompleted = levels
+        .filter((l) => l.id !== "level-0")
+        .every((l) => state.levels[l.id]?.status === "completed");
+
     return (
         <div className="space-y-1">
-            {/* ── Ongoing Mission ─────────────────────────────────────── */}
-            {activeLevel && activeLevelProgress && (
+            {/* ── All Completed ───────────────────────────────────────── */}
+            {allCompleted ? (
+                <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 text-center">
+                    <div className="flex justify-center mb-3">
+                        <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center">
+                            <span className="text-white text-xl font-bold">✓</span>
+                        </div>
+                    </div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-600 mb-1">
+                        Onboarding Complete
+                    </p>
+                    <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                        You've mastered the platform!
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mb-4">
+                        All missions completed. You're ready to use mgSCALE at full capacity.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => { onboardingService.completeOnboarding(); navigate("/dashboard"); }}
+                        className="inline-flex rounded-full bg-emerald-500 px-6 py-2 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-600 transition-colors"
+                    >
+                        Go to Dashboard →
+                    </button>
+                </div>
+            ) : (
+            /* ── Ongoing Mission ─────────────────────────────────────── */
+            activeLevel && activeLevelProgress && (
                 <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-500 mb-1">
                         Ongoing Mission
@@ -56,7 +87,6 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                             onClick={() => {
                                 navigate(activeLevel.route);
                                 if (activeTourComplete && onResumeToQuiz) {
-                                    // Tour done — open the quiz overlay directly
                                     onResumeToQuiz(activeLevel.id);
                                 } else {
                                     tourNavCtx?.setPendingStartLevelId(activeLevel.id);
@@ -88,7 +118,7 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                         );
                     })()}
                 </div>
-            )}
+            ))}
 
 
             <div className="mb-5">

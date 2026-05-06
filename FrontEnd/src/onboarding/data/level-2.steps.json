@@ -8,7 +8,8 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-sidebar-control-tower"],
-        "startPage": "/onboarding/dashboard"
+        "startPage": "/onboarding/dashboard",
+        "genieImage": "/genie/control_tower.webp"
     },
     {
         "id": "ct-filter-panel",
@@ -18,7 +19,8 @@
         "content": "Use these filters to narrow your view by direction, branch, or status — so you can focus on exactly the containers or routes that matter right now.",
         "placement": "left",
         "requireClick": false,
-        "startPage": "/onboarding/control-tower"
+        "startPage": "/onboarding/control-tower",
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
     },
     {
         "id": "ct-overview-containers",
@@ -27,7 +29,8 @@
         "icon": "Package",
         "content": "This panel lists every active container being monitored — container ID, status, and branch at a glance.",
         "placement": "right",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "ct-overview-map",
@@ -36,7 +39,8 @@
         "icon": "Map",
         "content": "And here's the map tying it all together — every branch, route, and status visualised in real time. Now let's walk through the filters to see how you control this view.",
         "placement": "bottom",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "ct-filter-direction",
@@ -45,7 +49,8 @@
         "icon": "SlidersHorizontal",
         "content": "Toggle between Cryotanks and Incubators to switch the type of assets you're monitoring. Cryotanks tracks inbound cryo shipments; Incubators covers IVF incubation units.",
         "placement": "left",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "ct-filter-branch",
@@ -54,7 +59,8 @@
         "icon": "SlidersHorizontal",
         "content": "Select a specific branch to narrow your view to assets and routes associated with that location. Leave it as All Branches to see everything at once.",
         "placement": "left",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "ct-filter-branch-open",
@@ -64,8 +70,8 @@
         "content": "Click this button to open the branch dropdown and see all available locations.",
         "placement": "left",
         "requireClick": true,
-        "clickOnlyId": ["#onboarding-control-branch-btn"]
-
+        "clickOnlyId": ["#onboarding-control-branch-btn"],
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "ct-filter-branch-select",
@@ -95,7 +101,8 @@
             "#onboarding-control-branch-list-1",
             "#onboarding-control-branch-list-4",
             "#onboarding-control-branch-list-7"
-        ]
+        ],
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "ct-filter-branch-selected",
@@ -104,7 +111,8 @@
         "icon": "Package",
         "content": "The branch filter is now set to Egmore. This panel updates instantly — you can see only the containers and routes associated with that location.",
         "placement": "right",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "ct-filter-status",
@@ -113,7 +121,8 @@
         "icon": "SlidersHorizontal",
         "content": "Filter by asset status — Safe, Risk, or Critical — to quickly zero in on what needs your attention right now.",
         "placement": "left",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_caution.webp"
     },
     {
         "id": "ct-filter-status-open",
@@ -123,7 +132,8 @@
         "content": "Click here to open the status dropdown and see the available filter options.",
         "placement": "left",
         "requireClick": true,
-        "clickOnlyId": ["#onboarding-control-status-btn"]
+        "clickOnlyId": ["#onboarding-control-status-btn"],
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "ct-filter-status-select",
@@ -138,7 +148,8 @@
         "disableClickID": [
             "#onboarding-control-status-list-All",
             "#onboarding-control-status-list-Safe"
-        ]
+        ],
+        "genieImage": "/genie/shock.webp"
     },
     {
         "id": "ct-filter-status-selected",
@@ -147,7 +158,8 @@
         "icon": "Package",
         "content": "Status is now filtered to Critical. This list shows only containers flagged as critical — your highest priority items at a glance.",
         "placement": "right",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_caution.webp"
     },
     {
         "id": "ct-active-containers",
@@ -156,7 +168,8 @@
         "icon": "Package",
         "content": "This panel lists every active container currently being monitored. Each row shows the container ID, status, and branch — giving you a live snapshot of your entire cryogenic network at a glance.",
         "placement": "right",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "ct-map",
@@ -165,7 +178,8 @@
         "icon": "Map",
         "content": "This map visualizes the active lanes and risk zones across all your monitored sites.",
         "placement": "bottom",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "ct-kpi",
@@ -174,6 +188,7 @@
         "icon": "Activity",
         "content": "Each row here is a live container. Click any tank to drill into its sensor readings and history — we'll dive deeper into this in the next level.",
         "placement": "right",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_casual.webp"
     }
 ]

@@ -24,6 +24,9 @@ class Hospital(Base):
     branches = relationship(
         "HospitalBranch", back_populates="hospital", cascade="all, delete-orphan"
     )
+    incubators = relationship(
+        "Incubator", back_populates="hospital", cascade="all, delete-orphan"
+    )
     ui_variants = relationship(
         "UIRouteVariant", back_populates="hospital", cascade="all, delete-orphan"
     )

@@ -702,6 +702,7 @@ class QualityService:
                     "cooldown_minutes": int(r.cooldown_minutes)
                     if r.cooldown_minutes is not None
                     else 60,
+                    "unack_escalation_threshold": r.unack_escalation_threshold,
                     "status": bool(r.status),
                 }
                 for r in rows
@@ -715,22 +716,28 @@ class QualityService:
         self,
         hospital_id: int,
         branch_id: int,
-        tank_id: int,
-        kpi_name: str,
+        tank_id: Optional[int] = None,
+        incubator_id: Optional[int] = None,
+        chamber_id: Optional[str] = None,
+        kpi_name: str = "",
         alert_name: Optional[str] = None,
         min_val: Optional[float] = None,
         max_val: Optional[float] = None,
         unit: Optional[str] = None,
         alert_type: Optional[str] = None,
         cooldown_minutes: Optional[int] = None,
+        unack_escalation_threshold: Optional[int] = None,
         status: bool = True,
     ) -> KpiConfig:
-        """Create a KpiConfig row. Validates tank belongs to branch."""
-        self.validate_tank_belongs_to_branch(tank_id, branch_id)
+        """Create a KpiConfig row for a tank or incubator."""
+        if tank_id is not None:
+            self.validate_tank_belongs_to_branch(tank_id, branch_id)
         row = KpiConfig(
             hospital_id=hospital_id,
             branch_id=branch_id,
             tank_id=tank_id,
+            incubator_id=incubator_id,
+            chamber_id=chamber_id,
             kpi_name=kpi_name.strip(),
             alert_name=alert_name.strip() if alert_name else None,
             min=min_val,
@@ -738,6 +745,7 @@ class QualityService:
             unit=unit.strip() if unit else None,
             alert_type=alert_type.strip() if alert_type else None,
             cooldown_minutes=cooldown_minutes if cooldown_minutes is not None else 60,
+            unack_escalation_threshold=unack_escalation_threshold,
             status=status,
         )
         self.db.add(row)
@@ -755,6 +763,7 @@ class QualityService:
         unit: Optional[str] = None,
         alert_type: Optional[str] = None,
         cooldown_minutes: Optional[int] = None,
+        unack_escalation_threshold: Optional[int] = None,
         status: Optional[bool] = None,
     ) -> Optional[KpiConfig]:
         """Update a KpiConfig row. Validates config's tank belongs to branch when branch_id provided."""
@@ -776,6 +785,12 @@ class QualityService:
         row.alert_type = alert_type.strip() if isinstance(alert_type, str) and alert_type else None
         if cooldown_minutes is not None:
             row.cooldown_minutes = cooldown_minutes
+        # None explicitly clears escalation (disables it), matching alert_type pattern
+        row.unack_escalation_threshold = (
+            int(unack_escalation_threshold)
+            if isinstance(unack_escalation_threshold, (int, float))
+            else None
+        )
         if status is not None:
             row.status = status
         self.db.flush()
@@ -858,6 +873,12 @@ class QualityService:
                         cooldown_val = int(cooldown_val)
                     except (TypeError, ValueError):
                         cooldown_val = None
+                escalation_threshold = cfg.get("unack_escalation_threshold")
+                if escalation_threshold is not None:
+                    try:
+                        escalation_threshold = int(escalation_threshold)
+                    except (TypeError, ValueError):
+                        escalation_threshold = None
                 query = self.db.query(KpiConfig).filter(
                     KpiConfig.tank_id == tank_id,
                     KpiConfig.kpi_name == kpi_name,
@@ -876,6 +897,7 @@ class QualityService:
                         existing.unit = unit
                     if cooldown_val is not None:
                         existing.cooldown_minutes = cooldown_val
+                    existing.unack_escalation_threshold = escalation_threshold
                     self.db.flush()
                     updated += 1
                 else:
@@ -892,6 +914,7 @@ class QualityService:
                         cooldown_minutes=cooldown_val
                         if cooldown_val is not None
                         else 60,
+                        unack_escalation_threshold=escalation_threshold,
                         status=bool(status_val),
                     )
                     self.db.add(row)

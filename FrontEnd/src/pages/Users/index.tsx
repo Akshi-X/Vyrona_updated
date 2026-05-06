@@ -23,6 +23,13 @@ export default function UsersPage() {
 
     const [resendingId, setResendingId] = useState<string | null>(null);
 
+    // Onboarding: open invite modal via event so tour can walk through it
+    useEffect(() => {
+        const fn = () => setShowInviteModal(true);
+        document.addEventListener("onboarding:open-invite-modal", fn);
+        return () => document.removeEventListener("onboarding:open-invite-modal", fn);
+    }, []);
+
     const handleResendInvite = async (userId: string) => {
         setResendingId(userId);
         try {
@@ -127,14 +134,14 @@ export default function UsersPage() {
     return (
         <>
         {showInviteModal && (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg border border-gray-200 shadow-lg w-full max-w-md mx-4 p-6">
+            <div id="onboarding-users-invite-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+                <div id="onboarding-users-invite-modal-card" className="bg-white rounded-lg border border-gray-200 shadow-lg w-full max-w-md mx-4 p-6">
                     <h3 className="text-lg font-semibold text-gray-800 mb-1">Invite User</h3>
                     <p className="text-sm text-gray-500 mb-1">Enter the email and role to send an invite link.</p>
                     <p className="text-xs text-amber-600 mb-5">The invite link will expire in 1 week.</p>
 
                     <div className="flex flex-col gap-4">
-                        <div className="flex flex-col gap-1.5">
+                        <div id="onboarding-users-invite-email" className="flex flex-col gap-1.5">
                             <label className="text-xs font-semibold text-gray-600">Email</label>
                             <input
                                 type="email"
@@ -147,7 +154,7 @@ export default function UsersPage() {
                             {inviteEmailError && <p className="text-xs text-red-500">{inviteEmailError}</p>}
                         </div>
 
-                        <div className="flex flex-col gap-1.5">
+                        <div id="onboarding-users-invite-role" className="flex flex-col gap-1.5">
                             <label className="text-xs font-semibold text-gray-600">Role</label>
                             <select
                                 className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
@@ -162,7 +169,7 @@ export default function UsersPage() {
                         </div>
 
                         {inviteRole === "User" && (
-                            <div className="flex flex-col gap-1.5">
+                            <div id="onboarding-users-invite-branch" className="flex flex-col gap-1.5">
                                 <label className="text-xs font-semibold text-gray-600">Branch</label>
                                 <select
                                     className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
@@ -185,7 +192,7 @@ export default function UsersPage() {
                         )}
                     </div>
 
-                    <div className="flex gap-3 justify-end mt-6">
+                    <div id="onboarding-users-invite-actions" className="flex gap-3 justify-end mt-6">
                         <button
                             type="button"
                             onClick={closeInviteModal}
@@ -195,6 +202,7 @@ export default function UsersPage() {
                             Cancel
                         </button>
                         <button
+                            id="onboarding-users-invite-send"
                             type="button"
                             onClick={handleInvite}
                             disabled={
@@ -216,6 +224,7 @@ export default function UsersPage() {
             lucideIcon={Users}
             actions={
                 <button
+                    id="onboarding-users-add-btn"
                     type="button"
                     onClick={() => setShowInviteModal(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
@@ -242,7 +251,7 @@ export default function UsersPage() {
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                    <div className="flex flex-col gap-2">
+                    <div id="onboarding-users-filter-role" className="flex flex-col gap-2">
                         <label className="text-xs font-semibold text-gray-600">Role</label>
                         <select
                             className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
@@ -255,7 +264,7 @@ export default function UsersPage() {
                         </select>
                     </div>
 
-                    <div className="flex flex-col gap-2">
+                    <div id="onboarding-users-filter-branch" className="flex flex-col gap-2">
                         <label className="text-xs font-semibold text-gray-600">Branch</label>
                         <select
                             className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
@@ -285,18 +294,18 @@ export default function UsersPage() {
 
                 {error && <div className="mt-4 text-sm text-red-500">{error}</div>}
 
-                <div className="mt-4 overflow-x-auto">
+                <div id="onboarding-users-table" className="mt-4 overflow-x-auto">
                     <table className="min-w-full text-sm">
                         <thead className="bg-[#fdeeff]">
                             <tr>
-                                <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Name</th>
-                                <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Email</th>
-                                <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Role</th>
-                                <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Branch</th>
-                                <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Status</th>
-                                <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Approved</th>
-                                <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Last Login</th>
-                                <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Invite</th>
+                                <th id="onboarding-users-col-name" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Name</th>
+                                <th id="onboarding-users-col-email" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Email</th>
+                                <th id="onboarding-users-col-role" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Role</th>
+                                <th id="onboarding-users-col-branch" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Branch</th>
+                                <th id="onboarding-users-col-status" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Status</th>
+                                <th id="onboarding-users-col-approved" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Approved</th>
+                                <th id="onboarding-users-col-lastlogin" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Last Login</th>
+                                <th id="onboarding-users-col-invite" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Invite</th>
                             </tr>
                         </thead>
                         <tbody>
