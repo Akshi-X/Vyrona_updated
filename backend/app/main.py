@@ -45,6 +45,10 @@ from app.controller.IVF import (
     ivf_reports_controller,
     quality_tracking_controller,
 )
+from app.controller.external import (
+    hms_controller,
+    integration_auth_controller,
+)
 from app.init_db import init_db as create_admin
 from app.init_db import sync_ivf_schema
 from app.middleware.exception_handler import (
@@ -247,6 +251,8 @@ app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_reports_controller.router, prefix=API_PREFIX)
 app.include_router(internal_alert_controller.router, prefix=API_PREFIX)
 app.include_router(internal_refill_controller.router, prefix=API_PREFIX)
+app.include_router(integration_auth_controller.router, prefix=API_PREFIX)
+app.include_router(hms_controller.router, prefix=API_PREFIX)
 app.include_router(ui_variant_controller.router, prefix=API_PREFIX)
 
 

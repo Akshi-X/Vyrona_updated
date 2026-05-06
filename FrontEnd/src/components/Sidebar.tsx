@@ -51,8 +51,8 @@ const isDropdown = (item: NavItem): item is NavGroup =>
 const DASHBOARD_CHILD_PATHS = [
     "/dashboard",
     "/ivf-track-shipment",
-    "/incubator-tracking",
-    "/embryo-grading",
+    // "/incubator-tracking",
+    // "/embryo-grading",
 ];
 
 const isDashboardRoute = (pathname: string) =>
