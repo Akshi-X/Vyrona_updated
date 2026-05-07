@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import Modal from '../../components/Modal';
-import FilterPanel, { FilterSelect, FilterToggle } from '../../components/FilterPanel';
+import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
 import { type IVFTreatment } from '../../types/ivf';
 import { ivfService, type IvfBranch } from '../../services/ivfService';
 import { shipmentService } from '../../services/shipmentService';
@@ -11,12 +11,7 @@ import { shipmentService } from '../../services/shipmentService';
 interface EmbryoGradingDetail {
   grade: string;
   description: string;
-  blastocystFormation: string;
-  innerCellMass: string;
-  trophectoderm: string;
-  expansion: string;
   viability: string;
-  recommendations: string[];
 }
 
 interface EmbryologyLogEntry {
@@ -124,11 +119,9 @@ export default function EmbryoGradingPage() {
   const [selectedBranch, setSelectedBranch] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [selectedEmbryo, setSelectedEmbryo] = useState<IVFTreatment | null>(null);
-  const [direction, setDirection] = useState<'fresh' | 'frozen'>('fresh');
   const [embryologyLogsByEmbryo, setEmbryologyLogsByEmbryo] = useState<Record<string, EmbryologyLogEntry[]>>({});
   const [isAddLogFormOpen, setIsAddLogFormOpen] = useState(false);
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
-  const [openDaySection, setOpenDaySection] = useState<'day0' | 'day3' | 'day5' | 'day6' | null>('day0');
   const [isAddEmbryoFormOpen, setIsAddEmbryoFormOpen] = useState(false);
   const [branches, setBranches] = useState<IvfBranch[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
@@ -193,107 +186,17 @@ export default function EmbryoGradingPage() {
   // Mock embryo grading details data
   const getEmbryoGradingDetails = (grade: string): EmbryoGradingDetail => {
     const gradingData: Record<string, EmbryoGradingDetail> = {
-      '4AA': {
-        grade: '4AA',
-        description: 'Excellent quality blastocyst with perfect inner cell mass and trophectoderm morphology.',
-        blastocystFormation: 'Fully expanded blastocyst (Grade 4)',
-        innerCellMass: 'Very cohesive, many cells, tightly packed (Grade A)',
-        trophectoderm: 'Many cells, forming cohesive layer (Grade A)',
-        expansion: 'Fully expanded with thin zona pellucida',
-        viability: 'Highest implantation potential',
-        recommendations: [
-          'Excellent candidate for transfer',
-          'Consider single embryo transfer',
-          'High success rate expected',
-          'Can be vitrified for future use'
-        ]
-      },
-      '4AB': {
-        grade: '4AB',
-        description: 'Very good quality blastocyst with excellent inner cell mass but slightly less optimal trophectoderm.',
-        blastocystFormation: 'Fully expanded blastocyst (Grade 4)',
-        innerCellMass: 'Very cohesive, many cells, tightly packed (Grade A)',
-        trophectoderm: 'Few cells, loosely grouped (Grade B)',
-        expansion: 'Fully expanded with thin zona pellucida',
-        viability: 'Very high implantation potential',
-        recommendations: [
-          'Very good candidate for transfer',
-          'Consider for single embryo transfer',
-          'Good success rate expected',
-          'Suitable for vitrification'
-        ]
-      },
-      '4BA': {
-        grade: '4BA',
-        description: 'Good quality blastocyst with excellent trophectoderm but slightly less optimal inner cell mass.',
-        blastocystFormation: 'Fully expanded blastocyst (Grade 4)',
-        innerCellMass: 'Loosely grouped, several cells (Grade B)',
-        trophectoderm: 'Many cells, forming cohesive layer (Grade A)',
-        expansion: 'Fully expanded with thin zona pellucida',
-        viability: 'High implantation potential',
-        recommendations: [
-          'Good candidate for transfer',
-          'May consider multiple embryo transfer',
-          'Good success rate expected',
-          'Suitable for vitrification'
-        ]
-      },
-      '4BB': {
-        grade: '4BB',
-        description: 'Good quality blastocyst with balanced morphology between inner cell mass and trophectoderm.',
-        blastocystFormation: 'Fully expanded blastocyst (Grade 4)',
-        innerCellMass: 'Loosely grouped, several cells (Grade B)',
-        trophectoderm: 'Few cells, loosely grouped (Grade B)',
-        expansion: 'Fully expanded with thin zona pellucida',
-        viability: 'Good implantation potential',
-        recommendations: [
-          'Good candidate for transfer',
-          'Consider multiple embryo transfer',
-          'Moderate success rate expected',
-          'Suitable for vitrification'
-        ]
-      },
-      '3AA': {
-        grade: '3AA',
-        description: 'Expanding blastocyst with excellent cell morphology but not fully expanded.',
-        blastocystFormation: 'Expanding blastocyst (Grade 3)',
-        innerCellMass: 'Very cohesive, many cells, tightly packed (Grade A)',
-        trophectoderm: 'Many cells, forming cohesive layer (Grade A)',
-        expansion: 'Expanding with visible cavity',
-        viability: 'Good implantation potential',
-        recommendations: [
-          'Good candidate for transfer',
-          'May need extended culture',
-          'Consider multiple embryo transfer',
-          'Can be vitrified but monitor closely'
-        ]
-      },
-      '2AA': {
-        grade: '2AA',
-        description: 'Early blastocyst with excellent cell morphology but minimal expansion.',
-        blastocystFormation: 'Early blastocyst (Grade 2)',
-        innerCellMass: 'Very cohesive, many cells, tightly packed (Grade A)',
-        trophectoderm: 'Many cells, forming cohesive layer (Grade A)',
-        expansion: 'Small cavity visible',
-        viability: 'Moderate implantation potential',
-        recommendations: [
-          'Consider extended culture to Grade 3-4',
-          'May not be optimal for immediate transfer',
-          'Consider multiple embryo transfer if proceeding',
-          'Vitrification possible but lower priority'
-        ]
-      }
+      '4AA': { grade: '4AA', description: 'Excellent quality blastocyst with perfect inner cell mass and trophectoderm morphology.', viability: 'Highest implantation potential' },
+      '4AB': { grade: '4AB', description: 'Very good quality blastocyst with excellent inner cell mass but slightly less optimal trophectoderm.', viability: 'Very high implantation potential' },
+      '4BA': { grade: '4BA', description: 'Good quality blastocyst with excellent trophectoderm but slightly less optimal inner cell mass.', viability: 'High implantation potential' },
+      '4BB': { grade: '4BB', description: 'Good quality blastocyst with balanced morphology between inner cell mass and trophectoderm.', viability: 'Good implantation potential' },
+      '3AA': { grade: '3AA', description: 'Expanding blastocyst with excellent cell morphology but not fully expanded.', viability: 'Good implantation potential' },
+      '2AA': { grade: '2AA', description: 'Early blastocyst with excellent cell morphology but minimal expansion.', viability: 'Moderate implantation potential' },
     };
-
     return gradingData[grade] || {
       grade: grade || 'Unknown',
       description: 'Grading information not available for this embryo.',
-      blastocystFormation: 'Not assessed',
-      innerCellMass: 'Not assessed',
-      trophectoderm: 'Not assessed',
-      expansion: 'Not assessed',
       viability: 'Unknown',
-      recommendations: ['Consult with embryologist for assessment']
     };
   };
 
@@ -490,10 +393,6 @@ export default function EmbryoGradingPage() {
           day0Dish: String(index + 1),
           pn: '2PN',
           dropNo: String(index + 1),
-          day3: '—',
-          day4: '—',
-          day5: '—',
-          day6: '—',
           fate: '—',
           fzNo: '—',
           notes: '—',
@@ -568,7 +467,6 @@ export default function EmbryoGradingPage() {
       fzNo: '',
       notes: '',
     });
-    setOpenDaySection('day0');
     setLogModalStep(0);
   };
 
@@ -591,19 +489,21 @@ export default function EmbryoGradingPage() {
   // Helper function to get color for grade (AA=green, BB=yellow, CC=red)
   const getGradeColor = (label: string): string => {
     if (!label || label === '—') return '';
-    const icmTe = label.slice(1); // Extract ICM+TE (e.g., "AA", "BB", "AB")
+    const icmTe = label.slice(1);
     if (icmTe === 'AA') return 'text-green-600 font-semibold';
     if (icmTe === 'BB') return 'text-yellow-600 font-semibold';
     if (icmTe === 'AB' || icmTe === 'BA') return 'text-amber-600 font-semibold';
-    return 'text-red-600 font-semibold';
+    return '';
   };
 
   const handleAddLogEntry = () => {
     if (!selectedEmbryoKey) return;
     
     const day3Label = generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation);
-    const day5Label = generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade);
-    const day6Label = generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade);
+    const rawDay5Label = generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade);
+    const day5Label = rawDay5Label !== '—' ? rawDay5Label : (logForm.day5Stage || '—');
+    const rawDay6Label = generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade);
+    const day6Label = rawDay6Label !== '—' ? rawDay6Label : (logForm.day6Stage || '—');
 
     const updatedEntry: EmbryologyLogEntry = {
       id: editingLogId || Date.now(),
@@ -687,7 +587,7 @@ export default function EmbryoGradingPage() {
     setIncubators([]);
   };
 
-  const handleNewEmbryoFieldChange = (field: keyof NewEmbryoFormState, value: string) => {
+  const handleNewEmbryoFieldChange = (field: keyof NewEmbryoFormState, value: string | number | null) => {
     setNewEmbryoForm((prev) => {
       const next = { ...prev, [field]: value };
       const toNum = (v: string) => { const n = Number.parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : 0; };
@@ -789,15 +689,6 @@ export default function EmbryoGradingPage() {
         <div className="flex items-center gap-2">
           <div className="md:hidden">
             <FilterPanel activeCount={activeFilterCount}>
-              <FilterToggle
-                label="Direction"
-                value={direction}
-                onChange={(val) => setDirection(val as "fresh" | "frozen")}
-                options={[
-                  { label: 'Fresh', value: 'fresh' },
-                  { label: 'Frozen', value: 'frozen' },
-                ]}
-              />
               <FilterSelect
                 label="Branch"
                 value={selectedBranch}
@@ -834,40 +725,9 @@ export default function EmbryoGradingPage() {
               <div className="hidden md:flex flex-col gap-3 bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-full shrink-0">
                 <div className="mb-3 pb-2 border-b border-gray-100">
                   <h2 className="text-sm font-semibold text-black">Filters</h2>
-                  <p className="text-xs text-gray-500">Refine embryos by direction, branch and status</p>
+                  <p className="text-xs text-gray-500">Refine embryos by branch and status</p>
                 </div>
                 <div className="flex flex-col gap-3">
-                  {/* Direction Toggle */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Direction
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setDirection('fresh')}
-                        className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
-                          direction === 'fresh'
-                            ? 'bg-[#6b1176] text-white border-[#6b1176]'
-                            : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
-                        }`}
-                      >
-                        Fresh
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDirection('frozen')}
-                        className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
-                          direction === 'frozen'
-                            ? 'bg-[#6b1176] text-white border-[#6b1176]'
-                            : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
-                        }`}
-                      >
-                        Frozen
-                      </button>
-                    </div>
-                  </div>
-
                   <FilterSelect
                     label="Branch"
                     value={selectedBranch}
@@ -1101,7 +961,7 @@ export default function EmbryoGradingPage() {
                                   <td colSpan={10} className="px-3 py-6 text-center text-gray-500">No log entries yet. Click Add Entry.</td>
                                 </tr>
                               ) : (
-                                selectedEmbryologyLogs.map((row, index) => (
+                                selectedEmbryologyLogs.map((row) => (
                                   <tr key={row.id} className="border-t border-[#F1F1F1] hover:bg-[#FCF9FF] divide-x divide-[#E7E1E1]">
                                     <td className="px-2 py-2 whitespace-nowrap">
                                       <div className="font-medium">#{row.oocyteNo}</div>
