@@ -1878,11 +1878,11 @@ export default function AlertSetting() {
                             <div id="onboarding-alert-containers" className="bg-white border border-[#E7E1E1] rounded-lg p-3 flex flex-col overflow-hidden flex-1 min-h-[340px]">
                                 <div className="flex items-center justify-between mb-2">
                                     <h2 className="font-bold text-black text-base">
-                                        Active Containers
+                                        {directionFilter === "incubators" ? "Active Incubators" : "Active Containers"}
                                     </h2>
                                 </div>
                                 <div className="pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176]">
-                                    Containers #
+                                    {directionFilter === "incubators" ? "Incubators #" : "Containers #"}
                                 </div>
                                 <div
                                     className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
@@ -1963,7 +1963,7 @@ export default function AlertSetting() {
                                                     } ${lockContainerSelection ? "opacity-70 cursor-not-allowed" : ""}`}
                                                 >
                                                     <span className="text-[#6b1176] text-xs font-bold block truncate">
-                                                        Container {c.canisterId}
+                                                        {directionFilter === "incubators" ? "Incubator" : "Container"} {c.canisterId}
                                                     </span>
                                                     {c.branchName && c.branchName !== "N/A" && (
                                                         <div className="text-xs text-gray-900 leading-snug truncate">
@@ -1997,9 +1997,9 @@ export default function AlertSetting() {
                                 <h2 className="font-bold text-black text-base">
                                     Alert Configuration{" "}
                                     {selectedContainers.length > 1
-                                        ? `- ${selectedContainers.length} Containers Selected`
+                                        ? `- ${selectedContainers.length} ${directionFilter === "incubators" ? "Incubators" : "Containers"} Selected`
                                         : primaryContainer
-                                          ? `- Cryocan ${primaryContainer.canisterId}`
+                                          ? `- ${directionFilter === "incubators" ? "Incubator" : "Cryocan"} ${primaryContainer.canisterId}`
                                           : ""}
                                 </h2>
                                 <button
@@ -2018,50 +2018,6 @@ export default function AlertSetting() {
                                       ? "Selecting a tank will allow you to create alert configurations for various KPIs. Start by adding a new alert and setting thresholds to receive notifications when conditions are met."
                                       : "Configure alert thresholds for the selected container. Set minimum and maximum values to receive notifications when conditions are met."}
                             </p>
-                            {primaryContainer?.is_incubator &&
-                                primaryContainer.chamber_r != null &&
-                                primaryContainer.chamber_c != null && (
-                                    <div className="mb-6">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                                                Select Chamber
-                                            </p>
-                                            {selectedChamberId && (
-                                                <span className="text-xs bg-[#6b1176]/10 text-[#6b1176] font-semibold px-2 py-0.5 rounded-full">
-                                                    Chamber {selectedChamberId} selected
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="w-full max-w-sm mx-auto rounded-xl p-3">
-                                            <div
-                                                className="grid gap-2"
-                                                style={{ gridTemplateColumns: `repeat(${primaryContainer.chamber_c}, minmax(0, 1fr))` }}
-                                            >
-                                                {Array.from({ length: primaryContainer.chamber_r }).map((_, r) =>
-                                                    Array.from({ length: primaryContainer.chamber_c! }).map((_, c) => {
-                                                        const num = r * primaryContainer.chamber_c! + c + 1;
-                                                        const id = String(num);
-                                                        const active = selectedChamberId === id;
-                                                        return (
-                                                            <button
-                                                                key={id}
-                                                                type="button"
-                                                                onClick={() => setSelectedChamberId(active ? null : id)}
-                                                                className={`w-full h-10 rounded-lg text-sm font-semibold transition-all duration-150 ${
-                                                                    active
-                                                                        ? "bg-[#6b1176] text-white scale-105"
-                                                                        : "bg-white text-gray-500 border border-gray-200 hover:border-[#6b1176] hover:text-[#6b1176] hover:scale-105"
-                                                                }`}
-                                                            >
-                                                                {num}
-                                                            </button>
-                                                        );
-                                                    })
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             {!primaryContainer ? (
                                 <div className="flex-1 flex items-center justify-center">
                                     <div className="text-center text-gray-400">
@@ -2115,6 +2071,50 @@ export default function AlertSetting() {
                                                     scrollbarWidth: "thin",
                                                 }}
                                             >
+                                                {primaryContainer?.is_incubator &&
+                                                    primaryContainer.chamber_r != null &&
+                                                    primaryContainer.chamber_c != null && (
+                                                        <div className="mb-3">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                                                    Select Chamber
+                                                                </p>
+                                                                {selectedChamberId && (
+                                                                    <span className="text-xs bg-[#6b1176]/10 text-[#6b1176] font-semibold px-2 py-0.5 rounded-full">
+                                                                        Chamber {selectedChamberId} selected
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="w-full max-w-sm mx-auto rounded-xl p-3">
+                                                                <div
+                                                                    className="grid gap-2"
+                                                                    style={{ gridTemplateColumns: `repeat(${primaryContainer.chamber_c}, minmax(0, 1fr))` }}
+                                                                >
+                                                                    {Array.from({ length: primaryContainer.chamber_r }).map((_, r) =>
+                                                                        Array.from({ length: primaryContainer.chamber_c! }).map((_, c) => {
+                                                                            const num = r * primaryContainer.chamber_c! + c + 1;
+                                                                            const id = String(num);
+                                                                            const active = selectedChamberId === id;
+                                                                            return (
+                                                                                <button
+                                                                                    key={id}
+                                                                                    type="button"
+                                                                                    onClick={() => setSelectedChamberId(active ? null : id)}
+                                                                                    className={`w-full h-10 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                                                                                        active
+                                                                                            ? "bg-[#6b1176] text-white scale-105"
+                                                                                            : "bg-white text-gray-500 border border-gray-200 hover:border-[#6b1176] hover:text-[#6b1176] hover:scale-105"
+                                                                                    }`}
+                                                                                >
+                                                                                    {num}
+                                                                                </button>
+                                                                            );
+                                                                        })
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 {/* Multi-container mode OR single container with no config: show all KPI types with empty values */}
                                                 {selectedContainers.length >
                                                     1 ||
@@ -3249,7 +3249,7 @@ export default function AlertSetting() {
                                                                                             className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176]"
                                                                                         />
                                                                                         <div className="min-w-0">
-                                                                                            <div className="text-xs font-semibold text-[#6b1176] truncate">Container {c.canisterId}</div>
+                                                                                            <div className="text-xs font-semibold text-[#6b1176] truncate">{directionFilter === "incubators" ? "Incubator" : "Container"} {c.canisterId}</div>
                                                                                             <div className="text-xs text-gray-500 truncate">{c.branchName}</div>
                                                                                         </div>
                                                                                     </label>

@@ -1,8 +1,13 @@
 export interface IVFTreatment {
   hisNumber: string;
+  patientName?: string;
   cryolockNum: string;
   canisterNum: number;
   embryo_count?: number;
+  oocyte_m2?: number;
+  oocyte_m1?: number;
+  oocyte_gv?: number;
+  oocyte_others?: number;
   tankCode: string;
   caneCode: string;
   gobletColor: string;
@@ -13,6 +18,12 @@ export interface IVFTreatment {
   // Available from API, not currently displayed in the table UI
   embryoGrading?: string;
   description?: string | null;
+  injectionMethod?: string;
+  spermQuality?: string;
+  oocytesQuality?: string;
+  cycleType?: string;
+  incubatorCode?: string;
+  chamberPosition?: string;
 }
 
 export interface EmbryoTrackingApiResponse {
