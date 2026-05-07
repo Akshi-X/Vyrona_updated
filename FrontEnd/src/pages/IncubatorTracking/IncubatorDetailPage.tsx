@@ -25,10 +25,9 @@ type IllustrationMetrics = {
 
 function generateChambers(chamberR: number, chamberC: number): string[] {
   const chambers: string[] = [];
-  for (let r = 0; r < chamberR; r++) {
-    for (let c = 1; c <= chamberC; c++) {
-      chambers.push(`${String.fromCharCode(65 + r)}${c}`);
-    }
+  for (let r = 0; r < chamberR*chamberC; r++) {
+      chambers.push(`${r+1}`);
+      
   }
   return chambers;
 }
