@@ -43,6 +43,7 @@ import {
     Gauge,
 } from "lucide-react";
 import { Switch } from "../../components/ui/switch";
+import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 
 interface ContainerRow {
     tank_id: number;
@@ -578,6 +579,7 @@ const AlertStatusBadge = ({
 
 export default function AlertSetting() {
     const { isAuthenticated } = useAuth();
+    const isOnboarding = useOnboardingMode();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const directionFilter: "cryotanks" | "incubators" =
@@ -1139,6 +1141,7 @@ export default function AlertSetting() {
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
+            if (isOnboarding) return;
             if (
                 branchDropdownRef.current &&
                 !branchDropdownRef.current.contains(event.target as Node)
@@ -1149,7 +1152,7 @@ export default function AlertSetting() {
         document.addEventListener("mousedown", handleClickOutside);
         return () =>
             document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    }, [isOnboarding]);
 
     // Onboarding: pre-fill draft values for Evaporation Rate and Lid State so the
     // Save Changes button becomes active for the final tour step.
@@ -3563,7 +3566,7 @@ export default function AlertSetting() {
                 <div
                     className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
                     onClick={() => {
-                        if (!notifySettingsSaving) {
+                        if (!notifySettingsSaving && !isOnboarding) {
                             setShowNotifySettings(false);
                             setNotifySettingsError(null);
                         }
