@@ -43,6 +43,7 @@ import {
     Gauge,
 } from "lucide-react";
 import { Switch } from "../../components/ui/switch";
+import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 
 interface ContainerRow {
     tank_id: number;
@@ -578,6 +579,7 @@ const AlertStatusBadge = ({
 
 export default function AlertSetting() {
     const { isAuthenticated } = useAuth();
+    const isOnboarding = useOnboardingMode();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const directionFilter: "cryotanks" | "incubators" =
@@ -653,6 +655,9 @@ export default function AlertSetting() {
     const [showBranchDropdown, setShowBranchDropdown] = useState(false);
     const [selectedTankIds, setSelectedTankIds] = useState<number[]>([]);
     const [savingToBranches, setSavingToBranches] = useState(false);
+    const [showChamberCopyDropdown, setShowChamberCopyDropdown] = useState(false);
+    const [selectedChamberIds, setSelectedChamberIds] = useState<string[]>([]);
+    const [savingToChambers, setSavingToChambers] = useState(false);
     const [configList, setConfigList] = useState<KpiConfigRow[]>([]);
     const [configLoading, setConfigLoading] = useState(false);
     const [configError, setConfigError] = useState<string | null>(null);
@@ -748,11 +753,11 @@ export default function AlertSetting() {
     }, []);
 
     const refetchKpiConfig = useCallback(
-        async (id: number, options?: { showLoading?: boolean; isIncubator?: boolean }) => {
+        async (id: number, options?: { showLoading?: boolean; isIncubator?: boolean; chamberId?: string | null }) => {
             if (options?.showLoading) setConfigLoading(true);
             try {
                 const type = options?.isIncubator ? "incubator" : "tank";
-                const res = await ivfService.getKpiConfigList(id, type);
+                const res = await ivfService.getKpiConfigList(id, type, options?.chamberId);
                 setConfigList(res?.config ?? []);
                 setTankContext({
                     hospital_id: res?.hospital_id ?? null,
@@ -882,13 +887,13 @@ export default function AlertSetting() {
             setConfigLoadedTankId(null);
             return;
         }
+        // Incubators are handled by the chamber effect below
+        if (primaryContainer.is_incubator) return;
         setConfigLoading(true);
         setConfigError(null);
         setConfigLoadedTankId(null);
-        refetchKpiConfig(
-            primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id,
-            { isIncubator: primaryContainer.is_incubator },
-        ).catch((e: any) => {
+        refetchKpiConfig(primaryContainer.tank_id)
+            .catch((e: any) => {
                 setConfigError(e?.message || "Failed to fetch KPI config");
                 setConfigList([]);
             })
@@ -898,7 +903,20 @@ export default function AlertSetting() {
     useEffect(() => {
         setDraftConfig({});
         setMultiDraftConfig({});
-    }, [primaryContainer?.tank_id]);
+    }, [primaryContainer?.tank_id, selectedChamberId]);
+
+    useEffect(() => {
+        if (!primaryContainer?.is_incubator) return;
+        setConfigLoading(true);
+        setConfigError(null);
+        refetchKpiConfig(
+            primaryContainer.incubator_id ?? primaryContainer.tank_id,
+            { isIncubator: true, chamberId: selectedChamberId },
+        ).catch((e: any) => {
+            setConfigError(e?.message || "Failed to fetch KPI config");
+            setConfigList([]);
+        }).finally(() => setConfigLoading(false));
+    }, [selectedChamberId, refetchKpiConfig]);
 
     useEffect(() => {
         if (primaryContainer) {
@@ -1089,7 +1107,7 @@ export default function AlertSetting() {
         }
 
         setSelectedContainers(nextSelection);
-        setSelectedChamberId(null);
+        setSelectedChamberId(nextSelection[0]?.is_incubator ? "1" : null);
     };
 
     const branchOptions = useMemo(
@@ -1123,6 +1141,7 @@ export default function AlertSetting() {
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
+            if (isOnboarding) return;
             if (
                 branchDropdownRef.current &&
                 !branchDropdownRef.current.contains(event.target as Node)
@@ -1133,7 +1152,7 @@ export default function AlertSetting() {
         document.addEventListener("mousedown", handleClickOutside);
         return () =>
             document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    }, [isOnboarding]);
 
     // Onboarding: pre-fill draft values for Evaporation Rate and Lid State so the
     // Save Changes button becomes active for the final tour step.
@@ -1193,7 +1212,7 @@ export default function AlertSetting() {
             };
             await ivfService.createKpiConfig(payload);
             closeForm();
-            await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
+            await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
                 showLoading: true,
             });
         } catch (e: any) {
@@ -1219,7 +1238,7 @@ export default function AlertSetting() {
             });
             closeForm();
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
+                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
                     showLoading: true,
                 });
             }
@@ -1379,20 +1398,28 @@ export default function AlertSetting() {
 
             if (configsToApply.length === 0) return;
 
-            const tankIds = selectedContainers.map((c) => c.tank_id);
             setSaveAllLoading(true);
             try {
-                await ivfService.bulkUpsertKpiConfig(tankIds, configsToApply);
+                if (primaryContainer?.is_incubator) {
+                    await ivfService.bulkUpsertKpiConfigForIncubator(
+                        primaryContainer.incubator_id ?? primaryContainer.tank_id,
+                        selectedChamberId,
+                        configsToApply,
+                    );
+                } else {
+                    const tankIds = selectedContainers.map((c) => c.tank_id);
+                    await ivfService.bulkUpsertKpiConfig(tankIds, configsToApply);
+                }
                 setMultiDraftConfig({});
                 // For multi-container, deselect all. For single container, reload config.
                 if (selectedContainers.length > 1) {
                     await refetchKpiConfig(
                         selectedContainers[0].is_incubator ? (selectedContainers[0].incubator_id ?? selectedContainers[0].tank_id) : selectedContainers[0].tank_id,
-                        { showLoading: true, isIncubator: selectedContainers[0].is_incubator },
+                        { showLoading: true, isIncubator: selectedContainers[0].is_incubator, chamberId: selectedChamberId },
                     );
                     setSelectedContainers([]);
                 } else if (primaryContainer) {
-                    await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
+                    await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
                         showLoading: true,
                     });
                 }
@@ -1506,16 +1533,21 @@ export default function AlertSetting() {
                 }
 
                 if (configsToApply.length > 0) {
-                    await ivfService.bulkUpsertKpiConfig(
-                        [primaryContainer.tank_id],
-                        configsToApply,
-                    );
+                    if (primaryContainer.is_incubator) {
+                        await ivfService.bulkUpsertKpiConfigForIncubator(
+                            primaryContainer.incubator_id ?? primaryContainer.tank_id,
+                            selectedChamberId,
+                            configsToApply,
+                        );
+                    } else {
+                        await ivfService.bulkUpsertKpiConfig([primaryContainer.tank_id], configsToApply);
+                    }
                 }
             }
             setDraftConfig({});
             setMultiDraftConfig({});
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
+                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
                     showLoading: true,
                 });
             }
@@ -1534,7 +1566,7 @@ export default function AlertSetting() {
             await ivfService.deleteKpiConfig(configToDeleteId);
             closeDeleteConfirm();
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
+                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
                     showLoading: true,
                 });
             }
@@ -1849,11 +1881,11 @@ export default function AlertSetting() {
                             <div id="onboarding-alert-containers" className="bg-white border border-[#E7E1E1] rounded-lg p-3 flex flex-col overflow-hidden flex-1 min-h-[340px]">
                                 <div className="flex items-center justify-between mb-2">
                                     <h2 className="font-bold text-black text-base">
-                                        Active Containers
+                                        {directionFilter === "incubators" ? "Active Incubators" : "Active Containers"}
                                     </h2>
                                 </div>
                                 <div className="pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176]">
-                                    Containers #
+                                    {directionFilter === "incubators" ? "Incubators #" : "Containers #"}
                                 </div>
                                 <div
                                     className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
@@ -1934,7 +1966,7 @@ export default function AlertSetting() {
                                                     } ${lockContainerSelection ? "opacity-70 cursor-not-allowed" : ""}`}
                                                 >
                                                     <span className="text-[#6b1176] text-xs font-bold block truncate">
-                                                        Container {c.canisterId}
+                                                        {directionFilter === "incubators" ? "Incubator" : "Container"} {c.canisterId}
                                                     </span>
                                                     {c.branchName && c.branchName !== "N/A" && (
                                                         <div className="text-xs text-gray-900 leading-snug truncate">
@@ -1968,9 +2000,9 @@ export default function AlertSetting() {
                                 <h2 className="font-bold text-black text-base">
                                     Alert Configuration{" "}
                                     {selectedContainers.length > 1
-                                        ? `- ${selectedContainers.length} Containers Selected`
+                                        ? `- ${selectedContainers.length} ${directionFilter === "incubators" ? "Incubators" : "Containers"} Selected`
                                         : primaryContainer
-                                          ? `- Cryocan ${primaryContainer.canisterId}`
+                                          ? `- ${directionFilter === "incubators" ? "Incubator" : "Cryocan"} ${primaryContainer.canisterId}`
                                           : ""}
                                 </h2>
                                 <button
@@ -1989,46 +2021,6 @@ export default function AlertSetting() {
                                       ? "Selecting a tank will allow you to create alert configurations for various KPIs. Start by adding a new alert and setting thresholds to receive notifications when conditions are met."
                                       : "Configure alert thresholds for the selected container. Set minimum and maximum values to receive notifications when conditions are met."}
                             </p>
-                            {primaryContainer?.is_incubator &&
-                                primaryContainer.chamber_r != null &&
-                                primaryContainer.chamber_c != null && (
-                                    <div className="mb-6">
-                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                                            Select Chamber
-                                        </p>
-                                        <div
-                                            className="inline-grid gap-1.5"
-                                            style={{ gridTemplateColumns: `repeat(${primaryContainer.chamber_c}, minmax(0, 1fr))` }}
-                                        >
-                                            {Array.from({ length: primaryContainer.chamber_r }).map((_, r) =>
-                                                Array.from({ length: primaryContainer.chamber_c! }).map((_, c) => {
-                                                    const id = `R${r + 1}C${c + 1}`;
-                                                    const active = selectedChamberId === id;
-                                                    return (
-                                                        <button
-                                                            key={id}
-                                                            type="button"
-                                                            onClick={() => setSelectedChamberId(active ? null : id)}
-                                                            title={id}
-                                                            className={`w-9 h-9 rounded border text-xs font-medium transition-colors ${
-                                                                active
-                                                                    ? "bg-[#6b1176] text-white border-[#6b1176]"
-                                                                    : "bg-white text-gray-600 border-gray-300 hover:border-[#6b1176] hover:text-[#6b1176]"
-                                                            }`}
-                                                        >
-                                                            {id}
-                                                        </button>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
-                                        {selectedChamberId && (
-                                            <p className="mt-2 text-xs text-[#6b1176] font-medium">
-                                                Chamber {selectedChamberId} selected
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
                             {!primaryContainer ? (
                                 <div className="flex-1 flex items-center justify-center">
                                     <div className="text-center text-gray-400">
@@ -2082,6 +2074,50 @@ export default function AlertSetting() {
                                                     scrollbarWidth: "thin",
                                                 }}
                                             >
+                                                {primaryContainer?.is_incubator &&
+                                                    primaryContainer.chamber_r != null &&
+                                                    primaryContainer.chamber_c != null && (
+                                                        <div className="mb-3">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                                                    Select Chamber
+                                                                </p>
+                                                                {selectedChamberId && (
+                                                                    <span className="text-xs bg-[#6b1176]/10 text-[#6b1176] font-semibold px-2 py-0.5 rounded-full">
+                                                                        Chamber {selectedChamberId} selected
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="w-full max-w-sm mx-auto rounded-xl p-3">
+                                                                <div
+                                                                    className="grid gap-2"
+                                                                    style={{ gridTemplateColumns: `repeat(${primaryContainer.chamber_c}, minmax(0, 1fr))` }}
+                                                                >
+                                                                    {Array.from({ length: primaryContainer.chamber_r }).map((_, r) =>
+                                                                        Array.from({ length: primaryContainer.chamber_c! }).map((_, c) => {
+                                                                            const num = r * primaryContainer.chamber_c! + c + 1;
+                                                                            const id = String(num);
+                                                                            const active = selectedChamberId === id;
+                                                                            return (
+                                                                                <button
+                                                                                    key={id}
+                                                                                    type="button"
+                                                                                    onClick={() => setSelectedChamberId(active ? null : id)}
+                                                                                    className={`w-full h-10 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                                                                                        active
+                                                                                            ? "bg-[#6b1176] text-white scale-105"
+                                                                                            : "bg-white text-gray-500 border border-gray-200 hover:border-[#6b1176] hover:text-[#6b1176] hover:scale-105"
+                                                                                    }`}
+                                                                                >
+                                                                                    {num}
+                                                                                </button>
+                                                                            );
+                                                                        })
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 {/* Multi-container mode OR single container with no config: show all KPI types with empty values */}
                                                 {selectedContainers.length >
                                                     1 ||
@@ -3048,116 +3084,225 @@ export default function AlertSetting() {
                                                 )}
                                             </div>
                                             <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex flex-col md:flex-row items-stretch md:items-center justify-end gap-3">
-                                                {/* Save to Additional Branches */}
+                                                {/* Copy to additional tanks (cryotanks only) OR Apply to other chambers (incubators only) */}
                                                 <div className="relative w-full md:w-auto">
-                                                    <button
-                                                        type="button"
-                                                        disabled={!primaryContainer || configList.length === 0}
-                                                        onClick={() => setShowBranchDropdown((v) => !v)}
-                                                        className="w-full md:w-auto px-4 py-2.5 border border-[#6b1176] text-[#6b1176] rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                                    >
-                                                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-                                                        </svg>
-                                                        Copy to Additional Tanks
-                                                        <svg className={`w-3 h-3 transition-transform ${showBranchDropdown ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
-                                                    </button>
-                                                    {showBranchDropdown && (() => {
-                                                        const filteredTanks = containers.filter((c) => {
-                                                            const matchBranch = branchFilter === "All" || c.branchName === branchFilter;
-                                                            const matchDevice = directionFilter === "incubators" ? c.is_incubator : !c.is_incubator;
-                                                            return matchBranch && matchDevice && c.tank_id !== primaryContainer?.tank_id;
-                                                        });
-                                                        return (
-                                                            <>
-                                                                <div className="fixed inset-0 z-40" onClick={() => { setShowBranchDropdown(false); setSelectedTankIds([]); }} />
-                                                                <div className="absolute bottom-full right-0 mb-2 w-72 bg-white border border-[#E7E1E1] rounded-xl shadow-xl z-50 overflow-hidden">
-                                                                    {/* Select all row */}
-                                                                    <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
-                                                                        <span className="text-xs text-gray-500">{filteredTanks.length} tank{filteredTanks.length !== 1 ? "s" : ""}</span>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() =>
-                                                                                setSelectedTankIds(
-                                                                                    filteredTanks.every((c) => selectedTankIds.includes(c.tank_id))
-                                                                                        ? selectedTankIds.filter((id) => !filteredTanks.some((c) => c.tank_id === id))
-                                                                                        : [...new Set([...selectedTankIds, ...filteredTanks.map((c) => c.tank_id)])]
-                                                                                )
-                                                                            }
-                                                                            className="text-xs text-[#6b1176] font-medium hover:underline"
-                                                                        >
-                                                                            {filteredTanks.every((c) => selectedTankIds.includes(c.tank_id)) && filteredTanks.length > 0 ? "Deselect All" : "Select All"}
-                                                                        </button>
-                                                                    </div>
-                                                                    {/* Tank list */}
-                                                                    <div className="max-h-52 overflow-y-auto divide-y divide-gray-50" style={{ scrollbarWidth: "thin" }}>
-                                                                        {filteredTanks.length === 0 && (
-                                                                            <div className="px-4 py-3 text-xs text-gray-400">No tanks available.</div>
-                                                                        )}
-                                                                        {filteredTanks.map((c) => (
-                                                                            <label key={c.tank_id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7ECFF] cursor-pointer">
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    checked={selectedTankIds.includes(c.tank_id)}
-                                                                                    onChange={() =>
-                                                                                        setSelectedTankIds((prev) =>
-                                                                                            prev.includes(c.tank_id)
-                                                                                                ? prev.filter((id) => id !== c.tank_id)
-                                                                                                : [...prev, c.tank_id]
+                                                    {primaryContainer?.is_incubator ? (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                disabled={!primaryContainer || configList.length === 0}
+                                                                onClick={() => setShowChamberCopyDropdown((v) => !v)}
+                                                                className="w-full md:w-auto px-4 py-2.5 border border-[#6b1176] text-[#6b1176] rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                            >
+                                                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                                Apply to Other Chambers
+                                                                <svg className={`w-3 h-3 transition-transform ${showChamberCopyDropdown ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
+                                                            </button>
+                                                            {showChamberCopyDropdown && (() => {
+                                                                const totalChambers = (primaryContainer.chamber_r ?? 0) * (primaryContainer.chamber_c ?? 0);
+                                                                const otherChambers = Array.from({ length: totalChambers }, (_, i) => String(i + 1)).filter((id) => id !== selectedChamberId);
+                                                                return (
+                                                                    <>
+                                                                        <div className="fixed inset-0 z-40" onClick={() => { setShowChamberCopyDropdown(false); }} />
+                                                                        <div className="absolute bottom-full right-0 mb-2 w-64 bg-white border border-[#E7E1E1] rounded-xl shadow-xl z-50 overflow-hidden">
+                                                                            <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                                                                                <span className="text-xs text-gray-500">{otherChambers.length} chamber{otherChambers.length !== 1 ? "s" : ""}</span>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        setSelectedChamberIds(
+                                                                                            otherChambers.every((id) => selectedChamberIds.includes(id))
+                                                                                                ? []
+                                                                                                : [...otherChambers]
                                                                                         )
                                                                                     }
-                                                                                    className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176]"
-                                                                                />
-                                                                                <div className="min-w-0">
-                                                                                    <div className="text-xs font-semibold text-[#6b1176] truncate">Container {c.canisterId}</div>
-                                                                                    <div className="text-xs text-gray-500 truncate">{c.branchName}</div>
-                                                                                </div>
-                                                                            </label>
-                                                                        ))}
-                                                                    </div>
-                                                                    <div className="px-4 py-3 border-t border-gray-100 flex justify-end">
-                                                                        <button
-                                                                            type="button"
-                                                                            disabled={selectedTankIds.length === 0 || savingToBranches}
-                                                                            onClick={async () => {
-                                                                                setSavingToBranches(true);
-                                                                                try {
-                                                                                    const configsToApply = configList.map((cfg) => ({
-                                                                                        kpi_name: cfg.kpi_name,
-                                                                                        alert_name: cfg.alert_name ?? null,
-                                                                                        min: cfg.min ?? null,
-                                                                                        max: cfg.max ?? null,
-                                                                                        unit: cfg.unit ?? null,
-                                                                                        alert_type: cfg.alert_type ?? null,
-                                                                                        cooldown_minutes: cfg.cooldown_minutes,
-                                                                                        status: isActiveAlertType(cfg.alert_type ?? null),
-                                                                                    }));
-                                                                                    await ivfService.bulkUpsertKpiConfig(selectedTankIds, configsToApply);
-                                                                                    if (primaryContainer) {
-                                                                                        await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
-                                                                                            showLoading: true,
-                                                                                        });
+                                                                                    className="text-xs text-[#6b1176] font-medium hover:underline"
+                                                                                >
+                                                                                    {otherChambers.every((id) => selectedChamberIds.includes(id)) && otherChambers.length > 0 ? "Deselect All" : "Select All"}
+                                                                                </button>
+                                                                            </div>
+                                                                            <div className="max-h-52 overflow-y-auto divide-y divide-gray-50" style={{ scrollbarWidth: "thin" }}>
+                                                                                {otherChambers.length === 0 && (
+                                                                                    <div className="px-4 py-3 text-xs text-gray-400">No other chambers available.</div>
+                                                                                )}
+                                                                                {otherChambers.map((cid) => (
+                                                                                    <label key={cid} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7ECFF] cursor-pointer">
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            checked={selectedChamberIds.includes(cid)}
+                                                                                            onChange={() =>
+                                                                                                setSelectedChamberIds((prev) =>
+                                                                                                    prev.includes(cid) ? prev.filter((id) => id !== cid) : [...prev, cid]
+                                                                                                )
+                                                                                            }
+                                                                                            className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176]"
+                                                                                        />
+                                                                                        <span className="text-xs font-semibold text-[#6b1176]">Chamber {cid}</span>
+                                                                                    </label>
+                                                                                ))}
+                                                                            </div>
+                                                                            <div className="px-4 py-3 border-t border-gray-100 flex justify-end">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    disabled={selectedChamberIds.length === 0 || savingToChambers}
+                                                                                    onClick={async () => {
+                                                                                        setSavingToChambers(true);
+                                                                                        try {
+                                                                                            const configsToApply = configList.map((cfg) => ({
+                                                                                                kpi_name: cfg.kpi_name,
+                                                                                                alert_name: cfg.alert_name ?? null,
+                                                                                                min: cfg.min ?? null,
+                                                                                                max: cfg.max ?? null,
+                                                                                                unit: cfg.unit ?? null,
+                                                                                                alert_type: cfg.alert_type ?? null,
+                                                                                                cooldown_minutes: cfg.cooldown_minutes,
+                                                                                                status: isActiveAlertType(cfg.alert_type ?? null),
+                                                                                            }));
+                                                                                            await Promise.all(
+                                                                                                selectedChamberIds.map((cid) =>
+                                                                                                    ivfService.bulkUpsertKpiConfigForIncubator(
+                                                                                                        primaryContainer!.incubator_id ?? primaryContainer!.tank_id,
+                                                                                                        cid,
+                                                                                                        configsToApply,
+                                                                                                    )
+                                                                                                )
+                                                                                            );
+                                                                                            if (primaryContainer) {
+                                                                                                await refetchKpiConfig(
+                                                                                                    primaryContainer.incubator_id ?? primaryContainer.tank_id,
+                                                                                                    { isIncubator: true, chamberId: selectedChamberId, showLoading: true },
+                                                                                                );
+                                                                                            }
+                                                                                            toast.success(`Applied to ${selectedChamberIds.length} chamber${selectedChamberIds.length !== 1 ? "s" : ""} successfully`);
+                                                                                        } finally {
+                                                                                            setSavingToChambers(false);
+                                                                                            setShowChamberCopyDropdown(false);
+                                                                                            setSelectedChamberIds([]);
+                                                                                        }
+                                                                                    }}
+                                                                                    className="px-4 py-2 bg-[#6b1176] text-white rounded-lg text-xs font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                                                >
+                                                                                    {savingToChambers ? (
+                                                                                        <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</>
+                                                                                    ) : (
+                                                                                        <>Apply to {selectedChamberIds.length} Chamber{selectedChamberIds.length !== 1 ? "s" : ""}</>
+                                                                                    )}
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                disabled={!primaryContainer || configList.length === 0}
+                                                                onClick={() => setShowBranchDropdown((v) => !v)}
+                                                                className="w-full md:w-auto px-4 py-2.5 border border-[#6b1176] text-[#6b1176] rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                            >
+                                                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                                                                </svg>
+                                                                Copy to Additional Tanks
+                                                                <svg className={`w-3 h-3 transition-transform ${showBranchDropdown ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
+                                                            </button>
+                                                            {showBranchDropdown && (() => {
+                                                                const filteredTanks = containers.filter((c) => {
+                                                                    const matchBranch = branchFilter === "All" || c.branchName === branchFilter;
+                                                                    return matchBranch && !c.is_incubator && c.tank_id !== primaryContainer?.tank_id;
+                                                                });
+                                                                return (
+                                                                    <>
+                                                                        <div className="fixed inset-0 z-40" onClick={() => { setShowBranchDropdown(false); setSelectedTankIds([]); }} />
+                                                                        <div className="absolute bottom-full right-0 mb-2 w-72 bg-white border border-[#E7E1E1] rounded-xl shadow-xl z-50 overflow-hidden">
+                                                                            <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                                                                                <span className="text-xs text-gray-500">{filteredTanks.length} tank{filteredTanks.length !== 1 ? "s" : ""}</span>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        setSelectedTankIds(
+                                                                                            filteredTanks.every((c) => selectedTankIds.includes(c.tank_id))
+                                                                                                ? selectedTankIds.filter((id) => !filteredTanks.some((c) => c.tank_id === id))
+                                                                                                : [...new Set([...selectedTankIds, ...filteredTanks.map((c) => c.tank_id)])]
+                                                                                        )
                                                                                     }
-                                                                                    toast.success(`Copied to ${selectedTankIds.length} tank(s) successfully`);
-                                                                                } finally {
-                                                                                    setSavingToBranches(false);
-                                                                                    setShowBranchDropdown(false);
-                                                                                    setSelectedTankIds([]);
-                                                                                }
-                                                                            }}
-                                                                            className="px-4 py-2 bg-[#6b1176] text-white rounded-lg text-xs font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                                                                        >
-                                                                            {savingToBranches ? (
-                                                                                <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</>
-                                                                            ) : (
-                                                                                <>Apply to {selectedTankIds.length} Tank{selectedTankIds.length !== 1 ? "s" : ""}</>
-                                                                            )}
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            </>
-                                                        );
-                                                    })()}
+                                                                                    className="text-xs text-[#6b1176] font-medium hover:underline"
+                                                                                >
+                                                                                    {filteredTanks.every((c) => selectedTankIds.includes(c.tank_id)) && filteredTanks.length > 0 ? "Deselect All" : "Select All"}
+                                                                                </button>
+                                                                            </div>
+                                                                            <div className="max-h-52 overflow-y-auto divide-y divide-gray-50" style={{ scrollbarWidth: "thin" }}>
+                                                                                {filteredTanks.length === 0 && (
+                                                                                    <div className="px-4 py-3 text-xs text-gray-400">No tanks available.</div>
+                                                                                )}
+                                                                                {filteredTanks.map((c) => (
+                                                                                    <label key={c.tank_id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7ECFF] cursor-pointer">
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            checked={selectedTankIds.includes(c.tank_id)}
+                                                                                            onChange={() =>
+                                                                                                setSelectedTankIds((prev) =>
+                                                                                                    prev.includes(c.tank_id)
+                                                                                                        ? prev.filter((id) => id !== c.tank_id)
+                                                                                                        : [...prev, c.tank_id]
+                                                                                                )
+                                                                                            }
+                                                                                            className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176]"
+                                                                                        />
+                                                                                        <div className="min-w-0">
+                                                                                            <div className="text-xs font-semibold text-[#6b1176] truncate">{directionFilter === "incubators" ? "Incubator" : "Container"} {c.canisterId}</div>
+                                                                                            <div className="text-xs text-gray-500 truncate">{c.branchName}</div>
+                                                                                        </div>
+                                                                                    </label>
+                                                                                ))}
+                                                                            </div>
+                                                                            <div className="px-4 py-3 border-t border-gray-100 flex justify-end">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    disabled={selectedTankIds.length === 0 || savingToBranches}
+                                                                                    onClick={async () => {
+                                                                                        setSavingToBranches(true);
+                                                                                        try {
+                                                                                            const configsToApply = configList.map((cfg) => ({
+                                                                                                kpi_name: cfg.kpi_name,
+                                                                                                alert_name: cfg.alert_name ?? null,
+                                                                                                min: cfg.min ?? null,
+                                                                                                max: cfg.max ?? null,
+                                                                                                unit: cfg.unit ?? null,
+                                                                                                alert_type: cfg.alert_type ?? null,
+                                                                                                cooldown_minutes: cfg.cooldown_minutes,
+                                                                                                status: isActiveAlertType(cfg.alert_type ?? null),
+                                                                                            }));
+                                                                                            await ivfService.bulkUpsertKpiConfig(selectedTankIds, configsToApply);
+                                                                                            if (primaryContainer) {
+                                                                                                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
+                                                                                                    showLoading: true,
+                                                                                                });
+                                                                                            }
+                                                                                            toast.success(`Copied to ${selectedTankIds.length} tank(s) successfully`);
+                                                                                        } finally {
+                                                                                            setSavingToBranches(false);
+                                                                                            setShowBranchDropdown(false);
+                                                                                            setSelectedTankIds([]);
+                                                                                        }
+                                                                                    }}
+                                                                                    className="px-4 py-2 bg-[#6b1176] text-white rounded-lg text-xs font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                                                >
+                                                                                    {savingToBranches ? (
+                                                                                        <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</>
+                                                                                    ) : (
+                                                                                        <>Apply to {selectedTankIds.length} Tank{selectedTankIds.length !== 1 ? "s" : ""}</>
+                                                                                    )}
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </>
+                                                    )}
                                                 </div>
                                                 {/* Save Changes */}
                                                 <button
@@ -3421,7 +3566,7 @@ export default function AlertSetting() {
                 <div
                     className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
                     onClick={() => {
-                        if (!notifySettingsSaving) {
+                        if (!notifySettingsSaving && !isOnboarding) {
                             setShowNotifySettings(false);
                             setNotifySettingsError(null);
                         }
