@@ -81,6 +81,23 @@ class ConnectionManager:
             self.active_connections[connection_id]["tank_id"] = tank_id
             logger.info(f"Connection {connection_id} subscribed to tank_id {tank_id}")
 
+    def set_incubator_subscription(
+        self,
+        connection_id: str,
+        incubator_id: int,
+        chamber_id: str,
+        incubator_code: str = None,
+    ):
+        """Set which incubator chamber this connection is subscribed to."""
+        if connection_id in self.active_connections:
+            self.active_connections[connection_id]["incubator_id"] = incubator_id
+            self.active_connections[connection_id]["chamber_id"] = chamber_id
+            if incubator_code is not None:
+                self.active_connections[connection_id]["incubator_code"] = incubator_code
+            logger.info(
+                f"Connection {connection_id} subscribed to incubator_id {incubator_id} chamber {chamber_id}"
+            )
+
     def set_live(self, connection_id: str, live: bool):
         """Set whether to send live KPI data to this connection (True = LIVE range only)."""
         if connection_id in self.active_connections:
@@ -186,6 +203,41 @@ class ConnectionManager:
                 disconnected.append(connection_id)
         
         # Remove disconnected clients
+        for conn_id in disconnected:
+            self.disconnect(conn_id)
+
+    async def broadcast_incubator(self, data: dict):
+        """
+        Broadcast incubator KPI data to connections subscribed to the matching
+        incubator_id + chamber_id, respecting the live flag.
+        No DB lookup needed (incubator_id and chamber_id are in the payload).
+        """
+        if not self.active_connections:
+            return
+
+        incubator_id_from_data = data.get("incubator_id")
+        chamber_id_from_data = data.get("chamber_id")
+        if incubator_id_from_data is None:
+            return
+        try:
+            incubator_id_from_data = int(incubator_id_from_data)
+        except (TypeError, ValueError):
+            return
+
+        disconnected = []
+        for connection_id, conn_data in list(self.active_connections.items()):
+            if conn_data.get("incubator_id") != incubator_id_from_data:
+                continue
+            if chamber_id_from_data is not None and conn_data.get("chamber_id") != chamber_id_from_data:
+                continue
+            if not conn_data.get("live", True):
+                continue
+            try:
+                await conn_data["websocket"].send_json(data)
+            except Exception as e:
+                logger.error(f"Error sending incubator KPI data to client {connection_id}: {e}")
+                disconnected.append(connection_id)
+
         for conn_id in disconnected:
             self.disconnect(conn_id)
 
