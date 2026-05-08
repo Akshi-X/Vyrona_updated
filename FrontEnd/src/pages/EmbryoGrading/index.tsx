@@ -496,6 +496,24 @@ export default function EmbryoGradingPage() {
     return '';
   };
 
+  const renderBlastBadge = (label: string) => {
+    if (!label || label === '—') return <span className="text-gray-400 text-xs">—</span>;
+    const expansion = label.charAt(0);
+    const icmTe = label.slice(1);
+    const isKnownGrade = /^[A-C]{2}$/.test(icmTe);
+    if (!isKnownGrade) {
+      return <span className="inline-block rounded px-1.5 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600">{label}</span>;
+    }
+    const chipClass = icmTe === 'AA' ? 'bg-green-50 border border-green-200' : icmTe === 'BB' ? 'bg-yellow-50 border border-yellow-200' : 'bg-amber-50 border border-amber-200';
+    const gradeClass = icmTe === 'AA' ? 'text-green-700' : icmTe === 'BB' ? 'text-yellow-700' : 'text-amber-700';
+    return (
+      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-bold ${chipClass}`}>
+        <span className="text-gray-400 mr-0.5">{expansion}</span>
+        <span className={gradeClass}>{icmTe}</span>
+      </span>
+    );
+  };
+
   const handleAddLogEntry = () => {
     if (!selectedEmbryoKey) return;
     
@@ -554,6 +572,40 @@ export default function EmbryoGradingPage() {
     resetLogForm();
     setIsAddLogFormOpen(false);
   };
+
+  const openEditLog = (row: typeof selectedEmbryologyLogs[number], step: number) => {
+    const v = (val: string | undefined) => (val === '—' ? '' : val || '');
+    setLogForm({
+      oocyteNo: v(row.oocyteNo),
+      maturity: row.maturity === '—' ? 'MII' : (row.maturity || 'MII'),
+      oocyteComments: v(row.oocyteComments),
+      day0Dish: v(row.day0Dish),
+      pn: row.pn === '—' ? '2PN' : (row.pn || '2PN'),
+      dropNo: v(row.dropNo),
+      day0ZygoteStatus: v(row.day0ZygoteStatus),
+      day0Notes: v(row.day0Notes),
+      day3CellCount: v(row.day3CellCount),
+      day3Fragmentation: v(row.day3Fragmentation),
+      day3Symmetry: v(row.day3Symmetry),
+      day3Notes: v(row.day3Notes),
+      day5Stage: v(row.day5Stage),
+      day5ExpansionGrade: v(row.day5ExpansionGrade),
+      day5IcmGrade: v(row.day5IcmGrade),
+      day5TeGrade: v(row.day5TeGrade),
+      day6Stage: v(row.day6Stage),
+      day6ExpansionGrade: v(row.day6ExpansionGrade),
+      day6IcmGrade: v(row.day6IcmGrade),
+      day6TeGrade: v(row.day6TeGrade),
+      day6Progression: v(row.day6Progression),
+      fate: v(row.fate),
+      fzNo: v(row.fzNo),
+      notes: v(row.notes),
+    });
+    setEditingLogId(row.id);
+    setLogModalStep(step);
+    setIsAddLogFormOpen(true);
+  };
+
 
   const resetNewEmbryoForm = () => {
     setNewEmbryoForm({
@@ -963,18 +1015,19 @@ export default function EmbryoGradingPage() {
                               ) : (
                                 selectedEmbryologyLogs.map((row) => (
                                   <tr key={row.id} className="border-t border-[#F1F1F1] hover:bg-[#FCF9FF] divide-x divide-[#E7E1E1]">
-                                    <td className="px-2 py-2 whitespace-nowrap">
+                                    <td className="px-2 py-2 whitespace-nowrap cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 0)}>
                                       <div className="font-medium">#{row.oocyteNo}</div>
                                       <div className="text-[10px] text-gray-400">Drop {row.day0Dish} | {row.maturity}</div>
                                     </td>
-                                    <td className="px-2 py-2">{row.pn}</td>
-                                    <td className="px-2 py-2 text-center">
-                                      <div className="font-semibold">{row.day3Label || '—'}</div>
-                                      {row.dropNo && row.dropNo !== '—' && <div className="text-[10px] text-gray-400">Drop {row.dropNo}</div>}
+                                    <td className="px-2 py-2 cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 0)}>{row.pn}</td>
+                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 1)}>
+                                      {row.day3Label && row.day3Label !== '—'
+                                        ? <span className="inline-block rounded px-1.5 py-0.5 text-xs font-bold bg-[#F7ECFF] text-[#6b1176]">{row.day3Label}</span>
+                                        : <span className="text-gray-400 text-xs">—</span>}
                                     </td>
-                                    <td className={`px-2 py-2 font-semibold text-center ${getGradeColor(row.day5Label || '—')}`}>{row.day5Label || '—'}</td>
-                                    <td className={`px-2 py-2 font-semibold text-center ${getGradeColor(row.day6Label || '—')}`}>{row.day6Label || '—'}</td>
-                                    <td className="px-2 py-2">
+                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 2)}>{renderBlastBadge(row.day5Label || '—')}</td>
+                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 3)}>{renderBlastBadge(row.day6Label || '—')}</td>
+                                    <td className="px-2 py-2 cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 4)}>
                                       <div className="flex items-center gap-1.5">
                                         {row.fate === 'Freeze' ? (
                                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 text-sm font-semibold border border-sky-200">
@@ -1003,37 +1056,7 @@ export default function EmbryoGradingPage() {
                                     <td className="px-2 py-2 flex gap-1 sticky right-0 z-10 bg-white border-l border-[#E7E1E1]">
                                       <button
                                         type="button"
-                                        onClick={() => {
-                                          setLogForm({
-                                            oocyteNo: row.oocyteNo === '—' ? '' : (row.oocyteNo || ''),
-                                            maturity: row.maturity === '—' ? '' : (row.maturity || 'MII'),
-                                            oocyteComments: row.oocyteComments === '—' ? '' : (row.oocyteComments || ''),
-                                            day0Dish: row.day0Dish === '—' ? '' : (row.day0Dish || ''),
-                                            pn: row.pn === '—' ? '' : (row.pn || '2PN'),
-                                            dropNo: row.dropNo === '—' ? '' : (row.dropNo || ''),
-                                            day0ZygoteStatus: row.day0ZygoteStatus === '—' ? '' : (row.day0ZygoteStatus || ''),
-                                            day0Notes: row.day0Notes === '—' ? '' : (row.day0Notes || ''),
-                                            day3CellCount: row.day3CellCount === '—' ? '' : (row.day3CellCount || ''),
-                                            day3Fragmentation: row.day3Fragmentation === '—' ? '' : (row.day3Fragmentation || ''),
-                                            day3Symmetry: row.day3Symmetry === '—' ? '' : (row.day3Symmetry || ''),
-                                            day3Notes: row.day3Notes === '—' ? '' : (row.day3Notes || ''),
-                                            day5Stage: row.day5Stage === '—' ? '' : (row.day5Stage || ''),
-                                            day5ExpansionGrade: row.day5ExpansionGrade === '—' ? '' : (row.day5ExpansionGrade || ''),
-                                            day5IcmGrade: row.day5IcmGrade === '—' ? '' : (row.day5IcmGrade || ''),
-                                            day5TeGrade: row.day5TeGrade === '—' ? '' : (row.day5TeGrade || ''),
-                                            day6Stage: row.day6Stage === '—' ? '' : (row.day6Stage || ''),
-                                            day6ExpansionGrade: row.day6ExpansionGrade === '—' ? '' : (row.day6ExpansionGrade || ''),
-                                            day6IcmGrade: row.day6IcmGrade === '—' ? '' : (row.day6IcmGrade || ''),
-                                            day6TeGrade: row.day6TeGrade === '—' ? '' : (row.day6TeGrade || ''),
-                                            day6Progression: row.day6Progression === '—' ? '' : (row.day6Progression || ''),
-                                            fate: row.fate === '—' ? '' : (row.fate || ''),
-                                            fzNo: row.fzNo === '—' ? '' : (row.fzNo || ''),
-                                            notes: row.notes === '—' ? '' : (row.notes || ''),
-                                          });
-                                          setEditingLogId(row.id);
-                                          setLogModalStep(0);
-                                          setIsAddLogFormOpen(true);
-                                        }}
+                                        onClick={() => openEditLog(row, 0)}
                                         className="px-2 py-1 text-xs bg-[#6b1176] text-white rounded hover:bg-[#5a0f62] transition-colors"
                                         title="Update entry"
                                       >
@@ -1280,8 +1303,8 @@ export default function EmbryoGradingPage() {
           setIsAddEmbryoFormOpen(false);
           resetNewEmbryoForm();
         }}
-        title="Add New HIS"
-        description="Fill basic embryo details to create a new HIS entry"
+        title="Add New Cycle"
+        description="Enter cycle details to register a new IVF treatment entry"
         containerClassName="w-full max-w-[750px]"
       >
         <div className="space-y-3">
@@ -1483,7 +1506,7 @@ export default function EmbryoGradingPage() {
               disabled={!newEmbryoForm.hisNumber.trim()}
               className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Add New HIS
+              Add Cycle
             </button>
           </div>
         </div>
