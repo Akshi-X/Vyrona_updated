@@ -665,7 +665,13 @@ export class IvfService extends BaseApiService {
         config: Array<KpiConfigRow>;
     }> {
         let param = type === "incubator" ? `incubator_id=${encodeURIComponent(id)}` : `tank_id=${encodeURIComponent(id)}`;
-        if (type === "incubator" && chamberId) param += `&chamber_id=${encodeURIComponent(chamberId)}`;
+        if (type === "incubator") {
+            if (chamberId) {
+                param += `&chamber_id=${encodeURIComponent(chamberId)}`;
+            } else if (chamberId === null) {
+                param += `&chamber_id=null`;
+            }
+        }
         return await this.request(
             `/api/ivf/quality/kpi-config/list?${param}`,
             { method: "GET" },
