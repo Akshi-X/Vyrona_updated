@@ -36,8 +36,14 @@ import {
     Loader2,
     Clock,
     Settings,
+    Wind,
+    CloudFog,
+    CloudRain,
+    FlaskConical,
+    Gauge,
 } from "lucide-react";
 import { Switch } from "../../components/ui/switch";
+import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 
 interface ContainerRow {
     tank_id: number;
@@ -46,6 +52,10 @@ interface ContainerRow {
     branch_id: number;
     status: string;
     date: string;
+    is_incubator: boolean;
+    incubator_id?: number | null;
+    chamber_r?: number | null;
+    chamber_c?: number | null;
 }
 
 const KPI_NAMES = {
@@ -56,12 +66,349 @@ const KPI_NAMES = {
     IVF_SHOCK: "shock",
     IVF_TIVE_BATTERY_PERCENTAGE: "tive_battery_percentage",
     IVF_LN2_LID_STATE: "ln2_lid_state",
+    INCUBATOR_O2: "incubator_o2",
+    INCUBATOR_CO2: "incubator_co2",
+    INCUBATOR_TEMP: "incubator_temp",
+    INCUBATOR_HUMIDITY: "incubator_humidity",
+    INCUBATOR_PH: "incubator_ph",
+    INCUBATOR_VOC: "incubator_voc",
+    INCUBATOR_LID_STATE: "incubator_lid_state",
 } as const;
 
 const isActiveAlertType = (alertType?: string | null) =>
     alertType === "critical" || alertType === "soft";
 
-// KPI metadata configuration with icons, labels, and descriptions
+// ─── KPI Form Config ──────────────────────────────────────────────────────────
+
+interface LidStateOption {
+    value: string;           // stored in draft.lid_state ("closed" | "open")
+    label: string;
+    set_min: number | null;
+    set_max: number | null;
+}
+
+interface KpiFormConfig {
+    kpi_name: string;
+    alert_name: string | null;
+    label: string;
+    description: string;
+    icon: React.ReactNode;
+    unit: string | null;
+    min_available: boolean;
+    max_available: boolean;
+    both_required: boolean;      // temp: both min+max must be set together
+    min_label: string | null;
+    max_label: string | null;
+    min_bound: number | null;    // HTML min= on the input
+    max_bound: number | null;    // HTML max= on the input
+    cooldown_available: boolean;
+    custom_dropdown: LidStateOption[] | null;  // non-null only for lid_state
+    default_alert_type: "soft" | "critical" | "no_alert" | null;
+    tank_type: "cryotank" | "incubator";
+}
+
+const KPI_FORM_CONFIG: KpiFormConfig[] = [
+    {
+        kpi_name: KPI_NAMES.IVF_LN2_EVAPORATION_RATE,
+        alert_name: null,
+        label: "Evaporation Rate",
+        description: "Track LN2 evaporation rate to predict refill schedules",
+        icon: <TrendingUp size={20} />,
+        unit: "kg/hr",
+        min_available: true,
+        max_available: true,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: null,
+        max_bound: null,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "no_alert",
+        tank_type: "cryotank",
+    },
+    {
+        kpi_name: KPI_NAMES.IVF_LN2_LEVEL,
+        alert_name: null,
+        label: "LN2",
+        description: "Liquid nitrogen level monitoring for cryogenic safety",
+        icon: <Droplets size={20} />,
+        unit: "Ln2 in kg",
+        min_available: true,
+        max_available: false,
+        both_required: false,
+        min_label: "Min",
+        max_label: null,
+        min_bound: 0,
+        max_bound: null,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "no_alert",
+        tank_type: "cryotank",
+    },
+    {
+        kpi_name: KPI_NAMES.IVF_LN2_LID_STATE,
+        alert_name: null,
+        label: "Lid State",
+        description: "Alert triggers after lid change persists for the configured duration; repeats at the same interval if it continues.",
+        icon: <DoorOpen size={20} />,
+        unit: null,
+        min_available: false,
+        max_available: false,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: null,
+        max_bound: null,
+        cooldown_available: true,
+        custom_dropdown: [
+            { value: "",        label: "Select State",              set_min: null, set_max: null },
+            { value: "closed",  label: "Closed (Alert when opened)", set_min: 0,    set_max: 0 },
+            { value: "open",    label: "Open (Alert when closed)",   set_min: 1,    set_max: 1 },
+        ],
+        default_alert_type: "soft",
+        tank_type: "cryotank",
+    },
+    {
+        kpi_name: KPI_NAMES.IVF_SHOCK,
+        alert_name: null,
+        label: "Shock Detection",
+        description: "Alert for physical impacts or sudden movements",
+        icon: <Zap size={20} />,
+        unit: "g",
+        min_available: true,
+        max_available: true,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: null,
+        max_bound: null,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "no_alert",
+        tank_type: "cryotank",
+    },
+    {
+        kpi_name: KPI_NAMES.IVF_TEMPERATURE_EXTERNAL,
+        alert_name: null,
+        label: "External Temperature",
+        description: "Track ambient temperature around the storage container",
+        icon: <ThermometerSun size={20} />,
+        unit: "°C",
+        min_available: true,
+        max_available: true,
+        both_required: true,
+        min_label: null,
+        max_label: null,
+        min_bound: null,
+        max_bound: null,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "soft",
+        tank_type: "cryotank",
+    },
+    {
+        kpi_name: KPI_NAMES.IVF_TEMPERATURE_INTERNAL,
+        alert_name: null,
+        label: "Internal Temperature",
+        description: "Monitor the internal tank temperature for safe storage conditions",
+        icon: <Thermometer size={20} />,
+        unit: "°C",
+        min_available: true,
+        max_available: true,
+        both_required: true,
+        min_label: null,
+        max_label: null,
+        min_bound: null,
+        max_bound: null,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "soft",
+        tank_type: "cryotank",
+    },
+    {
+        kpi_name: KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE,
+        alert_name: null,
+        label: "Battery Level",
+        description: "Monitor device battery to ensure continuous tracking",
+        icon: <Battery size={20} />,
+        unit: "%",
+        min_available: true,
+        max_available: false,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: 0,
+        max_bound: 100,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "soft",
+        tank_type: "cryotank",
+    },
+    // ── Incubator KPIs ────────────────────────────────────────────────────────
+    {
+        kpi_name: KPI_NAMES.INCUBATOR_O2,
+        alert_name: null,
+        label: "O₂ Level",
+        description: "Monitor oxygen concentration inside the incubator",
+        icon: <Wind size={20} />,
+        unit: "%",
+        min_available: true,
+        max_available: true,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: 0,
+        max_bound: 100,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "soft",
+        tank_type: "incubator",
+    },
+    {
+        kpi_name: KPI_NAMES.INCUBATOR_CO2,
+        alert_name: null,
+        label: "CO₂ Level",
+        description: "Monitor carbon dioxide concentration inside the incubator",
+        icon: <CloudFog size={20} />,
+        unit: "%",
+        min_available: true,
+        max_available: true,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: 0,
+        max_bound: 100,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "soft",
+        tank_type: "incubator",
+    },
+    {
+        kpi_name: KPI_NAMES.INCUBATOR_TEMP,
+        alert_name: null,
+        label: "Temperature",
+        description: "Monitor incubator chamber temperature for optimal conditions",
+        icon: <Thermometer size={20} />,
+        unit: "°C",
+        min_available: true,
+        max_available: true,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: null,
+        max_bound: null,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "soft",
+        tank_type: "incubator",
+    },
+    {
+        kpi_name: KPI_NAMES.INCUBATOR_HUMIDITY,
+        alert_name: null,
+        label: "Humidity",
+        description: "Monitor relative humidity inside the incubator",
+        icon: <CloudRain size={20} />,
+        unit: "%",
+        min_available: true,
+        max_available: true,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: 0,
+        max_bound: 100,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "soft",
+        tank_type: "incubator",
+    },
+    {
+        kpi_name: KPI_NAMES.INCUBATOR_PH,
+        alert_name: null,
+        label: "pH Level",
+        description: "Monitor pH level of the incubator culture media",
+        icon: <FlaskConical size={20} />,
+        unit: "pH",
+        min_available: true,
+        max_available: true,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: 0,
+        max_bound: 14,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "soft",
+        tank_type: "incubator",
+    },
+    {
+        kpi_name: KPI_NAMES.INCUBATOR_VOC,
+        alert_name: null,
+        label: "VOC",
+        description: "Monitor volatile organic compound levels inside the incubator",
+        icon: <Gauge size={20} />,
+        unit: "ppb",
+        min_available: true,
+        max_available: true,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: 0,
+        max_bound: null,
+        cooldown_available: true,
+        custom_dropdown: null,
+        default_alert_type: "soft",
+        tank_type: "incubator",
+    },
+    {
+        kpi_name: KPI_NAMES.INCUBATOR_LID_STATE,
+        alert_name: null,
+        label: "Lid State",
+        description: "Alert triggers after lid change persists for the configured duration; repeats at the same interval if it continues.",
+        icon: <DoorOpen size={20} />,
+        unit: null,
+        min_available: false,
+        max_available: false,
+        both_required: false,
+        min_label: null,
+        max_label: null,
+        min_bound: null,
+        max_bound: null,
+        cooldown_available: true,
+        custom_dropdown: [
+            { value: "",        label: "Select State",              set_min: null, set_max: null },
+            { value: "closed",  label: "Closed (Alert when opened)", set_min: 0,    set_max: 0 },
+            { value: "open",    label: "Open (Alert when closed)",   set_min: 1,    set_max: 1 },
+        ],
+        default_alert_type: "soft",
+        tank_type: "incubator",
+    },
+];
+
+const DEFAULT_KPI_FORM_CONFIG: KpiFormConfig = {
+    kpi_name: "",
+    alert_name: null,
+    label: "Custom Alert",
+    description: "Custom monitoring parameter",
+    icon: <Info size={20} />,
+    unit: null,
+    min_available: true,
+    max_available: true,
+    both_required: false,
+    min_label: null,
+    max_label: null,
+    min_bound: null,
+    max_bound: null,
+    cooldown_available: true,
+    custom_dropdown: null,
+    default_alert_type: null,
+    tank_type: "cryotank",
+};
+
+const getKpiFormConfig = (kpiName: string): KpiFormConfig =>
+    KPI_FORM_CONFIG.find((c) => c.kpi_name === kpiName) ?? DEFAULT_KPI_FORM_CONFIG;
+
+// Backward-compat helpers derived from KPI_FORM_CONFIG
 interface KpiMetadata {
     label: string;
     description: string;
@@ -69,110 +416,31 @@ interface KpiMetadata {
     unit?: string;
 }
 
-const KPI_METADATA: Record<string, KpiMetadata> = {
-    [KPI_NAMES.IVF_TEMPERATURE_INTERNAL]: {
-        label: "Internal Temperature",
-        description:
-            "Monitor the internal tank temperature for safe storage conditions",
-        icon: <Thermometer size={20} />,
-        unit: "°C",
-    },
-    [KPI_NAMES.IVF_TEMPERATURE_EXTERNAL]: {
-        label: "External Temperature",
-        description: "Track ambient temperature around the storage container",
-        icon: <ThermometerSun size={20} />,
-        unit: "°C",
-    },
-    [KPI_NAMES.IVF_LN2_LEVEL]: {
-        label: "LN2",
-        description: "Liquid nitrogen level monitoring for cryogenic safety",
-        icon: <Droplets size={20} />,
-        unit: "Ln2 in kg",
-    },
-    [KPI_NAMES.IVF_LN2_EVAPORATION_RATE]: {
-        label: "Evaporation Rate",
-        description: "Track LN2 evaporation rate to predict refill schedules",
-        icon: <TrendingUp size={20} />,
-        unit: "kg/hr",
-    },
-    [KPI_NAMES.IVF_SHOCK]: {
-        label: "Shock Detection",
-        description: "Alert for physical impacts or sudden movements",
-        icon: <Zap size={20} />,
-    },
-    [KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE]: {
-        label: "Battery Level",
-        description: "Monitor device battery to ensure continuous tracking",
-        icon: <Battery size={20} />,
-        unit: "%",
-    },
-    [KPI_NAMES.IVF_LN2_LID_STATE]: {
-        label: "Lid State",
-        description: "Alert triggers after lid change persists for the configured duration; repeats at the same interval if it continues.",
-        icon: <DoorOpen size={20} />,
-    },
-};
-
-// Default metadata for unknown KPIs
-const DEFAULT_KPI_METADATA: KpiMetadata = {
-    label: "Custom Alert",
-    description: "Custom monitoring parameter",
-    icon: <Info size={20} />,
-};
-
-// Helper to get KPI metadata
 const getKpiMetadata = (kpiName: string): KpiMetadata => {
-    return KPI_METADATA[kpiName] || DEFAULT_KPI_METADATA;
+    const cfg = getKpiFormConfig(kpiName);
+    return { label: cfg.label, description: cfg.description, icon: cfg.icon, unit: cfg.unit ?? undefined };
 };
 
-// All KPI names as an array for multi-container selection
-const ALL_KPI_NAMES = Object.values(KPI_NAMES);
+const CRYOTANK_KPI_NAMES = KPI_FORM_CONFIG
+    .filter((c) => c.tank_type === "cryotank")
+    .map((c) => c.kpi_name);
 
-// KPI-specific input type configurations
-type KpiInputType =
-    | "standard"
-    | "temperature"
-    | "percentage"
-    | "battery"
-    | "lid_state";
+const INCUBATOR_KPI_NAMES = KPI_FORM_CONFIG
+    .filter((c) => c.tank_type === "incubator")
+    .map((c) => c.kpi_name);
 
-const getKpiInputType = (kpiName: string): KpiInputType => {
-    switch (kpiName) {
-        case KPI_NAMES.IVF_TEMPERATURE_INTERNAL:
-        case KPI_NAMES.IVF_TEMPERATURE_EXTERNAL:
-            return "temperature";
-        case KPI_NAMES.IVF_LN2_LEVEL:
-            return "percentage";
-        case KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE:
-            return "battery";
-        case KPI_NAMES.IVF_LN2_LID_STATE:
-            return "lid_state";
-        default:
-            return "standard";
-    }
-};
-
-// Lid state options for select dropdown
-const LID_STATE_OPTIONS = [
-    { value: "", label: "Select State" },
-    { value: "closed", label: "Closed (Alert when opened)" },
-    { value: "open", label: "Open (Alert when closed)" },
-];
-
-// Helper to convert lid state to min/max values
-const lidStateToValues = (
-    state: string | null,
-): { min: number | null; max: number | null } => {
-    if (state === "closed") return { min: 0, max: 0 }; // Alert when lid opens (value becomes 1)
-    if (state === "open") return { min: 1, max: 1 }; // Alert when lid closes (value becomes 0)
+// Lid state helpers (kept for draft ↔ min/max conversion)
+const lidStateToValues = (state: string | null): { min: number | null; max: number | null } => {
+    const cfg = getKpiFormConfig(KPI_NAMES.IVF_LN2_LID_STATE);
+    const opt = cfg.custom_dropdown?.find((o) => o.value === state);
+    if (opt) return { min: opt.set_min, max: opt.set_max };
     return { min: null, max: null };
 };
 
-// Helper to convert min/max to lid state
 const valuesToLidState = (min: number | null, max: number | null): string => {
-    if (min === 0 && max === 0) return "closed";
-    if (min === 1 && max === 1) return "open";
-    return "";
+    const cfg = getKpiFormConfig(KPI_NAMES.IVF_LN2_LID_STATE);
+    const opt = cfg.custom_dropdown?.find((o) => o.set_min === min && o.set_max === max && o.value !== "");
+    return opt?.value ?? "";
 };
 
 // Validation helpers
@@ -222,27 +490,18 @@ const validateBattery = (
     return { valid: true };
 };
 
-// Check if alert type should be enabled based on KPI type and values
+// Check if alert type should be enabled based on KPI form config
 const isAlertTypeEnabled = (
     kpiName: string,
     min: number | null,
     max: number | null,
     lidState?: string,
 ): boolean => {
-    if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
-        return min !== null;
-    }
-    const inputType = getKpiInputType(kpiName);
-    switch (inputType) {
-        case "lid_state":
-            return !!lidState && lidState !== "";
-        case "battery":
-            return min !== null;
-        case "temperature":
-            return min !== null && max !== null;
-        default:
-            return min !== null || max !== null;
-    }
+    const cfg = getKpiFormConfig(kpiName);
+    if (cfg.custom_dropdown) return !!lidState && lidState !== "";
+    if (!cfg.max_available) return min !== null;           // battery or ln2_level
+    if (cfg.both_required) return min !== null && max !== null;  // temperature
+    return min !== null || max !== null;                   // standard
 };
 
 // Get validation for a specific KPI
@@ -251,22 +510,15 @@ const getKpiValidation = (
     min: number | null,
     max: number | null,
 ): { valid: boolean; error?: string } => {
-    if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
-        return validatePercentage(min, null);
+    const cfg = getKpiFormConfig(kpiName);
+    if (cfg.custom_dropdown) return { valid: true };       // handled by dropdown selection
+    if (!cfg.max_available) {
+        if (cfg.max_bound !== null) return validateBattery(min); // battery
+        return validatePercentage(min, null);               // ln2_level
     }
-    const inputType = getKpiInputType(kpiName);
-    switch (inputType) {
-        case "temperature":
-            return validateTemperature(min, max);
-        case "percentage":
-            return validatePercentage(min, max);
-        case "battery":
-            return validateBattery(min);
-        case "lid_state":
-            return { valid: true }; // Lid state validation is handled differently
-        default:
-            return validateMinMax(min, max);
-    }
+    if (cfg.both_required) return validateTemperature(min, max);
+    if (cfg.min_bound === 0) return validatePercentage(min, max);
+    return validateMinMax(min, max);
 };
 
 const AlertStatusBadge = ({
@@ -327,7 +579,22 @@ const AlertStatusBadge = ({
 
 export default function AlertSetting() {
     const { isAuthenticated } = useAuth();
+    const isOnboarding = useOnboardingMode();
     const [searchParams, setSearchParams] = useSearchParams();
+
+    const directionFilter: "cryotanks" | "incubators" =
+        searchParams.get("direction") === "incubators" ? "incubators" : "cryotanks";
+
+    const activeKpiNames = directionFilter === "incubators" ? INCUBATOR_KPI_NAMES : CRYOTANK_KPI_NAMES;
+
+    const setDirectionFilter = (d: "cryotanks" | "incubators") => {
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            if (d === "incubators") next.set("direction", "incubators");
+            else next.delete("direction");
+            return next;
+        }, { replace: true });
+    };
 
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [branchFilter, setBranchFilter] = useState<string>("All");
@@ -346,14 +613,19 @@ export default function AlertSetting() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams.get("branch_id"), branches]);
 
-    // Sync branchFilter (name) → URL as numeric branch_id
+    // Sync branchFilter → URL branch_id (direction is managed directly via setDirectionFilter)
     useEffect(() => {
-        const params: Record<string, string> = {};
-        if (branchFilter !== "All") {
-            const branch = branches.find((b) => b.branch_name === branchFilter);
-            if (branch) params.branch_id = String(branch.branch_id);
-        }
-        setSearchParams(params, { replace: true });
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            if (branchFilter !== "All") {
+                const branch = branches.find((b) => b.branch_name === branchFilter);
+                if (branch) next.set("branch_id", String(branch.branch_id));
+                else next.delete("branch_id");
+            } else {
+                next.delete("branch_id");
+            }
+            return next;
+        }, { replace: true });
     }, [branchFilter, branches, setSearchParams]);
 
     // Close dropdowns when clicking outside
@@ -379,9 +651,13 @@ export default function AlertSetting() {
         ContainerRow[]
     >([]);
     const primaryContainer = selectedContainers[0] ?? null;
+    const [selectedChamberId, setSelectedChamberId] = useState<string | null>(null);
     const [showBranchDropdown, setShowBranchDropdown] = useState(false);
     const [selectedTankIds, setSelectedTankIds] = useState<number[]>([]);
     const [savingToBranches, setSavingToBranches] = useState(false);
+    const [showChamberCopyDropdown, setShowChamberCopyDropdown] = useState(false);
+    const [selectedChamberIds, setSelectedChamberIds] = useState<string[]>([]);
+    const [savingToChambers, setSavingToChambers] = useState(false);
     const [configList, setConfigList] = useState<KpiConfigRow[]>([]);
     const [configLoading, setConfigLoading] = useState(false);
     const [configError, setConfigError] = useState<string | null>(null);
@@ -436,6 +712,7 @@ export default function AlertSetting() {
                 alert_type?: string | null;
                 lid_state?: string;
                 cooldown_minutes?: number;
+                unack_escalation_threshold?: number | null;
             }
         >
     >({});
@@ -449,6 +726,7 @@ export default function AlertSetting() {
                 alert_type?: string | null;
                 lid_state?: string;
                 cooldown_minutes?: number;
+                unack_escalation_threshold?: number | null;
             }
         >
     >({});
@@ -475,16 +753,17 @@ export default function AlertSetting() {
     }, []);
 
     const refetchKpiConfig = useCallback(
-        async (tankId: number, options?: { showLoading?: boolean }) => {
+        async (id: number, options?: { showLoading?: boolean; isIncubator?: boolean; chamberId?: string | null }) => {
             if (options?.showLoading) setConfigLoading(true);
             try {
-                const res = await ivfService.getKpiConfigList(tankId);
+                const type = options?.isIncubator ? "incubator" : "tank";
+                const res = await ivfService.getKpiConfigList(id, type, options?.chamberId);
                 setConfigList(res?.config ?? []);
                 setTankContext({
                     hospital_id: res?.hospital_id ?? null,
                     branch_id: res?.branch_id ?? null,
                 });
-                setConfigLoadedTankId(tankId);
+                setConfigLoadedTankId(id);
                 return res;
             } finally {
                 if (options?.showLoading) setConfigLoading(false);
@@ -506,16 +785,12 @@ export default function AlertSetting() {
                 const kpiName = kpiKey.includes("-")
                     ? kpiKey.split("-").pop()
                     : kpiKey;
-                const inputType = getKpiInputType(kpiName || "");
-                const isLn2Level = (kpiName || "") === KPI_NAMES.IVF_LN2_LEVEL;
+                const cfg = getKpiFormConfig(kpiName || "");
 
                 switch (currentField) {
                     case "min":
-                        if (inputType === "battery") {
-                            refs.alertType?.focus();
-                        } else if (isLn2Level) {
-                            refs.alertType?.focus();
-                        } else if (inputType === "lid_state") {
+                        // If max is not available (battery, ln2_level) or it's a dropdown, go straight to alert type
+                        if (!cfg.max_available || cfg.custom_dropdown) {
                             refs.alertType?.focus();
                         } else {
                             refs.max?.focus();
@@ -528,7 +803,6 @@ export default function AlertSetting() {
                         refs.alertType?.focus();
                         break;
                     case "alertType":
-                        // Move to next KPI's first input (optional - could be implemented if needed)
                         break;
                 }
             }
@@ -552,74 +826,59 @@ export default function AlertSetting() {
         if (!isAuthenticated) return;
         setContainersLoading(true);
         setContainersError(null);
-        shipmentService
-            .getActiveCanisters({})
-            .then((data: any) => {
+        setSelectedContainers([]);
+        setSelectedChamberId(null);
+
+        const fetchPromise = directionFilter === "incubators"
+            ? shipmentService.getActiveIncubators({}).then((data) => {
+                return data.branches.flatMap((branch) =>
+                    branch.incubators.map((inc) => ({
+                        tank_id: inc.incubator_id,
+                        canisterId: inc.incubator_code ?? String(inc.incubator_id),
+                        branchName: branch.branch_name,
+                        branch_id: branch.branch_id,
+                        status: "Safe" as const,
+                        date: inc.updated_at ? new Date(inc.updated_at).toLocaleDateString("en-GB") : "-",
+                        is_incubator: true,
+                        incubator_id: inc.incubator_id,
+                        chamber_r: inc.chamber_r,
+                        chamber_c: inc.chamber_c,
+                    }))
+                );
+            })
+            : shipmentService.getActiveCanisters({}).then((data: any) => {
                 let list: ContainerRow[] = [];
-                if (data?.canisters && Array.isArray(data.canisters)) {
-                    list = data.canisters.map((c: any) => ({
-                        tank_id: c.tank_id ?? c.canister_id,
-                        canisterId: String(
-                            c.canister_number ??
-                                c.canister_id ??
-                                c.tank_code ??
-                                "",
-                        ),
-                        branchName: c.branch_name ?? "N/A",
-                        branch_id: c.branch_id ?? 0,
-                        status:
-                            c.canister_status === "critical"
-                                ? "Critical"
-                                : c.canister_status === "risk"
-                                  ? "Risk"
-                                  : "Safe",
-                        date: c.updated_at
-                            ? new Date(c.updated_at).toLocaleDateString("en-GB")
-                            : "-",
-                    }));
-                } else if (data?.branches && Array.isArray(data.branches)) {
+                if (data?.branches && Array.isArray(data.branches)) {
                     list = data.branches.flatMap((branch: any) => {
                         const tanks = branch.tanks || branch.canisters || [];
                         return tanks.map((t: any) => {
-                            const status = (
-                                t.status ||
-                                t.canister_status ||
-                                "safe"
-                            ).toString();
-                            const statusDisplay =
-                                status === "critical"
-                                    ? "Critical"
-                                    : status === "risk"
-                                      ? "Risk"
-                                      : "Safe";
+                            const status = (t.status || t.canister_status || "safe").toString();
                             return {
                                 tank_id: t.tank_id ?? t.canister_id ?? 0,
-                                canisterId: String(
-                                    t.tank_code ??
-                                        t.canister_number ??
-                                        t.canister_id ??
-                                        "",
-                                ),
+                                canisterId: String(t.tank_code ?? t.canister_number ?? t.canister_id ?? ""),
                                 branchName: branch.branch_name || "N/A",
                                 branch_id: branch.branch_id ?? 0,
-                                status: statusDisplay,
-                                date: t.updated_at
-                                    ? new Date(t.updated_at).toLocaleDateString(
-                                          "en-GB",
-                                      )
-                                    : "-",
+                                status: status === "critical" ? "Critical" : status === "risk" ? "Risk" : "Safe",
+                                date: t.updated_at ? new Date(t.updated_at).toLocaleDateString("en-GB") : "-",
+                                is_incubator: false,
+                                incubator_id: null,
+                                chamber_r: null,
+                                chamber_c: null,
                             };
                         });
                     });
                 }
-                setContainers(list);
-            })
+                return list;
+            });
+
+        fetchPromise
+            .then((list) => setContainers(list))
             .catch((e: any) => {
                 setContainersError(e?.message || "Failed to fetch");
                 setContainers([]);
             })
             .finally(() => setContainersLoading(false));
-    }, [isAuthenticated]);
+    }, [isAuthenticated, directionFilter]);
 
     useEffect(() => {
         if (!primaryContainer?.tank_id) {
@@ -628,6 +887,8 @@ export default function AlertSetting() {
             setConfigLoadedTankId(null);
             return;
         }
+        // Incubators are handled by the chamber effect below
+        if (primaryContainer.is_incubator) return;
         setConfigLoading(true);
         setConfigError(null);
         setConfigLoadedTankId(null);
@@ -642,7 +903,20 @@ export default function AlertSetting() {
     useEffect(() => {
         setDraftConfig({});
         setMultiDraftConfig({});
-    }, [primaryContainer?.tank_id]);
+    }, [primaryContainer?.tank_id, selectedChamberId]);
+
+    useEffect(() => {
+        if (!primaryContainer?.is_incubator) return;
+        setConfigLoading(true);
+        setConfigError(null);
+        refetchKpiConfig(
+            primaryContainer.incubator_id ?? primaryContainer.tank_id,
+            { isIncubator: true, chamberId: selectedChamberId },
+        ).catch((e: any) => {
+            setConfigError(e?.message || "Failed to fetch KPI config");
+            setConfigList([]);
+        }).finally(() => setConfigLoading(false));
+    }, [selectedChamberId, refetchKpiConfig]);
 
     useEffect(() => {
         if (primaryContainer) {
@@ -665,6 +939,7 @@ export default function AlertSetting() {
             alert_type?: string | null;
             lid_state?: string;
             cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
         }
     > => {
         const next: Record<
@@ -675,19 +950,21 @@ export default function AlertSetting() {
                 alert_type?: string | null;
                 lid_state?: string;
                 cooldown_minutes?: number;
+                unack_escalation_threshold?: number | null;
             }
         > = {};
 
         for (const row of rows) {
-            const inputType = getKpiInputType(row.kpi_name);
+            const cfg = getKpiFormConfig(row.kpi_name);
             const baseDraft = {
                 min: row.min ?? null,
                 max: row.max ?? null,
                 alert_type: row.alert_type ?? null,
                 cooldown_minutes: row.cooldown_minutes ?? 60,
+                unack_escalation_threshold: row.unack_escalation_threshold ?? null,
             };
 
-            if (inputType === "lid_state") {
+            if (cfg.custom_dropdown) {
                 next[row.kpi_name] = {
                     ...baseDraft,
                     lid_state: valuesToLidState(row.min, row.max),
@@ -830,19 +1107,20 @@ export default function AlertSetting() {
         }
 
         setSelectedContainers(nextSelection);
+        setSelectedChamberId(nextSelection[0]?.is_incubator ? "1" : null);
     };
 
     const branchOptions = useMemo(
         () => ["All", ...branches.map((b) => b.branch_name)],
         [branches],
     );
-    const filteredContainers = useMemo(
-        () =>
-            branchFilter === "All"
-                ? containers
-                : containers.filter((c) => c.branchName === branchFilter),
-        [containers, branchFilter],
-    );
+    const filteredContainers = useMemo(() => {
+        return containers.filter((c) => {
+            const matchBranch = branchFilter === "All" || c.branchName === branchFilter;
+            const matchDevice = directionFilter === "incubators" ? c.is_incubator : !c.is_incubator;
+            return matchBranch && matchDevice;
+        });
+    }, [containers, branchFilter, directionFilter]);
     const activeFilterCount = useMemo(
         () => (branchFilter !== "All" ? 1 : 0),
         [branchFilter],
@@ -857,12 +1135,13 @@ export default function AlertSetting() {
     );
     const missingKpiNames = useMemo(
         () =>
-            ALL_KPI_NAMES.filter((kpiName) => !configuredKpiNames.has(kpiName)),
-        [configuredKpiNames],
+            activeKpiNames.filter((kpiName) => !configuredKpiNames.has(kpiName)),
+        [configuredKpiNames, activeKpiNames],
     );
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
+            if (isOnboarding) return;
             if (
                 branchDropdownRef.current &&
                 !branchDropdownRef.current.contains(event.target as Node)
@@ -873,7 +1152,7 @@ export default function AlertSetting() {
         document.addEventListener("mousedown", handleClickOutside);
         return () =>
             document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    }, [isOnboarding]);
 
     // Onboarding: pre-fill draft values for Evaporation Rate and Lid State so the
     // Save Changes button becomes active for the final tour step.
@@ -919,7 +1198,9 @@ export default function AlertSetting() {
             const payload: KpiConfigPayload = {
                 hospital_id: tankContext.hospital_id,
                 branch_id: tankContext.branch_id,
-                tank_id: primaryContainer.tank_id,
+                tank_id: primaryContainer.is_incubator ? null : primaryContainer.tank_id,
+                incubator_id: primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? null) : null,
+                chamber_id: primaryContainer.is_incubator ? (selectedChamberId ?? null) : null,
                 kpi_name: (formPayload.kpi_name ?? "").trim(),
                 alert_name: formPayload.alert_name ?? null,
                 min: formPayload.min ?? null,
@@ -931,7 +1212,7 @@ export default function AlertSetting() {
             };
             await ivfService.createKpiConfig(payload);
             closeForm();
-            await refetchKpiConfig(primaryContainer.tank_id, {
+            await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
                 showLoading: true,
             });
         } catch (e: any) {
@@ -957,7 +1238,7 @@ export default function AlertSetting() {
             });
             closeForm();
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.tank_id, {
+                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
                     showLoading: true,
                 });
             }
@@ -991,6 +1272,7 @@ export default function AlertSetting() {
             alert_type?: string | null;
             lid_state?: string;
             cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
         },
     ) => {
         setDraftConfig((prev) => {
@@ -1028,6 +1310,7 @@ export default function AlertSetting() {
             alert_type?: string | null;
             lid_state?: string;
             cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
         },
     ) => {
         setMultiDraftConfig((prev) => {
@@ -1068,23 +1351,24 @@ export default function AlertSetting() {
                 unit: string | null;
                 alert_type: string | null;
                 cooldown_minutes?: number;
+                unack_escalation_threshold?: number | null;
                 status?: boolean;
             }> = [];
-            for (const kpiName of ALL_KPI_NAMES) {
+            for (const kpiName of activeKpiNames) {
                 const d = getMultiDraft(kpiName);
                 const metadata = getKpiMetadata(kpiName);
-                const inputType = getKpiInputType(kpiName);
+                const cfg = getKpiFormConfig(kpiName);
 
                 let minVal = d.min ?? null;
                 let maxVal = d.max ?? null;
 
-                if (inputType === "battery" && minVal !== null) {
-                    maxVal = 100;
+                if (cfg.max_bound !== null && minVal !== null) {
+                    maxVal = cfg.max_bound;  // battery: max is always the hard ceiling
                 }
-                if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
-                    maxVal = null;
+                if (!cfg.max_available && cfg.max_bound === null) {
+                    maxVal = null;  // ln2_level: no max
                 }
-                if (inputType === "lid_state" && d.lid_state) {
+                if (cfg.custom_dropdown && d.lid_state) {
                     const values = lidStateToValues(d.lid_state);
                     minVal = values.min;
                     maxVal = values.max;
@@ -1106,6 +1390,7 @@ export default function AlertSetting() {
                         unit: metadata.unit ?? null,
                         alert_type: d.alert_type ?? null,
                         cooldown_minutes: d.cooldown_minutes,
+                        unack_escalation_threshold: d.alert_type === "critical" ? (d.unack_escalation_threshold ?? null) : null,
                         status: isActiveAlertType(d.alert_type ?? null),
                     });
                 }
@@ -1113,19 +1398,28 @@ export default function AlertSetting() {
 
             if (configsToApply.length === 0) return;
 
-            const tankIds = selectedContainers.map((c) => c.tank_id);
             setSaveAllLoading(true);
             try {
-                await ivfService.bulkUpsertKpiConfig(tankIds, configsToApply);
+                if (primaryContainer?.is_incubator) {
+                    await ivfService.bulkUpsertKpiConfigForIncubator(
+                        primaryContainer.incubator_id ?? primaryContainer.tank_id,
+                        selectedChamberId,
+                        configsToApply,
+                    );
+                } else {
+                    const tankIds = selectedContainers.map((c) => c.tank_id);
+                    await ivfService.bulkUpsertKpiConfig(tankIds, configsToApply);
+                }
                 setMultiDraftConfig({});
                 // For multi-container, deselect all. For single container, reload config.
                 if (selectedContainers.length > 1) {
-                    await refetchKpiConfig(selectedContainers[0].tank_id, {
-                        showLoading: true,
-                    });
+                    await refetchKpiConfig(
+                        selectedContainers[0].is_incubator ? (selectedContainers[0].incubator_id ?? selectedContainers[0].tank_id) : selectedContainers[0].tank_id,
+                        { showLoading: true, isIncubator: selectedContainers[0].is_incubator, chamberId: selectedChamberId },
+                    );
                     setSelectedContainers([]);
                 } else if (primaryContainer) {
-                    await refetchKpiConfig(primaryContainer.tank_id, {
+                    await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
                         showLoading: true,
                     });
                 }
@@ -1149,25 +1443,18 @@ export default function AlertSetting() {
                 // Find the KPI name for this config id to apply special logic
                 const config = configList.find((c) => c.id === id);
                 const kpiName = config?.kpi_name || "";
-                const inputType = getKpiInputType(kpiName);
+                const cfg = getKpiFormConfig(kpiName);
 
                 let minVal = d.min !== undefined ? d.min : undefined;
                 let maxVal = d.max !== undefined ? d.max : undefined;
 
-                // For battery, max is always 100
-                if (
-                    inputType === "battery" &&
-                    minVal !== undefined &&
-                    minVal !== null
-                ) {
-                    maxVal = 100;
+                if (cfg.max_bound !== null && minVal !== undefined && minVal !== null) {
+                    maxVal = cfg.max_bound;  // battery: max is always the hard ceiling
                 }
-                if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
-                    maxVal = null;
+                if (!cfg.max_available && cfg.max_bound === null) {
+                    maxVal = null;  // ln2_level: no max
                 }
-
-                // For lid_state, convert state to min/max
-                if (inputType === "lid_state" && d.lid_state !== undefined) {
+                if (cfg.custom_dropdown && d.lid_state !== undefined) {
                     const values = lidStateToValues(d.lid_state || null);
                     minVal = values.min;
                     maxVal = values.max;
@@ -1186,6 +1473,7 @@ export default function AlertSetting() {
                         d.cooldown_minutes !== undefined
                             ? d.cooldown_minutes
                             : undefined,
+                    unack_escalation_threshold: nextAlertType === "critical" ? (d.unack_escalation_threshold ?? null) : null,
                     status: isActiveAlertType(nextAlertType),
                 });
             }
@@ -1198,24 +1486,25 @@ export default function AlertSetting() {
                     unit: string | null;
                     alert_type: string | null;
                     cooldown_minutes?: number;
+                    unack_escalation_threshold?: number | null;
                     status?: boolean;
                 }> = [];
 
                 for (const kpiName of missingKpiNames) {
                     const d = getMultiDraft(kpiName);
                     const metadata = getKpiMetadata(kpiName);
-                    const inputType = getKpiInputType(kpiName);
+                    const cfg = getKpiFormConfig(kpiName);
 
                     let minVal = d.min ?? null;
                     let maxVal = d.max ?? null;
 
-                    if (inputType === "battery" && minVal !== null) {
-                        maxVal = 100;
+                    if (cfg.max_bound !== null && minVal !== null) {
+                        maxVal = cfg.max_bound;
                     }
-                    if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
+                    if (!cfg.max_available && cfg.max_bound === null) {
                         maxVal = null;
                     }
-                    if (inputType === "lid_state" && d.lid_state) {
+                    if (cfg.custom_dropdown && d.lid_state) {
                         const values = lidStateToValues(d.lid_state);
                         minVal = values.min;
                         maxVal = values.max;
@@ -1237,22 +1526,28 @@ export default function AlertSetting() {
                             unit: metadata.unit ?? null,
                             alert_type: d.alert_type ?? null,
                             cooldown_minutes: d.cooldown_minutes,
+                            unack_escalation_threshold: d.alert_type === "critical" ? (d.unack_escalation_threshold ?? null) : null,
                             status: isActiveAlertType(d.alert_type ?? null),
                         });
                     }
                 }
 
                 if (configsToApply.length > 0) {
-                    await ivfService.bulkUpsertKpiConfig(
-                        [primaryContainer.tank_id],
-                        configsToApply,
-                    );
+                    if (primaryContainer.is_incubator) {
+                        await ivfService.bulkUpsertKpiConfigForIncubator(
+                            primaryContainer.incubator_id ?? primaryContainer.tank_id,
+                            selectedChamberId,
+                            configsToApply,
+                        );
+                    } else {
+                        await ivfService.bulkUpsertKpiConfig([primaryContainer.tank_id], configsToApply);
+                    }
                 }
             }
             setDraftConfig({});
             setMultiDraftConfig({});
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.tank_id, {
+                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
                     showLoading: true,
                 });
             }
@@ -1271,7 +1566,7 @@ export default function AlertSetting() {
             await ivfService.deleteKpiConfig(configToDeleteId);
             closeDeleteConfirm();
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.tank_id, {
+                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
                     showLoading: true,
                 });
             }
@@ -1345,6 +1640,110 @@ export default function AlertSetting() {
         : Object.keys(draftConfig).length > 0 ||
           Object.keys(multiDraftConfig).length > 0;
 
+    // ─── Shared input renderer driven by KPI_FORM_CONFIG ─────────────────────
+    const renderKpiInputs = (
+        kpiName: string,
+        minVal: number | null,
+        maxVal: number | null,
+        lidStateVal: string,
+        kpiKey: string,
+        refs: { min?: HTMLInputElement | HTMLSelectElement | null; max?: HTMLInputElement | null },
+        onMin: (v: number | null) => void,
+        onMax: (v: number | null) => void,
+        onLid: (v: string) => void,
+    ) => {
+        const cfg = getKpiFormConfig(kpiName);
+        const dropdownKey = `lid-${kpiKey}`;
+
+        if (cfg.custom_dropdown) {
+            return (
+                <div className="flex items-center gap-2">
+                    <div className="relative w-64">
+                        <button
+                            type="button"
+                            className="dropdown-button w-full px-3 h-10 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
+                            onClick={() => setOpenDropdowns((prev) => ({ ...prev, [dropdownKey]: !prev[dropdownKey] }))}
+                        >
+                            <span>{cfg.custom_dropdown.find((o) => o.value === lidStateVal)?.label || "Select"}</span>
+                            <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns[dropdownKey] ? "rotate-180" : ""}`} />
+                        </button>
+                        {openDropdowns[dropdownKey] && (
+                            <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                {cfg.custom_dropdown.map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${opt.value === lidStateVal ? "bg-gray-200 text-gray-900" : "text-gray-700 hover:bg-gray-100"}`}
+                                        onClick={() => {
+                                            onLid(opt.value);
+                                            setOpenDropdowns((prev) => ({ ...prev, [dropdownKey]: false }));
+                                        }}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <>
+                {cfg.min_available && (
+                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                        <span className="text-xs text-gray-400 block">{cfg.min_label ?? "Min"}</span>
+                        <div className="flex items-center gap-1">
+                            <input
+                                ref={(el) => { refs.min = el; }}
+                                type="number"
+                                step="any"
+                                min={cfg.min_bound ?? undefined}
+                                max={cfg.max_bound ?? undefined}
+                                value={minVal != null ? minVal : ""}
+                                onChange={(e) => {
+                                    let v = e.target.value === "" ? null : Number(e.target.value);
+                                    if (v !== null && cfg.min_bound !== null && v < cfg.min_bound) v = cfg.min_bound;
+                                    if (v !== null && cfg.max_bound !== null && v > cfg.max_bound) v = cfg.max_bound;
+                                    onMin(v);
+                                }}
+                                onKeyDown={(e) => handleKeyDown(e, kpiKey, "min")}
+                                placeholder={cfg.min_label ?? "Min"}
+                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
+                            />
+                            {cfg.unit && <span className="text-sm text-gray-500 shrink-0">{cfg.unit}</span>}
+                        </div>
+                    </label>
+                )}
+                {cfg.max_available && (
+                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                        <span className="text-xs text-gray-400 block">{cfg.max_label ?? "Max"}</span>
+                        <div className="flex items-center gap-1">
+                            <input
+                                ref={(el) => { refs.max = el as HTMLInputElement; }}
+                                type="number"
+                                step="any"
+                                min={cfg.min_bound ?? undefined}
+                                value={maxVal != null ? maxVal : ""}
+                                onChange={(e) => {
+                                    let v = e.target.value === "" ? null : Number(e.target.value);
+                                    if (v !== null && cfg.min_bound !== null && v < cfg.min_bound) v = cfg.min_bound;
+                                    onMax(v);
+                                }}
+                                onKeyDown={(e) => handleKeyDown(e, kpiKey, "max")}
+                                placeholder={cfg.max_label ?? "Max"}
+                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
+                            />
+                            {cfg.unit && <span className="text-sm text-gray-500 shrink-0">{cfg.unit}</span>}
+                        </div>
+                    </label>
+                )}
+            </>
+        );
+    };
+    // ─────────────────────────────────────────────────────────────────────────
+
     return (
         <>
                 <PageLayout
@@ -1381,6 +1780,25 @@ export default function AlertSetting() {
                         <div className="w-full xl1:w-[380px] xl1:shrink-0 flex flex-col gap-6">
                             {/* Filters card - hidden on mobile (shown via header filter icon) */}
                             <div id="onboarding-alert-filters" className="hidden md:flex bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 flex-col gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Direction</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setDirectionFilter("cryotanks")}
+                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "cryotanks" ? "bg-[#6b1176] text-white border-[#6b1176]" : "bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50"}`}
+                                        >
+                                            Cryotanks
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setDirectionFilter("incubators")}
+                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "incubators" ? "bg-[#6b1176] text-white border-[#6b1176]" : "bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50"}`}
+                                        >
+                                            Incubators
+                                        </button>
+                                    </div>
+                                </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Branch
@@ -1463,11 +1881,11 @@ export default function AlertSetting() {
                             <div id="onboarding-alert-containers" className="bg-white border border-[#E7E1E1] rounded-lg p-3 flex flex-col overflow-hidden flex-1 min-h-[340px]">
                                 <div className="flex items-center justify-between mb-2">
                                     <h2 className="font-bold text-black text-base">
-                                        Active Containers
+                                        {directionFilter === "incubators" ? "Active Incubators" : "Active Containers"}
                                     </h2>
                                 </div>
                                 <div className="pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176]">
-                                    Containers #
+                                    {directionFilter === "incubators" ? "Incubators #" : "Containers #"}
                                 </div>
                                 <div
                                     className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
@@ -1548,7 +1966,7 @@ export default function AlertSetting() {
                                                     } ${lockContainerSelection ? "opacity-70 cursor-not-allowed" : ""}`}
                                                 >
                                                     <span className="text-[#6b1176] text-xs font-bold block truncate">
-                                                        Container {c.canisterId}
+                                                        {directionFilter === "incubators" ? "Incubator" : "Container"} {c.canisterId}
                                                     </span>
                                                     {c.branchName && c.branchName !== "N/A" && (
                                                         <div className="text-xs text-gray-900 leading-snug truncate">
@@ -1582,9 +2000,9 @@ export default function AlertSetting() {
                                 <h2 className="font-bold text-black text-base">
                                     Alert Configuration{" "}
                                     {selectedContainers.length > 1
-                                        ? `- ${selectedContainers.length} Containers Selected`
+                                        ? `- ${selectedContainers.length} ${directionFilter === "incubators" ? "Incubators" : "Containers"} Selected`
                                         : primaryContainer
-                                          ? `- Cryocan ${primaryContainer.canisterId}`
+                                          ? `- ${directionFilter === "incubators" ? "Incubator" : "Cryocan"} ${primaryContainer.canisterId}`
                                           : ""}
                                 </h2>
                                 <button
@@ -1656,11 +2074,55 @@ export default function AlertSetting() {
                                                     scrollbarWidth: "thin",
                                                 }}
                                             >
+                                                {primaryContainer?.is_incubator &&
+                                                    primaryContainer.chamber_r != null &&
+                                                    primaryContainer.chamber_c != null && (
+                                                        <div className="mb-3">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                                                    Select Chamber
+                                                                </p>
+                                                                {selectedChamberId && (
+                                                                    <span className="text-xs bg-[#6b1176]/10 text-[#6b1176] font-semibold px-2 py-0.5 rounded-full">
+                                                                        Chamber {selectedChamberId} selected
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="w-full max-w-sm mx-auto rounded-xl p-3">
+                                                                <div
+                                                                    className="grid gap-2"
+                                                                    style={{ gridTemplateColumns: `repeat(${primaryContainer.chamber_c}, minmax(0, 1fr))` }}
+                                                                >
+                                                                    {Array.from({ length: primaryContainer.chamber_r }).map((_, r) =>
+                                                                        Array.from({ length: primaryContainer.chamber_c! }).map((_, c) => {
+                                                                            const num = r * primaryContainer.chamber_c! + c + 1;
+                                                                            const id = String(num);
+                                                                            const active = selectedChamberId === id;
+                                                                            return (
+                                                                                <button
+                                                                                    key={id}
+                                                                                    type="button"
+                                                                                    onClick={() => setSelectedChamberId(active ? null : id)}
+                                                                                    className={`w-full h-10 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                                                                                        active
+                                                                                            ? "bg-[#6b1176] text-white scale-105"
+                                                                                            : "bg-white text-gray-500 border border-gray-200 hover:border-[#6b1176] hover:text-[#6b1176] hover:scale-105"
+                                                                                    }`}
+                                                                                >
+                                                                                    {num}
+                                                                                </button>
+                                                                            );
+                                                                        })
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 {/* Multi-container mode OR single container with no config: show all KPI types with empty values */}
                                                 {selectedContainers.length >
                                                     1 ||
                                                 configList.length === 0 ? (
-                                                    ALL_KPI_NAMES.map(
+                                                    activeKpiNames.map(
                                                         (kpiName) => {
                                                             const d =
                                                                 getMultiDraft(
@@ -1681,10 +2143,6 @@ export default function AlertSetting() {
                                                                 60;
                                                             const metadata =
                                                                 getKpiMetadata(
-                                                                    kpiName,
-                                                                );
-                                                            const inputType =
-                                                                getKpiInputType(
                                                                     kpiName,
                                                                 );
                                                             const kpiKey = `multi-${kpiName}`;
@@ -1799,385 +2257,16 @@ export default function AlertSetting() {
                                                                             )}
 
                                                                             <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-2 md:mt-4">
-                                                                                {/* Lid State - special select input */}
-                                                                                {inputType ===
-                                                                                "lid_state" ? (
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <div className="relative w-64">
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                className="dropdown-button w-full px-3 h-10 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
-                                                                                                onClick={() =>
-                                                                                                    setOpenDropdowns(
-                                                                                                        (
-                                                                                                            prev,
-                                                                                                        ) => ({
-                                                                                                            ...prev,
-                                                                                                            [`multi-lid-${kpiName}`]:
-                                                                                                                !prev[
-                                                                                                                    `multi-lid-${kpiName}`
-                                                                                                                ],
-                                                                                                        }),
-                                                                                                    )
-                                                                                                }
-                                                                                            >
-                                                                                                <span>
-                                                                                                    {LID_STATE_OPTIONS.find(
-                                                                                                        (
-                                                                                                            opt,
-                                                                                                        ) =>
-                                                                                                            opt.value ===
-                                                                                                            lidStateVal,
-                                                                                                    )
-                                                                                                        ?.label ||
-                                                                                                        "Select"}
-                                                                                                </span>
-                                                                                                <ChevronDown
-                                                                                                    className={`w-4 h-4 transition-transform ${openDropdowns[`multi-lid-${kpiName}`] ? "rotate-180" : ""}`}
-                                                                                                />
-                                                                                            </button>
-                                                                                            {openDropdowns[
-                                                                                                `multi-lid-${kpiName}`
-                                                                                            ] && (
-                                                                                                <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                                                                                                    {LID_STATE_OPTIONS.map(
-                                                                                                        (
-                                                                                                            opt,
-                                                                                                        ) => (
-                                                                                                            <button
-                                                                                                                key={
-                                                                                                                    opt.value
-                                                                                                                }
-                                                                                                                type="button"
-                                                                                                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                                                                                    opt.value ===
-                                                                                                                    lidStateVal
-                                                                                                                        ? "bg-gray-200 text-gray-900"
-                                                                                                                        : "text-gray-700 hover:bg-gray-100"
-                                                                                                                }`}
-                                                                                                                onClick={() => {
-                                                                                                                    setMultiDraft(
-                                                                                                                        kpiName,
-                                                                                                                        {
-                                                                                                                            lid_state:
-                                                                                                                                opt.value,
-                                                                                                                        },
-                                                                                                                    );
-                                                                                                                    setOpenDropdowns(
-                                                                                                                        (
-                                                                                                                            prev,
-                                                                                                                        ) => ({
-                                                                                                                            ...prev,
-                                                                                                                            [`multi-lid-${kpiName}`]: false,
-                                                                                                                        }),
-                                                                                                                    );
-                                                                                                                }}
-                                                                                                            >
-                                                                                                                {
-                                                                                                                    opt.label
-                                                                                                                }
-                                                                                                            </button>
-                                                                                                        ),
-                                                                                                    )}
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ) : inputType ===
-                                                                                  "battery" ? (
-                                                                                    /* Battery - only min input, max is always 100 */
-                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                        <span className="text-xs text-gray-400 block">Min</span>
-                                                                                        <div className="flex items-center gap-1">
-                                                                                        <input
-                                                                                            ref={(
-                                                                                                el,
-                                                                                            ) => {
-                                                                                                refs.min =
-                                                                                                    el;
-                                                                                            }}
-                                                                                            type="number"
-                                                                                            step="any"
-                                                                                            min={
-                                                                                                0
-                                                                                            }
-                                                                                            max={
-                                                                                                100
-                                                                                            }
-                                                                                            value={
-                                                                                                minVal !=
-                                                                                                null
-                                                                                                    ? minVal
-                                                                                                    : ""
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                e,
-                                                                                            ) => {
-                                                                                                let v =
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value ===
-                                                                                                    ""
-                                                                                                        ? null
-                                                                                                        : Number(
-                                                                                                              e
-                                                                                                                  .target
-                                                                                                                  .value,
-                                                                                                          );
-                                                                                                if (
-                                                                                                    v !==
-                                                                                                        null &&
-                                                                                                    v <
-                                                                                                        0
-                                                                                                )
-                                                                                                    v = 0;
-                                                                                                if (
-                                                                                                    v !==
-                                                                                                        null &&
-                                                                                                    v >
-                                                                                                        100
-                                                                                                )
-                                                                                                    v = 100;
-                                                                                                setMultiDraft(
-                                                                                                    kpiName,
-                                                                                                    {
-                                                                                                        min: v,
-                                                                                                    },
-                                                                                                );
-                                                                                            }}
-                                                                                            onKeyDown={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                handleKeyDown(
-                                                                                                    e,
-                                                                                                    kpiKey,
-                                                                                                    "min",
-                                                                                                )
-                                                                                            }
-                                                                                            placeholder="Min"
-                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                                                                                        />
-                                                                                        {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
-                                                                                        </div>
-                                                                                    </label>
-                                                                                ) : kpiName ===
-                                                                                  KPI_NAMES.IVF_LN2_LEVEL ? (
-                                                                                    /* LN2 - single threshold like battery */
-                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                        <span className="text-xs text-gray-400 block">Min</span>
-                                                                                        <div className="flex items-center gap-1">
-                                                                                        <input
-                                                                                            ref={(
-                                                                                                el,
-                                                                                            ) => {
-                                                                                                refs.min =
-                                                                                                    el;
-                                                                                            }}
-                                                                                            type="number"
-                                                                                            step="any"
-                                                                                            min={
-                                                                                                0
-                                                                                            }
-                                                                                            max={
-                                                                                                100
-                                                                                            }
-                                                                                            value={
-                                                                                                minVal !=
-                                                                                                null
-                                                                                                    ? minVal
-                                                                                                    : ""
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                e,
-                                                                                            ) => {
-                                                                                                let v =
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value ===
-                                                                                                    ""
-                                                                                                        ? null
-                                                                                                        : Number(
-                                                                                                              e
-                                                                                                                  .target
-                                                                                                                  .value,
-                                                                                                          );
-                                                                                                if (
-                                                                                                    v !==
-                                                                                                        null &&
-                                                                                                    v <
-                                                                                                        0
-                                                                                                )
-                                                                                                    v = 0;
-                                                                                                if (
-                                                                                                    v !==
-                                                                                                        null &&
-                                                                                                    v >
-                                                                                                        100
-                                                                                                )
-                                                                                                    v = 100;
-                                                                                                setMultiDraft(
-                                                                                                    kpiName,
-                                                                                                    {
-                                                                                                        min: v,
-                                                                                                        max: null,
-                                                                                                    },
-                                                                                                );
-                                                                                            }}
-                                                                                            onKeyDown={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                handleKeyDown(
-                                                                                                    e,
-                                                                                                    kpiKey,
-                                                                                                    "min",
-                                                                                                )
-                                                                                            }
-                                                                                            placeholder="Min"
-                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                                                                                        />
-                                                                                        {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
-                                                                                        </div>
-                                                                                    </label>
-                                                                                ) : (
-                                                                                    /* Standard/Temperature/Percentage inputs */
-                                                                                    <>
-                                                                                        <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                            <span className="text-xs text-gray-400 block">Min</span>
-                                                                                            <div className="flex items-center gap-1">
-                                                                                            <input
-                                                                                                ref={(
-                                                                                                    el,
-                                                                                                ) => {
-                                                                                                    refs.min =
-                                                                                                        el;
-                                                                                                }}
-                                                                                                type="number"
-                                                                                                step="any"
-                                                                                                min={
-                                                                                                    inputType ===
-                                                                                                    "percentage"
-                                                                                                        ? 0
-                                                                                                        : undefined
-                                                                                                }
-                                                                                                value={
-                                                                                                    minVal !=
-                                                                                                    null
-                                                                                                        ? minVal
-                                                                                                        : ""
-                                                                                                }
-                                                                                                onChange={(
-                                                                                                    e,
-                                                                                                ) => {
-                                                                                                    let v =
-                                                                                                        e
-                                                                                                            .target
-                                                                                                            .value ===
-                                                                                                        ""
-                                                                                                            ? null
-                                                                                                            : Number(
-                                                                                                                  e
-                                                                                                                      .target
-                                                                                                                      .value,
-                                                                                                              );
-                                                                                                    if (
-                                                                                                        inputType ===
-                                                                                                            "percentage" &&
-                                                                                                        v !==
-                                                                                                            null &&
-                                                                                                        v <
-                                                                                                            0
-                                                                                                    )
-                                                                                                        v = 0;
-                                                                                                    setMultiDraft(
-                                                                                                        kpiName,
-                                                                                                        {
-                                                                                                            min: v,
-                                                                                                        },
-                                                                                                    );
-                                                                                                }}
-                                                                                                onKeyDown={(
-                                                                                                    e,
-                                                                                                ) =>
-                                                                                                    handleKeyDown(
-                                                                                                        e,
-                                                                                                        kpiKey,
-                                                                                                        "min",
-                                                                                                    )
-                                                                                                }
-                                                                                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                                                                                            />
-                                                                                                {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
-                                                                                            </div>
-                                                                                        </label>
-                                                                                        <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                            <span className="text-xs text-gray-400 block">Max</span>
-                                                                                            <div className="flex items-center gap-1">
-                                                                                            <input
-                                                                                                ref={(
-                                                                                                    el,
-                                                                                                ) => {
-                                                                                                    refs.max =
-                                                                                                        el;
-                                                                                                }}
-                                                                                                type="number"
-                                                                                                step="any"
-                                                                                                min={
-                                                                                                    inputType ===
-                                                                                                    "percentage"
-                                                                                                        ? 0
-                                                                                                        : undefined
-                                                                                                }
-                                                                                                value={
-                                                                                                    maxVal !=
-                                                                                                    null
-                                                                                                        ? maxVal
-                                                                                                        : ""
-                                                                                                }
-                                                                                                onChange={(
-                                                                                                    e,
-                                                                                                ) => {
-                                                                                                    let v =
-                                                                                                        e
-                                                                                                            .target
-                                                                                                            .value ===
-                                                                                                        ""
-                                                                                                            ? null
-                                                                                                            : Number(
-                                                                                                                  e
-                                                                                                                      .target
-                                                                                                                      .value,
-                                                                                                              );
-                                                                                                    if (
-                                                                                                        inputType ===
-                                                                                                            "percentage" &&
-                                                                                                        v !==
-                                                                                                            null &&
-                                                                                                        v <
-                                                                                                            0
-                                                                                                    )
-                                                                                                        v = 0;
-                                                                                                    setMultiDraft(
-                                                                                                        kpiName,
-                                                                                                        {
-                                                                                                            max: v,
-                                                                                                        },
-                                                                                                    );
-                                                                                                }}
-                                                                                                onKeyDown={(
-                                                                                                    e,
-                                                                                                ) =>
-                                                                                                    handleKeyDown(
-                                                                                                        e,
-                                                                                                        kpiKey,
-                                                                                                        "max",
-                                                                                                    )
-                                                                                                }
-                                                                                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                                                                                            />
-                                                                                                {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
-                                                                                            </div>
-                                                                                        </label>
-                                                                                    </>
+                                                                                {renderKpiInputs(
+                                                                                    kpiName,
+                                                                                    minVal,
+                                                                                    maxVal,
+                                                                                    lidStateVal,
+                                                                                    kpiKey,
+                                                                                    refs,
+                                                                                    (v) => setMultiDraft(kpiName, { min: v }),
+                                                                                    (v) => setMultiDraft(kpiName, { max: v }),
+                                                                                    (v) => setMultiDraft(kpiName, { lid_state: v }),
                                                                                 )}
                                                                                 <div className="flex flex-wrap items-center gap-3">
                                                                                 <div className="relative w-44 min-w-[140px]">
@@ -2242,8 +2331,9 @@ export default function AlertSetting() {
                                                                                                             setMultiDraft(
                                                                                                                 kpiName,
                                                                                                                 {
-                                                                                                                    alert_type:
-                                                                                                                        v,
+                                                                                                                    alert_type: v,
+                                                                                                                    // Clear escalation threshold when moving away from critical
+                                                                                                                    ...(v !== "critical" && { unack_escalation_threshold: null }),
                                                                                                                 },
                                                                                                             );
                                                                                                             setOpenDropdowns(
@@ -2326,6 +2416,36 @@ export default function AlertSetting() {
                                                                                         </div>
                                                                                     </label>
                                                                                 )}
+                                                                                {/* Escalation Threshold — critical alerts only */}
+                                                                                {isCritical && (
+                                                                                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg min-w-[100px]">
+                                                                                        <span className="text-[10px] text-orange-700 font-medium">Escalation</span>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <input
+                                                                                                type="number"
+                                                                                                min={0}
+                                                                                                step={1}
+                                                                                                placeholder="—"
+                                                                                                value={d.unack_escalation_threshold ?? ""}
+                                                                                                onChange={(e) => {
+                                                                                                    const raw = e.target.value;
+                                                                                                    setMultiDraft(kpiName, {
+                                                                                                        unack_escalation_threshold: raw === "" ? null : Math.max(0, Math.round(Number(raw))),
+                                                                                                    });
+                                                                                                }}
+                                                                                                title="Send escalation email to admins/managers after N consecutive unacknowledged alerts. Leave empty to disable."
+                                                                                                className="w-10 text-sm text-orange-900 bg-transparent outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                            />
+                                                                                            <span className="text-[10px] text-orange-600 whitespace-nowrap">
+                                                                                                {d.unack_escalation_threshold === null || d.unack_escalation_threshold === undefined
+                                                                                                    ? "disabled"
+                                                                                                    : d.unack_escalation_threshold === 0
+                                                                                                    ? "⚡ immediate"
+                                                                                                    : `after ${d.unack_escalation_threshold} unack`}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
                                                                                 </div>
                                                                             </div>
                                                                         </div>
@@ -2370,10 +2490,6 @@ export default function AlertSetting() {
                                                                 r.alert_name?.trim()
                                                                     ? r.alert_name
                                                                     : metadata.label;
-                                                            const inputType =
-                                                                getKpiInputType(
-                                                                    r.kpi_name,
-                                                                );
                                                             const kpiKey = `single-${r.id}`;
                                                             const refs =
                                                                 getInputRefs(
@@ -2486,315 +2602,16 @@ export default function AlertSetting() {
 
                                                                             {/* Inputs Row */}
                                                                             <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-2 md:mt-4">
-                                                                                {/* Lid State - special select input */}
-                                                                                {inputType ===
-                                                                                "lid_state" ? (
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <div className="relative w-64">
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                className="dropdown-button w-full px-3 h-12 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
-                                                                                                onClick={() =>
-                                                                                                    setOpenDropdowns(
-                                                                                                        (
-                                                                                                            prev,
-                                                                                                        ) => ({
-                                                                                                            ...prev,
-                                                                                                            [`single-lid-${r.id}`]:
-                                                                                                                !prev[
-                                                                                                                    `single-lid-${r.id}`
-                                                                                                                ],
-                                                                                                        }),
-                                                                                                    )
-                                                                                                }
-                                                                                            >
-                                                                                                <span>
-                                                                                                    {LID_STATE_OPTIONS.find(
-                                                                                                        (
-                                                                                                            opt,
-                                                                                                        ) =>
-                                                                                                            opt.value ===
-                                                                                                            lidStateVal,
-                                                                                                    )
-                                                                                                        ?.label ||
-                                                                                                        "Select"}
-                                                                                                </span>
-                                                                                                <ChevronDown
-                                                                                                    className={`w-4 h-4 transition-transform ${openDropdowns[`single-lid-${r.id}`] ? "rotate-180" : ""}`}
-                                                                                                />
-                                                                                            </button>
-                                                                                            {openDropdowns[
-                                                                                                `single-lid-${r.id}`
-                                                                                            ] && (
-                                                                                                <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                                                                                                    {LID_STATE_OPTIONS.map(
-                                                                                                        (
-                                                                                                            opt,
-                                                                                                        ) => (
-                                                                                                            <button
-                                                                                                                key={
-                                                                                                                    opt.value
-                                                                                                                }
-                                                                                                                type="button"
-                                                                                                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                                                                                    opt.value ===
-                                                                                                                    lidStateVal
-                                                                                                                        ? "bg-gray-200 text-gray-900"
-                                                                                                                        : "text-gray-700 hover:bg-gray-100"
-                                                                                                                }`}
-                                                                                                                onClick={() => {
-                                                                                                                    setDraft(
-                                                                                                                        r.id,
-                                                                                                                        {
-                                                                                                                            lid_state:
-                                                                                                                                opt.value,
-                                                                                                                        },
-                                                                                                                    );
-                                                                                                                    setOpenDropdowns(
-                                                                                                                        (
-                                                                                                                            prev,
-                                                                                                                        ) => ({
-                                                                                                                            ...prev,
-                                                                                                                            [`single-lid-${r.id}`]: false,
-                                                                                                                        }),
-                                                                                                                    );
-                                                                                                                }}
-                                                                                                            >
-                                                                                                                {
-                                                                                                                    opt.label
-                                                                                                                }
-                                                                                                            </button>
-                                                                                                        ),
-                                                                                                    )}
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ) : inputType ===
-                                                                                      "battery" ||
-                                                                                  r.kpi_name ===
-                                                                                      KPI_NAMES.IVF_LN2_LEVEL ? (
-                                                                                    /* Battery - only min input, max is always 100 */
-                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                        <span className="text-xs text-gray-400 block">Min</span>
-                                                                                        <div className="flex items-center gap-1">
-                                                                                        <input
-                                                                                            ref={(
-                                                                                                el,
-                                                                                            ) => {
-                                                                                                refs.min =
-                                                                                                    el;
-                                                                                            }}
-                                                                                            type="number"
-                                                                                            step="any"
-                                                                                            min={
-                                                                                                0
-                                                                                            }
-                                                                                            max={
-                                                                                                100
-                                                                                            }
-                                                                                            value={
-                                                                                                minVal !=
-                                                                                                null
-                                                                                                    ? minVal
-                                                                                                    : ""
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                e,
-                                                                                            ) => {
-                                                                                                let v =
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value ===
-                                                                                                    ""
-                                                                                                        ? null
-                                                                                                        : Number(
-                                                                                                              e
-                                                                                                                  .target
-                                                                                                                  .value,
-                                                                                                          );
-                                                                                                if (
-                                                                                                    v !==
-                                                                                                        null &&
-                                                                                                    v <
-                                                                                                        0
-                                                                                                )
-                                                                                                    v = 0;
-                                                                                                if (
-                                                                                                    v !==
-                                                                                                        null &&
-                                                                                                    v >
-                                                                                                        100
-                                                                                                )
-                                                                                                    v = 100;
-                                                                                                setDraft(
-                                                                                                    r.id,
-                                                                                                    {
-                                                                                                        min: v,
-                                                                                                        ...(r.kpi_name ===
-                                                                                                        KPI_NAMES.IVF_LN2_LEVEL
-                                                                                                            ? {
-                                                                                                                  max: null,
-                                                                                                              }
-                                                                                                            : {}),
-                                                                                                    },
-                                                                                                );
-                                                                                            }}
-                                                                                            onKeyDown={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                handleKeyDown(
-                                                                                                    e,
-                                                                                                    kpiKey,
-                                                                                                    "min",
-                                                                                                )
-                                                                                            }
-                                                                                            placeholder="Min"
-                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                                                                                        />
-                                                                                        {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
-                                                                                        </div>
-                                                                                    </label>
-                                                                                ) : (
-                                                                                    /* Standard/Temperature/Percentage inputs */
-                                                                                    <>
-                                                                                        <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                            <span className="text-xs text-gray-400 block">Min</span>
-                                                                                            <div className="flex items-center gap-1">
-                                                                                            <input
-                                                                                                ref={(
-                                                                                                    el,
-                                                                                                ) => {
-                                                                                                    refs.min =
-                                                                                                        el;
-                                                                                                }}
-                                                                                                type="number"
-                                                                                                step="any"
-                                                                                                min={
-                                                                                                    inputType ===
-                                                                                                    "percentage"
-                                                                                                        ? 0
-                                                                                                        : undefined
-                                                                                                }
-                                                                                                value={
-                                                                                                    minVal !=
-                                                                                                    null
-                                                                                                        ? minVal
-                                                                                                        : ""
-                                                                                                }
-                                                                                                onChange={(
-                                                                                                    e,
-                                                                                                ) => {
-                                                                                                    let v =
-                                                                                                        e
-                                                                                                            .target
-                                                                                                            .value ===
-                                                                                                        ""
-                                                                                                            ? null
-                                                                                                            : Number(
-                                                                                                                  e
-                                                                                                                      .target
-                                                                                                                      .value,
-                                                                                                              );
-                                                                                                    if (
-                                                                                                        inputType ===
-                                                                                                            "percentage" &&
-                                                                                                        v !==
-                                                                                                            null &&
-                                                                                                        v <
-                                                                                                            0
-                                                                                                    )
-                                                                                                        v = 0;
-                                                                                                    setDraft(
-                                                                                                        r.id,
-                                                                                                        {
-                                                                                                            min: v,
-                                                                                                        },
-                                                                                                    );
-                                                                                                }}
-                                                                                                onKeyDown={(
-                                                                                                    e,
-                                                                                                ) =>
-                                                                                                    handleKeyDown(
-                                                                                                        e,
-                                                                                                        kpiKey,
-                                                                                                        "min",
-                                                                                                    )
-                                                                                                }
-                                                                                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                                                                                            />
-                                                                                                {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
-                                                                                            </div>
-                                                                                        </label>
-                                                                                        <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                            <span className="text-xs text-gray-400 block">Max</span>
-                                                                                            <div className="flex items-center gap-1">
-                                                                                            <input
-                                                                                                ref={(
-                                                                                                    el,
-                                                                                                ) => {
-                                                                                                    refs.max =
-                                                                                                        el;
-                                                                                                }}
-                                                                                                type="number"
-                                                                                                step="any"
-                                                                                                min={
-                                                                                                    inputType ===
-                                                                                                    "percentage"
-                                                                                                        ? 0
-                                                                                                        : undefined
-                                                                                                }
-                                                                                                value={
-                                                                                                    maxVal !=
-                                                                                                    null
-                                                                                                        ? maxVal
-                                                                                                        : ""
-                                                                                                }
-                                                                                                onChange={(
-                                                                                                    e,
-                                                                                                ) => {
-                                                                                                    let v =
-                                                                                                        e
-                                                                                                            .target
-                                                                                                            .value ===
-                                                                                                        ""
-                                                                                                            ? null
-                                                                                                            : Number(
-                                                                                                                  e
-                                                                                                                      .target
-                                                                                                                      .value,
-                                                                                                              );
-                                                                                                    if (
-                                                                                                        inputType ===
-                                                                                                            "percentage" &&
-                                                                                                        v !==
-                                                                                                            null &&
-                                                                                                        v <
-                                                                                                            0
-                                                                                                    )
-                                                                                                        v = 0;
-                                                                                                    setDraft(
-                                                                                                        r.id,
-                                                                                                        {
-                                                                                                            max: v,
-                                                                                                        },
-                                                                                                    );
-                                                                                                }}
-                                                                                                onKeyDown={(
-                                                                                                    e,
-                                                                                                ) =>
-                                                                                                    handleKeyDown(
-                                                                                                        e,
-                                                                                                        kpiKey,
-                                                                                                        "max",
-                                                                                                    )
-                                                                                                }
-                                                                                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                                                                                            />
-                                                                                                {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
-                                                                                            </div>
-                                                                                        </label>
-                                                                                    </>
+                                                                                {renderKpiInputs(
+                                                                                    r.kpi_name,
+                                                                                    minVal,
+                                                                                    maxVal,
+                                                                                    lidStateVal,
+                                                                                    kpiKey,
+                                                                                    refs,
+                                                                                    (v) => setDraft(r.id, { min: v }),
+                                                                                    (v) => setDraft(r.id, { max: v }),
+                                                                                    (v) => setDraft(r.id, { lid_state: v }),
                                                                                 )}
 
                                                                                 {/* Alert Type Select */}
@@ -2861,8 +2678,9 @@ export default function AlertSetting() {
                                                                                                             setDraft(
                                                                                                                 r.id,
                                                                                                                 {
-                                                                                                                    alert_type:
-                                                                                                                        v,
+                                                                                                                    alert_type: v,
+                                                                                                                    // Clear escalation threshold when moving away from critical
+                                                                                                                    ...(v !== "critical" && { unack_escalation_threshold: null }),
                                                                                                                 },
                                                                                                             );
                                                                                                             setOpenDropdowns(
@@ -2945,6 +2763,39 @@ export default function AlertSetting() {
                                                                                         </div>
                                                                                     </label>
                                                                                 )}
+                                                                                {/* Escalation Threshold — critical alerts only */}
+                                                                                {isCritical && (
+                                                                                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg min-w-[100px]">
+                                                                                        <span className="text-[10px] text-orange-700 font-medium">Escalation</span>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <input
+                                                                                                type="number"
+                                                                                                min={0}
+                                                                                                step={1}
+                                                                                                placeholder="—"
+                                                                                                value={
+                                                                                                    (d.unack_escalation_threshold !== undefined
+                                                                                                        ? d.unack_escalation_threshold
+                                                                                                        : r.unack_escalation_threshold) ?? ""
+                                                                                                }
+                                                                                                onChange={(e) => {
+                                                                                                    const raw = e.target.value;
+                                                                                                    setDraft(r.id, {
+                                                                                                        unack_escalation_threshold: raw === "" ? null : Math.max(0, Math.round(Number(raw))),
+                                                                                                    });
+                                                                                                }}
+                                                                                                title="Send escalation email to admins/managers after N consecutive unacknowledged alerts. Leave empty to disable."
+                                                                                                className="w-10 text-sm text-orange-900 bg-transparent outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                            />
+                                                                                            <span className="text-[10px] text-orange-600 whitespace-nowrap">
+                                                                                                {(() => {
+                                                                                                    const v = d.unack_escalation_threshold !== undefined ? d.unack_escalation_threshold : r.unack_escalation_threshold;
+                                                                                                    return v === null || v === undefined ? "disabled" : v === 0 ? "⚡ immediate" : `after ${v} unack`;
+                                                                                                })()}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
                                                                                 </div>
                                                                             </div>
                                                                         </div>
@@ -2975,10 +2826,6 @@ export default function AlertSetting() {
                                                                     60;
                                                                 const metadata =
                                                                     getKpiMetadata(
-                                                                        kpiName,
-                                                                    );
-                                                                const inputType =
-                                                                    getKpiInputType(
                                                                         kpiName,
                                                                     );
                                                                 const kpiKey = `single-missing-${kpiName}`;
@@ -3040,312 +2887,18 @@ export default function AlertSetting() {
                                                                                     />
                                                                                 </div>
                                                                                 <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-2 md:mt-4">
-                                                                                {inputType ===
-                                                                                "lid_state" ? (
-                                                                                <div className="relative w-64">
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className="dropdown-button w-full px-3 h-12 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
-                                                                                        onClick={() =>
-                                                                                            setOpenDropdowns(
-                                                                                                (
-                                                                                                    prev,
-                                                                                                ) => ({
-                                                                                                    ...prev,
-                                                                                                    [`single-missing-lid-${kpiName}`]:
-                                                                                                        !prev[
-                                                                                                            `single-missing-lid-${kpiName}`
-                                                                                                        ],
-                                                                                                }),
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        <span>
-                                                                                            {LID_STATE_OPTIONS.find(
-                                                                                                (
-                                                                                                    opt,
-                                                                                                ) =>
-                                                                                                    opt.value ===
-                                                                                                    lidStateVal,
-                                                                                            )
-                                                                                                ?.label ||
-                                                                                                "Select"}
-                                                                                        </span>
-                                                                                        <ChevronDown
-                                                                                            className={`w-4 h-4 transition-transform ${openDropdowns[`single-missing-lid-${kpiName}`] ? "rotate-180" : ""}`}
-                                                                                        />
-                                                                                    </button>
-                                                                                    {openDropdowns[
-                                                                                        `single-missing-lid-${kpiName}`
-                                                                                    ] && (
-                                                                                        <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                                                                                            {LID_STATE_OPTIONS.map(
-                                                                                                (
-                                                                                                    opt,
-                                                                                                ) => (
-                                                                                                    <button
-                                                                                                        key={
-                                                                                                            opt.value
-                                                                                                        }
-                                                                                                        type="button"
-                                                                                                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                                                                            opt.value ===
-                                                                                                            lidStateVal
-                                                                                                                ? "bg-gray-200 text-gray-900"
-                                                                                                                : "text-gray-700 hover:bg-gray-100"
-                                                                                                        }`}
-                                                                                                        onClick={() => {
-                                                                                                            setMultiDraft(
-                                                                                                                kpiName,
-                                                                                                                {
-                                                                                                                    lid_state:
-                                                                                                                        opt.value,
-                                                                                                                },
-                                                                                                            );
-                                                                                                            setOpenDropdowns(
-                                                                                                                (
-                                                                                                                    prev,
-                                                                                                                ) => ({
-                                                                                                                    ...prev,
-                                                                                                                    [`single-missing-lid-${kpiName}`]: false,
-                                                                                                                }),
-                                                                                                            );
-                                                                                                        }}
-                                                                                                    >
-                                                                                                        {
-                                                                                                            opt.label
-                                                                                                        }
-                                                                                                    </button>
-                                                                                                ),
-                                                                                            )}
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
-                                                                            ) : inputType ===
-                                                                                  "battery" ||
-                                                                              kpiName ===
-                                                                                  KPI_NAMES.IVF_LN2_LEVEL ? (
-                                                                                <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                    <span className="text-xs text-gray-400 block">Min</span>
-                                                                                    <div className="flex items-center gap-1">
-                                                                                    <input
-                                                                                        ref={(
-                                                                                            el,
-                                                                                        ) => {
-                                                                                            refs.min =
-                                                                                                el;
-                                                                                        }}
-                                                                                        type="number"
-                                                                                        step="any"
-                                                                                        min={
-                                                                                            0
-                                                                                        }
-                                                                                        max={
-                                                                                            100
-                                                                                        }
-                                                                                        value={
-                                                                                            minVal !=
-                                                                                            null
-                                                                                                ? minVal
-                                                                                                : ""
-                                                                                        }
-                                                                                        onChange={(
-                                                                                            e,
-                                                                                        ) => {
-                                                                                            let v =
-                                                                                                e
-                                                                                                    .target
-                                                                                                    .value ===
-                                                                                                ""
-                                                                                                    ? null
-                                                                                                    : Number(
-                                                                                                          e
-                                                                                                              .target
-                                                                                                              .value,
-                                                                                                      );
-                                                                                            if (
-                                                                                                v !==
-                                                                                                    null &&
-                                                                                                v <
-                                                                                                    0
-                                                                                            )
-                                                                                                v = 0;
-                                                                                            if (
-                                                                                                v !==
-                                                                                                    null &&
-                                                                                                v >
-                                                                                                    100
-                                                                                            )
-                                                                                                v = 100;
-                                                                                            setMultiDraft(
-                                                                                                kpiName,
-                                                                                                {
-                                                                                                    min: v,
-                                                                                                    ...(kpiName ===
-                                                                                                    KPI_NAMES.IVF_LN2_LEVEL
-                                                                                                        ? {
-                                                                                                              max: null,
-                                                                                                          }
-                                                                                                        : {}),
-                                                                                                },
-                                                                                            );
-                                                                                        }}
-                                                                                        onKeyDown={(
-                                                                                            e,
-                                                                                        ) =>
-                                                                                            handleKeyDown(
-                                                                                                e,
-                                                                                                kpiKey,
-                                                                                                "min",
-                                                                                            )
-                                                                                        }
-                                                                                        placeholder="Min"
-                                                                                        className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                                                                                    />
-                                                                                    {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
-                                                                                    </div>
-                                                                                </label>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                        <span className="text-xs text-gray-400 block">Min</span>
-                                                                                        <div className="flex items-center gap-1">
-                                                                                        <input
-                                                                                            ref={(
-                                                                                                el,
-                                                                                            ) => {
-                                                                                                refs.min =
-                                                                                                    el;
-                                                                                            }}
-                                                                                            type="number"
-                                                                                            step="any"
-                                                                                            min={
-                                                                                                inputType ===
-                                                                                                "percentage"
-                                                                                                    ? 0
-                                                                                                    : undefined
-                                                                                            }
-                                                                                            value={
-                                                                                                minVal !=
-                                                                                                null
-                                                                                                    ? minVal
-                                                                                                    : ""
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                e,
-                                                                                            ) => {
-                                                                                                let v =
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value ===
-                                                                                                    ""
-                                                                                                        ? null
-                                                                                                        : Number(
-                                                                                                              e
-                                                                                                                  .target
-                                                                                                                  .value,
-                                                                                                          );
-                                                                                                if (
-                                                                                                    inputType ===
-                                                                                                        "percentage" &&
-                                                                                                    v !==
-                                                                                                        null &&
-                                                                                                    v <
-                                                                                                        0
-                                                                                                )
-                                                                                                    v = 0;
-                                                                                                setMultiDraft(
-                                                                                                    kpiName,
-                                                                                                    {
-                                                                                                        min: v,
-                                                                                                    },
-                                                                                                );
-                                                                                            }}
-                                                                                            onKeyDown={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                handleKeyDown(
-                                                                                                    e,
-                                                                                                    kpiKey,
-                                                                                                    "min",
-                                                                                                )
-                                                                                            }
-                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                                                                                        />
-                                                                                            {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
-                                                                                        </div>
-                                                                                    </label>
-                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                        <span className="text-xs text-gray-400 block">Max</span>
-                                                                                        <div className="flex items-center gap-1">
-                                                                                        <input
-                                                                                            ref={(
-                                                                                                el,
-                                                                                            ) => {
-                                                                                                refs.max =
-                                                                                                    el;
-                                                                                            }}
-                                                                                            type="number"
-                                                                                            step="any"
-                                                                                            min={
-                                                                                                inputType ===
-                                                                                                "percentage"
-                                                                                                    ? 0
-                                                                                                    : undefined
-                                                                                            }
-                                                                                            value={
-                                                                                                maxVal !=
-                                                                                                null
-                                                                                                    ? maxVal
-                                                                                                    : ""
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                e,
-                                                                                            ) => {
-                                                                                                let v =
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value ===
-                                                                                                    ""
-                                                                                                        ? null
-                                                                                                        : Number(
-                                                                                                              e
-                                                                                                                  .target
-                                                                                                                  .value,
-                                                                                                          );
-                                                                                                if (
-                                                                                                    inputType ===
-                                                                                                        "percentage" &&
-                                                                                                    v !==
-                                                                                                        null &&
-                                                                                                    v <
-                                                                                                        0
-                                                                                                )
-                                                                                                    v = 0;
-                                                                                                setMultiDraft(
-                                                                                                    kpiName,
-                                                                                                    {
-                                                                                                        max: v,
-                                                                                                    },
-                                                                                                );
-                                                                                            }}
-                                                                                            onKeyDown={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                handleKeyDown(
-                                                                                                    e,
-                                                                                                    kpiKey,
-                                                                                                    "max",
-                                                                                                )
-                                                                                            }
-                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                                                                                        />
-                                                                                            {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
-                                                                                        </div>
-                                                                                    </label>
-                                                                                </>
-                                                                            )}
-                                                                            <div className="flex flex-wrap items-center gap-3">
+                                                                                {renderKpiInputs(
+                                                                                    kpiName,
+                                                                                    minVal,
+                                                                                    maxVal,
+                                                                                    lidStateVal,
+                                                                                    kpiKey,
+                                                                                    refs,
+                                                                                    (v) => setMultiDraft(kpiName, { min: v }),
+                                                                                    (v) => setMultiDraft(kpiName, { max: v }),
+                                                                                    (v) => setMultiDraft(kpiName, { lid_state: v }),
+                                                                                )}
+                                                                                <div className="flex flex-wrap items-center gap-3">
                                                                             <div className="relative w-44 min-w-[140px]">
                                                                                 <button
                                                                                     type="button"
@@ -3404,8 +2957,9 @@ export default function AlertSetting() {
                                                                                                         setMultiDraft(
                                                                                                             kpiName,
                                                                                                             {
-                                                                                                                alert_type:
-                                                                                                                    v,
+                                                                                                                alert_type: v,
+                                                                                                                // Clear escalation threshold when moving away from critical
+                                                                                                                ...(v !== "critical" && { unack_escalation_threshold: null }),
                                                                                                             },
                                                                                                         );
                                                                                                         setOpenDropdowns(
@@ -3488,6 +3042,36 @@ export default function AlertSetting() {
                                                                                         </div>
                                                                                     </label>
                                                                                 )}
+                                                                                {/* Escalation Threshold — critical alerts only */}
+                                                                                {typeVal === "critical" && (
+                                                                                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg min-w-[100px]">
+                                                                                        <span className="text-[10px] text-orange-700 font-medium">Escalation</span>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <input
+                                                                                                type="number"
+                                                                                                min={0}
+                                                                                                step={1}
+                                                                                                placeholder="—"
+                                                                                                value={d.unack_escalation_threshold ?? ""}
+                                                                                                onChange={(e) => {
+                                                                                                    const raw = e.target.value;
+                                                                                                    setMultiDraft(kpiName, {
+                                                                                                        unack_escalation_threshold: raw === "" ? null : Math.max(0, Math.round(Number(raw))),
+                                                                                                    });
+                                                                                                }}
+                                                                                                title="Send escalation email to admins/managers after N consecutive unacknowledged alerts. Leave empty to disable."
+                                                                                                className="w-10 text-sm text-orange-900 bg-transparent outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                            />
+                                                                                            <span className="text-[10px] text-orange-600 whitespace-nowrap">
+                                                                                                {d.unack_escalation_threshold === null || d.unack_escalation_threshold === undefined
+                                                                                                    ? "disabled"
+                                                                                                    : d.unack_escalation_threshold === 0
+                                                                                                    ? "⚡ immediate"
+                                                                                                    : `after ${d.unack_escalation_threshold} unack`}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -3500,114 +3084,225 @@ export default function AlertSetting() {
                                                 )}
                                             </div>
                                             <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex flex-col md:flex-row items-stretch md:items-center justify-end gap-3">
-                                                {/* Save to Additional Branches */}
+                                                {/* Copy to additional tanks (cryotanks only) OR Apply to other chambers (incubators only) */}
                                                 <div className="relative w-full md:w-auto">
-                                                    <button
-                                                        type="button"
-                                                        disabled={!primaryContainer || configList.length === 0}
-                                                        onClick={() => setShowBranchDropdown((v) => !v)}
-                                                        className="w-full md:w-auto px-4 py-2.5 border border-[#6b1176] text-[#6b1176] rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                                    >
-                                                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-                                                        </svg>
-                                                        Copy to Additional Tanks
-                                                        <svg className={`w-3 h-3 transition-transform ${showBranchDropdown ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
-                                                    </button>
-                                                    {showBranchDropdown && (() => {
-                                                        const filteredTanks = branchFilter === "All"
-                                                            ? containers.filter((c) => c.tank_id !== primaryContainer?.tank_id)
-                                                            : containers.filter((c) => c.branchName === branchFilter && c.tank_id !== primaryContainer?.tank_id);
-                                                        return (
-                                                            <>
-                                                                <div className="fixed inset-0 z-40" onClick={() => { setShowBranchDropdown(false); setSelectedTankIds([]); }} />
-                                                                <div className="absolute bottom-full right-0 mb-2 w-72 bg-white border border-[#E7E1E1] rounded-xl shadow-xl z-50 overflow-hidden">
-                                                                    {/* Select all row */}
-                                                                    <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
-                                                                        <span className="text-xs text-gray-500">{filteredTanks.length} tank{filteredTanks.length !== 1 ? "s" : ""}</span>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() =>
-                                                                                setSelectedTankIds(
-                                                                                    filteredTanks.every((c) => selectedTankIds.includes(c.tank_id))
-                                                                                        ? selectedTankIds.filter((id) => !filteredTanks.some((c) => c.tank_id === id))
-                                                                                        : [...new Set([...selectedTankIds, ...filteredTanks.map((c) => c.tank_id)])]
-                                                                                )
-                                                                            }
-                                                                            className="text-xs text-[#6b1176] font-medium hover:underline"
-                                                                        >
-                                                                            {filteredTanks.every((c) => selectedTankIds.includes(c.tank_id)) && filteredTanks.length > 0 ? "Deselect All" : "Select All"}
-                                                                        </button>
-                                                                    </div>
-                                                                    {/* Tank list */}
-                                                                    <div className="max-h-52 overflow-y-auto divide-y divide-gray-50" style={{ scrollbarWidth: "thin" }}>
-                                                                        {filteredTanks.length === 0 && (
-                                                                            <div className="px-4 py-3 text-xs text-gray-400">No tanks available.</div>
-                                                                        )}
-                                                                        {filteredTanks.map((c) => (
-                                                                            <label key={c.tank_id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7ECFF] cursor-pointer">
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    checked={selectedTankIds.includes(c.tank_id)}
-                                                                                    onChange={() =>
-                                                                                        setSelectedTankIds((prev) =>
-                                                                                            prev.includes(c.tank_id)
-                                                                                                ? prev.filter((id) => id !== c.tank_id)
-                                                                                                : [...prev, c.tank_id]
+                                                    {primaryContainer?.is_incubator ? (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                disabled={!primaryContainer || configList.length === 0}
+                                                                onClick={() => setShowChamberCopyDropdown((v) => !v)}
+                                                                className="w-full md:w-auto px-4 py-2.5 border border-[#6b1176] text-[#6b1176] rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                            >
+                                                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                                Apply to Other Chambers
+                                                                <svg className={`w-3 h-3 transition-transform ${showChamberCopyDropdown ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
+                                                            </button>
+                                                            {showChamberCopyDropdown && (() => {
+                                                                const totalChambers = (primaryContainer.chamber_r ?? 0) * (primaryContainer.chamber_c ?? 0);
+                                                                const otherChambers = Array.from({ length: totalChambers }, (_, i) => String(i + 1)).filter((id) => id !== selectedChamberId);
+                                                                return (
+                                                                    <>
+                                                                        <div className="fixed inset-0 z-40" onClick={() => { setShowChamberCopyDropdown(false); }} />
+                                                                        <div className="absolute bottom-full right-0 mb-2 w-64 bg-white border border-[#E7E1E1] rounded-xl shadow-xl z-50 overflow-hidden">
+                                                                            <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                                                                                <span className="text-xs text-gray-500">{otherChambers.length} chamber{otherChambers.length !== 1 ? "s" : ""}</span>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        setSelectedChamberIds(
+                                                                                            otherChambers.every((id) => selectedChamberIds.includes(id))
+                                                                                                ? []
+                                                                                                : [...otherChambers]
                                                                                         )
                                                                                     }
-                                                                                    className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176]"
-                                                                                />
-                                                                                <div className="min-w-0">
-                                                                                    <div className="text-xs font-semibold text-[#6b1176] truncate">Container {c.canisterId}</div>
-                                                                                    <div className="text-xs text-gray-500 truncate">{c.branchName}</div>
-                                                                                </div>
-                                                                            </label>
-                                                                        ))}
-                                                                    </div>
-                                                                    <div className="px-4 py-3 border-t border-gray-100 flex justify-end">
-                                                                        <button
-                                                                            type="button"
-                                                                            disabled={selectedTankIds.length === 0 || savingToBranches}
-                                                                            onClick={async () => {
-                                                                                setSavingToBranches(true);
-                                                                                try {
-                                                                                    const configsToApply = configList.map((cfg) => ({
-                                                                                        kpi_name: cfg.kpi_name,
-                                                                                        alert_name: cfg.alert_name ?? null,
-                                                                                        min: cfg.min ?? null,
-                                                                                        max: cfg.max ?? null,
-                                                                                        unit: cfg.unit ?? null,
-                                                                                        alert_type: cfg.alert_type ?? null,
-                                                                                        cooldown_minutes: cfg.cooldown_minutes,
-                                                                                        status: isActiveAlertType(cfg.alert_type ?? null),
-                                                                                    }));
-                                                                                    await ivfService.bulkUpsertKpiConfig(selectedTankIds, configsToApply);
-                                                                                    if (primaryContainer) {
-                                                                                        await refetchKpiConfig(primaryContainer.tank_id, {
-                                                                                            showLoading: true,
-                                                                                        });
+                                                                                    className="text-xs text-[#6b1176] font-medium hover:underline"
+                                                                                >
+                                                                                    {otherChambers.every((id) => selectedChamberIds.includes(id)) && otherChambers.length > 0 ? "Deselect All" : "Select All"}
+                                                                                </button>
+                                                                            </div>
+                                                                            <div className="max-h-52 overflow-y-auto divide-y divide-gray-50" style={{ scrollbarWidth: "thin" }}>
+                                                                                {otherChambers.length === 0 && (
+                                                                                    <div className="px-4 py-3 text-xs text-gray-400">No other chambers available.</div>
+                                                                                )}
+                                                                                {otherChambers.map((cid) => (
+                                                                                    <label key={cid} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7ECFF] cursor-pointer">
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            checked={selectedChamberIds.includes(cid)}
+                                                                                            onChange={() =>
+                                                                                                setSelectedChamberIds((prev) =>
+                                                                                                    prev.includes(cid) ? prev.filter((id) => id !== cid) : [...prev, cid]
+                                                                                                )
+                                                                                            }
+                                                                                            className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176]"
+                                                                                        />
+                                                                                        <span className="text-xs font-semibold text-[#6b1176]">Chamber {cid}</span>
+                                                                                    </label>
+                                                                                ))}
+                                                                            </div>
+                                                                            <div className="px-4 py-3 border-t border-gray-100 flex justify-end">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    disabled={selectedChamberIds.length === 0 || savingToChambers}
+                                                                                    onClick={async () => {
+                                                                                        setSavingToChambers(true);
+                                                                                        try {
+                                                                                            const configsToApply = configList.map((cfg) => ({
+                                                                                                kpi_name: cfg.kpi_name,
+                                                                                                alert_name: cfg.alert_name ?? null,
+                                                                                                min: cfg.min ?? null,
+                                                                                                max: cfg.max ?? null,
+                                                                                                unit: cfg.unit ?? null,
+                                                                                                alert_type: cfg.alert_type ?? null,
+                                                                                                cooldown_minutes: cfg.cooldown_minutes,
+                                                                                                status: isActiveAlertType(cfg.alert_type ?? null),
+                                                                                            }));
+                                                                                            await Promise.all(
+                                                                                                selectedChamberIds.map((cid) =>
+                                                                                                    ivfService.bulkUpsertKpiConfigForIncubator(
+                                                                                                        primaryContainer!.incubator_id ?? primaryContainer!.tank_id,
+                                                                                                        cid,
+                                                                                                        configsToApply,
+                                                                                                    )
+                                                                                                )
+                                                                                            );
+                                                                                            if (primaryContainer) {
+                                                                                                await refetchKpiConfig(
+                                                                                                    primaryContainer.incubator_id ?? primaryContainer.tank_id,
+                                                                                                    { isIncubator: true, chamberId: selectedChamberId, showLoading: true },
+                                                                                                );
+                                                                                            }
+                                                                                            toast.success(`Applied to ${selectedChamberIds.length} chamber${selectedChamberIds.length !== 1 ? "s" : ""} successfully`);
+                                                                                        } finally {
+                                                                                            setSavingToChambers(false);
+                                                                                            setShowChamberCopyDropdown(false);
+                                                                                            setSelectedChamberIds([]);
+                                                                                        }
+                                                                                    }}
+                                                                                    className="px-4 py-2 bg-[#6b1176] text-white rounded-lg text-xs font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                                                >
+                                                                                    {savingToChambers ? (
+                                                                                        <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</>
+                                                                                    ) : (
+                                                                                        <>Apply to {selectedChamberIds.length} Chamber{selectedChamberIds.length !== 1 ? "s" : ""}</>
+                                                                                    )}
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                disabled={!primaryContainer || configList.length === 0}
+                                                                onClick={() => setShowBranchDropdown((v) => !v)}
+                                                                className="w-full md:w-auto px-4 py-2.5 border border-[#6b1176] text-[#6b1176] rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                            >
+                                                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                                                                </svg>
+                                                                Copy to Additional Tanks
+                                                                <svg className={`w-3 h-3 transition-transform ${showBranchDropdown ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
+                                                            </button>
+                                                            {showBranchDropdown && (() => {
+                                                                const filteredTanks = containers.filter((c) => {
+                                                                    const matchBranch = branchFilter === "All" || c.branchName === branchFilter;
+                                                                    return matchBranch && !c.is_incubator && c.tank_id !== primaryContainer?.tank_id;
+                                                                });
+                                                                return (
+                                                                    <>
+                                                                        <div className="fixed inset-0 z-40" onClick={() => { setShowBranchDropdown(false); setSelectedTankIds([]); }} />
+                                                                        <div className="absolute bottom-full right-0 mb-2 w-72 bg-white border border-[#E7E1E1] rounded-xl shadow-xl z-50 overflow-hidden">
+                                                                            <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                                                                                <span className="text-xs text-gray-500">{filteredTanks.length} tank{filteredTanks.length !== 1 ? "s" : ""}</span>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        setSelectedTankIds(
+                                                                                            filteredTanks.every((c) => selectedTankIds.includes(c.tank_id))
+                                                                                                ? selectedTankIds.filter((id) => !filteredTanks.some((c) => c.tank_id === id))
+                                                                                                : [...new Set([...selectedTankIds, ...filteredTanks.map((c) => c.tank_id)])]
+                                                                                        )
                                                                                     }
-                                                                                    toast.success(`Copied to ${selectedTankIds.length} tank(s) successfully`);
-                                                                                } finally {
-                                                                                    setSavingToBranches(false);
-                                                                                    setShowBranchDropdown(false);
-                                                                                    setSelectedTankIds([]);
-                                                                                }
-                                                                            }}
-                                                                            className="px-4 py-2 bg-[#6b1176] text-white rounded-lg text-xs font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                                                                        >
-                                                                            {savingToBranches ? (
-                                                                                <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</>
-                                                                            ) : (
-                                                                                <>Apply to {selectedTankIds.length} Tank{selectedTankIds.length !== 1 ? "s" : ""}</>
-                                                                            )}
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            </>
-                                                        );
-                                                    })()}
+                                                                                    className="text-xs text-[#6b1176] font-medium hover:underline"
+                                                                                >
+                                                                                    {filteredTanks.every((c) => selectedTankIds.includes(c.tank_id)) && filteredTanks.length > 0 ? "Deselect All" : "Select All"}
+                                                                                </button>
+                                                                            </div>
+                                                                            <div className="max-h-52 overflow-y-auto divide-y divide-gray-50" style={{ scrollbarWidth: "thin" }}>
+                                                                                {filteredTanks.length === 0 && (
+                                                                                    <div className="px-4 py-3 text-xs text-gray-400">No tanks available.</div>
+                                                                                )}
+                                                                                {filteredTanks.map((c) => (
+                                                                                    <label key={c.tank_id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7ECFF] cursor-pointer">
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            checked={selectedTankIds.includes(c.tank_id)}
+                                                                                            onChange={() =>
+                                                                                                setSelectedTankIds((prev) =>
+                                                                                                    prev.includes(c.tank_id)
+                                                                                                        ? prev.filter((id) => id !== c.tank_id)
+                                                                                                        : [...prev, c.tank_id]
+                                                                                                )
+                                                                                            }
+                                                                                            className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176]"
+                                                                                        />
+                                                                                        <div className="min-w-0">
+                                                                                            <div className="text-xs font-semibold text-[#6b1176] truncate">{directionFilter === "incubators" ? "Incubator" : "Container"} {c.canisterId}</div>
+                                                                                            <div className="text-xs text-gray-500 truncate">{c.branchName}</div>
+                                                                                        </div>
+                                                                                    </label>
+                                                                                ))}
+                                                                            </div>
+                                                                            <div className="px-4 py-3 border-t border-gray-100 flex justify-end">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    disabled={selectedTankIds.length === 0 || savingToBranches}
+                                                                                    onClick={async () => {
+                                                                                        setSavingToBranches(true);
+                                                                                        try {
+                                                                                            const configsToApply = configList.map((cfg) => ({
+                                                                                                kpi_name: cfg.kpi_name,
+                                                                                                alert_name: cfg.alert_name ?? null,
+                                                                                                min: cfg.min ?? null,
+                                                                                                max: cfg.max ?? null,
+                                                                                                unit: cfg.unit ?? null,
+                                                                                                alert_type: cfg.alert_type ?? null,
+                                                                                                cooldown_minutes: cfg.cooldown_minutes,
+                                                                                                status: isActiveAlertType(cfg.alert_type ?? null),
+                                                                                            }));
+                                                                                            await ivfService.bulkUpsertKpiConfig(selectedTankIds, configsToApply);
+                                                                                            if (primaryContainer) {
+                                                                                                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
+                                                                                                    showLoading: true,
+                                                                                                });
+                                                                                            }
+                                                                                            toast.success(`Copied to ${selectedTankIds.length} tank(s) successfully`);
+                                                                                        } finally {
+                                                                                            setSavingToBranches(false);
+                                                                                            setShowBranchDropdown(false);
+                                                                                            setSelectedTankIds([]);
+                                                                                        }
+                                                                                    }}
+                                                                                    className="px-4 py-2 bg-[#6b1176] text-white rounded-lg text-xs font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                                                >
+                                                                                    {savingToBranches ? (
+                                                                                        <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</>
+                                                                                    ) : (
+                                                                                        <>Apply to {selectedTankIds.length} Tank{selectedTankIds.length !== 1 ? "s" : ""}</>
+                                                                                    )}
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </>
+                                                    )}
                                                 </div>
                                                 {/* Save Changes */}
                                                 <button
@@ -3871,7 +3566,7 @@ export default function AlertSetting() {
                 <div
                     className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
                     onClick={() => {
-                        if (!notifySettingsSaving) {
+                        if (!notifySettingsSaving && !isOnboarding) {
                             setShowNotifySettings(false);
                             setNotifySettingsError(null);
                         }

@@ -42,6 +42,7 @@ from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
 from app.models.IVF.ln2_readings_model import Ln2Reading
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.incubator_model import Incubator
 from app.models.kpi_config_model import KpiConfig
 from app.models.user_model import User
 from app.service.activity_log_service import (
@@ -53,11 +54,13 @@ from app.service.activity_log_service import (
 from app.service.IVF.quality_tracking_service import QualityTrackingService
 from app.service.quality_service import (
     QualityService,
+    append_incubator_kpi_snapshot_to_db,
     append_tank_kpi_snapshot_to_db,
+    push_incubator_kpi_to_redis,
     push_ivf_quality_to_redis,
     push_tank_kpi_to_redis,
 )
-from app.service.redis_service import get_ln2_pubsub, get_redis, get_tank_kpi_pubsub
+from app.service.redis_service import get_incubator_kpi_pubsub, get_ln2_pubsub, get_redis, get_tank_kpi_pubsub
 from app.utils.ivf_helpers import get_branch_filter_info
 from app.utils.user_helpers import is_hospital_department, is_specific_department
 from app.utils.websocket_manager import ConnectionManager
@@ -667,10 +670,13 @@ def _resolve_current_hospital_id(request: Request, db: Session) -> int:
 
 def _kpi_config_metadata(row: KpiConfig) -> dict:
     return {
+        "id": row.id,
         "config_id": row.id,
         "hospital_id": row.hospital_id,
         "branch_id": row.branch_id,
         "tank_id": row.tank_id,
+        "incubator_id": row.incubator_id,
+        "chamber_id": row.chamber_id,
         "kpi_name": row.kpi_name,
         "alert_name": row.alert_name,
         "min": float(row.min) if row.min is not None else None,
@@ -768,34 +774,54 @@ def update_hospital_notification_settings(
 
 @router.get("/kpi-config/list")
 def list_kpi_config(
-    tank_id: int = Query(..., description="Tank ID to list KPI config for"),
+    tank_id: Optional[int] = Query(None, description="Tank ID"),
+    incubator_id: Optional[int] = Query(None, description="Incubator ID"),
+    chamber_id: Optional[str] = Query(None, description="Chamber ID filter (incubator only)"),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List all KPI config rows for a tank (Alert Setting). IVF Admin, Manager, and User only."""
+    """List all KPI config rows for a tank or incubator (Alert Setting)."""
     _require_alert_setting_role(current_user)
+    quality_service = QualityService(db)
+
+    if incubator_id is not None:
+        incubator = db.query(Incubator).filter(
+            Incubator.incubator_id == incubator_id,
+            Incubator.hospital_id == current_user.hospital_id,
+        ).first()
+        if not incubator:
+            raise HTTPException(status_code=404, detail=f"Incubator '{incubator_id}' not found")
+        q = db.query(KpiConfig).filter(KpiConfig.incubator_id == incubator_id)
+        if chamber_id:
+            q = q.filter(KpiConfig.chamber_id == chamber_id)
+        rows = q.order_by(KpiConfig.kpi_name, KpiConfig.alert_name).all()
+        return {
+            "incubator_id": incubator_id,
+            "incubator_code": incubator.incubator_code or "",
+            "branch_id": incubator.branch_id,
+            "hospital_id": incubator.hospital_id,
+            "config": [_kpi_config_metadata(r) for r in rows],
+        }
+
+    if tank_id is None:
+        raise HTTPException(status_code=400, detail="Provide tank_id or incubator_id")
+
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
     if not tank:
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
-    quality_service = QualityService(db)
     try:
         quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     rows = quality_service.list_kpi_config_by_tank(tank_id)
-    branch = (
-        db.query(HospitalBranch)
-        .filter(HospitalBranch.branch_id == tank.branch_id)
-        .first()
-    )
-    hospital_id = branch.hospital_id if branch else None
+    branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
     return {
         "tank_id": tank_id,
         "tank_code": tank.tank_code or "",
         "branch_id": tank.branch_id,
-        "hospital_id": hospital_id,
+        "hospital_id": branch.hospital_id if branch else None,
         "config": rows,
     }
 
@@ -807,48 +833,49 @@ def create_kpi_config(
     current_user: User = Depends(get_current_user),
     body: dict = Body(...),
 ):
-    """Create a KPI config row (Alert Setting). IVF Admin, Manager, and User only. Body: hospital_id, branch_id, tank_id, kpi_name, alert_name?, min?, max?, unit?, alert_type?, status?."""
+    """Create a KPI config row. Body: hospital_id, branch_id, kpi_name, and either tank_id or incubator_id."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
-    required = ("hospital_id", "branch_id", "tank_id", "kpi_name")
-    for k in required:
+    for k in ("hospital_id", "branch_id", "kpi_name"):
         if k not in body:
             raise HTTPException(status_code=400, detail=f"Missing required field: {k}")
+    if body.get("tank_id") is None and body.get("incubator_id") is None:
+        raise HTTPException(status_code=400, detail="Provide tank_id or incubator_id")
     try:
         hospital_id = int(body["hospital_id"])
         branch_id_val = int(body["branch_id"])
-        tank_id = int(body["tank_id"])
+        tank_id = int(body["tank_id"]) if body.get("tank_id") is not None else None
+        incubator_id_val = int(body["incubator_id"]) if body.get("incubator_id") is not None else None
     except (TypeError, ValueError):
-        raise HTTPException(
-            status_code=400, detail="hospital_id, branch_id, tank_id must be integers"
-        )
+        raise HTTPException(status_code=400, detail="hospital_id, branch_id, tank_id/incubator_id must be integers")
     if branch_id is not None and branch_id_val != branch_id:
-        raise HTTPException(
-            status_code=403, detail="Cannot create config for another branch"
-        )
+        raise HTTPException(status_code=403, detail="Cannot create config for another branch")
+
     quality_service = QualityService(db)
     row = quality_service.create_kpi_config(
         hospital_id=hospital_id,
         branch_id=branch_id_val,
         tank_id=tank_id,
+        incubator_id=incubator_id_val,
+        chamber_id=body.get("chamber_id"),
         kpi_name=str(body["kpi_name"]),
         alert_name=body.get("alert_name"),
         min_val=body.get("min") if body.get("min") is not None else None,
         max_val=body.get("max") if body.get("max") is not None else None,
         unit=body.get("unit"),
         alert_type=body.get("alert_type"),
-        cooldown_minutes=int(body["cooldown_minutes"])
-        if body.get("cooldown_minutes") is not None
-        else None,
+        cooldown_minutes=int(body["cooldown_minutes"]) if body.get("cooldown_minutes") is not None else None,
+        unack_escalation_threshold=int(body["unack_escalation_threshold"]) if body.get("unack_escalation_threshold") is not None else None,
         status=body.get("status", True),
     )
     db.commit()
 
+    target_label = f"incubator:{incubator_id_val}" if incubator_id_val else str(row.tank_id)
     ActivityLogService(db).log_activity(
         action="alert_configuration.kpi_config_created",
         outcome=ActivityOutcome.SUCCESS.value,
         actor=build_actor_from_user(current_user),
-        target=build_target("tank", str(row.tank_id)),
+        target=build_target("tank", target_label),
         metadata={
             **_kpi_config_metadata(row),
             "kpi_names": [row.kpi_name] if row.kpi_name else [],
@@ -869,6 +896,7 @@ def create_kpi_config(
         "cooldown_minutes": int(row.cooldown_minutes)
         if row.cooldown_minutes is not None
         else 60,
+        "unack_escalation_threshold": row.unack_escalation_threshold,
         "status": bool(row.status),
     }
 
@@ -924,6 +952,63 @@ def bulk_upsert_kpi_config(
     return result
 
 
+@router.post("/kpi-config/bulk-incubator")
+def bulk_upsert_kpi_config_for_incubator(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """
+    Bulk upsert KPI config for a single incubator + optional chamber.
+    Body: incubator_id (int), chamber_id (str | null), configs (list).
+    """
+    _require_alert_setting_role(current_user)
+    incubator_id = body.get("incubator_id")
+    chamber_id = body.get("chamber_id")
+    configs = body.get("configs")
+    if not incubator_id:
+        raise HTTPException(status_code=400, detail="incubator_id is required")
+    if not isinstance(configs, list):
+        raise HTTPException(status_code=400, detail="configs must be a list")
+    try:
+        incubator_id = int(incubator_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="incubator_id must be an integer")
+
+    incubator = db.query(Incubator).filter(
+        Incubator.incubator_id == incubator_id,
+        Incubator.hospital_id == current_user.hospital_id,
+    ).first()
+    if not incubator:
+        raise HTTPException(status_code=404, detail=f"Incubator '{incubator_id}' not found")
+
+    quality_service = QualityService(db)
+    result = quality_service.bulk_upsert_kpi_config_for_incubator(
+        incubator_id=incubator_id,
+        chamber_id=chamber_id,
+        configs=configs,
+        hospital_id=incubator.hospital_id,
+        branch_id=incubator.branch_id,
+    )
+    db.commit()
+
+    ActivityLogService(db).log_activity(
+        action="alert_configuration.kpi_config_bulk_upserted",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("incubator", str(incubator_id)),
+        metadata={
+            "incubator_id": incubator_id,
+            "chamber_id": chamber_id,
+            "updated": result.get("updated"),
+            "created": result.get("created"),
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
+    return result
+
+
 @router.put("/kpi-config/{config_id}")
 def update_kpi_config(
     config_id: int,
@@ -951,6 +1036,9 @@ def update_kpi_config(
         alert_type=body.get("alert_type"),
         cooldown_minutes=int(body["cooldown_minutes"])
         if body.get("cooldown_minutes") is not None
+        else None,
+        unack_escalation_threshold=int(body["unack_escalation_threshold"])
+        if body.get("unack_escalation_threshold") is not None
         else None,
         status=body.get("status"),
     )
@@ -990,6 +1078,7 @@ def update_kpi_config(
         "cooldown_minutes": int(row.cooldown_minutes)
         if row.cooldown_minutes is not None
         else 60,
+        "unack_escalation_threshold": row.unack_escalation_threshold,
         "status": bool(row.status),
     }
 
@@ -1735,3 +1824,422 @@ async def ivf_ln2_websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"IVF LN2 WebSocket error: {e}")
         ln2_manager.disconnect_by_websocket(websocket)
+
+
+# ===========================================================================
+# Incubator KPI REST Endpoints + WebSocket
+# ===========================================================================
+
+incubator_kpi_manager = ConnectionManager()
+
+
+@router.get("/incubators/{incubator_id}/kpi-config")
+def get_incubator_kpi_config(
+    incubator_id: int = Path(..., description="Incubator ID"),
+    chamber_id: Optional[str] = Query(None, description="Chamber ID (e.g. A1)"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI limits config for an incubator (optionally scoped to a chamber)."""
+    incubator = db.query(Incubator).filter(
+        Incubator.incubator_id == incubator_id,
+        Incubator.hospital_id == current_user.hospital_id,
+    ).first()
+    if not incubator:
+        raise HTTPException(status_code=404, detail=f"Incubator '{incubator_id}' not found")
+    quality_service = QualityService(db)
+    return quality_service.get_incubator_kpi_config(
+        incubator_id, incubator.incubator_code or f"I{incubator_id}", chamber_id
+    )
+
+
+@router.get("/incubators/{incubator_id}/kpi-history")
+def get_incubator_kpi_history(
+    incubator_id: int = Path(..., description="Incubator ID"),
+    chamber_id: Optional[str] = Query(None, description="Chamber ID (e.g. A1)"),
+    duration_minutes: Optional[int] = Query(
+        None,
+        description="LIVE=omit. Static: 60=1H (1min buckets), 1440=24H (30min buckets), 10080=7D (6h buckets).",
+    ),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI history for an incubator chamber. Same time-range semantics as tank endpoint."""
+    incubator = db.query(Incubator).filter(
+        Incubator.incubator_id == incubator_id,
+        Incubator.hospital_id == current_user.hospital_id,
+    ).first()
+    if not incubator:
+        raise HTTPException(status_code=404, detail=f"Incubator '{incubator_id}' not found")
+
+    incubator_code = incubator.incubator_code or f"I{incubator_id}"
+    effective_chamber_id = chamber_id or ""
+
+    quality_service = QualityService(db)
+
+    since = (
+        datetime.now(timezone.utc) - timedelta(minutes=duration_minutes)
+        if duration_minutes
+        else None
+    )
+    latest_timestamp = None
+    if duration_minutes in {DURATION_1H, DURATION_24H, DURATION_7D}:
+        latest_timestamp = quality_service.get_latest_incubator_kpi_timestamp(
+            incubator_id, effective_chamber_id
+        )
+        if latest_timestamp is not None:
+            since = latest_timestamp - timedelta(minutes=duration_minutes)
+
+    aggregated_order_asc = False
+    if duration_minutes == DURATION_1H:
+        per_kpi = quality_service.get_incubator_kpi_history_aggregated(
+            incubator_id, effective_chamber_id, since, AGG_BUCKET_MINUTES_1H, until=latest_timestamp
+        ) or {}
+        aggregated_order_asc = True
+    elif duration_minutes == DURATION_24H:
+        per_kpi = quality_service.get_incubator_kpi_history_aggregated(
+            incubator_id, effective_chamber_id, since, AGG_BUCKET_MINUTES_24H, until=latest_timestamp
+        ) or {}
+        aggregated_order_asc = True
+    elif duration_minutes == DURATION_7D:
+        per_kpi = quality_service.get_incubator_kpi_history_aggregated(
+            incubator_id, effective_chamber_id, since, AGG_BUCKET_MINUTES_7D, until=latest_timestamp
+        ) or {}
+        aggregated_order_asc = True
+    elif duration_minutes is not None and duration_minutes > 0:
+        per_kpi = quality_service.get_readings_per_kpi_since_incubator(
+            incubator_id, effective_chamber_id, since
+        ) or {}
+    else:
+        per_kpi = quality_service.get_last_n_readings_per_kpi_incubator(
+            incubator_id, effective_chamber_id, DEFAULT_LIVE_READINGS_CAP
+        ) or {}
+
+    kpi_series: dict = {}
+    for item in per_kpi.get("kpis") or []:
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        kpi_series.setdefault(name, []).append(
+            {
+                "timestamp": item.get("timestamp"),
+                "value": item.get("value"),
+                "avg": item.get("avg"),
+                "min": item.get("min"),
+                "max": item.get("max"),
+                "count": item.get("count"),
+                "unit": item.get("unit") or "",
+            }
+        )
+
+    if not aggregated_order_asc:
+        for name in list(kpi_series.keys()):
+            kpi_series[name].reverse()
+
+    return {
+        "incubator_id": incubator_id,
+        "incubator_code": incubator_code,
+        "chamber_id": effective_chamber_id,
+        "kpi_series": kpi_series,
+    }
+
+
+@router.get("/incubators/{incubator_id}/kpi-history-date")
+def get_incubator_kpi_history_by_date(
+    incubator_id: int = Path(..., description="Incubator ID"),
+    chamber_id: Optional[str] = Query(None, description="Chamber ID (e.g. A1)"),
+    date: str = Query(..., description="Date in YYYY-MM-DD format (IST)."),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI history from IST start-of-day for the given date. Same IST→UTC logic as tank endpoint."""
+    incubator = db.query(Incubator).filter(
+        Incubator.incubator_id == incubator_id,
+        Incubator.hospital_id == current_user.hospital_id,
+    ).first()
+    if not incubator:
+        raise HTTPException(status_code=404, detail=f"Incubator '{incubator_id}' not found")
+
+    incubator_code = incubator.incubator_code or f"I{incubator_id}"
+    effective_chamber_id = chamber_id or ""
+
+    try:
+        selected = datetime.strptime(date.strip(), "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid date format. Expected YYYY-MM-DD.")
+
+    IST_OFFSET = timedelta(hours=5, minutes=30)
+    since_utc = datetime(selected.year, selected.month, selected.day, tzinfo=timezone.utc) - IST_OFFSET
+    end_of_day_utc = since_utc + timedelta(days=1)
+    now_utc = datetime.now(timezone.utc)
+    until_utc = min(end_of_day_utc, now_utc)
+
+    if since_utc >= now_utc:
+        return {
+            "incubator_id": incubator_id,
+            "incubator_code": incubator_code,
+            "chamber_id": effective_chamber_id,
+            "kpi_series": {},
+        }
+
+    quality_service = QualityService(db)
+    per_kpi = quality_service.get_incubator_kpi_history_aggregated(
+        incubator_id, effective_chamber_id, since_utc, AGG_BUCKET_MINUTES_24H, until=until_utc
+    ) or {}
+
+    kpi_series: dict = {}
+    for item in per_kpi.get("kpis") or []:
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        kpi_series.setdefault(name, []).append(
+            {
+                "timestamp": item.get("timestamp"),
+                "value": item.get("value"),
+                "avg": item.get("avg"),
+                "min": item.get("min"),
+                "max": item.get("max"),
+                "count": item.get("count"),
+                "unit": item.get("unit") or "",
+            }
+        )
+
+    return {
+        "incubator_id": incubator_id,
+        "incubator_code": incubator_code,
+        "chamber_id": effective_chamber_id,
+        "kpi_series": kpi_series,
+    }
+
+
+@router.post("/incubators/{incubator_code}/kpi-readings")
+def append_incubator_kpi_reading(
+    incubator_code: str = Path(..., description="Incubator code"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """
+    Append an incubator KPI snapshot (store in DB + push to Redis for live graph).
+    Body: { incubator_id?, incubator_code?, chamber_id, timestamp, kpis: [{ name, value, unit }] }.
+    This is the sensor/device ingestion endpoint — mirrors POST /tanks/{code}/kpi-readings.
+    """
+    incubator_code_str = str(incubator_code).strip()
+    incubator = db.query(Incubator).filter(
+        Incubator.incubator_code == incubator_code_str,
+        Incubator.hospital_id == current_user.hospital_id,
+    ).first()
+    if not incubator:
+        raise HTTPException(status_code=404, detail=f"Incubator '{incubator_code}' not found")
+
+    if not body or "kpis" not in body:
+        raise HTTPException(status_code=400, detail="Body must include 'kpis' array")
+    ts = body.get("timestamp")
+    if not ts:
+        raise HTTPException(status_code=400, detail="Body must include 'timestamp'")
+    chamber_id = body.get("chamber_id", "")
+    if isinstance(ts, str):
+        ts = ts.replace("Z", "+00:00")
+        try:
+            ts = datetime.fromisoformat(ts)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid timestamp format")
+    kpis = list(body["kpis"]) if isinstance(body["kpis"], list) else []
+    append_incubator_kpi_snapshot_to_db(
+        db, incubator.incubator_id, incubator_code_str, chamber_id, ts, kpis
+    )
+    db.commit()
+    return {
+        "incubator_id": incubator.incubator_id,
+        "incubator_code": incubator_code_str,
+        "chamber_id": chamber_id,
+        "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
+    }
+
+
+async def incubator_kpi_redis_listener():
+    """Listen for incubator KPI readings from Redis and broadcast to incubator KPI WS clients."""
+    loop = asyncio.get_event_loop()
+    pubsub = None
+    while True:
+        try:
+            if pubsub is None:
+                try:
+                    pubsub = get_incubator_kpi_pubsub()
+                    logger.info("Incubator KPI Redis listener started")
+                except Exception as e:
+                    logger.error(f"Error connecting to incubator KPI Redis: {e}. Retrying in 5s...")
+                    await asyncio.sleep(5)
+                    continue
+            message = await loop.run_in_executor(
+                None,
+                lambda: pubsub.get_message(timeout=1.0, ignore_subscribe_messages=True),
+            )
+            if message and message.get("type") == "message":
+                try:
+                    raw = message.get("data")
+                    if isinstance(raw, bytes):
+                        raw = raw.decode("utf-8")
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict) and "data" in parsed and isinstance(parsed.get("data"), dict):
+                        payload = parsed["data"]
+                    else:
+                        payload = parsed
+                    await incubator_kpi_manager.broadcast_incubator(payload)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse incubator KPI message: {e}")
+                except Exception as e:
+                    logger.error(f"Error broadcasting incubator KPI message: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Error in incubator_kpi_redis_listener: {e}")
+            pubsub = None
+            await asyncio.sleep(5)
+
+
+@router.websocket("/incubator-kpi-ws")
+async def incubator_kpi_websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket for Incubator KPI Quality Tracking live graph.
+    Query: ?token=<jwt>&branch_id_override=<id> (optional, Manager only).
+    Send JSON: { "incubator_id": 1, "chamber_id": "A1", "live": true } to subscribe.
+    Receives type "incubator_kpi" messages for that incubator/chamber.
+    """
+    connection_id = None
+    user_id = None
+    branch_id = None
+    role = None
+
+    try:
+        query_params = dict(websocket.query_params)
+        token = query_params.get("token")
+        if not token:
+            await websocket.close(code=4401)
+            return
+
+        branch_id_override = None
+        if query_params.get("branch_id_override"):
+            try:
+                branch_id_override = int(query_params["branch_id_override"])
+            except (ValueError, TypeError):
+                pass
+
+        try:
+            from app.auth.auth import verify_websocket_token
+            auth_info = verify_websocket_token(token)
+            user_id = auth_info["user_id"]
+        except InvalidTokenException as e:
+            logger.warning(f"Incubator KPI WebSocket rejected: invalid token - {e}")
+            await websocket.close(code=4401)
+            return
+        except Exception as e:
+            logger.warning(f"Incubator KPI WebSocket rejected: token verification failed - {e}")
+            await websocket.close(code=4401)
+            return
+
+        db_temp = SessionLocal()
+        try:
+            user = db_temp.query(User).filter(User.user_id == user_id).first()
+            if not user or not user.status:
+                await websocket.close(code=4403)
+                return
+            if getattr(user, "approved_status", None) != "approved":
+                await websocket.close(code=4403)
+                return
+            if not is_specific_department(user.department, "IVF"):
+                await websocket.close(code=4403)
+                return
+            role = user.role.value if hasattr(user.role, "value") else str(user.role)
+            branch_id = user.branch_id
+            if role == "Manager" and branch_id_override is not None:
+                branch_id = branch_id_override
+        finally:
+            db_temp.close()
+
+        await websocket.accept()
+        connection_id = await incubator_kpi_manager.connect(websocket)
+        incubator_kpi_manager.active_connections[connection_id]["user_id"] = user_id
+        incubator_kpi_manager.active_connections[connection_id]["branch_id"] = branch_id
+        incubator_kpi_manager.active_connections[connection_id]["role"] = role
+        logger.info(
+            f"Incubator KPI WebSocket authenticated: user={user_id}, branch={branch_id}, connection={connection_id}"
+        )
+
+    except Exception as e:
+        logger.error(f"Incubator KPI WebSocket auth error: {e}", exc_info=True)
+        try:
+            if connection_id:
+                incubator_kpi_manager.disconnect(connection_id)
+            await websocket.close(code=1011, reason=str(e))
+        except Exception:
+            pass
+        return
+
+    try:
+        db = SessionLocal()
+        try:
+            while True:
+                try:
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                    try:
+                        message = json.loads(data)
+                        if not isinstance(message, dict):
+                            continue
+                        incubator_id = message.get("incubator_id")
+                        live_val = message.get("live")
+                        if incubator_id is None:
+                            if live_val is not None:
+                                incubator_kpi_manager.set_live(connection_id, bool(live_val))
+                            else:
+                                await websocket.send_json({
+                                    "type": "error",
+                                    "message": "Subscription message must contain 'incubator_id'",
+                                })
+                            continue
+
+                        try:
+                            incubator_id_int = int(incubator_id)
+                        except (TypeError, ValueError):
+                            await websocket.send_json({"type": "error", "message": "Invalid 'incubator_id'"})
+                            continue
+
+                        chamber_id = str(message.get("chamber_id") or "")
+                        incubator = db.query(Incubator).filter(
+                            Incubator.incubator_id == incubator_id_int
+                        ).first()
+                        if not incubator:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": f"Incubator {incubator_id_int} not found",
+                            })
+                            continue
+
+                        incubator_kpi_manager.set_incubator_subscription(
+                            connection_id,
+                            incubator_id_int,
+                            chamber_id,
+                            incubator.incubator_code,
+                        )
+                        incubator_kpi_manager.set_live(connection_id, bool(message.get("live", True)))
+                        await websocket.send_json({
+                            "type": "subscription_confirmed",
+                            "incubator_id": incubator_id_int,
+                            "incubator_code": incubator.incubator_code or "",
+                            "chamber_id": chamber_id,
+                            "branch_id": incubator.branch_id,
+                        })
+                    except json.JSONDecodeError:
+                        pass
+                except asyncio.TimeoutError:
+                    continue
+        finally:
+            db.close()
+    except WebSocketDisconnect:
+        incubator_kpi_manager.disconnect_by_websocket(websocket)
+        logger.info(f"Incubator KPI WebSocket disconnected: {connection_id}")
+    except Exception as e:
+        logger.error(f"Incubator KPI WebSocket error: {e}")
+        incubator_kpi_manager.disconnect_by_websocket(websocket)

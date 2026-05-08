@@ -310,7 +310,7 @@ class ShipmentService extends BaseApiService {
    * GET /api/ivf/control_tower/active_canisters
    */
   async getActiveCanisters(filters?: {
-    branch_name?: string;
+    branch_id?: number;
     status?: string;
   }): Promise<{
     branches: Array<{
@@ -327,8 +327,8 @@ class ShipmentService extends BaseApiService {
     total: number;
   }> {
     const params = new URLSearchParams();
-    if (filters?.branch_name) {
-      params.append('branch_name', filters.branch_name);
+    if (filters?.branch_id != null) {
+      params.append('branch_id', String(filters.branch_id));
     }
     if (filters?.status) {
       params.append('status', filters.status);
@@ -338,6 +338,31 @@ class ShipmentService extends BaseApiService {
       ? `/api/ivf/control_tower/active_canisters?${queryString}`
       : '/api/ivf/control_tower/active_canisters';
     return this.get(url);
+  }
+
+  /**
+   * GET /api/ivf/control_tower/active_incubators
+   */
+  async getActiveIncubators(filters?: { branch_name?: string }): Promise<{
+    branches: Array<{
+      branch_id: number;
+      branch_name: string;
+      incubators: Array<{
+        incubator_id: number;
+        incubator_code: string | null;
+        external_id: string | null;
+        type: string | null;
+        chamber_r: number | null;
+        chamber_c: number | null;
+        updated_at: string | null;
+      }>;
+    }>;
+    total: number;
+  }> {
+    const params = new URLSearchParams();
+    if (filters?.branch_name) params.append('branch_name', filters.branch_name);
+    const qs = params.toString();
+    return this.get(qs ? `/api/ivf/control_tower/active_incubators?${qs}` : '/api/ivf/control_tower/active_incubators');
   }
 
   /**

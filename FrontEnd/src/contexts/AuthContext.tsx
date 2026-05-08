@@ -20,7 +20,7 @@ interface AuthContextType {
     onboardingCompleted: boolean | undefined;
     isEmailNotificationsEnabled: boolean;
     setIsEmailNotificationsEnabled: (enabled: boolean) => void;
-    login: (token: string, role?: string, rememberMe?: boolean) => void;
+    login: (token: string, role?: string, rememberMe?: boolean, onboardingCompleted?: boolean) => void;
     logout: () => void;
 }
 
@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setIsAuthenticated(false);
             setRememberMe(false);
             rememberMeRef.current = false;
-            localStorage.removeItem("user_role");
+            localStorage.clear();
         }, timeoutDuration);
     }, [isAuthenticated]);
 
@@ -136,7 +136,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     setIsAuthenticated(false);
                     setRememberMe(false);
                     rememberMeRef.current = false;
-                    localStorage.removeItem("user_role");
+                    localStorage.clear();
                 }, timeoutDuration);
             } else {
                 // Inactivity-based 1-hour timeout when remember me is disabled
@@ -323,6 +323,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         newToken: string,
         role?: string,
         rememberMe: boolean = false,
+        onboardingCompleted?: boolean,
     ) => {
         authUtils.setToken(newToken, rememberMe);
         setToken(newToken);
@@ -331,6 +332,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (role) {
             setUserRole(role);
             localStorage.setItem("user_role", role);
+        }
+
+        if (onboardingCompleted !== undefined) {
+            setOnboardingCompleted(onboardingCompleted);
+            localStorage.setItem("onboarding_completed", String(onboardingCompleted));
         }
 
         // Set session timeout
@@ -349,8 +355,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUserRole(undefined);
         setOnboardingCompleted(undefined);
         setIsAuthenticated(false);
-        localStorage.removeItem("user_role");
-        localStorage.removeItem("onboarding_completed");
+        localStorage.clear();
     };
 
     const value: AuthContextType = {
