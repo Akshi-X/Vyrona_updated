@@ -17,6 +17,7 @@ import { onboardingService } from "../services/onboardingService";
 interface OnboardingContextValue {
     state: OnboardingState;
     levels: OnboardingLevelConfig[];
+    isHydrating: boolean;
     getLevelProgress: (levelId: string) => OnboardingLevelProgress | undefined;
     getSteps: (levelId: string) => OnboardingStep[];
     getQuiz: (levelId: string) => OnboardingQuizQuestion[];
@@ -429,7 +430,29 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Set to true only when a tour or level completes — triggers an API save
     const apiSyncNeededRef = useRef(false);
+    const apiHydratedRef = useRef(false);
+    const [isHydrating, setIsHydrating] = React.useState(false);
     const { isAuthenticated } = useAuth();
+
+    // On login, fetch saved state from the API and merge it.
+    // If the API returns null (first-ever login), keep fresh state → welcome shows.
+    // If it returns a state, hydrate → user resumes where they left off.
+    useEffect(() => {
+        if (!isAuthenticated) {
+            apiHydratedRef.current = false;
+            return;
+        }
+        if (apiHydratedRef.current) return;
+        apiHydratedRef.current = true;
+
+        setIsHydrating(true);
+        onboardingService.getState().then((apiState) => {
+            if (apiState) {
+                dispatch({ type: "HYDRATE", payload: apiState });
+            }
+            setIsHydrating(false);
+        });
+    }, [isAuthenticated]);
 
     // Always persist to localStorage; only push to API on tour/quiz completion
     useEffect(() => {
@@ -444,6 +467,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const value = useMemo<OnboardingContextValue>(() => ({
         state,
         levels: onboardingLevels,
+        isHydrating,
         getLevelProgress: (levelId) => state.levels[levelId],
         getSteps: (levelId) => onboardingStepsByLevel[levelId] || [],
         getQuiz: (levelId) => onboardingQuizByLevel[levelId] || [],
@@ -476,7 +500,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         },
         resetLevel: (levelId) => dispatch({ type: "RESET_LEVEL", levelId }),
         resetQuiz: (levelId) => dispatch({ type: "RESET_QUIZ", levelId }),
-    }), [state]);
+    }), [state, isHydrating]);
 
     return (
         <OnboardingContext.Provider value={value}>

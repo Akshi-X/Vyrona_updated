@@ -38,6 +38,7 @@ export interface TotalContainersResponse {
 
 export interface QualityDeviationsFlaggedResponse {
     total_deviations: number;
+    active_total_deviations: number;
     deviations_by_kpi: Record<string, number>;
 }
 
@@ -113,6 +114,7 @@ export interface KpiConfigRow {
     unit: string | null;
     alert_type: string | null;
     cooldown_minutes: number;
+    unack_escalation_threshold: number | null;
     status: boolean;
 }
 
@@ -120,7 +122,9 @@ export interface KpiConfigRow {
 export interface KpiConfigPayload {
     hospital_id: number;
     branch_id: number;
-    tank_id: number;
+    tank_id?: number | null;
+    incubator_id?: number | null;
+    chamber_id?: string | null;
     kpi_name: string;
     alert_name?: string | null;
     min?: number | null;
@@ -128,6 +132,7 @@ export interface KpiConfigPayload {
     unit?: string | null;
     alert_type?: string | null;
     cooldown_minutes?: number;
+    unack_escalation_threshold?: number | null;
     status?: boolean;
 }
 
@@ -312,6 +317,29 @@ export class IvfService extends BaseApiService {
         return await this.request<IvfBranchesResponse>(endpoint, {
             method: "GET",
         });
+    }
+
+    async getActiveIncubators(branchName?: string): Promise<{
+        branches: Array<{
+            branch_id: number;
+            branch_name: string;
+            incubators: Array<{
+                incubator_id: number;
+                incubator_code?: string | null;
+                external_id?: string | null;
+                type?: string | null;
+                chamber_r?: number | null;
+                chamber_c?: number | null;
+                updated_at?: string | null;
+            }>;
+        }>;
+        total: number;
+    }> {
+        const params = new URLSearchParams();
+        if (branchName) params.set("branch_name", branchName);
+        const qs = params.toString();
+        const endpoint = `/api/ivf/control_tower/active_incubators${qs ? `?${qs}` : ""}`;
+        return await this.request(endpoint, { method: "GET" });
     }
 
     async getReservoirs(): Promise<{
@@ -551,16 +579,95 @@ export class IvfService extends BaseApiService {
         );
     }
 
+    /** Get KPI limits config for an incubator chamber (for threshold lines on the chart). */
+    async getIncubatorKpiConfig(incubatorId: number, chamberId?: string): Promise<{
+        incubator_id: number;
+        incubator_code: string;
+        chamber_id?: string | null;
+        branch_id?: number | null;
+        branch_name?: string | null;
+        kpi_limits: Record<string, Record<string, { min?: number | null; max?: number | null; alert_type?: string | null }>>;
+    }> {
+        const params = new URLSearchParams();
+        if (chamberId != null) params.set("chamber_id", chamberId);
+        const qs = params.toString();
+        return await this.request(
+            `/api/ivf/quality/incubators/${encodeURIComponent(incubatorId)}/kpi-config${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+        );
+    }
+
+    /** Get incubator KPI history for Quality Tracking chart. Same duration_minutes semantics as tank endpoint. */
+    async getIncubatorKpiHistory(
+        incubatorId: number,
+        chamberId?: string,
+        durationMinutes?: number,
+    ): Promise<{
+        incubator_id: number;
+        incubator_code: string;
+        chamber_id: string;
+        kpi_series: Record<string, Array<{
+            timestamp: string;
+            value: number;
+            avg?: number;
+            min?: number;
+            max?: number;
+            count?: number;
+            unit: string;
+        }>>;
+    }> {
+        const params = new URLSearchParams();
+        if (chamberId != null) params.set("chamber_id", chamberId);
+        if (durationMinutes != null && durationMinutes > 0) params.set("duration_minutes", String(durationMinutes));
+        const qs = params.toString();
+        return await this.request(
+            `/api/ivf/quality/incubators/${encodeURIComponent(incubatorId)}/kpi-history${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+        );
+    }
+
+    /** Get incubator KPI history from a specific IST date to now. */
+    async getIncubatorKpiHistoryByDate(
+        incubatorId: number,
+        date: string,
+        chamberId?: string,
+    ): Promise<{
+        incubator_id: number;
+        incubator_code: string;
+        chamber_id: string;
+        kpi_series: Record<string, Array<{
+            timestamp: string;
+            value: number;
+            avg?: number;
+            min?: number;
+            max?: number;
+            count?: number;
+            unit: string;
+        }>>;
+    }> {
+        const params = new URLSearchParams();
+        params.set("date", date);
+        if (chamberId != null) params.set("chamber_id", chamberId);
+        return await this.request(
+            `/api/ivf/quality/incubators/${encodeURIComponent(incubatorId)}/kpi-history-date?${params.toString()}`,
+            { method: "GET" },
+        );
+    }
+
     /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank. */
-    async getKpiConfigList(tankId: number): Promise<{
-        tank_id: number;
-        tank_code: string;
+    async getKpiConfigList(id: number, type: "tank" | "incubator" = "tank", chamberId?: string | null): Promise<{
+        tank_id?: number;
+        incubator_id?: number;
+        tank_code?: string;
+        incubator_code?: string;
         branch_id: number;
         hospital_id: number | null;
         config: Array<KpiConfigRow>;
     }> {
+        let param = type === "incubator" ? `incubator_id=${encodeURIComponent(id)}` : `tank_id=${encodeURIComponent(id)}`;
+        if (type === "incubator" && chamberId) param += `&chamber_id=${encodeURIComponent(chamberId)}`;
         return await this.request(
-            `/api/ivf/quality/kpi-config/list?tank_id=${encodeURIComponent(tankId)}`,
+            `/api/ivf/quality/kpi-config/list?${param}`,
             { method: "GET" },
         );
     }
@@ -620,6 +727,7 @@ export class IvfService extends BaseApiService {
             unit?: string | null;
             alert_type?: string | null;
             cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
             status?: boolean;
         }>,
     ): Promise<{ updated: number; created: number }> {
@@ -627,6 +735,28 @@ export class IvfService extends BaseApiService {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tank_ids: tankIds, configs }),
+        });
+    }
+
+    async bulkUpsertKpiConfigForIncubator(
+        incubatorId: number,
+        chamberId: string | null,
+        configs: Array<{
+            kpi_name: string;
+            alert_name?: string | null;
+            min?: number | null;
+            max?: number | null;
+            unit?: string | null;
+            alert_type?: string | null;
+            cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
+            status?: boolean;
+        }>,
+    ): Promise<{ updated: number; created: number }> {
+        return await this.request("/api/ivf/quality/kpi-config/bulk-incubator", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ incubator_id: incubatorId, chamber_id: chamberId, configs }),
         });
     }
 
@@ -765,8 +895,11 @@ export class IvfService extends BaseApiService {
     }
 
     async getQualityDeviationsFlagged(): Promise<QualityDeviationsFlaggedResponse> {
+        const now = new Date();
+        const from = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        const to = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
         return await this.request<QualityDeviationsFlaggedResponse>(
-            "/api/ivf/dashboard/metrics/total-deviations",
+            `/api/ivf/dashboard/metrics/total-deviations?from_ts=${from}&to_ts=${to}`,
             { method: "GET" },
         );
     }
@@ -807,8 +940,11 @@ export class IvfService extends BaseApiService {
     }
 
     async getDeviationsGraph(): Promise<DeviationsGraphResponse> {
+        const now = new Date();
+        const from = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        const to = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
         const raw = await this.request<DeviationsGraphResponse>(
-            "/api/ivf/dashboard/metrics/deviations-graph",
+            `/api/ivf/dashboard/metrics/deviations-graph?from_ts=${from}&to_ts=${to}`,
             { method: "GET" },
         );
         // Some environments return an array like: [{ view_level, data, ... }]

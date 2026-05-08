@@ -1,6 +1,7 @@
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '../contexts/AuthContext';
+
 export default function SidebarLayout() {
   const navigate = useNavigate();
   const { logout } = useAuth();

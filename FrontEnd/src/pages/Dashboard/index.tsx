@@ -594,6 +594,7 @@ export default function Dashboard({ }: DashboardProps) {
       } catch (e: any) {
         if (!cancelled) {
           setIvfQualityDeviations(null);
+          setIvfActiveQualityDeviations(null);
           setIvfQualityDeviationsError(e?.message || 'Failed to load quality deviations');
         }
       } finally {
@@ -1193,7 +1194,10 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* <h1 className="font-semibold text-black text-lg">Monthly Summary</h1> */}
                   {/* Quality Tracking Links - Above the chart */}
                   <section id="onboarding-dashboard-quality-tracking">
-                    <div className="flex gap-6 mt-10">
+                    <h2 className="font-semibold text-black text-base mb-4 text-right">
+                      Monthly ({new Date().toLocaleString('default', { month: 'long' })})
+                    </h2>
+                    <div className="flex gap-6">
                       {/* Container Quality Tracking */}
                           <div
                             id="onboarding-dashboard-cryocan-card"

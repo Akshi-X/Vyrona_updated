@@ -304,7 +304,7 @@ const VerifyOtp: React.FC = () => {
                     // Set token with proper expiration based on rememberMe setting
                     const shouldRemember = rememberMe === true;
                     authUtils.setToken(response.auth_token, shouldRemember);
-                    login(response.auth_token, response.role, shouldRemember);
+                    login(response.auth_token, response.role, shouldRemember, response.onboarding_completed ?? true);
                 }
                 // Persist user id for pages that need it (e.g., My Tickets)
                 try {
