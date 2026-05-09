@@ -173,37 +173,63 @@ def validate_login_request(email: str, password: str, db: Session) -> User:
     Returns:
         Validated User object
     """
-    # Validation 1: User exists
-    user = get_user_by_email(email, db)
-    if not user:
-        raise UserNotFoundException(email=email)
+    print(f"\n[AUTH_DEPENDENCIES] STEP A: validate_login_request called for {email}")
     
-    # Validation 2: Check account lock (auto-unlocks if expired)
-    check_account_lock_status(user, db)
-    
-    # Validation 3: Account is active
-    if not user.status:
-        raise AccountInactiveException(user_id=user.user_id)
-    
-    # Validation 4: User is approved
-    if user.approved_status != 'approved':
-        raise UserNotApprovedException(user_id=user.user_id)
-    
-    # Validation 5: Password is correct
-    if not verify_password(password, user.password_hash):
-        # Increment failed attempts and possibly lock
-        increment_failed_login_attempt(user, db)
-        attempts_remaining = get_remaining_attempts(user)
+    try:
+        # Validation 1: User exists
+        print(f"[AUTH_DEPENDENCIES] STEP B: Looking up user by email: {email}")
+        user = get_user_by_email(email, db)
+        if not user:
+            print(f"[AUTH_DEPENDENCIES] ERROR: User not found for email: {email}")
+            raise UserNotFoundException(email=email)
+        print(f"[AUTH_DEPENDENCIES] STEP C: User found - ID: {user.user_id}")
         
-        raise InvalidCredentialsException(
-            email=email,
-            attempts_remaining=attempts_remaining if attempts_remaining > 0 else None
-        )
-    
-    # All validations passed! Reset login attempts
-    reset_login_attempts(user, db)
-    
-    return user
+        # Validation 2: Check account lock (auto-unlocks if expired)
+        print(f"[AUTH_DEPENDENCIES] STEP D: Checking account lock status...")
+        check_account_lock_status(user, db)
+        print(f"[AUTH_DEPENDENCIES] STEP E: Account lock check passed")
+        
+        # Validation 3: Account is active
+        print(f"[AUTH_DEPENDENCIES] STEP F: Checking if account is active - status: {user.status}")
+        if not user.status:
+            print(f"[AUTH_DEPENDENCIES] ERROR: Account is inactive")
+            raise AccountInactiveException(user_id=user.user_id)
+        print(f"[AUTH_DEPENDENCIES] STEP G: Account is active")
+        
+        # Validation 4: User is approved
+        print(f"[AUTH_DEPENDENCIES] STEP H: Checking approval status - approved_status: {user.approved_status}")
+        if user.approved_status != 'approved':
+            print(f"[AUTH_DEPENDENCIES] ERROR: User not approved")
+            raise UserNotApprovedException(user_id=user.user_id)
+        print(f"[AUTH_DEPENDENCIES] STEP I: User is approved")
+        
+        # Validation 5: Password is correct
+        print(f"[AUTH_DEPENDENCIES] STEP J: Verifying password...")
+        if not verify_password(password, user.password_hash):
+            print(f"[AUTH_DEPENDENCIES] ERROR: Password verification failed")
+            # Increment failed attempts and possibly lock
+            increment_failed_login_attempt(user, db)
+            attempts_remaining = get_remaining_attempts(user)
+            
+            raise InvalidCredentialsException(
+                email=email,
+                attempts_remaining=attempts_remaining if attempts_remaining > 0 else None
+            )
+        print(f"[AUTH_DEPENDENCIES] STEP K: Password verified successfully")
+        
+        # All validations passed! Reset login attempts
+        print(f"[AUTH_DEPENDENCIES] STEP L: Resetting login attempts...")
+        reset_login_attempts(user, db)
+        print(f"[AUTH_DEPENDENCIES] STEP M: All validations passed! Returning user")
+        
+        return user
+        
+    except Exception as e:
+        print(f"\n[AUTH_DEPENDENCIES] EXCEPTION in validate_login_request: {str(e)}")
+        print(f"  Error type: {type(e).__name__}")
+        import traceback
+        print(f"  Traceback: {traceback.format_exc()}")
+        raise
 
 
 def validate_registration_request(request: UserRegister, db: Session) -> UserRegister:

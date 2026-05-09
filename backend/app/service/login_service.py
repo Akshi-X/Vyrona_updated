@@ -41,26 +41,56 @@ def handle_login(email: str, password: str, remember_me: bool, db: Session) -> d
     Raises:
         Various exceptions if validation or OTP sending fails
     """
-    # Validation (all security checks)
-    user = validate_login_request(email, password, db)
+    print("\n[LOGIN_SERVICE] STEP 1: handle_login called")
+    print(f"  Email: {email}")
+    print(f"  Remember Me: {remember_me}")
     
-    # Business Logic: Generate and send OTP with remember_me preference
     try:
-        otp = send_otp_to_user(db, str(user.user_id), user.email, remember_me)
-        audit_log_disabled = is_audit_log_disabled_for_user(user)
-        ActivityLogService(db).log_activity(
-            action="user.login_requested",
-            outcome=ActivityOutcome.SUCCESS.value,
-            actor=build_actor_from_user(user),
-            metadata={"remember_me": remember_me},
-            audit_log_disabled=audit_log_disabled,
-        )
+        # Validation (all security checks)
+        print("\n[LOGIN_SERVICE] STEP 2: Calling validate_login_request...")
+        user = validate_login_request(email, password, db)
+        print(f"[LOGIN_SERVICE] STEP 3: User validation passed")
+        print(f"  User ID: {user.user_id}")
+        print(f"  User Email: {user.email}")
         
-        return {
-            "user_id": str(user.user_id),
-            "email": user.email,
-            "otp_expiry": None  # Frontend uses fixed 10-minute countdown to avoid timezone issues
-        }
+        # Business Logic: Generate and send OTP with remember_me preference
+        try:
+            print("\n[LOGIN_SERVICE] STEP 4: Calling send_otp_to_user...")
+            otp = send_otp_to_user(db, str(user.user_id), user.email, remember_me)
+            print(f"[LOGIN_SERVICE] STEP 5: OTP sent successfully")
+            
+            print("\n[LOGIN_SERVICE] STEP 6: Logging activity...")
+            audit_log_disabled = is_audit_log_disabled_for_user(user)
+            ActivityLogService(db).log_activity(
+                action="user.login_requested",
+                outcome=ActivityOutcome.SUCCESS.value,
+                actor=build_actor_from_user(user),
+                metadata={"remember_me": remember_me},
+                audit_log_disabled=audit_log_disabled,
+            )
+            print("[LOGIN_SERVICE] STEP 7: Activity logged")
+            
+            result = {
+                "user_id": str(user.user_id),
+                "email": user.email,
+                "otp_expiry": None  # Frontend uses fixed 10-minute countdown to avoid timezone issues
+            }
+            
+            print("\n[LOGIN_SERVICE] STEP 8: Returning login result")
+            print(f"  Result: {result}")
+            return result
+            
+        except Exception as e:
+            print(f"\n[LOGIN_SERVICE] ERROR in OTP sending: {str(e)}")
+            print(f"  Error type: {type(e).__name__}")
+            import traceback
+            print(f"  Traceback: {traceback.format_exc()}")
+            raise OTPSendFailedException(email=user.email, reason=str(e))
+            
     except Exception as e:
-        raise OTPSendFailedException(email=user.email, reason=str(e))
+        print(f"\n[LOGIN_SERVICE] ERROR in handle_login: {str(e)}")
+        print(f"  Error type: {type(e).__name__}")
+        import traceback
+        print(f"  Traceback: {traceback.format_exc()}")
+        raise
 

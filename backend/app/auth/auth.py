@@ -127,3 +127,8 @@ def get_current_user(
         raise UserFromTokenNotFoundException(user_id=user_id)
     
     return user
+
+
+
+
+print(get_password_hash("easyPeasy1!"))
