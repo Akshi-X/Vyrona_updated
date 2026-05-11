@@ -1,0 +1,43 @@
+name: Deploy Azure Function (Flex, nozip)
+
+on:
+  push:
+    branches:
+      - iot-azure-function
+  workflow_dispatch:
+
+env:
+  FUNCTION_APP_NAME: mgscale-ingestion-prod
+  FUNCTION_APP_PATH: tive-ingestion-function
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Azure CLI
+        run: |
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+      - name: Install Azure Functions Core Tools
+        run: |
+          npm install -g azure-functions-core-tools@4 --unsafe-perm true
+
+      - name: Azure Login (Service Principal)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Publish Function App (NO ZIP )
+        run: |
+          cd $FUNCTION_APP_PATH
+          func azure functionapp publish $FUNCTION_APP_NAME --nozip
