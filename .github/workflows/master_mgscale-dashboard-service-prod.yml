@@ -4,67 +4,20 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "FrontEnd/**"
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/reusable-azure-webapp-node.yml
+    with:
+      app_name: mgscale-dashboard-service-prod
+      frontend_path: FrontEnd
+      node_version: '22.x'
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
+      VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+      VITE_GOOGLE_MAP_ID: ${{ secrets.VITE_GOOGLE_MAP_ID }}
 
-    permissions:
-      contents: read
-
-    steps:
-      # 1️⃣ Checkout code
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # 2️⃣ Setup Node
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.x'
-          cache: 'npm'
-          cache-dependency-path: FrontEnd/package-lock.json
-
-      # 3️⃣ Install dependencies
-      - name: Install dependencies
-        working-directory: FrontEnd
-        run: npm ci
-
-      # 4️⃣ Validate PROD API URL secret
-      - name: Validate PROD API URL secret
-        working-directory: FrontEnd
-        env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
-        run: |
-          echo "Checking secret..."
-          if [ "$VITE_API_BASE_URL" = "https://mgscale-alerting-service-prod-d5hfgmdnd6d3f2f8.westeurope-01.azurewebsites.net" ]; then
-            echo "Correct value"
-          else
-            echo "Wrong value"
-          fi
-
-      # 5️⃣ Build frontend (inject Vite env vars)
-      - name: Build frontend
-        working-directory: FrontEnd
-        env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
-          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
-          VITE_GOOGLE_MAP_ID: ${{ secrets.VITE_GOOGLE_MAP_ID }}
-        run: |
-          npm run build
-          cp web.config dist/
-
-      # 6️⃣ Azure Login using SAME Service Principal as Backend
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          auth-type: SERVICE_PRINCIPAL
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      # 7️⃣ Deploy dist folder to Azure Web App
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: mgscale-dashboard-service-prod
-          package: FrontEnd/dist
