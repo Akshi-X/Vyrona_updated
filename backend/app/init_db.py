@@ -16,6 +16,8 @@ from app.models import (
 )
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.hospital_model import Hospital
+from app.models.IVF.ivf_cycle_model import IvfCycle
+from app.models.IVF.ivf_cycle_log_model import IvfCycleLog
 from app.models.user_model import User
 from app.utils.utils import generate_user_id
 
@@ -1124,6 +1126,90 @@ def create_mygrape_admin():
         db.close()
 
 
+def seed_ivf_cycles():
+    """
+    Seed ivf_cycle and ivf_cycle_log tables with representative sample data.
+    Idempotent: skips if any cycles already exist for ARC Fertility Hospitals.
+    """
+    logger.info("Seeding IVF cycles...")
+    db = SessionLocal()
+    try:
+        hospital = db.query(Hospital).filter(Hospital.hospital_name == "ARC Fertility Hospitals").first()
+        if not hospital:
+            logger.warning("ARC Fertility Hospitals not found — skipping IVF cycle seed")
+            return
+
+        hospital_id = hospital.hospital_id
+        if db.query(IvfCycle).filter(IvfCycle.hospital_id == hospital_id).first():
+            logger.info("IVF cycles already seeded — skipping")
+            return
+
+        branch = db.query(HospitalBranch).filter(HospitalBranch.hospital_id == hospital_id).first()
+        branch_id = branch.branch_id if branch else None
+
+        CYCLES = [
+            dict(his_id="HIS001", patient_name="Ananya Krishnan",   injection_method="ICSI",  sperm_quality="Good",         oocyte_quality="Good",           cycle_type="OG",    oocyte_m2=8, oocyte_m1=1, oocyte_gv=0, oocyte_others=1, status="Active"),
+            dict(his_id="HIS002", patient_name="Priya Subramaniam", injection_method="PICSI", sperm_quality="Average",       oocyte_quality="Good",           cycle_type="DOHSP", oocyte_m2=7, oocyte_m1=2, oocyte_gv=1, oocyte_others=0, status="Active"),
+            dict(his_id="HIS003", patient_name="Meena Rajan",       injection_method="ICSI",  sperm_quality="Good",         oocyte_quality="Average",        cycle_type="OG",    oocyte_m2=6, oocyte_m1=1, oocyte_gv=1, oocyte_others=2, status="Active"),
+            dict(his_id="HIS004", patient_name="Divya Nair",        injection_method="IMSI",  sperm_quality="Poor",         oocyte_quality="Average to Poor", cycle_type="DET",   oocyte_m2=5, oocyte_m1=2, oocyte_gv=0, oocyte_others=1, status="Completed"),
+            dict(his_id="HIS005", patient_name="Lakshmi Venkat",    injection_method="ICSI",  sperm_quality="Average (NI)", oocyte_quality="Good",           cycle_type="OG",    oocyte_m2=9, oocyte_m1=1, oocyte_gv=0, oocyte_others=0, status="Active"),
+        ]
+
+        LOGS = {
+            "HIS001": [
+                dict(oocyte_no=1, oocyte_comments="Good cytoplasm",    d0_maturity="MII", d0_drop_no="1", d1_pn="2PN", d1_zygote_status="Normal",   d3_drop_no="1", d3_grade="8C1", d3_symmetry="Even",            d5_stage="Blastocyst", d5_grade="4AA", fate="Freeze", freeze_no="1", meta={"d0_notes":"","d1_notes":"","d3_notes":"Good cleavage","d5_notes":"Top grade","d6_notes":"","final_notes":""}),
+                dict(oocyte_no=2, oocyte_comments="Minor granularity", d0_maturity="MII", d0_drop_no="1", d1_pn="2PN", d1_zygote_status="Normal",   d3_drop_no="1", d3_grade="6C2", d3_symmetry="Slightly uneven", d5_stage="Blastocyst", d5_grade="4AB", fate="Freeze", freeze_no="2", meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":""}),
+                dict(oocyte_no=3, oocyte_comments="Good cytoplasm",    d0_maturity="MII", d0_drop_no="2", d1_pn="2PN", d1_zygote_status="Normal",   d3_drop_no="2", d3_grade="8C1", d3_symmetry="Even",            d5_stage="Blastocyst", d5_grade="4BB", fate="Freeze", freeze_no="3", meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":""}),
+                dict(oocyte_no=4, oocyte_comments="Good cytoplasm",    d0_maturity="MII", d0_drop_no="2", d1_pn="1PN", d1_zygote_status="Abnormal", d3_drop_no="2", d3_grade="4C3", d3_symmetry="Uneven",          d5_stage="Morula",     d5_grade=None,  fate="Discard",freeze_no=None, meta={"d0_notes":"","d1_notes":"Abnormal PN","d3_notes":"Poor cleavage","d5_notes":"","d6_notes":"","final_notes":"Discarded due to abnormal fertilization"}),
+                dict(oocyte_no=5, oocyte_comments="Good cytoplasm",    d0_maturity="MI",  d0_drop_no="3", d1_pn="0PN", d1_zygote_status=None,       d3_drop_no=None,d3_grade=None,  d3_symmetry=None,              d5_stage=None,         d5_grade=None,  fate="Discard",freeze_no=None, meta={"d0_notes":"MI oocyte","d1_notes":"Failed fertilization","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":""}),
+            ],
+            "HIS002": [
+                dict(oocyte_no=1, oocyte_comments="Good cytoplasm", d0_maturity="MII", d0_drop_no="1", d1_pn="2PN", d1_zygote_status="Normal", d3_drop_no="1", d3_grade="8C1", d3_symmetry="Even",  d5_stage="Blastocyst", d5_grade="4AA", fate="Freeze", freeze_no="1", meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":""}),
+                dict(oocyte_no=2, oocyte_comments="Good cytoplasm", d0_maturity="MII", d0_drop_no="1", d1_pn="2PN", d1_zygote_status="Normal", d3_drop_no="1", d3_grade="7C1", d3_symmetry="Even",  d5_stage="Blastocyst", d5_grade="4AB", fate="Freeze", freeze_no="2", meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":""}),
+                dict(oocyte_no=3, oocyte_comments="Good cytoplasm", d0_maturity="MII", d0_drop_no="2", d1_pn="2PN", d1_zygote_status="Normal", d3_drop_no="2", d3_grade="6C2", d3_symmetry="Slightly uneven", d5_stage="Early Blast", d5_grade=None, fate="Discard", freeze_no=None, meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"Did not reach blast","d6_notes":"","final_notes":""}),
+            ],
+            "HIS003": [
+                dict(oocyte_no=1, oocyte_comments="Good cytoplasm", d0_maturity="MII", d0_drop_no="1", d1_pn="2PN", d1_zygote_status="Normal", d3_drop_no="1", d3_grade="8C1", d3_symmetry="Even", d5_stage="Blastocyst", d5_grade="4BA", fate="Freeze", freeze_no="1", meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":""}),
+                dict(oocyte_no=2, oocyte_comments="Minor granularity", d0_maturity="MII", d0_drop_no="1", d1_pn="2PN", d1_zygote_status="Normal", d3_drop_no="1", d3_grade="6C2", d3_symmetry="Slightly uneven", d5_stage="Morula", d5_grade=None, d6_stage="Blastocyst", d6_grade="5BB", d6_progression="Delayed development", fate="Freeze", freeze_no="2", meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"Slow — check D6","d6_notes":"Late blast","final_notes":""}),
+            ],
+            "HIS004": [
+                dict(oocyte_no=1, oocyte_comments="Good cytoplasm", d0_maturity="MII", d0_drop_no="1", d1_pn="2PN", d1_zygote_status="Normal", d3_drop_no="1", d3_grade="8C1", d3_symmetry="Even", d5_stage="Blastocyst", d5_grade="4AA", fate="Transfer", freeze_no=None, meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":"Selected for FET"}),
+                dict(oocyte_no=2, oocyte_comments="Good cytoplasm", d0_maturity="MII", d0_drop_no="1", d1_pn="2PN", d1_zygote_status="Normal", d3_drop_no="1", d3_grade="6C1", d3_symmetry="Even", d5_stage="Blastocyst", d5_grade="4BB", fate="Freeze", freeze_no="1", meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":""}),
+            ],
+            "HIS005": [
+                dict(oocyte_no=1, oocyte_comments="Good cytoplasm",    d0_maturity="MII", d0_drop_no="1", d1_pn="2PN", d1_zygote_status="Normal", d3_drop_no="1", d3_grade="8C1", d3_symmetry="Even", d5_stage="Blastocyst", d5_grade="4AA", fate="Freeze", freeze_no="1", meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":""}),
+                dict(oocyte_no=2, oocyte_comments="Good cytoplasm",    d0_maturity="MII", d0_drop_no="1", d1_pn="2PN", d1_zygote_status="Normal", d3_drop_no="1", d3_grade="8C1", d3_symmetry="Even", d5_stage="Blastocyst", d5_grade="4BB", fate="Freeze", freeze_no="2", meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":""}),
+                dict(oocyte_no=3, oocyte_comments="Minor granularity", d0_maturity="MII", d0_drop_no="2", d1_pn="2PN", d1_zygote_status="Normal", d3_drop_no="2", d3_grade="6C2", d3_symmetry="Slightly uneven", d5_stage="Early Blast", d5_grade=None, fate="Discard", freeze_no=None, meta={"d0_notes":"","d1_notes":"","d3_notes":"","d5_notes":"","d6_notes":"","final_notes":""}),
+            ],
+        }
+
+        cycle_map = {}
+        for c in CYCLES:
+            cycle = IvfCycle(
+                hospital_id=hospital_id,
+                branch_id=branch_id,
+                created_by="system",
+                updated_by="system",
+                **c,
+            )
+            db.add(cycle)
+            db.flush()
+            cycle_map[c["his_id"]] = cycle.cycle_id
+
+        for his_id, logs in LOGS.items():
+            cycle_id = cycle_map[his_id]
+            for log in logs:
+                db.add(IvfCycleLog(cycle_id=cycle_id, created_by="system", updated_by="system", **log))
+
+        db.commit()
+        logger.info("Seeded %d IVF cycles with logs", len(CYCLES))
+    except Exception as e:
+        db.rollback()
+        logger.error("ERROR seeding IVF cycles: %s", str(e), exc_info=True)
+    finally:
+        db.close()
+
+
 def init_db():
     """
     Initialize database tables and create pharma admins and companies if not exists.
@@ -1145,6 +1231,9 @@ def init_db():
 
     # Create hospitals and branches for IVF users
     # create_hospitals_and_branches()
+
+    # Seed IVF cycle sample data
+    # seed_ivf_cycles()
 
     # Create IVF admins if ivf_admins.json exists
     # create_ivf_admins()

@@ -40,6 +40,7 @@ from app.controller.IVF import (
     internal_alert_controller,
     internal_refill_controller,
     ivf_controller,
+    ivf_cycle_controller,
     ivf_dashboard_controller,
     ivf_quality_controller,
     ivf_reports_controller,
@@ -245,6 +246,7 @@ app.include_router(quality_controller.router, prefix=API_PREFIX)
 app.include_router(quality_tracking_controller.router, prefix=API_PREFIX)
 app.include_router(iot_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_controller.router, prefix=API_PREFIX)
+app.include_router(ivf_cycle_controller.router, prefix=API_PREFIX)
 app.include_router(kpi_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)

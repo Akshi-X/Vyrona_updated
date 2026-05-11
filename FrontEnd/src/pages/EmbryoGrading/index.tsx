@@ -4,8 +4,7 @@ import PageLayout from '../../components/PageLayout';
 import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import Modal from '../../components/Modal';
 import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
-import { type IVFTreatment } from '../../types/ivf';
-import { ivfService, type IvfBranch } from '../../services/ivfService';
+import { ivfService, type IvfBranch, type IvfCycle, type IvfCycleLog, type IvfCycleWithLogs, type IvfLogUpsert, type IvfCycleCreate } from '../../services/ivfService';
 import { shipmentService } from '../../services/shipmentService';
 
 interface EmbryoGradingDetail {
@@ -14,46 +13,16 @@ interface EmbryoGradingDetail {
   viability: string;
 }
 
-interface EmbryologyLogEntry {
-  id: number;
-  oocyteNo: string;
-  maturity: string;
-  oocyteComments: string;
-  day0Dish: string;
-  pn: string;
-  dropNo: string;
-  day0ZygoteStatus?: string;
-  day0Notes?: string;
-  day3CellCount?: string;
-  day3Fragmentation?: string;
-  day3Symmetry?: string;
-  day3Notes?: string;
-  day3Label?: string;
-  day5Stage?: string;
-  day5ExpansionGrade?: string;
-  day5IcmGrade?: string;
-  day5TeGrade?: string;
-  day5Label?: string;
-  day6Stage?: string;
-  day6ExpansionGrade?: string;
-  day6IcmGrade?: string;
-  day6TeGrade?: string;
-  day6Label?: string;
-  day6Progression?: string;
-  fate: string;
-  fzNo: string;
-  notes: string;
-}
-
 interface EmbryologyLogFormState {
   oocyteNo: string;
-  maturity: string;
   oocyteComments: string;
-  day0Dish: string;
-  pn: string;
-  dropNo: string;
-  day0ZygoteStatus: string;
-  day0Notes: string;
+  d0Maturity: string;
+  d0DropNo: string;
+  d0Notes: string;
+  d1Pn: string;
+  d1ZygoteStatus: string;
+  d1Notes: string;
+  day3DropNo: string;
   day3CellCount: string;
   day3Fragmentation: string;
   day3Symmetry: string;
@@ -62,11 +31,13 @@ interface EmbryologyLogFormState {
   day5ExpansionGrade: string;
   day5IcmGrade: string;
   day5TeGrade: string;
+  day5Notes: string;
   day6Stage: string;
   day6ExpansionGrade: string;
   day6IcmGrade: string;
   day6TeGrade: string;
   day6Progression: string;
+  day6Notes: string;
   fate: string;
   fzNo: string;
   notes: string;
@@ -113,14 +84,15 @@ export default function EmbryoGradingPage() {
   const { his } = useParams<{ his: string }>();
   const detailHis = his?.trim().toUpperCase() || '';
   const isDetailView = Boolean(detailHis);
-  const [embryos, setEmbryos] = useState<IVFTreatment[]>([]);
+  const [cycles, setCycles] = useState<IvfCycle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedBranch, setSelectedBranch] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
-  const [selectedEmbryo, setSelectedEmbryo] = useState<IVFTreatment | null>(null);
-  const [embryologyLogsByEmbryo, setEmbryologyLogsByEmbryo] = useState<Record<string, EmbryologyLogEntry[]>>({});
+  const [selectedCycle, setSelectedCycle] = useState<IvfCycleWithLogs | null>(null);
+  const [logsLoading, setLogsLoading] = useState(false);
   const [isAddLogFormOpen, setIsAddLogFormOpen] = useState(false);
+  const [logSaving, setLogSaving] = useState(false);
+  const [cycleCreating, setCycleCreating] = useState(false);
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
   const [isAddEmbryoFormOpen, setIsAddEmbryoFormOpen] = useState(false);
   const [branches, setBranches] = useState<IvfBranch[]>([]);
@@ -158,13 +130,14 @@ export default function EmbryoGradingPage() {
   });
   const [logForm, setLogForm] = useState<EmbryologyLogFormState>({
     oocyteNo: '',
-    maturity: 'MII',
     oocyteComments: '',
-    day0Dish: '',
-    pn: '2PN',
-    dropNo: '',
-    day0ZygoteStatus: '',
-    day0Notes: '',
+    d0Maturity: 'MII',
+    d0DropNo: '',
+    d0Notes: '',
+    d1Pn: '2PN',
+    d1ZygoteStatus: '',
+    d1Notes: '',
+    day3DropNo: '',
     day3CellCount: '',
     day3Fragmentation: '',
     day3Symmetry: '',
@@ -173,11 +146,13 @@ export default function EmbryoGradingPage() {
     day5ExpansionGrade: '',
     day5IcmGrade: '',
     day5TeGrade: '',
+    day5Notes: '',
     day6Stage: '',
     day6ExpansionGrade: '',
     day6IcmGrade: '',
     day6TeGrade: '',
     day6Progression: '',
+    day6Notes: '',
     fate: '',
     fzNo: '',
     notes: '',
@@ -201,87 +176,20 @@ export default function EmbryoGradingPage() {
   };
 
 
-  // Load embryo data
   useEffect(() => {
-    const fetchEmbryoData = async () => {
+    const fetchCycles = async () => {
       try {
         setLoading(true);
         setError(null);
-        // Load mock data for embryo grading
-        const mockData: IVFTreatment[] = [
-          {
-            hisNumber: "HIS001", patientName: "Ananya Krishnan",
-            cryolockNum: "CL001", canisterNum: 1, embryo_count: 10,
-            oocyte_m2: 8, oocyte_m1: 1, oocyte_gv: 0, oocyte_others: 1,
-            tankCode: "TANK-A", caneCode: "CANE-1", gobletColor: "Yellow", cryolockColor: "Blue",
-            dateOfVitrification: "2024-01-15", siteName: "Main Hospital", status: "Stored", embryoGrading: "4AA", description: null,
-            injectionMethod: "ICSI", spermQuality: "Good", oocytesQuality: "Good", cycleType: "OG", incubatorCode: "INC-A1", chamberPosition: "3",
-          },
-          {
-            hisNumber: "HIS002", patientName: "Priya Subramaniam",
-            cryolockNum: "CL002", canisterNum: 2, embryo_count: 10,
-            oocyte_m2: 8, oocyte_m1: 1, oocyte_gv: 0, oocyte_others: 1,
-            tankCode: "TANK-B", caneCode: "CANE-2", gobletColor: "Green", cryolockColor: "Red",
-            dateOfVitrification: "2024-02-20", siteName: "Branch Clinic", status: "In Transit", embryoGrading: "4AB", description: "Being transferred to IVF lab",
-            injectionMethod: "PICSI", spermQuality: "Average", oocytesQuality: "Good", cycleType: "DOHSP", incubatorCode: "INC-B2", chamberPosition: "7",
-          },
-          {
-            hisNumber: "HIS003", patientName: "Meena Rajan",
-            cryolockNum: "CL003", canisterNum: 1, embryo_count: 10,
-            oocyte_m2: 8, oocyte_m1: 1, oocyte_gv: 0, oocyte_others: 1,
-            tankCode: "TANK-A", caneCode: "CANE-3", gobletColor: "Blue", cryolockColor: "Yellow",
-            dateOfVitrification: "2024-03-10", siteName: "Main Hospital", status: "Stored", embryoGrading: "4BA", description: null,
-            injectionMethod: "ICSI", spermQuality: "Good", oocytesQuality: "Average", cycleType: "OG", incubatorCode: "INC-A1", chamberPosition: "12",
-          },
-          {
-            hisNumber: "HIS004", patientName: "Divya Nair",
-            cryolockNum: "CL004", canisterNum: 3, embryo_count: 10,
-            oocyte_m2: 8, oocyte_m1: 1, oocyte_gv: 0, oocyte_others: 1,
-            tankCode: "TANK-C", caneCode: "CANE-1", gobletColor: "Red", cryolockColor: "Green",
-            dateOfVitrification: "2024-01-05", siteName: "Satellite Center", status: "Thawed", embryoGrading: "2AA", description: null,
-            injectionMethod: "IMSI", spermQuality: "Poor", oocytesQuality: "Average to Poor", cycleType: "DET", incubatorCode: "INC-C1", chamberPosition: "2",
-          },
-          {
-            hisNumber: "HIS005", patientName: "Lakshmi Venkat",
-            cryolockNum: "CL005", canisterNum: 2, embryo_count: 10,
-            oocyte_m2: 8, oocyte_m1: 1, oocyte_gv: 0, oocyte_others: 1,
-            tankCode: "TANK-B", caneCode: "CANE-2", gobletColor: "Yellow", cryolockColor: "Blue",
-            dateOfVitrification: "2024-02-28", siteName: "Branch Clinic", status: "Stored", embryoGrading: "4BB", description: null,
-            injectionMethod: "ICSI", spermQuality: "Average (NI)", oocytesQuality: "Good", cycleType: "OG", incubatorCode: "INC-B2", chamberPosition: "5",
-          },
-          {
-            hisNumber: "HIS006", patientName: "Kavitha Murali",
-            cryolockNum: "CL006", canisterNum: 1, embryo_count: 10,
-            oocyte_m2: 8, oocyte_m1: 1, oocyte_gv: 0, oocyte_others: 1,
-            tankCode: "TANK-A", caneCode: "CANE-4", gobletColor: "Purple", cryolockColor: "Orange",
-            dateOfVitrification: "2024-03-15", siteName: "Main Hospital", status: "Stored", embryoGrading: "4AB", description: null,
-            injectionMethod: "PICSI", spermQuality: "Good", oocytesQuality: "Good", cycleType: "DOHSP", incubatorCode: "INC-A2", chamberPosition: "9",
-          },
-          {
-            hisNumber: "HIS007", patientName: "Saranya Pillai",
-            cryolockNum: "CL007", canisterNum: 3, embryo_count: 10,
-            oocyte_m2: 8, oocyte_m1: 1, oocyte_gv: 0, oocyte_others: 1,
-            tankCode: "TANK-C", caneCode: "CANE-3", gobletColor: "Green", cryolockColor: "Blue",
-            dateOfVitrification: "2024-01-20", siteName: "Satellite Center", status: "Stored", embryoGrading: "3AA", description: null,
-            injectionMethod: "ICSI", spermQuality: "Average", oocytesQuality: "Average", cycleType: "OG", incubatorCode: "INC-C1", chamberPosition: "6",
-          },
-          {
-            hisNumber: "HIS008", patientName: "Rekha Chandran",
-            cryolockNum: "CL008", canisterNum: 2, embryo_count: 10,
-            oocyte_m2: 8, oocyte_m1: 1, oocyte_gv: 0, oocyte_others: 1,
-            tankCode: "TANK-B", caneCode: "CANE-1", gobletColor: "Red", cryolockColor: "Yellow",
-            dateOfVitrification: "2024-02-10", siteName: "Branch Clinic", status: "In Transit", embryoGrading: "4BB", description: "Scheduled for transfer",
-            injectionMethod: "IMSI", spermQuality: "Average (NI)", oocytesQuality: "Average to Poor", cycleType: "OG", incubatorCode: "INC-B1", chamberPosition: "4",
-          },
-        ];
-        setEmbryos(mockData);
+        const data = await ivfService.listCycles();
+        setCycles(data);
       } catch (err: any) {
-        setError(err?.message || 'Failed to load embryo data');
+        setError(err?.message || 'Failed to load cycles');
       } finally {
         setLoading(false);
       }
     };
-    fetchEmbryoData();
+    fetchCycles();
   }, []);
 
   // Fetch branches when Add Cycle modal opens
@@ -295,161 +203,50 @@ export default function EmbryoGradingPage() {
     }).finally(() => setBranchesLoading(false));
   }, [isAddEmbryoFormOpen]);
 
-  // Get unique branches and statuses for filters
-  const branchOptions = React.useMemo(() => {
-    const set = new Set<string>();
-    embryos.forEach(embryo => {
-      if (embryo.siteName && embryo.siteName.trim()) {
-        set.add(embryo.siteName.trim());
-      }
-    });
-    return ['All', ...Array.from(set).sort()];
-  }, [embryos]);
-
   const statusOptions = React.useMemo(() => {
     const set = new Set<string>();
-    embryos.forEach(embryo => {
-      if (embryo.status && embryo.status.trim()) {
-        set.add(embryo.status.trim());
-      }
-    });
+    cycles.forEach(c => { if (c.status) set.add(c.status); });
     return ['All', ...Array.from(set).sort()];
-  }, [embryos]);
+  }, [cycles]);
 
   const activeFilterCount = React.useMemo(() => {
-    let count = 0;
-    if (selectedBranch !== 'All') count++;
-    if (selectedStatus !== 'All') count++;
-    return count;
-  }, [selectedBranch, selectedStatus]);
+    return selectedStatus !== 'All' ? 1 : 0;
+  }, [selectedStatus]);
 
-  // Filter embryos based on selected filters
-  const filteredEmbryos = React.useMemo(() => {
-    return embryos.filter(embryo => {
-      const matchBranch = selectedBranch === 'All' || embryo.siteName === selectedBranch;
-      const matchStatus = selectedStatus === 'All' || embryo.status === selectedStatus;
-      return matchBranch && matchStatus;
-    });
-  }, [embryos, selectedBranch, selectedStatus]);
+  const filteredCycles = React.useMemo(() => {
+    return cycles.filter(c => selectedStatus === 'All' || c.status === selectedStatus);
+  }, [cycles, selectedStatus]);
 
-  const embryoStats = React.useMemo(() => {
-    const total = filteredEmbryos.length;
-    const stored = filteredEmbryos.filter((embryo) => embryo.status === 'Stored').length;
-    const inTransit = filteredEmbryos.filter((embryo) => embryo.status === 'In Transit').length;
-    const thawed = filteredEmbryos.filter((embryo) => embryo.status === 'Thawed').length;
-    const highGrade = filteredEmbryos.filter((embryo) => {
-      const grades = (embryo.embryoGrading || '').split(',').map((g) => g.trim());
-      return grades.some((grade) => grade === '4AA' || grade === '4AB' || grade === '4BA');
-    }).length;
-
-    return { total, stored, inTransit, thawed, highGrade };
-  }, [filteredEmbryos]);
-
-  const getPrimaryGrade = (grading?: string) => {
-    return grading?.split(',')[0]?.trim() || 'N/A';
-  };
-
-  const getGradeChipStyle = (grade: string) => {
-    if (['4AA', '4AB', '4BA'].includes(grade)) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    if (['4BB', '3AA'].includes(grade)) return 'bg-amber-100 text-amber-700 border-amber-200';
-    return 'bg-slate-100 text-slate-700 border-slate-200';
-  };
-
-  const getEmbryoKey = (embryo: IVFTreatment | null) => {
-    if (!embryo) return '';
-    return `${embryo.hisNumber}-${embryo.cryolockNum}`;
-  };
-
-  const selectedEmbryoKey = getEmbryoKey(selectedEmbryo);
-  const selectedEmbryologyLogs = selectedEmbryoKey ? (embryologyLogsByEmbryo[selectedEmbryoKey] || []) : [];
+  const cycleStats = React.useMemo(() => {
+    const total = filteredCycles.length;
+    const active = filteredCycles.filter(c => c.status === 'Active').length;
+    const completed = filteredCycles.filter(c => c.status === 'Completed').length;
+    const paused = filteredCycles.filter(c => c.status === 'Paused').length;
+    return { total, active, completed, paused };
+  }, [filteredCycles]);
 
   useEffect(() => {
-    if (!detailHis || embryos.length === 0) return;
-    const matchedEmbryo = embryos.find((embryo) => embryo.hisNumber.toUpperCase() === detailHis);
-    if (matchedEmbryo) {
-      setSelectedEmbryo(matchedEmbryo);
-    }
-  }, [detailHis, embryos]);
-
-  useEffect(() => {
-    if (!selectedEmbryo || !selectedEmbryoKey) return;
-    setEmbryologyLogsByEmbryo((prev) => {
-      if (prev[selectedEmbryoKey]) return prev;
-      const embryoCount = Number(selectedEmbryo.embryo_count || 0);
-
-      if (embryoCount > 0) {
-        const m2Count = selectedEmbryo.oocyte_m2 ?? 0;
-        const m1Count = selectedEmbryo.oocyte_m1 ?? 0;
-        const getMaturity = (i: number): string => {
-          if (i < m2Count) return 'MII';
-          if (i < m2Count + m1Count) return 'MI';
-          return '—';
-        };
-        const seedRows: EmbryologyLogEntry[] = Array.from({ length: embryoCount }, (_, index) => ({
-          id: index + 1,
-          oocyteNo: String(index + 1),
-          maturity: getMaturity(index),
-          oocyteComments: 'Good cytoplasm',
-          day0Dish: String(index + 1),
-          pn: '2PN',
-          dropNo: String(index + 1),
-          fate: '—',
-          fzNo: '—',
-          notes: '—',
-        }));
-
-        return { ...prev, [selectedEmbryoKey]: seedRows };
-      }
-
-      const grades = (selectedEmbryo.embryoGrading || '')
-        .split(',')
-        .map((grade) => grade.trim())
-        .filter(Boolean);
-      const seedRows: EmbryologyLogEntry[] = grades.map((grade, index) => ({
-        id: index + 1,
-        oocyteNo: String(index + 1),
-        maturity: 'MII',
-        oocyteComments: index % 2 === 0 ? 'Good cytoplasm' : 'Minor granularity',
-        day0Dish: String(Math.floor(index / 3) + 1),
-        pn: '2PN',
-        dropNo: String((index % 3) + 1),
-        day0ZygoteStatus: 'Normal',
-        day0Notes: '',
-        day3CellCount: String(index % 8 + 2),
-        day3Fragmentation: '1',
-        day3Symmetry: 'Even',
-        day3Notes: '',
-        day3Label: `${index % 8 + 2}C1`,
-        day5Stage: 'Blastocyst',
-        day5ExpansionGrade: grade[0] || '4',
-        day5IcmGrade: grade[1] || 'A',
-        day5TeGrade: grade[2] || 'A',
-        day5Label: grade,
-        day6Stage: '',
-        day6ExpansionGrade: '',
-        day6IcmGrade: '',
-        day6TeGrade: '',
-        day6Label: '',
-        day6Progression: '',
-        fate: ['Stored', 'In Transit'].includes(selectedEmbryo.status || '') ? 'Freeze' : 'Discard',
-        fzNo: ['Stored', 'In Transit'].includes(selectedEmbryo.status || '') ? `#${index + 1}` : '',
-        notes: selectedEmbryo.description || '',
-      }));
-
-      return { ...prev, [selectedEmbryoKey]: seedRows };
-    });
-  }, [selectedEmbryo, selectedEmbryoKey]);
+    if (!detailHis || cycles.length === 0) return;
+    const matched = cycles.find(c => c.his_id.toUpperCase() === detailHis);
+    if (!matched) return;
+    setLogsLoading(true);
+    ivfService.getCycleWithLogs(matched.cycle_id)
+      .then(setSelectedCycle)
+      .catch(() => {})
+      .finally(() => setLogsLoading(false));
+  }, [detailHis, cycles]);
 
   const resetLogForm = () => {
     setLogForm({
       oocyteNo: '',
-      maturity: 'MII',
       oocyteComments: '',
-      day0Dish: '',
-      pn: '2PN',
-      dropNo: '',
-      day0ZygoteStatus: '',
-      day0Notes: '',
+      d0Maturity: 'MII',
+      d0DropNo: '',
+      d0Notes: '',
+      d1Pn: '2PN',
+      d1ZygoteStatus: '',
+      d1Notes: '',
+      day3DropNo: '',
       day3CellCount: '',
       day3Fragmentation: '',
       day3Symmetry: '',
@@ -458,11 +255,13 @@ export default function EmbryoGradingPage() {
       day5ExpansionGrade: '',
       day5IcmGrade: '',
       day5TeGrade: '',
+      day5Notes: '',
       day6Stage: '',
       day6ExpansionGrade: '',
       day6IcmGrade: '',
       day6TeGrade: '',
       day6Progression: '',
+      day6Notes: '',
       fate: '',
       fzNo: '',
       notes: '',
@@ -514,94 +313,102 @@ export default function EmbryoGradingPage() {
     );
   };
 
-  const handleAddLogEntry = () => {
-    if (!selectedEmbryoKey) return;
-    
-    const day3Label = generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation);
-    const rawDay5Label = generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade);
-    const day5Label = rawDay5Label !== '—' ? rawDay5Label : (logForm.day5Stage || '—');
-    const rawDay6Label = generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade);
-    const day6Label = rawDay6Label !== '—' ? rawDay6Label : (logForm.day6Stage || '—');
+  const handleAddLogEntry = async () => {
+    if (!selectedCycle) return;
+    setLogSaving(true);
 
-    const updatedEntry: EmbryologyLogEntry = {
-      id: editingLogId || Date.now(),
-      oocyteNo: logForm.oocyteNo || '—',
-      maturity: logForm.maturity || '—',
-      oocyteComments: logForm.oocyteComments || '—',
-      day0Dish: logForm.day0Dish || '—',
-      pn: logForm.pn || '—',
-      dropNo: logForm.dropNo || '—',
-      day0ZygoteStatus: logForm.day0ZygoteStatus || '—',
-      day0Notes: logForm.day0Notes || '—',
-      day3CellCount: logForm.day3CellCount || '—',
-      day3Fragmentation: logForm.day3Fragmentation || '—',
-      day3Symmetry: logForm.day3Symmetry || '—',
-      day3Notes: logForm.day3Notes || '—',
-      day3Label,
-      day5Stage: logForm.day5Stage || '—',
-      day5ExpansionGrade: logForm.day5ExpansionGrade || '—',
-      day5IcmGrade: logForm.day5IcmGrade || '—',
-      day5TeGrade: logForm.day5TeGrade || '—',
-      day5Label,
-      day6Stage: logForm.day6Stage || '—',
-      day6ExpansionGrade: logForm.day6ExpansionGrade || '—',
-      day6IcmGrade: logForm.day6IcmGrade || '—',
-      day6TeGrade: logForm.day6TeGrade || '—',
-      day6Label,
-      day6Progression: logForm.day6Progression || '—',
-      fate: logForm.fate || '—',
-      fzNo: logForm.fzNo || '—',
-      notes: logForm.notes || '—',
+    const day3Grade = generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation);
+    const d5Grade = generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade);
+    const d6Grade = generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade);
+
+    const meta: Record<string, string> = {};
+    if (logForm.d0Notes) meta.d0_notes = logForm.d0Notes;
+    if (logForm.d1Notes) meta.d1_notes = logForm.d1Notes;
+    if (logForm.day3Notes) meta.d3_notes = logForm.day3Notes;
+    if (logForm.day5Notes) meta.d5_notes = logForm.day5Notes;
+    if (logForm.day6Notes) meta.d6_notes = logForm.day6Notes;
+    if (logForm.notes) meta.final_notes = logForm.notes;
+
+    const payload: IvfLogUpsert = {
+      oocyte_no: parseInt(logForm.oocyteNo, 10) || 0,
+      ...(logForm.oocyteComments && { oocyte_comments: logForm.oocyteComments }),
+      ...(logForm.d0Maturity && { d0_maturity: logForm.d0Maturity }),
+      ...(logForm.d0DropNo && { d0_drop_no: logForm.d0DropNo }),
+      ...(logForm.d1Pn && { d1_pn: logForm.d1Pn }),
+      ...(logForm.d1ZygoteStatus && { d1_zygote_status: logForm.d1ZygoteStatus }),
+      ...(logForm.day3DropNo && { d3_drop_no: logForm.day3DropNo }),
+      ...(day3Grade !== '—' && { d3_grade: day3Grade }),
+      ...(logForm.day3Symmetry && { d3_symmetry: logForm.day3Symmetry }),
+      ...(logForm.day5Stage && { d5_stage: logForm.day5Stage }),
+      ...(d5Grade !== '—' && { d5_grade: d5Grade }),
+      ...(logForm.day6Stage && { d6_stage: logForm.day6Stage }),
+      ...(d6Grade !== '—' && { d6_grade: d6Grade }),
+      ...(logForm.day6Progression && { d6_progression: logForm.day6Progression }),
+      ...(logForm.fate && { fate: logForm.fate }),
+      ...(logForm.fzNo && { freeze_no: logForm.fzNo }),
+      ...(Object.keys(meta).length > 0 && { meta }),
     };
-    
-    if (editingLogId) {
-      // Update existing entry
-      setEmbryologyLogsByEmbryo((prev) => ({
-        ...prev,
-        [selectedEmbryoKey]: (prev[selectedEmbryoKey] || []).map(log => log.id === editingLogId ? updatedEntry : log),
-      }));
-      setEditingLogId(null);
-    } else {
-      // Add new entry
-      setEmbryologyLogsByEmbryo((prev) => ({
-        ...prev,
-        [selectedEmbryoKey]: [...(prev[selectedEmbryoKey] || []), updatedEntry],
-      }));
+
+    try {
+      await ivfService.upsertLog(selectedCycle.cycle_id, payload);
+      const updated = await ivfService.getCycleWithLogs(selectedCycle.cycle_id);
+      setSelectedCycle(updated);
+    } catch {
+      // log entry save failure is silent for now
+    } finally {
+      setLogSaving(false);
     }
-    
+
+    setEditingLogId(null);
     resetLogForm();
     setIsAddLogFormOpen(false);
   };
 
-  const openEditLog = (row: typeof selectedEmbryologyLogs[number], step: number) => {
-    const v = (val: string | undefined) => (val === '—' ? '' : val || '');
+  const parseD3Grade = (grade: string | null) => {
+    if (!grade) return { cells: '', frag: '' };
+    const m = grade.match(/^(\d+)C(\d+)$/);
+    return m ? { cells: m[1], frag: m[2] } : { cells: '', frag: '' };
+  };
+
+  const parseBlastGrade = (grade: string | null) => {
+    if (!grade || grade.length < 3) return { exp: '', icm: '', te: '' };
+    return { exp: grade[0], icm: grade[1], te: grade[2] };
+  };
+
+  const openEditLog = (log: IvfCycleLog, step: number) => {
+    const d3 = parseD3Grade(log.d3_grade);
+    const d5 = parseBlastGrade(log.d5_grade);
+    const d6 = parseBlastGrade(log.d6_grade);
     setLogForm({
-      oocyteNo: v(row.oocyteNo),
-      maturity: row.maturity === '—' ? 'MII' : (row.maturity || 'MII'),
-      oocyteComments: v(row.oocyteComments),
-      day0Dish: v(row.day0Dish),
-      pn: row.pn === '—' ? '2PN' : (row.pn || '2PN'),
-      dropNo: v(row.dropNo),
-      day0ZygoteStatus: v(row.day0ZygoteStatus),
-      day0Notes: v(row.day0Notes),
-      day3CellCount: v(row.day3CellCount),
-      day3Fragmentation: v(row.day3Fragmentation),
-      day3Symmetry: v(row.day3Symmetry),
-      day3Notes: v(row.day3Notes),
-      day5Stage: v(row.day5Stage),
-      day5ExpansionGrade: v(row.day5ExpansionGrade),
-      day5IcmGrade: v(row.day5IcmGrade),
-      day5TeGrade: v(row.day5TeGrade),
-      day6Stage: v(row.day6Stage),
-      day6ExpansionGrade: v(row.day6ExpansionGrade),
-      day6IcmGrade: v(row.day6IcmGrade),
-      day6TeGrade: v(row.day6TeGrade),
-      day6Progression: v(row.day6Progression),
-      fate: v(row.fate),
-      fzNo: v(row.fzNo),
-      notes: v(row.notes),
+      oocyteNo: String(log.oocyte_no),
+      oocyteComments: log.oocyte_comments || '',
+      d0Maturity: log.d0_maturity || 'MII',
+      d0DropNo: log.d0_drop_no || '',
+      d0Notes: log.meta?.d0_notes || '',
+      d1Pn: log.d1_pn || '2PN',
+      d1ZygoteStatus: log.d1_zygote_status || '',
+      d1Notes: log.meta?.d1_notes || '',
+      day3DropNo: log.d3_drop_no || '',
+      day3CellCount: d3.cells,
+      day3Fragmentation: d3.frag,
+      day3Symmetry: log.d3_symmetry || '',
+      day3Notes: log.meta?.d3_notes || '',
+      day5Stage: log.d5_stage || '',
+      day5ExpansionGrade: d5.exp,
+      day5IcmGrade: d5.icm,
+      day5TeGrade: d5.te,
+      day5Notes: log.meta?.d5_notes || '',
+      day6Stage: log.d6_stage || '',
+      day6ExpansionGrade: d6.exp,
+      day6IcmGrade: d6.icm,
+      day6TeGrade: d6.te,
+      day6Progression: log.d6_progression || '',
+      day6Notes: log.meta?.d6_notes || '',
+      fate: log.fate || '',
+      fzNo: log.freeze_no || '',
+      notes: log.meta?.final_notes || '',
     });
-    setEditingLogId(row.id);
+    setEditingLogId(log.log_id);
     setLogModalStep(step);
     setIsAddLogFormOpen(true);
   };
@@ -653,80 +460,81 @@ export default function EmbryoGradingPage() {
     });
   };
 
-  const handleAddEmbryo = () => {
+  const handleAddEmbryo = async () => {
     const hisNumber = newEmbryoForm.hisNumber.trim();
     if (!hisNumber) return;
-    const parsedInjected = Number.parseInt(newEmbryoForm.injected.trim(), 10);
-    const embryoCount = Number.isFinite(parsedInjected) && parsedInjected > 0 ? parsedInjected : 1;
+    setCycleCreating(true);
+    const parseCount = (v: string) => { const n = Number.parseInt(v.trim(), 10); return Number.isFinite(n) && n > 0 ? n : undefined; };
 
-    const generatedCryolockNum = `CL${String(embryos.length + 1).padStart(3, '0')}`;
-
-    const parseCount = (v: string) => { const n = Number.parseInt(v.trim(), 10); return Number.isFinite(n) && n > 0 ? n : 0; };
-
-    const newEntry: IVFTreatment = {
-      hisNumber,
-      patientName: newEmbryoForm.patientName.trim() || undefined,
-      cryolockNum: generatedCryolockNum,
-      canisterNum: 1,
-      embryo_count: embryoCount,
+    const payload: IvfCycleCreate = {
+      his_id: hisNumber,
+      ...(newEmbryoForm.patientName.trim() && { patient_name: newEmbryoForm.patientName.trim() }),
+      ...(newEmbryoForm.branch_id != null && { branch_id: newEmbryoForm.branch_id }),
+      ...(newEmbryoForm.incubator_id != null && { incubator_id: newEmbryoForm.incubator_id }),
+      ...(newEmbryoForm.chamberPosition && { chamber_position: newEmbryoForm.chamberPosition }),
+      ...(newEmbryoForm.injectionMethod && { injection_method: newEmbryoForm.injectionMethod }),
+      ...(newEmbryoForm.spermQuality && { sperm_quality: newEmbryoForm.spermQuality }),
+      ...(newEmbryoForm.oocytesQuality && { oocyte_quality: newEmbryoForm.oocytesQuality }),
+      ...(newEmbryoForm.cycleType && { cycle_type: newEmbryoForm.cycleType }),
       oocyte_m2: parseCount(newEmbryoForm.m2),
       oocyte_m1: parseCount(newEmbryoForm.m1),
       oocyte_gv: parseCount(newEmbryoForm.gv),
       oocyte_others: parseCount(newEmbryoForm.others),
-      tankCode: newEmbryoForm.tankCode.trim() || 'TANK-A',
-      caneCode: newEmbryoForm.caneCode.trim() || 'CANE-1',
-      gobletColor: newEmbryoForm.gobletColor.trim() || 'Yellow',
-      cryolockColor: newEmbryoForm.cryolockColor.trim() || 'Blue',
-      dateOfVitrification: new Date().toISOString().slice(0, 10),
-      siteName: newEmbryoForm.siteName.trim() || 'Main Hospital',
-      status: 'Stored',
-      embryoGrading: '4AA',
-      description: newEmbryoForm.description.trim() || null,
-      injectionMethod: newEmbryoForm.injectionMethod || undefined,
-      spermQuality: newEmbryoForm.spermQuality || undefined,
-      oocytesQuality: newEmbryoForm.oocytesQuality || undefined,
-      cycleType: newEmbryoForm.cycleType || undefined,
-      incubatorCode: selectedIncubator?.incubator_code ?? selectedIncubator?.external_id ?? undefined,
-      chamberPosition: newEmbryoForm.chamberPosition || undefined,
+      status: 'Active',
     };
 
-    setEmbryos((prev) => [newEntry, ...prev]);
-    setSelectedEmbryo(newEntry);
-    setIsAddEmbryoFormOpen(false);
-    resetNewEmbryoForm();
+    try {
+      const newCycle = await ivfService.createCycle(payload);
+      setCycles(prev => [newCycle, ...prev]);
+      setSelectedCycle({ ...newCycle, logs: [] });
+      setIsAddEmbryoFormOpen(false);
+      resetNewEmbryoForm();
+      navigate(`/embryo-grading/${newCycle.his_id}`);
+    } catch {
+      // creation failure is silent for now
+    } finally {
+      setCycleCreating(false);
+    }
   };
 
-  const primaryGradeDetails = selectedEmbryo
-    ? getEmbryoGradingDetails(getPrimaryGrade(selectedEmbryo.embryoGrading))
-    : null;
+  const logs = selectedCycle?.logs ?? [];
+
+  const bestGrade = React.useMemo(() => {
+    for (const log of logs) {
+      if (log.d5_grade) return log.d5_grade;
+    }
+    for (const log of logs) {
+      if (log.d6_grade) return log.d6_grade;
+    }
+    return null;
+  }, [logs]);
+
+  const primaryGradeDetails = bestGrade ? getEmbryoGradingDetails(bestGrade) : null;
 
   const logSummary = React.useMemo(() => {
-    const totalRows = selectedEmbryologyLogs.length;
-    const fertilized = selectedEmbryologyLogs.filter((row) => row.pn.toUpperCase() === '2PN').length;
-    const cleaved = selectedEmbryologyLogs.filter((row) => row.day3Label && row.day3Label !== '—').length;
-    const day3GoodGrade = selectedEmbryologyLogs.filter((row) => row.day3Fragmentation === '1' || row.day3Fragmentation === '0').length;
-    const blastRows = selectedEmbryologyLogs.filter((row) => (row.day5Label && row.day5Label !== '—') || (row.day6Label && row.day6Label !== '—')).length;
-    const blastGoodGrades = selectedEmbryologyLogs
-      .filter((row) => (row.day5Label && row.day5Label !== '—') || (row.day6Label && row.day6Label !== '—'))
-      .map((row) => row.day5Label && row.day5Label !== '—' ? `D5×${row.day5Label}` : `D6×${row.day6Label}`)
+    const totalRows = logs.length;
+    const fertilized = logs.filter(l => l.d1_pn === '2PN').length;
+    const cleaved = logs.filter(l => l.d3_grade).length;
+    const day3GoodGrade = logs.filter(l => {
+      const frag = parseD3Grade(l.d3_grade).frag;
+      return frag === '1' || frag === '0';
+    }).length;
+    const blastRows = logs.filter(l => l.d5_grade || l.d6_grade).length;
+    const blastGoodGrades = logs
+      .filter(l => l.d5_grade || l.d6_grade)
+      .map(l => l.d5_grade ? `D5×${l.d5_grade}` : `D6×${l.d6_grade}`)
       .join(', ');
-    const frozenRows = selectedEmbryologyLogs.filter((row) => row.fate.toLowerCase() === 'freeze').length;
+    const frozenRows = logs.filter(l => l.fate?.toLowerCase() === 'freeze').length;
     return { totalRows, fertilized, cleaved, day3GoodGrade, blastRows, blastGoodGrades, frozenRows };
-  }, [selectedEmbryologyLogs]);
+  }, [logs]);
 
   const calculateDayInCycle = (): string => {
-    if (!selectedEmbryo?.dateOfVitrification) {
-      return 'Day 0';
-    }
-    
+    if (!selectedCycle?.created_at) return 'Day 0';
     try {
-      const startDate = new Date(selectedEmbryo.dateOfVitrification);
+      const startDate = new Date(selectedCycle.created_at);
       const today = new Date();
-      const timeDiff = today.getTime() - startDate.getTime();
-      const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
-      
-      if (daysDiff < 0) return 'Day 0';
-      if (daysDiff === 0) return 'Day 0';
+      const daysDiff = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
+      if (daysDiff <= 0) return 'Day 0';
       return `Day ${daysDiff}`;
     } catch {
       return 'Day 0';
@@ -741,13 +549,6 @@ export default function EmbryoGradingPage() {
         <div className="flex items-center gap-2">
           <div className="md:hidden">
             <FilterPanel activeCount={activeFilterCount}>
-              <FilterSelect
-                label="Branch"
-                value={selectedBranch}
-                onChange={setSelectedBranch}
-                options={branchOptions}
-                allLabel="All Branches"
-              />
               <FilterSelect
                 label="Status"
                 value={selectedStatus}
@@ -777,16 +578,9 @@ export default function EmbryoGradingPage() {
               <div className="hidden md:flex flex-col gap-3 bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-full shrink-0">
                 <div className="mb-3 pb-2 border-b border-gray-100">
                   <h2 className="text-sm font-semibold text-black">Filters</h2>
-                  <p className="text-xs text-gray-500">Refine embryos by branch and status</p>
+                  <p className="text-xs text-gray-500">Refine cycles by status</p>
                 </div>
                 <div className="flex flex-col gap-3">
-                  <FilterSelect
-                    label="Branch"
-                    value={selectedBranch}
-                    onChange={setSelectedBranch}
-                    options={branchOptions}
-                    allLabel="All Branches"
-                  />
                   <FilterSelect
                     label="Status"
                     value={selectedStatus}
@@ -797,63 +591,48 @@ export default function EmbryoGradingPage() {
                 </div>
               </div>
 
-              {/* Active Embryos List */}
+              {/* Active Cycles List */}
               <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
                 <div className="flex items-center justify-between mb-2">
-                  <h2 className="font-bold text-black text-base">
-                  Active Embryos
-                  </h2>
-                  <span className="text-xs font-medium text-[#6b1176] bg-[#F7ECFF] px-2 py-1 rounded-full">{filteredEmbryos.length}</span>
+                  <h2 className="font-bold text-black text-base">Active Cycles</h2>
+                  <span className="text-xs font-medium text-[#6b1176] bg-[#F7ECFF] px-2 py-1 rounded-full">{filteredCycles.length}</span>
                 </div>
                 <div className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
-                  <div className="text-left">Embryo ID</div>
-                  <div className="text-center">Grade</div>
+                  <div className="text-left">HIS / Patient</div>
+                  <div className="text-center">Status</div>
                   <div className="text-center">Date</div>
                 </div>
-                <div
-                  className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
-                  style={{
-                    scrollbarWidth: 'thin'
-                  }}
-                >
+                <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100" style={{ scrollbarWidth: 'thin' }}>
                   {loading ? (
                     <div className="p-4 text-xs text-gray-500">Loading...</div>
                   ) : error ? (
                     <div className="p-4 text-xs text-red-600">{error}</div>
-                  ) : filteredEmbryos.length === 0 ? (
-                    <div className="p-4 text-xs text-gray-500">No embryos found.</div>
+                  ) : filteredCycles.length === 0 ? (
+                    <div className="p-4 text-xs text-gray-500">No cycles found.</div>
                   ) : (
-                    filteredEmbryos.map((embryo, index) => {
-                      const embryoId = `${embryo.hisNumber}-${embryo.cryolockNum}`;
-                      const isSelected = selectedEmbryo?.hisNumber === embryo.hisNumber && selectedEmbryo?.cryolockNum === embryo.cryolockNum;
-                      const primaryGrade = getPrimaryGrade(embryo.embryoGrading);
-
+                    filteredCycles.map((cycle) => {
+                      const isSelected = selectedCycle?.his_id === cycle.his_id;
                       return (
                         <div
-                          key={`${embryo.hisNumber}-${embryo.cryolockNum}-${index}`}
-                          className={`grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer ${
-                            isSelected ? 'bg-[#F7ECFF]' : ''
-                          }`}
-                          onClick={() => {
-                            setSelectedEmbryo(embryo);
-                            navigate(`/embryo-grading/${embryo.hisNumber}`);
-                          }}
+                          key={cycle.cycle_id}
+                          className={`grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer ${isSelected ? 'bg-[#F7ECFF]' : ''}`}
+                          onClick={() => navigate(`/embryo-grading/${cycle.his_id}`)}
                         >
                           <div className="min-w-0 text-left overflow-hidden">
-                            <div className="text-[#6b1176] text-xs font-bold truncate">
-                              {embryoId}
-                            </div>
-                            <div className="text-[10px] text-gray-400 truncate">
-                              {embryo.siteName}
-                            </div>
+                            <div className="text-[#6b1176] text-xs font-bold truncate">{cycle.his_id}</div>
+                            <div className="text-[10px] text-gray-400 truncate">{cycle.patient_name || '—'}</div>
                           </div>
                           <div className="text-center">
-                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getGradeChipStyle(primaryGrade)}`}>
-                              {primaryGrade}
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                              cycle.status === 'Active' ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                              : cycle.status === 'Completed' ? 'bg-sky-100 text-sky-700 border-sky-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}>
+                              {cycle.status || '—'}
                             </span>
                           </div>
                           <div className="text-center text-xs font-bold text-gray-600 truncate">
-                            {embryo.dateOfVitrification ? new Date(embryo.dateOfVitrification).toLocaleDateString('en-GB') : 'NA'}
+                            {cycle.created_at ? new Date(cycle.created_at).toLocaleDateString('en-GB') : '—'}
                           </div>
                         </div>
                       );
@@ -870,32 +649,17 @@ export default function EmbryoGradingPage() {
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">Embryology Log Sheet</h2>
-                    {selectedEmbryo && (
+                    {selectedCycle && (
                       <p className="text-sm text-gray-600 mt-1">
-                        {selectedEmbryo.hisNumber} - Cryolock {selectedEmbryo.cryolockNum}
-                        {selectedEmbryo.patientName && <span className="ml-2 text-gray-400">· {selectedEmbryo.patientName}</span>}
-                        {selectedEmbryo.siteName && <span className="ml-2 text-gray-400">· {selectedEmbryo.siteName}</span>}
+                        {selectedCycle.his_id}
+                        {selectedCycle.patient_name && <span className="ml-2 text-gray-400">· {selectedCycle.patient_name}</span>}
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                  {selectedEmbryo && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/embryo-grading/${selectedEmbryo.hisNumber}/advanced`, {
-                        state: {
-                          embryo: selectedEmbryo,
-                          logs: selectedEmbryologyLogs,
-                        },
-                      })}
-                      className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] transition-colors"
-                    >
-                      Start Embryo Grading
-                    </button>
-                  )}
                   <button
                     type="button"
-                    onClick={() => { setSelectedEmbryo(null); navigate('/embryo-grading'); }}
+                    onClick={() => { setSelectedCycle(null); navigate('/embryo-grading'); }}
                     className="p-2 rounded-md border border-[#E7E1E1] text-gray-500 hover:bg-gray-50 transition-colors"
                     title="Close"
                   >
@@ -905,12 +669,12 @@ export default function EmbryoGradingPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6">
-                  {selectedEmbryo ? (
+                  {selectedCycle ? (
                     <div className="space-y-4">
                       {/* Cycle Journey — single panoramic card */}
                       {(() => {
-                        const totalOocytes = (selectedEmbryo.oocyte_m2 ?? 0) + (selectedEmbryo.oocyte_m1 ?? 0) + (selectedEmbryo.oocyte_gv ?? 0) + (selectedEmbryo.oocyte_others ?? 0);
-                        const injected = selectedEmbryo.embryo_count ?? 0;
+                        const totalOocytes = (selectedCycle.oocyte_m2 ?? 0) + (selectedCycle.oocyte_m1 ?? 0) + (selectedCycle.oocyte_gv ?? 0) + (selectedCycle.oocyte_others ?? 0);
+                        const injected = logSummary.totalRows;
                         const pct = (n: number, of: number) => of > 0 ? Math.round((n / of) * 100) : 0;
                         const stages = [
                           { label: 'Oocytes',   value: totalOocytes,              base: totalOocytes,              bar: 'from-[#c084fc] to-[#a855f7]' },
@@ -921,10 +685,10 @@ export default function EmbryoGradingPage() {
                           { label: 'Blast',     value: logSummary.blastRows,      base: logSummary.day3GoodGrade,  bar: 'from-[#7dd3fc] to-[#0ea5e9]' },
                         ];
                         const breakdown = [
-                          { label: 'M2',     value: selectedEmbryo.oocyte_m2 ?? 0,     color: 'text-white' },
-                          { label: 'M1',     value: selectedEmbryo.oocyte_m1 ?? 0,     color: 'text-white' },
-                          { label: 'GV',     value: selectedEmbryo.oocyte_gv ?? 0,     color: 'text-white/80' },
-                          { label: 'Others', value: selectedEmbryo.oocyte_others ?? 0, color: 'text-white/80' },
+                          { label: 'M2',     value: selectedCycle.oocyte_m2 ?? 0,     color: 'text-white' },
+                          { label: 'M1',     value: selectedCycle.oocyte_m1 ?? 0,     color: 'text-white' },
+                          { label: 'GV',     value: selectedCycle.oocyte_gv ?? 0,     color: 'text-white/80' },
+                          { label: 'Others', value: selectedCycle.oocyte_others ?? 0, color: 'text-white/80' },
                         ];
                         return (
                           <div className="rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-[#3b0764] via-[#6b1176] to-[#4a044e] border border-[#9c3aa6]/40">
@@ -972,11 +736,11 @@ export default function EmbryoGradingPage() {
                                 <p className="text-sm font-black text-[#6b1176]">{dayDisplay}</p>
                               </div>
                               {([
-                                { label: 'Injection Method',    value: selectedEmbryo.injectionMethod || '—' },
-                                { label: 'Sperm Quality',       value: selectedEmbryo.spermQuality || '—' },
-                                { label: 'Oocyte Quality',      value: selectedEmbryo.oocytesQuality || '—' },
-                                { label: 'Type',                value: selectedEmbryo.cycleType || '—' },
-                                { label: 'Incubator / Chamber', value: selectedEmbryo.incubatorCode ? `${selectedEmbryo.incubatorCode}${selectedEmbryo.chamberPosition ? ` · ${selectedEmbryo.chamberPosition}` : ''}` : '—' },
+                                { label: 'Injection Method',    value: selectedCycle.injection_method || '—' },
+                                { label: 'Sperm Quality',       value: selectedCycle.sperm_quality || '—' },
+                                { label: 'Oocyte Quality',      value: selectedCycle.oocyte_quality || '—' },
+                                { label: 'Type',                value: selectedCycle.cycle_type || '—' },
+                                { label: 'Chamber',             value: selectedCycle.chamber_position || '—' },
                               ] as { label: string; value: string }[]).map((item) => (
                                 <div key={item.label} className="flex-1 min-w-[110px] px-4 py-3">
                                   <p className="text-xs font-extrabold uppercase tracking-wide mb-1 whitespace-nowrap text-[#9c3aa6]">{item.label}</p>
@@ -1008,38 +772,40 @@ export default function EmbryoGradingPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {selectedEmbryologyLogs.length === 0 ? (
+                              {logsLoading ? (
+                                <tr><td colSpan={10} className="px-3 py-6 text-center text-gray-400">Loading logs…</td></tr>
+                              ) : logs.length === 0 ? (
                                 <tr>
-                                  <td colSpan={10} className="px-3 py-6 text-center text-gray-500">No log entries yet. Click Add Entry.</td>
+                                  <td colSpan={10} className="px-3 py-6 text-center text-gray-500">No log entries yet. Click Add Oocyte.</td>
                                 </tr>
                               ) : (
-                                selectedEmbryologyLogs.map((row) => (
-                                  <tr key={row.id} className="border-t border-[#F1F1F1] hover:bg-[#FCF9FF] divide-x divide-[#E7E1E1]">
-                                    <td className="px-2 py-2 whitespace-nowrap cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 0)}>
-                                      <div className="font-medium">#{row.oocyteNo}</div>
-                                      <div className="text-[10px] text-gray-400">Drop {row.day0Dish} | {row.maturity}</div>
+                                logs.map((log) => (
+                                  <tr key={log.log_id} className="border-t border-[#F1F1F1] hover:bg-[#FCF9FF] divide-x divide-[#E7E1E1]">
+                                    <td className="px-2 py-2 whitespace-nowrap cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 0)}>
+                                      <div className="font-medium">#{log.oocyte_no}</div>
+                                      <div className="text-[10px] text-gray-400">{log.d0_maturity || '—'}{log.d0_drop_no ? ` · Drop ${log.d0_drop_no}` : ''}</div>
                                     </td>
-                                    <td className="px-2 py-2 cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 0)}>{row.pn}</td>
-                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 1)}>
-                                      {row.day3Label && row.day3Label !== '—'
-                                        ? <span className="inline-block rounded px-1.5 py-0.5 text-xs font-bold bg-[#F7ECFF] text-[#6b1176]">{row.day3Label}</span>
+                                    <td className="px-2 py-2 cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 1)}>{log.d1_pn || '—'}</td>
+                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 2)}>
+                                      {log.d3_grade
+                                        ? <span className="inline-block rounded px-1.5 py-0.5 text-xs font-bold bg-[#F7ECFF] text-[#6b1176]">{log.d3_grade}</span>
                                         : <span className="text-gray-400 text-xs">—</span>}
                                     </td>
-                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 2)}>{renderBlastBadge(row.day5Label || '—')}</td>
-                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 3)}>{renderBlastBadge(row.day6Label || '—')}</td>
-                                    <td className="px-2 py-2 cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(row, 4)}>
+                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 3)}>{renderBlastBadge(log.d5_grade || '—')}</td>
+                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 4)}>{renderBlastBadge(log.d6_grade || '—')}</td>
+                                    <td className="px-2 py-2 cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 5)}>
                                       <div className="flex items-center gap-1.5">
-                                        {row.fate === 'Freeze' ? (
+                                        {log.fate === 'Freeze' ? (
                                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 text-sm font-semibold border border-sky-200">
                                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 7l-5 5-5-5"/><path d="M17 17l-5-5-5 5"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M7 7l5 5 5-5"/><path d="M7 17l5-5 5 5"/></svg>
                                             Freeze
                                           </span>
-                                        ) : row.fate === 'Transfer' ? (
+                                        ) : log.fate === 'Transfer' ? (
                                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200">
                                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
                                             Transfer
                                           </span>
-                                        ) : row.fate === 'Discard' ? (
+                                        ) : log.fate === 'Discard' ? (
                                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-sm font-semibold border border-red-200">
                                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                                             Discard
@@ -1047,16 +813,16 @@ export default function EmbryoGradingPage() {
                                         ) : (
                                           <span className="text-gray-400">—</span>
                                         )}
-                                        {row.fate === 'Freeze' && row.fzNo && row.fzNo !== '—' && (
-                                          <span className="text-xs text-gray-400 font-medium">#{row.fzNo}</span>
+                                        {log.fate === 'Freeze' && log.freeze_no && (
+                                          <span className="text-xs text-gray-400 font-medium">#{log.freeze_no}</span>
                                         )}
                                       </div>
                                     </td>
-                                    <td className="px-2 py-2 text-xs">{row.notes}</td>
+                                    <td className="px-2 py-2 text-xs text-gray-500">{log.meta?.final_notes || '—'}</td>
                                     <td className="px-2 py-2 flex gap-1 sticky right-0 z-10 bg-white border-l border-[#E7E1E1]">
                                       <button
                                         type="button"
-                                        onClick={() => openEditLog(row, 0)}
+                                        onClick={() => openEditLog(log, 0)}
                                         className="px-2 py-1 text-xs bg-[#6b1176] text-white rounded hover:bg-[#5a0f62] transition-colors"
                                         title="Update entry"
                                       >
@@ -1071,17 +837,15 @@ export default function EmbryoGradingPage() {
                         </div>
                       </div>
 
-                      {selectedEmbryo && (
-                        <div className="flex justify-start">
-                          <button
-                            type="button"
-                            onClick={() => setIsAddLogFormOpen(true)}
-                            className="px-2.5 py-1.5 rounded bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] transition-colors"
-                          >
-                            Add Oocyte
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex justify-start">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddLogFormOpen(true)}
+                          className="px-2.5 py-1.5 rounded bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] transition-colors"
+                        >
+                          Add Oocyte
+                        </button>
+                      </div>
 
                       <div className="rounded-lg border border-[#E7E1E1] p-4 bg-white">
                         <h3 className="text-sm font-semibold text-gray-900 mb-2">Grade Context</h3>
@@ -1091,7 +855,7 @@ export default function EmbryoGradingPage() {
                     </div>
                   ) : (
                     <div className="text-center text-gray-500 py-8">
-                      <p>Select an embryo from the left list to view and maintain its embryology log sheet.</p>
+                      <p>Select a cycle from the left list to view its embryology log sheet.</p>
                     </div>
                   )}
                 </div>
@@ -1109,13 +873,12 @@ export default function EmbryoGradingPage() {
                   </div>
                   <span className="text-[10px] bg-green-50 text-green-700 font-semibold px-2.5 py-1 rounded-full border border-green-200">Live</span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { label: "Total", value: embryoStats.total, sub: "embryos", border: "border-[#E8E1F0]", from: "from-[#FCF9FF]", to: "to-[#F8F4FD]", val: "text-black" },
-                    { label: "Stored", value: embryoStats.stored, sub: "in storage", border: "border-[#E6F4EC]", from: "from-[#F5FCF8]", to: "to-[#EEFAF6]", val: "text-emerald-700" },
-                    { label: "In Transit", value: embryoStats.inTransit, sub: "moving", border: "border-[#FFF3CD]", from: "from-[#FFF8E9]", to: "to-[#FFF5DB]", val: "text-amber-700" },
-                    { label: "Thawed", value: embryoStats.thawed, sub: "for transfer", border: "border-[#DDEFFA]", from: "from-[#F4FAFF]", to: "to-[#EBF7FF]", val: "text-sky-700" },
-                    { label: "High Grade", value: embryoStats.highGrade, sub: "4AA / 4AB / 4BA", border: "border-[#F5EFF9]", from: "from-[#FCF7FF]", to: "to-[#F9F1FE]", val: "text-[#6b1176]" },
+                    { label: "Total", value: cycleStats.total, sub: "cycles", border: "border-[#E8E1F0]", from: "from-[#FCF9FF]", to: "to-[#F8F4FD]", val: "text-black" },
+                    { label: "Active", value: cycleStats.active, sub: "in progress", border: "border-[#E6F4EC]", from: "from-[#F5FCF8]", to: "to-[#EEFAF6]", val: "text-emerald-700" },
+                    { label: "Completed", value: cycleStats.completed, sub: "finished", border: "border-[#DDEFFA]", from: "from-[#F4FAFF]", to: "to-[#EBF7FF]", val: "text-sky-700" },
+                    { label: "Paused", value: cycleStats.paused, sub: "on hold", border: "border-[#FFF3CD]", from: "from-[#FFF8E9]", to: "to-[#FFF5DB]", val: "text-amber-700" },
                   ].map((s) => (
                     <div key={s.label} className={`rounded-lg border ${s.border} bg-gradient-to-br ${s.from} ${s.to} px-4 py-3 flex flex-col`}>
                       <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{s.label}</p>
@@ -1126,130 +889,79 @@ export default function EmbryoGradingPage() {
                 </div>
               </div>
 
-              {/* ── Today's Queue + Grade Distribution ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                {/* Today's Queue */}
-                <div className="rounded-lg border border-[#E7E1E1] bg-white p-5 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">Today's Queue</p>
-                      <p className="text-sm font-bold text-black mt-0.5">Needs Attention</p>
-                    </div>
-                    <span className="text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full">3 pending</span>
-                  </div>
-                  <div className="space-y-2">
-                    {[
-                      { his: "HIS008", name: "Rekha Mohan", task: "Day 3 Cell Count Check", due: "Due by 12:00 PM", tag: "bg-red-50 text-red-600 border-red-200", badge: "Urgent" },
-                      { his: "HIS006", name: "Kavitha Murali", task: "Day 5 Blastocyst Grading", due: "Due by 2:00 PM", tag: "bg-amber-50 text-amber-600 border-amber-200", badge: "Soon" },
-                      { his: "HIS007", name: "Sudha Balaji", task: "Day 6 Final Assessment", due: "Due by 4:00 PM", tag: "bg-blue-50 text-blue-600 border-blue-200", badge: "Scheduled" },
-                    ].map((item) => (
-                      <div
-                        key={item.his}
-                        className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 hover:border-[#6b1176]/30 hover:bg-[#F7ECFF]/30 cursor-pointer transition-all"
-                        onClick={() => navigate(`/embryo-grading/${item.his}`)}
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
-                          <p className="text-[10px] text-[#6b1176] font-medium">{item.his} · {item.task}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">{item.due}</p>
-                        </div>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${item.tag}`}>{item.badge}</span>
-                      </div>
-                    ))}
-                  </div>
+              {/* ── Cycle Type Distribution ── */}
+              <div className="rounded-lg border border-[#E7E1E1] bg-white p-5 flex flex-col gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">Cycle Distribution</p>
+                  <p className="text-sm font-bold text-black mt-0.5">By Injection Method</p>
                 </div>
-
-                {/* Grade Distribution */}
-                <div className="rounded-lg border border-[#E7E1E1] bg-white p-5 flex flex-col gap-3">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">Grade Distribution</p>
-                    <p className="text-sm font-bold text-black mt-0.5">Current Cycle Grades</p>
-                  </div>
-                  {(() => {
-                    const counts: Record<string, number> = {};
-                    embryos.forEach((e) => {
-                      const g = getPrimaryGrade(e.embryoGrading);
-                      if (g && g !== 'N/A') counts[g] = (counts[g] || 0) + 1;
-                    });
-                    const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
-                    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-                    const barColor = (g: string) => ['4AA','4AB','4BA'].includes(g) ? 'bg-emerald-400' : ['4BB','3AA'].includes(g) ? 'bg-amber-400' : 'bg-slate-400';
-                    const textColor = (g: string) => ['4AA','4AB','4BA'].includes(g) ? 'text-emerald-700' : ['4BB','3AA'].includes(g) ? 'text-amber-700' : 'text-slate-600';
-                    return (
-                      <div className="space-y-2.5">
-                        {sorted.map(([grade, count]) => (
-                          <div key={grade} className="flex items-center gap-3">
-                            <span className={`text-[10px] font-bold w-8 shrink-0 text-right ${textColor(grade)}`}>{grade}</span>
-                            <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${barColor(grade)}`} style={{ width: `${Math.round((count / total) * 100)}%` }} />
-                            </div>
-                            <span className="text-xs text-gray-500 w-5 shrink-0 text-right">{count}</span>
+                {(() => {
+                  const counts: Record<string, number> = {};
+                  filteredCycles.forEach(c => {
+                    const k = c.injection_method || 'Unknown';
+                    counts[k] = (counts[k] || 0) + 1;
+                  });
+                  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+                  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                  const colors = ['bg-[#6b1176]', 'bg-[#9c3aa6]', 'bg-[#c084fc]', 'bg-slate-400'];
+                  return (
+                    <div className="space-y-2.5">
+                      {sorted.map(([method, count], i) => (
+                        <div key={method} className="flex items-center gap-3">
+                          <span className="text-[10px] font-bold w-10 shrink-0 text-right text-gray-600">{method}</span>
+                          <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${colors[i % colors.length]}`} style={{ width: `${Math.round((count / total) * 100)}%` }} />
                           </div>
-                        ))}
-                        {sorted.length === 0 && <p className="text-xs text-gray-400">No graded embryos yet.</p>}
-                        <div className="pt-2 border-t border-gray-100 flex items-center gap-4 flex-wrap">
-                          {[["bg-emerald-400","High Grade"],["bg-amber-400","Mid Grade"],["bg-slate-400","Lower Grade"]].map(([c,l]) => (
-                            <span key={l} className="flex items-center gap-1 text-[10px] text-gray-500">
-                              <span className={`w-2 h-2 rounded-full ${c} inline-block`} />{l}
-                            </span>
-                          ))}
+                          <span className="text-xs text-gray-500 w-5 shrink-0 text-right">{count}</span>
                         </div>
-                      </div>
-                    );
-                  })()}
-                </div>
+                      ))}
+                      {sorted.length === 0 && <p className="text-xs text-gray-400">No cycles yet.</p>}
+                    </div>
+                  );
+                })()}
               </div>
 
-              {/* ── Past Cycles ── */}
+              {/* ── All Cycles ── */}
               <div className="rounded-lg border border-[#E7E1E1] bg-white p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">Past Cycles</p>
-                    <p className="text-sm font-bold text-black mt-0.5">All Embryos — Previous Sessions</p>
+                    <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">All Cycles</p>
+                    <p className="text-sm font-bold text-black mt-0.5">Patient Cycle Register</p>
                   </div>
-                  <span className="text-[10px] font-semibold text-[#6b1176] bg-[#F7ECFF] px-2.5 py-1 rounded-full">{filteredEmbryos.length} records</span>
+                  <span className="text-[10px] font-semibold text-[#6b1176] bg-[#F7ECFF] px-2.5 py-1 rounded-full">{filteredCycles.length} records</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-[#F7ECFF]">
-                        {["HIS No.", "Patient", "Cryolock", "Grade", "Site", "Vitrification", "Status", ""].map((h, i) => (
-                          <th key={i} className={`text-left text-[10px] font-semibold text-[#6b1176] px-3 py-2.5 ${i === 0 ? 'rounded-l-lg' : ''} ${i === 7 ? 'rounded-r-lg' : ''}`}>{h}</th>
+                        {["HIS No.", "Patient", "Method", "Type", "Status", "Created", ""].map((h, i) => (
+                          <th key={i} className={`text-left text-[10px] font-semibold text-[#6b1176] px-3 py-2.5 ${i === 0 ? 'rounded-l-lg' : ''} ${i === 6 ? 'rounded-r-lg' : ''}`}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {([
-                        { his: 'HIS021', patient: 'Nithya Balaji',    cryo: 'CL021', grade: '5AA', site: 'Main Hospital',    date: '2023-11-10', status: 'Thawed',     injection: 'ICSI',  sperm: 'Good',         type: 'OG'    },
-                        { his: 'HIS019', patient: 'Sangeetha Ravi',   cryo: 'CL019', grade: '4AB', site: 'Branch Clinic',   date: '2023-09-22', status: 'Stored',     injection: 'PICSI', sperm: 'Average',      type: 'DOHSP' },
-                        { his: 'HIS017', patient: 'Padma Suresh',     cryo: 'CL017', grade: '3AA', site: 'Satellite Center',date: '2023-08-05', status: 'In Transit', injection: 'ICSI',  sperm: 'Good',         type: 'OG'    },
-                        { his: 'HIS015', patient: 'Janaki Mohan',     cryo: 'CL015', grade: '4BB', site: 'Main Hospital',    date: '2023-06-18', status: 'Thawed',     injection: 'IMSI',  sperm: 'Poor',         type: 'DET'   },
-                        { his: 'HIS013', patient: 'Revathi Kumar',    cryo: 'CL013', grade: '4AA', site: 'Branch Clinic',   date: '2023-04-30', status: 'Stored',     injection: 'ICSI',  sperm: 'Good',         type: 'OG'    },
-                        { his: 'HIS011', patient: 'Usha Narayanan',   cryo: 'CL011', grade: '2BB', site: 'Main Hospital',    date: '2023-03-14', status: 'Thawed',     injection: 'PICSI', sperm: 'Average (NI)', type: 'DOHSP' },
-                        { his: 'HIS009', patient: 'Deepa Venkatesh',  cryo: 'CL009', grade: '4BA', site: 'Satellite Center',date: '2023-01-27', status: 'Stored',     injection: 'ICSI',  sperm: 'Good',         type: 'OG'    },
-                        { his: 'HIS007', patient: 'Amala Chandran',   cryo: 'CL007', grade: '3AB', site: 'Branch Clinic',   date: '2022-12-09', status: 'In Transit', injection: 'IMSI',  sperm: 'Average',      type: 'OG'    },
-                      ] as { his: string; patient: string; cryo: string; grade: string; site: string; date: string; status: string; injection: string; sperm: string; type: string }[]).map((r, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50 transition-colors cursor-pointer">
-                          <td className="px-3 py-2.5 text-xs font-semibold text-[#6b1176]">{r.his}</td>
-                          <td className="px-3 py-2.5 text-xs text-gray-700 max-w-[120px] truncate">{r.patient}</td>
-                          <td className="px-3 py-2.5 text-xs text-gray-600">{r.cryo}</td>
-                          <td className="px-3 py-2.5">
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getGradeChipStyle(r.grade)}`}>{r.grade}</span>
-                          </td>
-                          <td className="px-3 py-2.5 text-xs text-gray-500 max-w-[100px] truncate">{r.site}</td>
-                          <td className="px-3 py-2.5 text-xs text-gray-500">{new Date(r.date).toLocaleDateString('en-GB')}</td>
-                          <td className="px-3 py-2.5">
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                              r.status === 'Stored'     ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : r.status === 'In Transit' ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : r.status === 'Thawed'    ? 'bg-orange-50 text-orange-700 border-orange-200'
-                            : 'bg-gray-50 text-gray-600 border-gray-200'
-                            }`}>{r.status}</span>
-                          </td>
-                          <td className="px-3 py-2.5 text-[10px] text-[#6b1176] font-semibold">View →</td>
-                        </tr>
-                      ))}
+                      {filteredCycles.length === 0 ? (
+                        <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-gray-400">No cycles yet.</td></tr>
+                      ) : (
+                        filteredCycles.map(c => (
+                          <tr key={c.cycle_id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate(`/embryo-grading/${c.his_id}`)}>
+                            <td className="px-3 py-2.5 text-xs font-semibold text-[#6b1176]">{c.his_id}</td>
+                            <td className="px-3 py-2.5 text-xs text-gray-700 max-w-[140px] truncate">{c.patient_name || '—'}</td>
+                            <td className="px-3 py-2.5 text-xs text-gray-500">{c.injection_method || '—'}</td>
+                            <td className="px-3 py-2.5 text-xs text-gray-500">{c.cycle_type || '—'}</td>
+                            <td className="px-3 py-2.5">
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                c.status === 'Active'    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : c.status === 'Completed' ? 'bg-sky-50 text-sky-700 border-sky-200'
+                              : c.status === 'Paused'    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-gray-50 text-gray-600 border-gray-200'
+                              }`}>{c.status || '—'}</span>
+                            </td>
+                            <td className="px-3 py-2.5 text-xs text-gray-500">{new Date(c.created_at).toLocaleDateString('en-GB')}</td>
+                            <td className="px-3 py-2.5 text-[10px] text-[#6b1176] font-semibold">View →</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1364,11 +1076,11 @@ export default function EmbryoGradingPage() {
                 handleNewEmbryoFieldChange('incubator_id', null);
                 handleNewEmbryoFieldChange('chamberPosition', '');
                 setSelectedIncubator(null);
-                if (selected?.branch_name) {
+                if (selected?.branch_id) {
                   setIncubatorsLoading(true);
-                  shipmentService.getActiveIncubators({ branch_name: selected.branch_name })
+                  shipmentService.getActiveIncubators({ branch_id: selected.branch_id })
                     .then(res => {
-                      const list = res.branches.find(b => b.branch_name === selected.branch_name)?.incubators ?? [];
+                      const list = res.branches.find(b => b.branch_id === selected.branch_id)?.incubators ?? [];
                       setIncubators(list);
                     })
                     .catch(() => setIncubators([]))
@@ -1503,10 +1215,11 @@ export default function EmbryoGradingPage() {
             <button
               type="button"
               onClick={handleAddEmbryo}
-              disabled={!newEmbryoForm.hisNumber.trim()}
-              className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!newEmbryoForm.hisNumber.trim() || cycleCreating}
+              className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Add Cycle
+              {cycleCreating && <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
+              {cycleCreating ? 'Adding...' : 'Add Cycle'}
             </button>
           </div>
         </div>
@@ -1533,18 +1246,20 @@ export default function EmbryoGradingPage() {
 
           const STEP_BASE = { activeBg: 'bg-[#6b1176]', doneBg: 'bg-[#9c3aa6]', ring: 'ring-[#9c3aa6]', lineActive: 'bg-[#e9d5ff]', textActive: 'text-[#6b1176]', border: 'border-[#E7E1E1]', headerBg: 'bg-gradient-to-r from-[#3b0764] to-[#6b1176]', chipCls: 'bg-[#F7ECFF] border-[#c084fc]/40 text-[#6b1176]' };
           const STEPS = [
-            { label: 'Day 0', sub: 'Fertilization',                  ...STEP_BASE },
-            { label: 'Day 3', sub: 'Cleavage',                       ...STEP_BASE },
-            { label: 'Day 5', sub: 'Blastocyst',                     ...STEP_BASE },
-            { label: 'Day 6', sub: day6Locked ? 'N/A' : 'Late Blast', ...STEP_BASE, activeBg: day6Locked ? 'bg-gray-400' : 'bg-[#6b1176]', headerBg: day6Locked ? 'bg-gray-400' : 'bg-gradient-to-r from-[#3b0764] to-[#6b1176]' },
-            { label: 'Final', sub: 'Decision',                       ...STEP_BASE },
+            { dayKey: 'D0', label: 'Day 0', sub: 'Fertilization',                   ...STEP_BASE },
+            { dayKey: 'D1', label: 'Day 1', sub: 'PN Check',                        ...STEP_BASE },
+            { dayKey: 'D3', label: 'Day 3', sub: 'Cleavage',                        ...STEP_BASE },
+            { dayKey: 'D5', label: 'Day 5', sub: 'Blastocyst',                      ...STEP_BASE },
+            { dayKey: 'D6', label: 'Day 6', sub: day6Locked ? 'N/A' : 'Late Blast', ...STEP_BASE, activeBg: day6Locked ? 'bg-gray-400' : 'bg-[#6b1176]', headerBg: day6Locked ? 'bg-gray-400' : 'bg-gradient-to-r from-[#3b0764] to-[#6b1176]' },
+            { dayKey: 'F',  label: 'Final', sub: 'Decision',                        ...STEP_BASE },
           ];
 
           const stepSummary = (i: number): string => {
-            if (i === 0) { const p: string[] = []; if (logForm.day0Dish) p.push(`Dish ${logForm.day0Dish}`); if (logForm.dropNo) p.push(`Drop ${logForm.dropNo}`); if (logForm.pn) p.push(logForm.pn); return p.join(' · ') || '—'; }
-            if (i === 1) { const l = generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation); return l !== '—' ? l : (logForm.day3CellCount ? `${logForm.day3CellCount}C` : '—'); }
-            if (i === 2) { if (logForm.day5Stage === 'Blastocyst' && blastGradeFields5) return generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade); return logForm.day5Stage || '—'; }
-            if (i === 3) { if (day6Locked) return 'N/A'; if (logForm.day6Stage === 'Blastocyst' && blastGradeFields6) return generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade); return logForm.day6Stage || '—'; }
+            if (i === 0) { const p: string[] = []; if (logForm.d0Maturity) p.push(logForm.d0Maturity); if (logForm.d0DropNo) p.push(`Drop ${logForm.d0DropNo}`); return p.join(' · ') || '—'; }
+            if (i === 1) { return logForm.d1Pn || '—'; }
+            if (i === 2) { const l = generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation); return l !== '—' ? l : (logForm.day3CellCount ? `${logForm.day3CellCount}C` : '—'); }
+            if (i === 3) { if (logForm.day5Stage === 'Blastocyst' && blastGradeFields5) return generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade); return logForm.day5Stage || '—'; }
+            if (i === 4) { if (day6Locked) return 'N/A'; if (logForm.day6Stage === 'Blastocyst' && blastGradeFields6) return generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade); return logForm.day6Stage || '—'; }
             return logForm.fate || '—';
           };
 
@@ -1557,11 +1272,11 @@ export default function EmbryoGradingPage() {
                 {/* Left: HIS + Patient Name */}
                 <div>
                   <span className="text-[9px] font-bold uppercase tracking-widest text-[#e9d5ff]/60">HIS</span>
-                  <p className="text-white font-bold text-sm leading-tight">{selectedEmbryo?.hisNumber || '—'}</p>
-                  <p className="text-[#e9d5ff]/70 text-xs mt-0.5">{selectedEmbryo?.patientName || '—'}</p>
+                  <p className="text-white font-bold text-sm leading-tight">{selectedCycle?.his_id || '—'}</p>
+                  <p className="text-[#e9d5ff]/70 text-xs mt-0.5">{selectedCycle?.patient_name || '—'}</p>
                 </div>
 
-                {/* Right: Oocyte No + Maturity */}
+                {/* Right: Oocyte No */}
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col items-center">
                     <span className="text-[9px] font-bold uppercase tracking-widest text-[#e9d5ff]/60 mb-1">Oocyte No</span>
@@ -1571,19 +1286,6 @@ export default function EmbryoGradingPage() {
                       value={logForm.oocyteNo}
                       onChange={(e) => handleLogFieldChange('oocyteNo', e.target.value)}
                     />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-[#e9d5ff]/60 mb-1">Maturity</span>
-                    <select
-                      className="bg-white/10 border border-white/30 rounded-lg text-white text-sm font-semibold w-20 h-8 px-2 focus:outline-none focus:border-white/70"
-                      value={logForm.maturity}
-                      onChange={(e) => handleLogFieldChange('maturity', e.target.value)}
-                    >
-                      <option value="MII" className="text-black">MII</option>
-                      <option value="MI" className="text-black">MI</option>
-                      <option value="GV" className="text-black">GV</option>
-                      <option value="—" className="text-black">—</option>
-                    </select>
                   </div>
                 </div>
               </div>
@@ -1607,13 +1309,13 @@ export default function EmbryoGradingPage() {
                         {i < logModalStep ? (
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         ) : (
-                          <span>{i + 1}</span>
+                          <span className="text-[9px]">{step.dayKey}</span>
                         )}
                       </div>
                       <span className={`text-[9px] font-bold uppercase tracking-wide leading-none mt-1 ${i === logModalStep ? step.textActive : 'text-gray-400'}`}>{step.label}</span>
                       <span className={`text-[9px] leading-none ${i === logModalStep ? step.textActive + '/80' : 'text-gray-300'}`}>{step.sub}</span>
                     </button>
-                    {i < 4 && (
+                    {i < 5 && (
                       <div className={`flex-1 h-0.5 mt-4 transition-colors duration-300 ${i < logModalStep ? step.lineActive : 'bg-gray-200'}`} />
                     )}
                   </React.Fragment>
@@ -1645,18 +1347,33 @@ export default function EmbryoGradingPage() {
                     <p className="text-white font-black text-sm tracking-tight">{s.label}</p>
                     <p className="text-white/70 text-[11px]">{s.sub}</p>
                   </div>
-                  <span className="text-white/50 text-xs font-semibold">{logModalStep + 1} / 5</span>
+                  <span className="text-white/50 text-xs font-semibold">{logModalStep + 1} / 6</span>
                 </div>
                 <div className="bg-white p-5">
 
                   {/* Day 0 */}
                   {logModalStep === 0 && (
                     <div className="grid grid-cols-2 gap-4">
-                      <div><label className={lbl}>Dish No</label><input className={inp} placeholder="Dish number" value={logForm.day0Dish} onChange={(e) => handleLogFieldChange('day0Dish', e.target.value)} /></div>
-                      <div><label className={lbl}>Drop No</label><input className={inp} placeholder="Drop number" value={logForm.dropNo} onChange={(e) => handleLogFieldChange('dropNo', e.target.value)} /></div>
+                      <div>
+                        <label className={lbl}>Maturity</label>
+                        <select className={sel} value={logForm.d0Maturity} onChange={(e) => handleLogFieldChange('d0Maturity', e.target.value)}>
+                          <option value="MII">MII</option>
+                          <option value="MI">MI</option>
+                          <option value="GV">GV</option>
+                          <option value="Others">Others</option>
+                        </select>
+                      </div>
+                      <div><label className={lbl}>Drop No</label><input className={inp} placeholder="Drop number" value={logForm.d0DropNo} onChange={(e) => handleLogFieldChange('d0DropNo', e.target.value)} /></div>
+                      <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 0 notes…" value={logForm.d0Notes} onChange={(e) => handleLogFieldChange('d0Notes', e.target.value)} /></div>
+                    </div>
+                  )}
+
+                  {/* Day 1 */}
+                  {logModalStep === 1 && (
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className={lbl}>PN Status</label>
-                        <select className={sel} value={logForm.pn} onChange={(e) => handleLogFieldChange('pn', e.target.value)}>
+                        <select className={sel} value={logForm.d1Pn} onChange={(e) => handleLogFieldChange('d1Pn', e.target.value)}>
                           <option value="2PN">2PN ✓</option>
                           <option value="1PN">1PN</option>
                           <option value="3PN">3PN</option>
@@ -1666,19 +1383,21 @@ export default function EmbryoGradingPage() {
                       </div>
                       <div>
                         <label className={lbl}>Zygote Status</label>
-                        <select className={sel} value={logForm.day0ZygoteStatus} onChange={(e) => handleLogFieldChange('day0ZygoteStatus', e.target.value)}>
+                        <select className={sel} value={logForm.d1ZygoteStatus} onChange={(e) => handleLogFieldChange('d1ZygoteStatus', e.target.value)}>
                           <option value="">—</option>
                           <option value="Normal">Normal</option>
                           <option value="Abnormal">Abnormal</option>
                         </select>
                       </div>
-                      <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 0 notes…" value={logForm.day0Notes} onChange={(e) => handleLogFieldChange('day0Notes', e.target.value)} /></div>
+                      <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 1 notes…" value={logForm.d1Notes} onChange={(e) => handleLogFieldChange('d1Notes', e.target.value)} /></div>
                     </div>
                   )}
 
                   {/* Day 3 */}
-                  {logModalStep === 1 && (
+                  {logModalStep === 2 && (
                     <div className="grid grid-cols-2 gap-4">
+                      <div><label className={lbl}>Drop No</label><input className={inp} placeholder="Drop number" value={logForm.day3DropNo} onChange={(e) => handleLogFieldChange('day3DropNo', e.target.value)} /></div>
+                      <div />
                       <div>
                         <label className={lbl}>Cell Count</label>
                         <select className={sel} value={logForm.day3CellCount} onChange={(e) => handleLogFieldChange('day3CellCount', e.target.value)}>
@@ -1718,7 +1437,7 @@ export default function EmbryoGradingPage() {
                   )}
 
                   {/* Day 5 */}
-                  {logModalStep === 2 && (
+                  {logModalStep === 3 && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="col-span-2">
                         <label className={lbl}>Stage</label>
@@ -1761,11 +1480,12 @@ export default function EmbryoGradingPage() {
                           </div>
                         )}
                       </>)}
+                      <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 5 notes…" value={logForm.day5Notes} onChange={(e) => handleLogFieldChange('day5Notes', e.target.value)} /></div>
                     </div>
                   )}
 
                   {/* Day 6 */}
-                  {logModalStep === 3 && (
+                  {logModalStep === 4 && (
                     day6Locked ? (
                       <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
                         <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-2xl mb-1">🧊</div>
@@ -1827,12 +1547,13 @@ export default function EmbryoGradingPage() {
                             </select>
                           </div>
                         )}
+                        <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 6 notes…" value={logForm.day6Notes} onChange={(e) => handleLogFieldChange('day6Notes', e.target.value)} /></div>
                       </div>
                     )
                   )}
 
                   {/* Final */}
-                  {logModalStep === 4 && (
+                  {logModalStep === 5 && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="col-span-2">
                         <label className={lbl}>Fate</label>
@@ -1870,7 +1591,7 @@ export default function EmbryoGradingPage() {
                       Back
                     </button>
                   )}
-                  {logModalStep < 4 && (
+                  {logModalStep < 5 && (
                     <button type="button" onClick={() => setLogModalStep(prev => prev + 1)}
                       className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors flex items-center gap-1.5">
                       Next
@@ -1880,8 +1601,9 @@ export default function EmbryoGradingPage() {
                 </div>
 
                 {/* Right: Save */}
-                <button type="button" onClick={handleAddLogEntry}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#3b0764] to-[#9c3aa6] text-white text-sm font-bold shadow-md hover:opacity-90 transition-opacity">
+                <button type="button" onClick={handleAddLogEntry} disabled={logSaving}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#3b0764] to-[#9c3aa6] text-white text-sm font-bold shadow-md hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2">
+                  {logSaving && <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
                   {editingLogId ? 'Update' : 'Save'}
                 </button>
               </div>
