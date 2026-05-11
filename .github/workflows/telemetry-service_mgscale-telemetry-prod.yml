@@ -3,47 +3,19 @@ name: Deploy Azure Function (Flex, nozip)
 on:
   push:
     branches:
-      - telemetry-service-prod
+      - master
+    paths:
+      - "telemetry-service/**"
   workflow_dispatch:
-
-env:
-  FUNCTION_APP_NAME: mgscale-telemetry-prod
-  FUNCTION_APP_PATH: telemetry-service
-  PYTHON_VERSION: '3.11'
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/reusable-azure-function-python.yml
+    with:
+      function_app_name: mgscale-telemetry-prod
+      function_app_path: telemetry-service
+      python_version: "3.11"
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install Azure CLI
-        run: |
-          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
-      - name: Install Azure Functions Core Tools
-        run: |
-          npm install -g azure-functions-core-tools@4 --unsafe-perm true
-
-      - name: Azure Login (Service Principal)
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Install Python dependencies
-        run: |
-          cd ${{ env.FUNCTION_APP_PATH }}
-          pip install -r requirements.txt
-
-      - name: Publish Function App (NO ZIP)
-        run: |
-          cd ${{ env.FUNCTION_APP_PATH }}
-          func azure functionapp publish ${{ env.FUNCTION_APP_NAME }} --nozip
 

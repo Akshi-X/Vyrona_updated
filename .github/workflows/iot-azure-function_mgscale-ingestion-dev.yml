@@ -1,43 +1,20 @@
 name: Deploy Azure Function (Flex, nozip)
 
 on:
-    push:
-        branches:
-            - iot-webhook-trigger-dev
-    workflow_dispatch:
-
-env:
-    FUNCTION_APP_NAME: mgscale-ingestion-dev
-    FUNCTION_APP_PATH: tive-ingestion-function
-    PYTHON_VERSION: "3.11"
+  push:
+    branches:
+      - develop
+    paths:
+      - "tive-ingestion-function/**"
+  workflow_dispatch:
 
 jobs:
-    deploy:
-        runs-on: ubuntu-latest
+  deploy:
+    uses: ./.github/workflows/reusable-azure-function-python.yml
+    with:
+      function_app_name: mgscale-ingestion-dev
+      function_app_path: tive-ingestion-function
+      python_version: "3.11"
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
-
-            - name: Setup Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ env.PYTHON_VERSION }}
-
-            - name: Install Azure CLI
-              run: |
-                  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
-            - name: Install Azure Functions Core Tools
-              run: |
-                  npm install -g azure-functions-core-tools@4 --unsafe-perm true
-
-            - name: Azure Login (Service Principal)
-              uses: azure/login@v2
-              with:
-                  creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-            - name: Publish Function App (NO ZIP)
-              run: |
-                  cd $FUNCTION_APP_PATH
-                  func azure functionapp publish $FUNCTION_APP_NAME --nozip

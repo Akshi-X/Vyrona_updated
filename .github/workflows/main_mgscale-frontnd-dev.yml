@@ -4,48 +4,20 @@ on:
   push:
     branches:
       - develop
+    paths:
+      - "FrontEnd/**"
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/reusable-azure-webapp-node.yml
+    with:
+      app_name: mgscale-frontnd-dev
+      frontend_path: FrontEnd
+      node_version: '22.x'
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+      VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+      VITE_GOOGLE_MAP_ID: ${{ secrets.VITE_GOOGLE_MAP_ID }}
 
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.x'
-          cache: 'npm'
-          cache-dependency-path: FrontEnd/package-lock.json
-
-      - name: Install dependencies
-        working-directory: FrontEnd
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: FrontEnd
-        env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
-          VITE_GOOGLE_MAP_ID: ${{ secrets.VITE_GOOGLE_MAP_ID }}
-        run: |
-          npm run build
-          cp web.config dist/
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          auth-type: SERVICE_PRINCIPAL
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: mgscale-frontnd-dev
-          package: FrontEnd/dist

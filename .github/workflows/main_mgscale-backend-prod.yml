@@ -4,46 +4,20 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "backend/**"
   workflow_dispatch:
 
 jobs:
   build-push-deploy:
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/reusable-azure-webapp-docker.yml
+    with:
+      app_name: mgscale-alerting-service-prod
+      acr_login_server: mgscaleprod.azurecr.io
+      acr_username: mgscaleprod
+      image_name: mgscale-backend
+      context_path: ./backend
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      ACR_PASSWORD: ${{ secrets.ACR_ADMIN_PASSWORD_PROD }}
 
-    permissions:
-      contents: read
-
-    steps:
-      # 1️⃣ Checkout code
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # 2️⃣ Azure Login (Service Principal using AZURE_CREDENTIALS)
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          auth-type: SERVICE_PRINCIPAL
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      # 4️⃣ Login to ACR
-      - name: Login to ACR
-        run: |
-          docker login mgscaleprod.azurecr.io \
-            -u mgscaleprod \
-            -p ${{ secrets.ACR_ADMIN_PASSWORD_PROD }}
-      # 5️⃣ Build Docker image
-      - name: Build Docker Image
-        run: |
-          docker build \
-            -t mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }} \
-            ./backend
-      # 6️⃣ Push Docker image
-      - name: Push Docker Image
-        run: |
-          docker push mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }}
-      # 7️⃣ Deploy image to Azure Web App (Container)
-      - name: Deploy to Azure Web App (Container)
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: mgscale-alerting-service-prod
-          images: mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }}
