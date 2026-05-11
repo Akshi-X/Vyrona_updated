@@ -211,7 +211,7 @@ def get_active_canisters(
 def get_active_incubators(
     request: Request,
     db: Session = Depends(get_db),
-    branch_name: Optional[str] = Query(None),
+    branch_id: Optional[int] = Query(None),
 ):
     """Get active incubators grouped by branch for the current user's hospital scope."""
     try:
@@ -227,13 +227,13 @@ def get_active_incubators(
             if user_branch_id is None:
                 raise HTTPException(status_code=403, detail="Access denied: no branch assigned")
             filter_branch_id = user_branch_id
-        elif branch_name:
+        elif branch_id is not None:
             branch = db.query(HospitalBranch).filter(
-                HospitalBranch.branch_name == branch_name.strip(),
+                HospitalBranch.branch_id == branch_id,
                 HospitalBranch.hospital_id == hospital_id,
             ).first()
             if not branch:
-                raise HTTPException(status_code=404, detail=f"Branch '{branch_name}' not found")
+                raise HTTPException(status_code=404, detail=f"Branch {branch_id} not found")
             filter_branch_id = branch.branch_id
 
         service = IVFService(db)
