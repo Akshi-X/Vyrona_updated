@@ -7,7 +7,8 @@
         "content": "This is the Alert Configuration page. Here you can set KPI thresholds and notification rules for every container across all branches.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/dashboard"
+        "startPage": "/onboarding/dashboard",
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "al4-sidebar-click",
@@ -18,7 +19,8 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-sidebar-alert-setting"],
-        "prevDisable": true
+        "prevDisable": true,
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "al4-filters",
@@ -28,7 +30,56 @@
         "content": "Use the branch filter to narrow the container list to a specific location. This makes it easy to manage alerts across large multi-branch deployments.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_globe.webp"
+    },
+    {
+        "id": "al4-containers-overview",
+        "target": "#onboarding-alert-containers",
+        "title": "Active Containers",
+        "icon": "Package",
+        "content": "This panel lists all active containers across your branches. You can filter by branch and click any container to view or edit its alert configuration.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
+    },
+    {
+        "id": "al4-settings-btn",
+        "target": "#onboarding-alert-settings-btn",
+        "title": "Notification Settings",
+        "icon": "Settings",
+        "content": "Use this settings icon to configure how alerts are delivered — choose Email, WhatsApp, or both. Click here to open Notification Settings.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-alert-settings-btn"],
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "al4-notify-modal",
+        "target": "#onboarding-alert-notify-modal",
+        "title": "Notification Channels",
+        "icon": "Bell",
+        "content": "Toggle Email and WhatsApp to control which channels receive alert notifications. Changes take effect immediately after saving.",
+        "placement": "bottom",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_phone.webp"
+    },
+    {
+        "id": "al4-notify-close",
+        "target": "#onboarding-alert-notify-close",
+        "title": "Close Settings",
+        "icon": "X",
+        "content": "Close the Notification Settings panel to continue setting up your alert configuration.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-alert-notify-close"],
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "al4-branch-open",
@@ -39,7 +90,8 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-alert-branch-dropdown"],
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "al4-branch-bangalore",
@@ -50,8 +102,9 @@
         "placement": "right",
         "requireClick": true,
         "prevDisable": true,
-        "clickOnlyId": ["#onboarding-alert-branch-bangalore"],
-        "startPage": "/onboarding/alert-setting"
+        "clickOnlyId": ["#onboarding-alert-branch-16"],
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "al4-containers",
@@ -62,7 +115,8 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-alert-container-T-161"],
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting?branch_id=16",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "al4-kpi-panel",
@@ -73,6 +127,117 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "al4-kpi-temp-internal",
+        "target": "#onboarding-alert-kpi-temp_internal",
+        "title": "Internal Temperature",
+        "icon": "Thermometer",
+        "content": "Internal Temperature is a Critical Alert — a breach triggers an email notification. Thresholds are set between -200°C and -180°C with a 30-minute cooldown to prevent repeated paging.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/idea_with_thermometer.webp"
+    },
+    {
+        "id": "al4-kpi-temp-external",
+        "target": "#onboarding-alert-kpi-temp_external",
+        "title": "External Temperature",
+        "icon": "Thermometer",
+        "content": "External Temperature uses a Soft Alert — you'll get an in-app notification without email. The safe range is 20°C to 30°C with a 30-minute cooldown.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+    {
+        "id": "al4-kpi-ln2",
+        "target": "#onboarding-alert-kpi-ln2_level",
+        "title": "LN2 Level",
+        "icon": "Droplets",
+        "content": "LN2 Level is a Critical Alert with email notifications. A minimum threshold of 22 kg is enforced with a 60-minute cooldown, giving the team time to respond before another alert fires.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
+    },
+    {
+        "id": "al4-kpi-battery",
+        "target": "#onboarding-alert-kpi-tive_battery_percentage",
+        "title": "Battery Level",
+        "icon": "Battery",
+        "content": "Battery Level fires a Soft Alert (notification only) when charge drops below 20%. The 60-minute cooldown avoids a flood of low-battery notifications during a slow discharge.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "al4-kpi-shock",
+        "target": "#onboarding-alert-kpi-shock",
+        "title": "Shock Detection",
+        "icon": "Zap",
+        "content": "Shock Detection fires a Soft Alert when impact exceeds the configured G-force threshold — useful for flagging rough handling during transport.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/shock.webp"
+    },
+    {
+        "id": "al4-kpi-evaporation",
+        "target": "#onboarding-alert-kpi-ln2_evaporation_rate",
+        "title": "Evaporation Rate",
+        "icon": "Wind",
+        "content": "Evaporation Rate alerts when LN2 boils off faster than expected. We've set a Soft Alert with a range of 0.5–2.0 kg/hr and a 60-minute cooldown.",
+        "placement": "left",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:prefill-alert-evap-lid",
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/refilling.webp"
+    },
+    {
+        "id": "al4-kpi-lid",
+        "target": "#onboarding-alert-kpi-ln2_lid_state",
+        "title": "Lid State",
+        "icon": "Lock",
+        "content": "Lid State is set to alert when the lid is opened unexpectedly. This catches accidental openings that could warm the container.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/lid_state.webp"
+    },
+    {
+        "id": "al4-save-changes",
+        "target": "#onboarding-alert-save-btn",
+        "title": "Save Alert Configuration",
+        "icon": "Save",
+        "content": "Click Save Changes to apply the new Evaporation Rate and Lid State alert settings for this container.",
+        "placement": "top",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-alert-save-btn"],
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "al4-kpi-panel-overview",
+        "target": "#onboarding-alert-kpi-panel",
+        "title": "Configuration Saved",
+        "icon": "CheckCircle",
+        "content": "All KPI alerts are now configured for this container — Internal Temperature, External Temperature, LN2, Battery Level, Shock Detection, Evaporation Rate, and Lid State.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
     }
 ]

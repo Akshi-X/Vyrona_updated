@@ -65,6 +65,8 @@ export interface OnboardingStep {
     placement?: "top" | "bottom" | "left" | "right" | "center";
     requireClick?: boolean;
     prevDisable?: boolean;
+    /** On reload/refresh, walk the step index back past this step so the user never resumes mid-flow */
+    rewindOnRefresh?: boolean;
     clickOnlyId?: string[];
     disableClickID?: string[];
     genieImage?: string;

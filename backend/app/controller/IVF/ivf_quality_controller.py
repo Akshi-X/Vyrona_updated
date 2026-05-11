@@ -42,6 +42,7 @@ from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
 from app.models.IVF.ln2_readings_model import Ln2Reading
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.incubator_model import Incubator
 from app.models.kpi_config_model import KpiConfig
 from app.models.user_model import User
 from app.service.activity_log_service import (
@@ -768,34 +769,55 @@ def update_hospital_notification_settings(
 
 @router.get("/kpi-config/list")
 def list_kpi_config(
-    tank_id: int = Query(..., description="Tank ID to list KPI config for"),
+    tank_id: Optional[int] = Query(None, description="Tank ID"),
+    incubator_id: Optional[int] = Query(None, description="Incubator ID"),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List all KPI config rows for a tank (Alert Setting). IVF Admin, Manager, and User only."""
+    """List all KPI config rows for a tank or incubator (Alert Setting)."""
     _require_alert_setting_role(current_user)
+    quality_service = QualityService(db)
+
+    if incubator_id is not None:
+        incubator = db.query(Incubator).filter(
+            Incubator.incubator_id == incubator_id,
+            Incubator.hospital_id == current_user.hospital_id,
+        ).first()
+        if not incubator:
+            raise HTTPException(status_code=404, detail=f"Incubator '{incubator_id}' not found")
+        rows = (
+            db.query(KpiConfig)
+            .filter(KpiConfig.incubator_id == incubator_id)
+            .order_by(KpiConfig.kpi_name, KpiConfig.alert_name)
+            .all()
+        )
+        return {
+            "incubator_id": incubator_id,
+            "incubator_code": incubator.incubator_code or "",
+            "branch_id": incubator.branch_id,
+            "hospital_id": incubator.hospital_id,
+            "config": [_kpi_config_metadata(r) for r in rows],
+        }
+
+    if tank_id is None:
+        raise HTTPException(status_code=400, detail="Provide tank_id or incubator_id")
+
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
     if not tank:
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
-    quality_service = QualityService(db)
     try:
         quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     rows = quality_service.list_kpi_config_by_tank(tank_id)
-    branch = (
-        db.query(HospitalBranch)
-        .filter(HospitalBranch.branch_id == tank.branch_id)
-        .first()
-    )
-    hospital_id = branch.hospital_id if branch else None
+    branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
     return {
         "tank_id": tank_id,
         "tank_code": tank.tank_code or "",
         "branch_id": tank.branch_id,
-        "hospital_id": hospital_id,
+        "hospital_id": branch.hospital_id if branch else None,
         "config": rows,
     }
 
@@ -807,48 +829,49 @@ def create_kpi_config(
     current_user: User = Depends(get_current_user),
     body: dict = Body(...),
 ):
-    """Create a KPI config row (Alert Setting). IVF Admin, Manager, and User only. Body: hospital_id, branch_id, tank_id, kpi_name, alert_name?, min?, max?, unit?, alert_type?, status?."""
+    """Create a KPI config row. Body: hospital_id, branch_id, kpi_name, and either tank_id or incubator_id."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
-    required = ("hospital_id", "branch_id", "tank_id", "kpi_name")
-    for k in required:
+    for k in ("hospital_id", "branch_id", "kpi_name"):
         if k not in body:
             raise HTTPException(status_code=400, detail=f"Missing required field: {k}")
+    if body.get("tank_id") is None and body.get("incubator_id") is None:
+        raise HTTPException(status_code=400, detail="Provide tank_id or incubator_id")
     try:
         hospital_id = int(body["hospital_id"])
         branch_id_val = int(body["branch_id"])
-        tank_id = int(body["tank_id"])
+        tank_id = int(body["tank_id"]) if body.get("tank_id") is not None else None
+        incubator_id_val = int(body["incubator_id"]) if body.get("incubator_id") is not None else None
     except (TypeError, ValueError):
-        raise HTTPException(
-            status_code=400, detail="hospital_id, branch_id, tank_id must be integers"
-        )
+        raise HTTPException(status_code=400, detail="hospital_id, branch_id, tank_id/incubator_id must be integers")
     if branch_id is not None and branch_id_val != branch_id:
-        raise HTTPException(
-            status_code=403, detail="Cannot create config for another branch"
-        )
+        raise HTTPException(status_code=403, detail="Cannot create config for another branch")
+
     quality_service = QualityService(db)
     row = quality_service.create_kpi_config(
         hospital_id=hospital_id,
         branch_id=branch_id_val,
         tank_id=tank_id,
+        incubator_id=incubator_id_val,
+        chamber_id=body.get("chamber_id"),
         kpi_name=str(body["kpi_name"]),
         alert_name=body.get("alert_name"),
         min_val=body.get("min") if body.get("min") is not None else None,
         max_val=body.get("max") if body.get("max") is not None else None,
         unit=body.get("unit"),
         alert_type=body.get("alert_type"),
-        cooldown_minutes=int(body["cooldown_minutes"])
-        if body.get("cooldown_minutes") is not None
-        else None,
+        cooldown_minutes=int(body["cooldown_minutes"]) if body.get("cooldown_minutes") is not None else None,
+        unack_escalation_threshold=int(body["unack_escalation_threshold"]) if body.get("unack_escalation_threshold") is not None else None,
         status=body.get("status", True),
     )
     db.commit()
 
+    target_label = f"incubator:{incubator_id_val}" if incubator_id_val else str(row.tank_id)
     ActivityLogService(db).log_activity(
         action="alert_configuration.kpi_config_created",
         outcome=ActivityOutcome.SUCCESS.value,
         actor=build_actor_from_user(current_user),
-        target=build_target("tank", str(row.tank_id)),
+        target=build_target("tank", target_label),
         metadata={
             **_kpi_config_metadata(row),
             "kpi_names": [row.kpi_name] if row.kpi_name else [],
@@ -869,6 +892,7 @@ def create_kpi_config(
         "cooldown_minutes": int(row.cooldown_minutes)
         if row.cooldown_minutes is not None
         else 60,
+        "unack_escalation_threshold": row.unack_escalation_threshold,
         "status": bool(row.status),
     }
 
@@ -952,6 +976,9 @@ def update_kpi_config(
         cooldown_minutes=int(body["cooldown_minutes"])
         if body.get("cooldown_minutes") is not None
         else None,
+        unack_escalation_threshold=int(body["unack_escalation_threshold"])
+        if body.get("unack_escalation_threshold") is not None
+        else None,
         status=body.get("status"),
     )
     if not row:
@@ -990,6 +1017,7 @@ def update_kpi_config(
         "cooldown_minutes": int(row.cooldown_minutes)
         if row.cooldown_minutes is not None
         else 60,
+        "unack_escalation_threshold": row.unack_escalation_threshold,
         "status": bool(row.status),
     }
 

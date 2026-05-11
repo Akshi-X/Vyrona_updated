@@ -432,7 +432,7 @@ class ActiveTankItem(BaseModel):
     tank_code: str = Field(..., description="Tank code (e.g., 'T1')")
     updated_at: Optional[datetime] = Field(None, description="Last updated date and time from tanks table")
     status: CanisterStatus = Field(..., description="Tank status (safe, risk, critical)")
-    deviations: int = Field(...,description="Number of readings deviations")
+    deviations: int = Field(..., description="Number of readings deviations")
     class Config:
         from_attributes = True
 
@@ -452,6 +452,40 @@ class ActiveCanistersResponse(BaseModel):
     branches: List[BranchTanks] = Field(..., description="List of branches with their active tanks")
     total: int = Field(..., description="Total number of active tanks across all branches")
     
+    class Config:
+        from_attributes = True
+
+
+# ============================================
+# ACTIVE INCUBATORS CONTROL TOWER SCHEMA
+# ============================================
+
+class ActiveIncubatorItem(BaseModel):
+    incubator_id: int
+    incubator_code: Optional[str] = None
+    external_id: Optional[str] = None
+    type: Optional[str] = None
+    chamber_r: Optional[int] = None
+    chamber_c: Optional[int] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class BranchIncubators(BaseModel):
+    branch_id: int
+    branch_name: str
+    incubators: List[ActiveIncubatorItem]
+
+    class Config:
+        from_attributes = True
+
+
+class ActiveIncubatorsResponse(BaseModel):
+    branches: List[BranchIncubators]
+    total: int
+
     class Config:
         from_attributes = True
 

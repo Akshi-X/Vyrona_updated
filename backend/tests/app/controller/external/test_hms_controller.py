@@ -144,3 +144,61 @@ def test_missing_hospital_id_rejected():
 def test_empty_array_rejected(admin_app, admin_client):
     resp = admin_client.post("/external/hms/patient-cryolock", json=[])
     assert resp.status_code == 400
+
+
+def test_move_operation(admin_app, admin_client, monkeypatch):
+    """oldCryolockNumber present and different → operation=move, old_patient_crylock_id populated."""
+    mock_service = MagicMock()
+    mock_service.apply_cryolock_update.return_value = {
+        "status": "success",
+        "operation": "move",
+        "patient_crylock_id": 99,
+        "old_patient_crylock_id": 42,
+        "tank_id": 56,
+        "branch_id": 7,
+        "reason": None,
+    }
+    monkeypatch.setattr(
+        hms_controller,
+        "HMSIntegrationService",
+        MagicMock(return_value=mock_service),
+    )
+
+    move_payload = {**VALID_PAYLOAD, "oldCryolockNumber": "T1/C5/E1/3"}
+    resp = admin_client.post("/external/hms/patient-cryolock", json=move_payload)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["moved"] == 1
+    assert body["created"] == 0
+    assert body["updated"] == 0
+    r = body["results"][0]
+    assert r["operation"] == "move"
+    assert r["patient_crylock_id"] == 99
+    assert r["old_patient_crylock_id"] == 42
+
+
+def test_move_same_cryolock_number_treated_as_upsert(admin_app, admin_client, monkeypatch):
+    """oldCryolockNumber == cryolockNumber → move branch skipped, normal upsert runs."""
+    mock_service = MagicMock()
+    mock_service.apply_cryolock_update.return_value = {
+        "status": "success",
+        "operation": "noop",
+        "patient_crylock_id": 42,
+        "old_patient_crylock_id": None,
+        "tank_id": 56,
+        "branch_id": 7,
+        "reason": None,
+    }
+    monkeypatch.setattr(
+        hms_controller,
+        "HMSIntegrationService",
+        MagicMock(return_value=mock_service),
+    )
+
+    # Same value in both fields — must not be treated as a move
+    same_payload = {**VALID_PAYLOAD, "oldCryolockNumber": VALID_PAYLOAD["cryolockNumber"]}
+    resp = admin_client.post("/external/hms/patient-cryolock", json=same_payload)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["moved"] == 0
+    assert body["noop"] == 1

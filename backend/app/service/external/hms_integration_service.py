@@ -130,6 +130,24 @@ class HMSIntegrationService:
         )
         date_of_vitrification = self._parse_date(payload.dateofVitrification)
 
+        # Move operation: old position → new position
+        old_cryolock_raw = payload.oldCryolockNumber.strip() if payload.oldCryolockNumber else None
+        if old_cryolock_raw and old_cryolock_raw != cryolock_number:
+            return self._apply_move(
+                payload=payload,
+                hospital_id=hospital_id,
+                actor_user=actor_user,
+                new_cryolock_number=cryolock_number,
+                old_cryolock_number=old_cryolock_raw,
+                tank_code=tank_code,
+                canister_to_use=canister_to_use,
+                cane_code=cane_code,
+                position_number=position_number,
+                date_of_vitrification=date_of_vitrification,
+                his_number=his_number,
+                site_name=site_name,
+            )
+
         hospital = (
             self.db.query(Hospital)
             .filter(Hospital.hospital_id == hospital_id)
@@ -267,6 +285,192 @@ class HMSIntegrationService:
             "reason": None,
         }
 
+    def _apply_move(
+        self,
+        payload: HMSCryolockUpdate,
+        hospital_id: int,
+        actor_user: User,
+        new_cryolock_number: str,
+        old_cryolock_number: str,
+        tank_code: str,
+        canister_to_use: Optional[str],
+        cane_code: Optional[str],
+        position_number: int,
+        date_of_vitrification,
+        his_number: str,
+        site_name: str,
+    ) -> Dict[str, Any]:
+        """Delete the old position record and create one at the new position atomically.
+
+        User-managed fields (crylock_color, goblet_color, description, embryo_transfer,
+        in_transit) are transferred from old to new so no clinical state is lost.
+        """
+        hospital = (
+            self.db.query(Hospital)
+            .filter(Hospital.hospital_id == hospital_id)
+            .first()
+        )
+        if not hospital:
+            raise ValueError(f"Hospital {hospital_id} not found for calling admin")
+
+        branch = self._resolve_or_create_branch(hospital.hospital_id, site_name, actor_user.user_id)
+        tank = self._resolve_or_create_tank(
+            tank_code=tank_code,
+            tank_id_arc=payload.tankID,
+            branch_id=branch.branch_id,
+            created_by=actor_user.user_id,
+        )
+        if not tank:
+            raise RuntimeError(
+                f"Could not resolve tank for tank_code={tank_code} in branch={branch.branch_id}"
+            )
+
+        encrypted_his = encrypt_sensitive_ivf_value(his_number)
+        encrypted_old_crylock = encrypt_sensitive_ivf_value(old_cryolock_number)
+        encrypted_new_crylock = encrypt_sensitive_ivf_value(new_cryolock_number)
+
+        old_record: Optional[PatientCrylockInfo] = (
+            self.db.query(PatientCrylockInfo)
+            .filter(
+                or_(
+                    PatientCrylockInfo.his_number == encrypted_his,
+                    PatientCrylockInfo.his_number == his_number,
+                ),
+                or_(
+                    PatientCrylockInfo.crylock_number == encrypted_old_crylock,
+                    PatientCrylockInfo.crylock_number == old_cryolock_number,
+                ),
+            )
+            .first()
+        )
+
+        if old_record is None:
+            logger.warning(
+                "HMS move: old record not found for his=***%s old_crylock=%s; skipping",
+                his_number[-3:],
+                old_cryolock_number,
+            )
+            return {
+                "status": "skipped",
+                "operation": None,
+                "patient_crylock_id": None,
+                "old_patient_crylock_id": None,
+                "tank_id": None,
+                "branch_id": None,
+                "reason": (
+                    f"oldCryolockNumber '{old_cryolock_number}' not found; "
+                    "the record may have already been moved or never existed. "
+                    "Send without oldCryolockNumber to create/update at the new position."
+                ),
+            }
+
+        # Guard: new position already has a record for this patient
+        existing_new: Optional[PatientCrylockInfo] = (
+            self.db.query(PatientCrylockInfo)
+            .filter(
+                or_(
+                    PatientCrylockInfo.his_number == encrypted_his,
+                    PatientCrylockInfo.his_number == his_number,
+                ),
+                or_(
+                    PatientCrylockInfo.crylock_number == encrypted_new_crylock,
+                    PatientCrylockInfo.crylock_number == new_cryolock_number,
+                ),
+            )
+            .first()
+        )
+        if existing_new is not None and existing_new.id != old_record.id:
+            return {
+                "status": "skipped",
+                "operation": None,
+                "patient_crylock_id": None,
+                "tank_id": None,
+                "branch_id": None,
+                "reason": (
+                    f"Target position '{new_cryolock_number}' already has a record for "
+                    f"this patient (id={existing_new.id}); skipped to avoid duplicate"
+                ),
+            }
+
+        # Preserve user-managed fields
+        preserved = {
+            "crylock_color": old_record.crylock_color,
+            "goblet_color": old_record.goblet_color,
+            "description": old_record.description,
+            "embryo_transfer": old_record.embryo_transfer,
+            "in_transit": old_record.in_transit,
+        }
+        old_record_id = old_record.id
+        old_snapshot = {
+            field: self._serialize(getattr(old_record, field))
+            for field in _LOGGABLE_DIFF_FIELDS
+        }
+
+        new_values = {
+            "branch_id": branch.branch_id,
+            "tank_id": tank.tank_id,
+            "tank_code": tank_code,
+            "canister_number": canister_to_use,
+            "cane_code": cane_code,
+            "position_number": position_number,
+            "tank_id_arc": payload.tankID,
+            "cane_id_arc": payload.caneID,
+            "date_of_vitrification": date_of_vitrification,
+        }
+
+        self.db.delete(old_record)
+        self.db.flush()
+
+        new_record = PatientCrylockInfo(
+            branch_id=new_values["branch_id"],
+            tank_id=new_values["tank_id"],
+            his_number=encrypted_his,
+            crylock_number=encrypted_new_crylock,
+            tank_code=new_values["tank_code"],
+            canister_number=new_values["canister_number"],
+            cane_code=new_values["cane_code"],
+            position_number=new_values["position_number"],
+            tank_id_arc=new_values["tank_id_arc"],
+            cane_id_arc=new_values["cane_id_arc"],
+            date_of_vitrification=new_values["date_of_vitrification"],
+            crylock_color=preserved["crylock_color"],
+            goblet_color=preserved["goblet_color"],
+            description=preserved["description"],
+            in_transit=preserved["in_transit"],
+            embryo_transfer=preserved["embryo_transfer"],
+            created_by=actor_user.user_id,
+        )
+        self.db.add(new_record)
+        self.db.flush()
+
+        changes = {
+            field: {"old": old_snapshot[field], "new": self._serialize(new_values[field])}
+            for field in _LOGGABLE_DIFF_FIELDS
+            if old_snapshot[field] != self._serialize(new_values[field])
+        }
+
+        self._log_record(
+            hospital_id=hospital_id,
+            actor_user=actor_user,
+            operation="move",
+            record_id=new_record.id,
+            tank_id=new_record.tank_id,
+            branch_id=new_record.branch_id,
+            changes=changes,
+            extra_metadata={"old_patient_crylock_id": old_record_id},
+        )
+        self.db.commit()
+
+        return {
+            "status": "success",
+            "operation": "move",
+            "patient_crylock_id": new_record.id,
+            "old_patient_crylock_id": old_record_id,
+            "tank_id": new_record.tank_id,
+            "branch_id": new_record.branch_id,
+            "reason": None,
+        }
+
     def _resolve_or_create_branch(
         self,
         hospital_id: int,
@@ -361,7 +565,18 @@ class HMSIntegrationService:
         tank_id: int,
         branch_id: int,
         changes: Dict[str, Dict[str, Any]],
+        extra_metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
+        metadata: Dict[str, Any] = {
+            "operation": operation,
+            "patient_crylock_id": record_id,
+            "tank_id": tank_id,
+            "branch_id": branch_id,
+            "admin_user_id": actor_user.user_id,
+            "changes": changes,
+        }
+        if extra_metadata:
+            metadata.update(extra_metadata)
         ActivityLogService(self.db).log_activity(
             action="patient_crylock.hms_update",
             outcome=ActivityOutcome.SUCCESS.value,
@@ -377,14 +592,7 @@ class HMSIntegrationService:
                 target_label="patient_crylock_info",
                 hospital_id=hospital_id,
             ),
-            metadata={
-                "operation": operation,
-                "patient_crylock_id": record_id,
-                "tank_id": tank_id,
-                "branch_id": branch_id,
-                "admin_user_id": actor_user.user_id,
-                "changes": changes,
-            },
+            metadata=metadata,
         )
 
     def _log_failure(

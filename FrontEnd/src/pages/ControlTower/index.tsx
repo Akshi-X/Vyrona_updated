@@ -64,12 +64,22 @@ const ControlTower = () => {
         setSearchParams(params, { replace: true });
     }, [selectedBranch, selectedStatusInbound, setSearchParams]);
 
+    // Reset filters when onboarding navigates to clean URL (level-3 start)
+    useEffect(() => {
+        const branchFromUrl = searchParams.get("branch_id");
+        const statusFromUrl = searchParams.get("status");
+        if (!branchFromUrl) setSelectedBranch("All");
+        if (!statusFromUrl) setSelectedStatusInbound("All");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams.get("branch_id"), searchParams.get("status")]);
+
     // Active routes via API
     const [routes, setRoutes] = useState<ActiveRouteItem[]>([]);
     const [loadingRoutes, setLoadingRoutes] = useState(false);
     const [routesError, setRoutesError] = useState<string | null>(null);
 
     // Active canisters via API
+    const [deviceType, setDeviceType] = useState<"cryotanks" | "incubators">("cryotanks");
     const [canisters, setCanisters] = useState<
         Array<{
             id: string;
@@ -80,6 +90,7 @@ const ControlTower = () => {
             status: string;
             deviations?: number;
             date: string;
+            isIncubator: boolean;
         }>
     >([]);
     const [loadingCanisters, setLoadingCanisters] = useState(false);
@@ -226,6 +237,7 @@ const ControlTower = () => {
                     status: string;
                     deviations?: number;
                     date: string;
+                    isIncubator: boolean;
                 }> = [];
 
                 // Handle flat format (canisters array) - legacy format
@@ -260,11 +272,12 @@ const ControlTower = () => {
                                     canister.canister_id ??
                                     "N/A",
                             ),
-                            branchName: "N/A", // Flat format doesn't have branch info
-                            branchId: "N/A", // Flat format doesn't have branch info
+                            branchName: "N/A",
+                            branchId: "N/A",
                             status: statusText,
                             deviations: deviationCount,
                             date: date,
+                            isIncubator: canister.is_incubator ?? false,
                         };
                         },
                     );
@@ -311,6 +324,7 @@ const ControlTower = () => {
                                         status: statusText,
                                         deviations: deviationCount,
                                         date: date,
+                                        isIncubator: tank.is_incubator ?? false,
                                     };
                                 });
                             }
@@ -358,6 +372,7 @@ const ControlTower = () => {
                                         status: statusText,
                                         deviations: deviationCount,
                                         date: date,
+                                        isIncubator: canister.is_incubator ?? false,
                                     };
                                 });
                             }
@@ -517,6 +532,10 @@ const ControlTower = () => {
     const filteredCanisters = useMemo(() => {
         let result = canisters || [];
 
+        result = result.filter((c) =>
+            deviceType === "incubators" ? c.isIncubator : !c.isIncubator,
+        );
+
         if (selectedBranch && selectedBranch !== "All") {
             result = result.filter((c) => c.branchId === selectedBranch);
         }
@@ -526,7 +545,7 @@ const ControlTower = () => {
         }
 
         return result;
-    }, [canisters, selectedBranch, selectedStatusInbound]);
+    }, [canisters, deviceType, selectedBranch, selectedStatusInbound]);
 
     // Reset zoomToLocation after it's been used
     useEffect(() => {
@@ -558,12 +577,23 @@ const ControlTower = () => {
                 <FilterPanel activeCount={activeFilterCount}>
                     {isIvfUser && (
                         <FilterToggle
+                            label="Device Type"
+                            value={deviceType}
+                            onChange={(v) => setDeviceType(v as "cryotanks" | "incubators")}
+                            options={[
+                                { label: "Cryotanks", value: "cryotanks" },
+                                { label: "Incubators", value: "incubators" },
+                            ]}
+                        />
+                    )}
+                    {!isIvfUser && (
+                        <FilterToggle
                             label="Direction"
                             value={direction}
                             onChange={(v) => setDirection(v as "inbound" | "outbound")}
                             options={[
-                                { label: "Cryotanks", value: "inbound" },
-                                { label: "Incubators", value: "outbound", disabled: isIvfUser },
+                                { label: "Inbound", value: "inbound" },
+                                { label: "Outbound", value: "outbound" },
                             ]}
                         />
                     )}
@@ -622,12 +652,25 @@ const ControlTower = () => {
                                 {isIvfUser && (
                                     <div id="onboarding-control-filter-direction">
                                         <FilterToggle
+                                            label="Device Type"
+                                            value={deviceType}
+                                            onChange={(v) => setDeviceType(v as "cryotanks" | "incubators")}
+                                            options={[
+                                                { label: "Cryotanks", value: "cryotanks" },
+                                                { label: "Incubators", value: "incubators" },
+                                            ]}
+                                        />
+                                    </div>
+                                )}
+                                {!isIvfUser && (
+                                    <div id="onboarding-control-filter-direction">
+                                        <FilterToggle
                                             label="Direction"
                                             value={direction}
                                             onChange={(v) => setDirection(v as "inbound" | "outbound")}
                                             options={[
-                                                { label: "Cryotanks", value: "inbound" },
-                                                { label: "Incubators", value: "outbound", disabled: isIvfUser },
+                                                { label: "Inbound", value: "inbound" },
+                                                { label: "Outbound", value: "outbound" },
                                             ]}
                                         />
                                     </div>
@@ -852,7 +895,7 @@ const ControlTower = () => {
                                                                     <div className="min-w-0 text-left overflow-hidden">
                                                                         {route?.patientId ? (
                                                                             <Link
-                                                                                to={`/track/${route.patientId}`}
+                                                                                to={`${isOnboarding ? "/onboarding" : ""}/track/${route.patientId}`}
                                                                                 className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
                                                                                 onClick={(
                                                                                     e,
