@@ -40,6 +40,7 @@ from app.controller.IVF import (
     internal_alert_controller,
     internal_refill_controller,
     ivf_controller,
+    ivf_cycle_controller,
     ivf_dashboard_controller,
     ivf_quality_controller,
     ivf_reports_controller,
@@ -181,6 +182,7 @@ async def startup_event():
     logger.info("Starting LN2 Redis listener for real-time readings...")
     asyncio.create_task(ivf_quality_controller.ln2_redis_listener())
     asyncio.create_task(ivf_quality_controller.tank_kpi_redis_listener())
+    asyncio.create_task(ivf_quality_controller.incubator_kpi_redis_listener())
 
     # Step 4: Start scheduled task to fetch World Bank LPI data daily at midnight
     logger.info("Starting World Bank LPI daily fetch scheduler...")
@@ -244,6 +246,7 @@ app.include_router(quality_controller.router, prefix=API_PREFIX)
 app.include_router(quality_tracking_controller.router, prefix=API_PREFIX)
 app.include_router(iot_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_controller.router, prefix=API_PREFIX)
+app.include_router(ivf_cycle_controller.router, prefix=API_PREFIX)
 app.include_router(kpi_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)

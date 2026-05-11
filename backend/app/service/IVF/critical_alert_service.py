@@ -36,6 +36,7 @@ from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.tank_model import Tank
+from ...models.IVF.incubator_model import Incubator
 from ...models.user_model import User
 from ...schemas.IVF.critical_alert_schema import (
     AcknowledgeAlertResponse,
@@ -43,6 +44,7 @@ from ...schemas.IVF.critical_alert_schema import (
     CriticalAlertListResponse,
     CriticalAlertResponse,
     HospitalAlertsResponse,
+    IncubatorAlertsResponse,
     TankAlertsResponse,
 )
 from ...service.email_service import send_email
@@ -72,6 +74,20 @@ REMINDER_INTERVAL_HOURS = 1  # Send reminder every 1 hour
 # Occurrence tracking window for immediate alerts (24 hours)
 OCCURRENCE_TRACKING_HOURS = 24  # Track occurrences in last 24 hours
 OCCURRENCE_THRESHOLD = 3  # Send to managers after 3 occurrences
+
+# WhatsApp Content Template SIDs
+_WA_TEMPLATE_DEVIATION = "HX890c0696439223c8f7b952d35360ea25"   # "{{1}} is deviated to {{2}} in {{3}} branch for {{4}} tank"
+_WA_TEMPLATE_LID_STATE = "HXb0f2ec1db58e9f6ac5be31473a6a6cf7"   # "{{1}} is {{2}} in {{3}} branch for {{4}} tank"
+_WA_TEMPLATE_LN2_LEVEL = "HXcb6b9aeb47949e7b1c45efbfe7900eed"   # "{{1}} crossed L2 in {{2}} branch for {{3}} tank"
+
+_LID_STATE_KPI_NAMES = {"ln2_lid_state", "incubator_lid_state"}
+_LN2_LEVEL_KPI_NAMES = {"ln2_level"}
+_DEVIATION_KPI_NAMES = {
+    "temp_internal", "temp_external",
+    "ln2_evaporation_rate", "shock", "tive_battery_percentage",
+    "incubator_o2", "incubator_co2", "incubator_temp",
+    "incubator_humidity", "incubator_ph", "incubator_voc",
+}
 
 
 class CriticalAlertService:
@@ -727,8 +743,9 @@ class CriticalAlertService:
                         alert.alert_id,
                         alert.hospital_id,
                     )
+                logger.info(f"WHATSAPPAlert created for {is_hospital_whatsapp_configured} tank_id={tank_id} kpi_config_id={kpi_config.id}")
                 if is_hospital_whatsapp_configured:
-                    self._send_alert_whatsapp(alert)
+                    self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
                 else:
                     logger.info(
                         "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
@@ -1105,7 +1122,10 @@ class CriticalAlertService:
             .filter(
                 User.department == "IVF",
                 User.role.in_(["Manager", "Admin"]),
-                User.branch_id.in_(branch_ids),
+                or_(
+                    User.branch_id.in_(branch_ids),
+                    and_(User.hospital_id == hospital_id, User.branch_id.is_(None)),
+                ),
                 User.status == True,
                 User.approved_status == ApprovalStatus.APPROVED,
             )
@@ -1343,13 +1363,10 @@ class CriticalAlertService:
             except Exception as e:
                 logger.error(f"Failed to send users-only alert email to {user.email}: {str(e)}")
 
-    def _send_alert_whatsapp(self, alert: CriticalAlert):
+    def _send_alert_whatsapp(self, alert: CriticalAlert, *, kpi_config=None, kpi_value: Optional[float] = None):
         """Send WhatsApp notification via Twilio for critical (High severity) alerts only.
         Recipients: all Managers across the hospital + Users in the tank's branch."""
         if alert.severity != AlertSeverity.HIGH.value:
-            logger.debug(
-                f"Skipping WhatsApp for non-critical alert_id={alert.alert_id} (severity={alert.severity})"
-            )
             return
 
         account_sid = settings.TWILIO_ACCOUNT_SID
@@ -1403,7 +1420,10 @@ class CriticalAlertService:
             .filter(
                 User.department == "IVF",
                 User.role.in_(["Manager", "Admin"]),
-                User.branch_id.in_(branch_ids),
+                or_(
+                    User.branch_id.in_(branch_ids),
+                    and_(User.hospital_id == hospital_id, User.branch_id.is_(None)),
+                ),
                 User.status == True,
                 User.approved_status == ApprovalStatus.APPROVED,
             )
@@ -1431,26 +1451,46 @@ class CriticalAlertService:
             )
             return
 
+        import json
+
         client = Client(account_sid, auth_token)
         from_whatsapp_number = _to_whatsapp_number(from_number)
         tank_code = tank.tank_code or f"Tank-{tank.tank_id}"
-        message_body = (
-            f"Critical Alert | Tank: {tank_code} | Branch: {branch.branch_name or 'N/A'} | "
-            f"Type: {alert.alert_type} | Severity: {alert.severity} | {alert.message}"
-        )
+        branch_name = branch.branch_name or "N/A"
+
+        kpi_name = kpi_config.kpi_name if kpi_config else None
+        alert_name = (kpi_config.alert_name or kpi_name or alert.alert_type) if kpi_config else alert.alert_type
+
+        if kpi_name in _LN2_LEVEL_KPI_NAMES:
+            template_sid = _WA_TEMPLATE_LN2_LEVEL
+            content_variables = {"1": alert_name, "2": branch_name, "3": tank_code}
+        elif kpi_name in _LID_STATE_KPI_NAMES:
+            lid_str = "OPEN" if kpi_value == 1 else "CLOSED"
+            template_sid = _WA_TEMPLATE_LID_STATE
+            content_variables = {"1": alert_name, "2": lid_str, "3": branch_name, "4": tank_code}
+        elif kpi_name in _DEVIATION_KPI_NAMES:
+            value_str = str(round(kpi_value, 2)) if kpi_value is not None else "N/A"
+            template_sid = _WA_TEMPLATE_DEVIATION
+            content_variables = {"1": alert_name, "2": value_str, "3": branch_name, "4": tank_code}
+        else:
+            logger.warning(
+                "Unrecognised kpi_name=%s for alert_id=%s; skipping WhatsApp",
+                kpi_name, alert.alert_id,
+            )
+            return
 
         for user in recipients:
             try:
                 to_number = _to_whatsapp_number(user.phone_number)
-                client.messages.create(
+                msg = client.messages.create(
                     from_=from_whatsapp_number,
-                    body=message_body,
+                    content_sid=template_sid,
+                    content_variables=json.dumps(content_variables),
                     to=to_number,
                 )
                 logger.info(
-                    "Sent WhatsApp alert to %s for alert_id=%s",
-                    to_number,
-                    alert.alert_id,
+                    "Sent WhatsApp alert to %s for alert_id=%s (template=%s twilio_sid=%s)",
+                    to_number, alert.alert_id, template_sid, msg.sid,
                 )
             except Exception as e:
                 logger.error(
@@ -1458,6 +1498,7 @@ class CriticalAlertService:
                     getattr(user, "phone_number", "unknown"),
                     alert.alert_id,
                     str(e),
+                    exc_info=True,
                 )
 
     def _check_escalation_needed(self, kpi_config, tank_id: int) -> bool:
@@ -1916,7 +1957,10 @@ class CriticalAlertService:
                         .filter(
                             User.department == "IVF",
                             User.role == "Manager",
-                            User.branch_id.in_(branch_ids),
+                            or_(
+                                User.branch_id.in_(branch_ids),
+                                and_(User.hospital_id == hospital_id, User.branch_id.is_(None)),
+                            ),
                             User.status == True,
                             User.approved_status == ApprovalStatus.APPROVED,
                         )
@@ -2196,6 +2240,46 @@ class CriticalAlertService:
             raise ValueError(f"Tank '{tank_code}' not found: {str(e)}")
 
         return self.get_tank_alerts(tank_id)
+
+    def get_incubator_alerts(
+        self,
+        incubator_id: int,
+        chamber_id: Optional[str] = None,
+        branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
+    ) -> IncubatorAlertsResponse:
+        """Get all alerts for a specific incubator, optionally filtered by chamber."""
+        incubator_query = self.db.query(Incubator).filter(Incubator.incubator_id == incubator_id)
+        if hospital_id is not None:
+            incubator_query = incubator_query.filter(Incubator.hospital_id == hospital_id)
+        if branch_id is not None:
+            incubator_query = incubator_query.filter(Incubator.branch_id == branch_id)
+        incubator = incubator_query.first()
+        if not incubator:
+            raise ValueError(f"Incubator {incubator_id} not found")
+
+        alert_query = (
+            self.db.query(CriticalAlert)
+            .filter(CriticalAlert.incubator_id == incubator_id)
+            .order_by(desc(CriticalAlert.occurred_at))
+        )
+        if chamber_id:
+            alert_query = alert_query.filter(CriticalAlert.chamber_id == chamber_id)
+        alerts = alert_query.all()
+
+        incubator_code = incubator.incubator_code or f"Incubator-{incubator_id}"
+        alert_responses = []
+        for alert in alerts:
+            alert_dict = {**alert.__dict__, "incubator_code": incubator_code}
+            alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
+
+        return IncubatorAlertsResponse(
+            incubator_id=incubator_id,
+            incubator_code=incubator_code,
+            chamber_id=chamber_id,
+            alerts=alert_responses,
+            total_count=len(alert_responses),
+        )
 
     def get_hospital_alerts(
         self,

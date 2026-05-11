@@ -1,7 +1,7 @@
 """Add unack escalation fields to kpi_config
 
 Revision ID: 20260502_add_kpi_escalation_fields
-Revises: 20260501_create_integration_api_tokens
+Revises: 20260501_integration_api_tokens
 Create Date: 2026-05-02
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = "20260502_add_kpi_escalation_fields"
-down_revision = "20260501_create_integration_api_tokens"
+down_revision = "20260501_integration_api_tokens"
 branch_labels = None
 depends_on = None
 

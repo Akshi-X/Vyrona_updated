@@ -114,6 +114,31 @@ class ChatConnectionManager:
         for conn_id in disconnected:
             self.disconnect(conn_id)
 
+    def subscribe_to_incubator(self, connection_id: str, incubator_id: str):
+        """Subscribe connection to a specific incubator's messages."""
+        if connection_id in self.active_connections:
+            self.active_connections[connection_id].setdefault("subscribed_incubators", set()).add(str(incubator_id))
+
+    def unsubscribe_from_incubator(self, connection_id: str, incubator_id: str):
+        """Unsubscribe connection from a specific incubator's messages."""
+        if connection_id in self.active_connections:
+            self.active_connections[connection_id].setdefault("subscribed_incubators", set()).discard(str(incubator_id))
+
+    async def broadcast_to_incubator(self, incubator_id: str, message_data: dict):
+        """Broadcast message to all connections subscribed to this incubator."""
+        if not self.active_connections:
+            return
+        disconnected = []
+        for connection_id, conn_data in list(self.active_connections.items()):
+            if str(incubator_id) in conn_data.get("subscribed_incubators", set()):
+                try:
+                    await conn_data["websocket"].send_json(message_data)
+                except Exception as e:
+                    logger.error(f"Error sending incubator message to {connection_id}: {e}", exc_info=True)
+                    disconnected.append(connection_id)
+        for conn_id in disconnected:
+            self.disconnect(conn_id)
+
     async def send_to_user(self, user_id: str, message_data: dict):
         """Send message to a specific user"""
         disconnected = []

@@ -1,7 +1,7 @@
 """add is_incubator to tanks
 
 Revision ID: 20260504_add_is_incubator_to_tanks
-Revises: 20260425_add_onboarding_completed_to_users
+Revises: 20260425_user_onboarding_completed
 Create Date: 2026-05-04
 
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = '20260504_add_is_incubator_to_tanks'
-down_revision = '20260425_add_onboarding_completed_to_users'
+down_revision = '20260425_user_onboarding_completed'
 branch_labels = None
 depends_on = None
 

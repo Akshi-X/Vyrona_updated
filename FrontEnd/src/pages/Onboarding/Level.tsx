@@ -113,8 +113,10 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         if (document.querySelector(activeStep.target)) return;
 
         const interval = setInterval(() => {
-            if (document.querySelector(activeStep.target)) {
+            const el = document.querySelector(activeStep.target) as HTMLElement | null;
+            if (el) {
                 clearInterval(interval);
+                if (!activeStep.requireClick) el.style.setProperty("pointer-events", "none");
                 // Force @reactour to reposition even if stepIndex hasn't changed —
                 // calling setCurrentStep with the same value is a no-op in @reactour,
                 // so close + reopen on the next frame to trigger a fresh spotlight.

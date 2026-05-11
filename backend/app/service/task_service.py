@@ -24,6 +24,7 @@ from app.models.patient_model import Patient
 from app.models.task_model import Tasks
 from app.models.user_model import User
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.incubator_model import Incubator
 from app.schemas.task_schema import (
     CreateTaskRequest,
     UpdateTaskRequest,
@@ -178,6 +179,8 @@ def _build_task_response(task: Tasks, current_user: User, db: Session) -> TaskRe
         patient_id=task.patient_id,
         tank_code=tank_code,
         tank_id=task.tank_id,
+        incubator_id=task.incubator_id,
+        chamber_id=task.chamber_id,
         due_date=task.due_date,
         priority=task.priority,
         status=task.status,
@@ -265,7 +268,16 @@ def create_task(
                 tank_code=request.tank_code,
                 current_user=current_user
             )
-        
+
+        # Validate incubator for incubator flow
+        if request.incubator_id is not None:
+            incubator_query = db.query(Incubator).filter(Incubator.incubator_id == request.incubator_id)
+            if is_hospital_user and current_user.hospital_id:
+                incubator_query = incubator_query.filter(Incubator.hospital_id == current_user.hospital_id)
+            incubator = incubator_query.first()
+            if not incubator:
+                raise TaskInvalidPatientException(patient_id=f"Incubator with id '{request.incubator_id}' not found")
+
         # Create task
         task = Tasks(
             task_name=request.task_name,
@@ -275,6 +287,8 @@ def create_task(
             updated_by_id=current_user.user_id,
             patient_id=request.patient_id,
             tank_id=tank_id,
+            incubator_id=request.incubator_id,
+            chamber_id=request.chamber_id,
             due_date=request.due_date,
             priority=request.priority,
             status=request.status or TaskStatus.NOT_STARTED,
@@ -521,6 +535,86 @@ def get_tasks_by_canister(
         raise
     except Exception as e:
         raise DatabaseQueryException(operation="get canister tasks", reason=str(e))
+
+
+def get_tasks_by_incubator(
+    incubator_id: int,
+    current_user: User,
+    db: Session,
+    *,
+    chamber_id: Optional[str] = None,
+    status: Optional[TaskStatus] = None,
+    priority: Optional[TaskPriority] = None,
+    page: int = 1,
+    page_size: int = DEFAULT_PAGE_SIZE
+) -> PatientTaskListResponse:
+    """
+    Retrieve tasks associated with a specific incubator (and optionally a chamber).
+    chamber_id=None returns tasks for the whole incubator (all chambers).
+    """
+    try:
+        is_hospital_user = is_hospital_department(current_user.department) if current_user.department else False
+        incubator_query = db.query(Incubator).filter(Incubator.incubator_id == incubator_id)
+        if is_hospital_user and current_user.hospital_id:
+            incubator_query = incubator_query.filter(Incubator.hospital_id == current_user.hospital_id)
+        incubator = incubator_query.first()
+        if not incubator:
+            raise TaskInvalidPatientException(patient_id=f"Incubator with id '{incubator_id}' not found")
+
+        sanitized_page = max(page, 1)
+        sanitized_page_size = max(1, min(page_size, MAX_PAGE_SIZE))
+
+        query = (
+            db.query(Tasks)
+            .options(
+                selectinload(Tasks.assignee),
+                selectinload(Tasks.created_by)
+            )
+            .filter(Tasks.incubator_id == incubator_id)
+        )
+
+        if chamber_id:
+            query = query.filter(Tasks.chamber_id == chamber_id)
+
+        privileged_roles = {"manager", "pharma_admin", "admin", "mygrape_admin"}
+        if current_user.role.lower() not in privileged_roles:
+            query = query.filter(
+                or_(
+                    Tasks.created_by_id == current_user.user_id,
+                    Tasks.assignee_id == current_user.user_id
+                )
+            )
+
+        if status:
+            query = query.filter(Tasks.status == status)
+        if priority:
+            query = query.filter(Tasks.priority == priority)
+
+        total = query.count()
+        tasks = (
+            query.order_by(Tasks.created_at.desc())
+            .offset((sanitized_page - 1) * sanitized_page_size)
+            .limit(sanitized_page_size)
+            .all()
+        )
+
+        task_responses = [_build_task_response(task, current_user, db) for task in tasks]
+
+        return PatientTaskListResponse(
+            message=SuccessMessages.TASKS_RETRIEVED,
+            incubator_id=incubator_id,
+            chamber_id=chamber_id,
+            total=total,
+            page=sanitized_page,
+            page_size=sanitized_page_size,
+            has_next=((sanitized_page - 1) * sanitized_page_size + len(task_responses)) < total,
+            tasks=task_responses
+        )
+
+    except TaskInvalidPatientException:
+        raise
+    except Exception as e:
+        raise DatabaseQueryException(operation="get incubator tasks", reason=str(e))
 
 
 def get_task_by_id(task_id: int, current_user: User, db: Session) -> TaskResponse:
