@@ -8,6 +8,8 @@ import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
 import IVFQualityTrackingChart from './sections/IVFQualityTrackingChart';
 import { IVFQualityParametersTable } from './sections/IVFQualityParametersTable';
+import CryocanVisualizer from './sections/CryocanVisualisation';
+import { useIvfKpiSnapshot } from './sections/useIvfKpiSnapshot';
 import { userService, type UserProfileDto } from '../../services/userService';
 // Header icons & modals
 import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
@@ -57,6 +59,27 @@ export default function IVFTrackShipmentPage() {
         }>
     >([]);
     const [exporting, setExporting] = useState(false);
+    const [useNewCryocan, setUseNewCryocan] = useState(false);
+    const [selectedKpiKey, setSelectedKpiKey] = useState<string | null>(null);
+    const [cryocanCanisters, setCryocanCanisters] = useState<
+        Array<{ id: string; label: string; sampleCount?: number; status?: string }>
+    >([]);
+    const [cryocanContents, setCryocanContents] = useState<
+        Record<
+            string,
+            Array<{
+                id?: string;
+                type?: string;
+                hisNumber?: string;
+                cryolockNumber?: string;
+                caneCode?: string;
+                gobletColor?: string;
+                cryolockColor?: string;
+                vitrificationDate?: string;
+                description?: string | null;
+            }>
+        >
+    >({});
 
     // WebSocket for unread count
     const { unreadMessages: wsUnreadMessages } = useDashboardChatWebSocket();
@@ -85,6 +108,9 @@ export default function IVFTrackShipmentPage() {
         headerTankCode && headerTankCode !== "-"
             ? headerTankCode
             : routeTankCode;
+
+    const { sensorTiles, ln2Level, internalTemp, externalTemp, lidStatus } =
+        useIvfKpiSnapshot({ tankId, enabled: useNewCryocan });
     const fetchCriticalAlerts = async () => {
         setLoadingAlerts(true);
         try {
@@ -216,6 +242,92 @@ export default function IVFTrackShipmentPage() {
         const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
         return () => clearTimeout(timer);
     }, [accessDenied, countdown, navigate]);
+
+    useEffect(() => {
+        if (!useNewCryocan) return;
+        setSelectedKpiKey(null);
+    }, [useNewCryocan]);
+
+    useEffect(() => {
+        if (!useNewCryocan || !tankId) {
+            setCryocanCanisters([]);
+            setCryocanContents({});
+            return;
+        }
+
+        let cancelled = false;
+        ivfService
+            .getCanisterTrackingDetails(tankId)
+            .then((response) => {
+                if (cancelled) return;
+                const grouped = new Map<string, typeof response.data>();
+
+                response.data.forEach((row) => {
+                    const canisterId = String(row.canisterNum ?? "").trim();
+                    if (!canisterId) return;
+                    const current = grouped.get(canisterId) ?? [];
+                    current.push(row);
+                    grouped.set(canisterId, current);
+                });
+
+                const sorted = Array.from(grouped.entries()).sort(
+                    ([a], [b]) => {
+                        const aNum = Number(String(a).replace(/\D+/g, ""));
+                        const bNum = Number(String(b).replace(/\D+/g, ""));
+                        if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+                            return aNum - bNum;
+                        }
+                        return a.localeCompare(b);
+                    },
+                );
+
+                const nextCanisters = sorted.map(([id, rows]) => ({
+                    id,
+                    label: `Canister ${id}`,
+                    sampleCount: rows.length,
+                }));
+
+                const nextContents: Record<
+                    string,
+                    Array<{
+                        id?: string;
+                        type?: string;
+                        hisNumber?: string;
+                        cryolockNumber?: string;
+                        caneCode?: string;
+                        gobletColor?: string;
+                        cryolockColor?: string;
+                        vitrificationDate?: string;
+                        description?: string | null;
+                    }>
+                > = {};
+                sorted.forEach(([id, rows]) => {
+                    nextContents[id] = rows.map((row) => ({
+                        id: row.cryolockNum || row.hisNumber || undefined,
+                        type: "Cryolock",
+                        hisNumber: row.hisNumber || undefined,
+                        cryolockNumber: row.cryolockNum || undefined,
+                        caneCode: row.caneCode || undefined,
+                        gobletColor: row.gobletColor || undefined,
+                        cryolockColor: row.cryolockColor || undefined,
+                        vitrificationDate: row.dateOfVitrification || undefined,
+                        description: row.description ?? null,
+                    }));
+                });
+
+                setCryocanCanisters(nextCanisters);
+                setCryocanContents(nextContents);
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setCryocanCanisters([]);
+                setCryocanContents({});
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [useNewCryocan, tankId]);
 
     // Update stakeholder chats from WebSocket data
     useEffect(() => {
@@ -351,7 +463,7 @@ export default function IVFTrackShipmentPage() {
         <>
           <PageLayout title="Cryocan" icon={ContainerQualityTrackingIcon} actions={pageActions}>
                             {/* Breadcrumb */}
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                                 <div className="flex items-center gap-1 text-sm">
                                     <button
                                         type="button"
@@ -363,31 +475,103 @@ export default function IVFTrackShipmentPage() {
                                     <span className="text-gray-500">/</span>
                                     <span className="text-black font-semibold">Cryocan Quality Tracking</span>
                                 </div>
-                                <div className="text-sm font-semibold text-black">
-                                    {headerTankCode} - {headerBranchName}
+                                <div className="flex items-center gap-3">
+                                    <div className="text-sm font-semibold text-black">
+                                        {headerTankCode} - {headerBranchName}
+                                    </div>
+                                    <div className="inline-flex rounded-lg border border-[#E7E1E1] bg-white p-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setUseNewCryocan(false)}
+                                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                                                !useNewCryocan
+                                                    ? 'bg-[#6B1176] text-white'
+                                                    : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                            aria-pressed={!useNewCryocan}
+                                        >
+                                            Old UI
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setUseNewCryocan(true)}
+                                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                                                useNewCryocan
+                                                    ? 'bg-[#6B1176] text-white'
+                                                    : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                            aria-pressed={useNewCryocan}
+                                        >
+                                            3D UI
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             {/* <ContainerProcessFlow /> */}
                             {/* Row 1: Quality Tracking (left) | Quality Parameter (right) */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                                {/* Left Column: Quality Tracking */}
-                                <div className="h-full">
-                                    <IVFQualityTrackingChart
-                                        canisterNumber={tankId}
-                                    />
+                            {!useNewCryocan ? (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                                    {/* Left Column: Quality Tracking */}
+                                    <div className="h-full">
+                                        <IVFQualityTrackingChart
+                                            canisterNumber={tankId}
+                                        />
+                                    </div>
+                                    {/* Right Column: Quality Parameter */}
+                                    <div className="h-full">
+                                        <IVFQualityParametersTable
+                                            tankId={tankId}
+                                        />
+                                    </div>
                                 </div>
-                                {/* Right Column: Quality Parameter */}
-                                <div className="h-full">
-                                    <IVFQualityParametersTable
-                                        tankId={tankId}
-                                    />
+                            ) : (
+                                <div
+                                    className={`grid grid-cols-1 gap-6 items-stretch ${
+                                        selectedKpiKey ? 'lg:grid-cols-2' : 'lg:grid-cols-1'
+                                    }`}
+                                >
+                                    {selectedKpiKey && (
+                                        <div className="h-full">
+                                            <IVFQualityTrackingChart
+                                                canisterNumber={tankId}
+                                                selectedKpiKey={selectedKpiKey}
+                                                hideTabs
+                                                onClose={() => setSelectedKpiKey(null)}
+                                            />
+                                        </div>
+                                    )}
+                                    <div
+                                        className={
+                                            selectedKpiKey
+                                                ? 'h-full'
+                                                : 'h-full lg:col-span-2'
+                                        }
+                                    >
+                                        <CryocanVisualizer
+                                            variant="embedded"
+                                            hideSidebar={!!selectedKpiKey}
+                                            ln2Level={ln2Level ?? undefined}
+                                            internalTemp={internalTemp ?? undefined}
+                                            externalTemp={externalTemp ?? undefined}
+                                            lidStatus={lidStatus ?? undefined}
+                                            sensorTiles={sensorTiles}
+                                            selectedSensorId={selectedKpiKey}
+                                            canisters={cryocanCanisters}
+                                            canisterContents={cryocanContents}
+                                            onSensorSelect={(kpiKey) => {
+                                                setSelectedKpiKey(kpiKey);
+                                            }}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Row 2: Container Data (full width) */}
-                            <div>
-                                <ContainerDataTable canisterNumber={tankId} />
-                            </div>
+                            {!useNewCryocan && (
+                                <div>
+                                    <ContainerDataTable canisterNumber={tankId} />
+                                </div>
+                            )}
 
                             {/* Row 3: Refill Log (full width) */}
                             <div>

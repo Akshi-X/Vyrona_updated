@@ -28,6 +28,8 @@ export interface Task {
   canister_number?: string | null;
   tank_code?: string | null;
   tank_id?: number | null;
+  incubator_id?: number | null;
+  chamber_id?: string | null;
   due_date?: string;
   priority: 'Low' | 'Medium' | 'High';
   status: TaskStatus;
@@ -93,6 +95,16 @@ export class TasksService extends BaseApiService {
   }
 
   /**
+   * Get tasks for a specific incubator (optionally filtered by chamber)
+   */
+  async getIncubatorTasks(incubatorId: number, chamberId?: string): Promise<ScopedTaskListResponse> {
+    const query = chamberId ? `?chamber_id=${encodeURIComponent(chamberId)}` : '';
+    return await this.request<ScopedTaskListResponse>(`/api/incubators/${incubatorId}/tasks${query}`, {
+      method: 'GET',
+    });
+  }
+
+  /**
    * Get task by ID
    */
   async getTask(taskId: number): Promise<Task> {
@@ -111,6 +123,8 @@ export class TasksService extends BaseApiService {
     patient_id?: string;
     tank_code?: string;
     tank_id?: number;
+    incubator_id?: number;
+    chamber_id?: string;
     due_date?: string;
     priority: 'Low' | 'Medium' | 'High';
     status?: TaskStatus;

@@ -793,7 +793,9 @@ def list_kpi_config(
         if not incubator:
             raise HTTPException(status_code=404, detail=f"Incubator '{incubator_id}' not found")
         q = db.query(KpiConfig).filter(KpiConfig.incubator_id == incubator_id)
-        if chamber_id:
+        if chamber_id == "null":
+            q = q.filter(KpiConfig.chamber_id.is_(None))
+        elif chamber_id:
             q = q.filter(KpiConfig.chamber_id == chamber_id)
         rows = q.order_by(KpiConfig.kpi_name, KpiConfig.alert_name).all()
         return {

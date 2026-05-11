@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { chatService, type UnreadMessagesResponse, type PatientMessagesResponse } from '../services/chatService';
+import { chatService, type UnreadMessagesResponse, type PatientMessagesResponse, type IncubatorMessagesResponse } from '../services/chatService';
 
 /**
  * WebSocket hook for Dashboard - tracks unread tagged messages count
@@ -570,6 +570,153 @@ export function useCanisterChatWebSocket(canisterNumber: string | undefined) {
       disconnect();
     };
   }, [isAuthenticated, token, canisterNumber, connect, disconnect]);
+
+  return {
+    messages,
+    unreadCount,
+    isConnected,
+    markAsRead,
+    refreshMessages
+  };
+}
+
+/**
+ * WebSocket hook for Incubator page - tracks incubator-specific messages and unread count.
+ * Re-connects when chamberId changes so switching chambers refreshes the chat.
+ */
+export function useIncubatorChatWebSocket(incubatorId: number | undefined, chamberId?: string) {
+  const { token, isAuthenticated } = useAuth();
+  const [messages, setMessages] = useState<IncubatorMessagesResponse['messages']>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [isConnected, setIsConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 5;
+  const reconnectDelay = 3000;
+
+  const getWebSocketUrl = useCallback(() => {
+    const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+    const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
+    const wsUrl = baseUrl.replace(/^http/, 'ws');
+    return `${wsUrl}/api/chat/ws`;
+  }, []);
+
+  const fetchMessages = useCallback(() => {
+    if (incubatorId == null) return;
+    chatService.getIncubatorMessages(incubatorId, chamberId).then((response) => {
+      setMessages(response.messages || []);
+      setUnreadCount(response.unread_count || 0);
+    }).catch((error) => {
+      console.error('[Incubator Chat WS] Error fetching messages:', error);
+    });
+  }, [incubatorId, chamberId]);
+
+  const connect = useCallback(() => {
+    if (!isAuthenticated || !token || incubatorId == null) return;
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    try {
+      const wsUrl = getWebSocketUrl();
+      const url = `${wsUrl}?token=${encodeURIComponent(token)}&incubator_id=${encodeURIComponent(incubatorId)}`;
+      const ws = new WebSocket(url);
+
+      ws.onopen = () => {
+        setIsConnected(true);
+        reconnectAttemptsRef.current = 0;
+        fetchMessages();
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.type === 'connection_confirmed') {
+            fetchMessages();
+            return;
+          }
+
+          if (data.type === 'new_message' && data.data) {
+            const newMsg = data.data;
+            if (newMsg.incubator_id === incubatorId) {
+              setMessages(prev => {
+                const exists = prev.some(m => m.id === newMsg.id);
+                if (exists) return prev;
+                return [...prev, newMsg];
+              });
+              fetchMessages();
+            }
+            return;
+          }
+
+          if (data.type === 'error') {
+            console.error('[Incubator Chat WS] Error:', data.message);
+          }
+        } catch (error) {
+          console.error('[Incubator Chat WS] Parse error:', error);
+        }
+      };
+
+      ws.onerror = () => {
+        setIsConnected(false);
+      };
+
+      ws.onclose = () => {
+        setIsConnected(false);
+        wsRef.current = null;
+
+        if (reconnectAttemptsRef.current < maxReconnectAttempts && isAuthenticated && incubatorId != null) {
+          reconnectAttemptsRef.current++;
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect();
+          }, reconnectDelay);
+        }
+      };
+
+      wsRef.current = ws;
+    } catch (error) {
+      console.error('[Incubator Chat WS] Connection error:', error);
+      setIsConnected(false);
+    }
+  }, [isAuthenticated, token, incubatorId, getWebSocketUrl, fetchMessages]);
+
+  const disconnect = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setIsConnected(false);
+  }, []);
+
+  const markAsRead = useCallback(() => {
+    if (incubatorId == null) return;
+    chatService.markIncubatorAsRead(incubatorId, chamberId).catch((error) => {
+      console.error('[Incubator Chat WS] Error marking as read:', error);
+    });
+  }, [incubatorId, chamberId]);
+
+  const refreshMessages = useCallback(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  // Re-connect when incubatorId or chamberId changes
+  useEffect(() => {
+    if (isAuthenticated && token && incubatorId != null) {
+      disconnect();
+      reconnectAttemptsRef.current = 0;
+      connect();
+    } else {
+      disconnect();
+    }
+
+    return () => {
+      disconnect();
+    };
+  }, [isAuthenticated, token, incubatorId, chamberId, connect, disconnect]);
 
   return {
     messages,

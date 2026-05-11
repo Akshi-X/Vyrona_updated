@@ -32,14 +32,16 @@ interface MyTasksModalProps {
     onAdd?: () => void;
     onEdit?: (task: MyTask) => void | Promise<void>;
     onDelete?: (taskId: string) => void;
-    variant?: "dashboard" | "track" | "ivf"; // Add variant to differentiate between Dashboard, Track & Trace and IVF
-    currentUserName?: string; // Current user's full name for "Assigned by" field
-    currentUserId?: string; // Current user's ID
-    onTaskCreated?: () => void; // Callback to refresh tasks after creation
-    userRole?: string; // User's role for role-based access control
-    defaultPatientId?: string; // Default patient ID to pre-fill when adding a new task
-    defaultCanisterNumber?: string; // Default canister number to pre-fill when adding a new IVF task
-    defaultTankId?: number; // Default tank ID for exact IVF task mapping
+    variant?: "dashboard" | "track" | "ivf" | "incubator";
+    currentUserName?: string;
+    currentUserId?: string;
+    onTaskCreated?: () => void;
+    userRole?: string;
+    defaultPatientId?: string;
+    defaultCanisterNumber?: string;
+    defaultTankId?: number;
+    defaultIncubatorId?: number;
+    defaultChamberId?: string;
     id?: string;
 }
 
@@ -58,10 +60,13 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     defaultPatientId = "",
     defaultCanisterNumber = "",
     defaultTankId,
+    defaultIncubatorId,
+    defaultChamberId,
     id,
 }) => {
     const isUserRole = userRole?.toLowerCase() === "user";
     const isIvfVariant = variant === "ivf";
+    const isIncubatorVariant = variant === "incubator";
     const [showInputRow, setShowInputRow] = useState(false);
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(
@@ -117,7 +122,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         // Reset form with current user as default and pre-fill patientId/canisterNumber if provided
         setNewTask({
             patientId: isIvfVariant ? "" : defaultPatientId || "",
-            canisterNumber: isIvfVariant ? defaultCanisterNumber || "" : "",
+            canisterNumber: (isIvfVariant || isIncubatorVariant) ? defaultCanisterNumber || "" : "",
             taskName: "",
             description: "",
             assigneeBy: currentUserName || "",
@@ -137,8 +142,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             assigneeId: TASK_FIELD_ERRORS.assigneeId,
         };
 
-        // CGT uses patient_id, IVF uses canister_number
-        if (isIvfVariant) {
+        // CGT uses patient_id; IVF and incubator variants use canister_number (display-only)
+        if (isIvfVariant || isIncubatorVariant) {
             requiredFields.canisterNumber = TASK_FIELD_ERRORS.canisterNumber;
         } else {
             requiredFields.patientId = TASK_FIELD_ERRORS.patientId;
@@ -173,14 +178,11 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     ? Number(defaultTankId)
                     : undefined;
 
-            // Map frontend fields to API format
-            // assignee_id should be the user_id (string) to assign the task to
-            // For now, we default to current user (self-assignment)
             const taskData = {
                 task_name: newTask.taskName.trim(),
                 description: newTask.description.trim(),
-                assignee_id: newTask.assigneeId || currentUserId, // Use assigneeId or fallback to current user
-                patient_id: isIvfVariant
+                assignee_id: newTask.assigneeId || currentUserId,
+                patient_id: (isIvfVariant || isIncubatorVariant)
                     ? undefined
                     : newTask.patientId.trim() || undefined,
                 tank_id: isIvfVariant ? normalizedTankId : undefined,
@@ -188,6 +190,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     isIvfVariant && normalizedTankId === undefined
                         ? normalizedCanisterNumber || undefined
                         : undefined,
+                incubator_id: isIncubatorVariant ? defaultIncubatorId : undefined,
+                chamber_id: isIncubatorVariant ? defaultChamberId : undefined,
                 due_date: newTask.dueDate
                     ? new Date(newTask.dueDate).toISOString()
                     : undefined,
@@ -527,7 +531,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     ? "My Tasks (Track & Trace)"
                     : variant === "ivf"
                       ? "My Tasks (Cryocan Quality Tracking)"
-                      : "My Tasks"
+                      : variant === "incubator"
+                        ? "My Tasks (Incubator)"
+                        : "My Tasks"
             }
             description="Manage and track your assigned tasks"
             icon={
@@ -538,7 +544,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 />
             }
             headerAction={
-                onAdd && (!isUserRole || isIvfVariant) ? (
+                onAdd && (!isUserRole || isIvfVariant || isIncubatorVariant) ? (
                     <button
                         id="onboarding-my-tasks-add-btn"
                         onClick={(e) => {
@@ -711,16 +717,18 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     <div id="onboarding-my-tasks-input-row" className="mx-4 mt-4 mb-2 border border-[#6b1176] rounded-xl bg-purple-50 p-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs font-medium text-[#6b1176] mb-1">{isIvfVariant ? "Canister ID" : "Patient ID"}</label>
+                                <label className="block text-xs font-medium text-[#6b1176] mb-1">
+                                    {isIncubatorVariant ? "Incubator ID" : isIvfVariant ? "Canister ID" : "Patient ID"}
+                                </label>
                                 <input
                                     type="text"
-                                    value={isIvfVariant ? newTask.canisterNumber : newTask.patientId}
-                                    onChange={(e) => handleInputChange(isIvfVariant ? "canisterNumber" : "patientId", e.target.value)}
-                                    placeholder={isIvfVariant ? "Canister ID" : "Patient ID"}
+                                    value={(isIvfVariant || isIncubatorVariant) ? newTask.canisterNumber : newTask.patientId}
+                                    onChange={(e) => handleInputChange((isIvfVariant || isIncubatorVariant) ? "canisterNumber" : "patientId", e.target.value)}
+                                    placeholder={isIncubatorVariant ? "Incubator ID" : isIvfVariant ? "Canister ID" : "Patient ID"}
                                     readOnly
-                                    className={`w-full px-3 py-1.5 text-sm border rounded-lg bg-white text-gray-700 cursor-not-allowed focus:outline-none ${(isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId) ? "border-red-400" : "border-gray-300"}`}
+                                    className={`w-full px-3 py-1.5 text-sm border rounded-lg bg-white text-gray-700 cursor-not-allowed focus:outline-none ${((isIvfVariant || isIncubatorVariant) ? validationErrors.canisterNumber : validationErrors.patientId) ? "border-red-400" : "border-gray-300"}`}
                                 />
-                                {(isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId) && <p className="text-xs text-red-500 mt-0.5">{isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId}</p>}
+                                {((isIvfVariant || isIncubatorVariant) ? validationErrors.canisterNumber : validationErrors.patientId) && <p className="text-xs text-red-500 mt-0.5">{(isIvfVariant || isIncubatorVariant) ? validationErrors.canisterNumber : validationErrors.patientId}</p>}
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[#6b1176] mb-1">Task Name</label>

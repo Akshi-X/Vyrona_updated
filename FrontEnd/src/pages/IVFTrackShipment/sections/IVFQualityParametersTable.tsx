@@ -444,6 +444,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         setL2(thresholds.l2);
         setTankMaxCapacity(res?.tank_max_capacity_reading ?? null);
         setTankMinCapacity(res?.tank_min_capacity_reading ?? null);
+        console.log("Tank details:",res);
         setKpiLimits((res?.kpi_limits ?? {}) as Record<string, Record<string, { alert_type?: string | null }>>);
       })
       .catch(() => {});
@@ -892,6 +893,18 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
               timestamp={evapTimestamp}
             />
           )}
+
+          {(isInitialLoading || hasAlert('ln2_evaporation_rate')) && (
+            <KpiTile
+              icon={<EvaporationIcon className="text-[#6B1176]" />}
+              label="Evaporation Rate"
+              value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
+              danger={isEvaporationMissing}
+              loading={isInitialLoading}
+              timestamp={evapTimestamp}
+            />
+          )}
+
           {(isInitialLoading || hasAlert('shock')) && (
             <KpiTile
               icon={<ShockIcon className="text-[#6B1176]" />}

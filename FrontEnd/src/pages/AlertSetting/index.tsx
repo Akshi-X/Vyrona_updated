@@ -585,7 +585,6 @@ export default function AlertSetting() {
     const directionFilter: "cryotanks" | "incubators" =
         searchParams.get("direction") === "incubators" ? "incubators" : "cryotanks";
 
-    const activeKpiNames = directionFilter === "incubators" ? INCUBATOR_KPI_NAMES : CRYOTANK_KPI_NAMES;
 
     const setDirectionFilter = (d: "cryotanks" | "incubators") => {
         setSearchParams((prev) => {
@@ -652,6 +651,10 @@ export default function AlertSetting() {
     >([]);
     const primaryContainer = selectedContainers[0] ?? null;
     const [selectedChamberId, setSelectedChamberId] = useState<string | null>(null);
+    // Common = incubator-level (no chamber); only external temp applies at this scope
+    const effectiveKpiNames = directionFilter === "incubators" && selectedChamberId === null
+        ? [KPI_NAMES.IVF_TEMPERATURE_EXTERNAL]
+        : directionFilter === "incubators" ? INCUBATOR_KPI_NAMES : CRYOTANK_KPI_NAMES;
     const [showBranchDropdown, setShowBranchDropdown] = useState(false);
     const [selectedTankIds, setSelectedTankIds] = useState<number[]>([]);
     const [savingToBranches, setSavingToBranches] = useState(false);
@@ -916,7 +919,9 @@ export default function AlertSetting() {
             setConfigError(e?.message || "Failed to fetch KPI config");
             setConfigList([]);
         }).finally(() => setConfigLoading(false));
-    }, [selectedChamberId, refetchKpiConfig]);
+    // primaryContainer?.tank_id ensures refetch when a new incubator is selected
+    // even when selectedChamberId stays null (Common → Common)
+    }, [primaryContainer?.tank_id, selectedChamberId, refetchKpiConfig]);
 
     useEffect(() => {
         if (primaryContainer) {
@@ -1107,7 +1112,7 @@ export default function AlertSetting() {
         }
 
         setSelectedContainers(nextSelection);
-        setSelectedChamberId(nextSelection[0]?.is_incubator ? "1" : null);
+        setSelectedChamberId(null);
     };
 
     const branchOptions = useMemo(
@@ -1135,8 +1140,8 @@ export default function AlertSetting() {
     );
     const missingKpiNames = useMemo(
         () =>
-            activeKpiNames.filter((kpiName) => !configuredKpiNames.has(kpiName)),
-        [configuredKpiNames, activeKpiNames],
+            effectiveKpiNames.filter((kpiName) => !configuredKpiNames.has(kpiName)),
+        [configuredKpiNames, effectiveKpiNames],
     );
 
     useEffect(() => {
@@ -1354,7 +1359,7 @@ export default function AlertSetting() {
                 unack_escalation_threshold?: number | null;
                 status?: boolean;
             }> = [];
-            for (const kpiName of activeKpiNames) {
+            for (const kpiName of effectiveKpiNames) {
                 const d = getMultiDraft(kpiName);
                 const metadata = getKpiMetadata(kpiName);
                 const cfg = getKpiFormConfig(kpiName);
@@ -2082,13 +2087,23 @@ export default function AlertSetting() {
                                                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                                                                     Select Chamber
                                                                 </p>
-                                                                {selectedChamberId && (
-                                                                    <span className="text-xs bg-[#6b1176]/10 text-[#6b1176] font-semibold px-2 py-0.5 rounded-full">
-                                                                        Chamber {selectedChamberId} selected
-                                                                    </span>
-                                                                )}
+                                                                <span className="text-xs bg-[#6b1176]/10 text-[#6b1176] font-semibold px-2 py-0.5 rounded-full">
+                                                                    {selectedChamberId ? `Chamber ${selectedChamberId} selected` : "Common selected"}
+                                                                </span>
                                                             </div>
-                                                            <div className="w-full max-w-sm mx-auto rounded-xl p-3">
+                                                            <div className="w-full max-w-sm mx-auto rounded-xl p-3 space-y-2">
+                                                                {/* Common — incubator-level, chamber_id null */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setSelectedChamberId(null)}
+                                                                    className={`w-full h-10 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                                                                        !selectedChamberId
+                                                                            ? "bg-[#6b1176] text-white"
+                                                                            : "bg-white text-gray-500 border border-gray-200 hover:border-[#6b1176] hover:text-[#6b1176]"
+                                                                    }`}
+                                                                >
+                                                                    Common
+                                                                </button>
                                                                 <div
                                                                     className="grid gap-2"
                                                                     style={{ gridTemplateColumns: `repeat(${primaryContainer.chamber_c}, minmax(0, 1fr))` }}
@@ -2122,7 +2137,7 @@ export default function AlertSetting() {
                                                 {selectedContainers.length >
                                                     1 ||
                                                 configList.length === 0 ? (
-                                                    activeKpiNames.map(
+                                                    effectiveKpiNames.map(
                                                         (kpiName) => {
                                                             const d =
                                                                 getMultiDraft(
@@ -3086,7 +3101,7 @@ export default function AlertSetting() {
                                             <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex flex-col md:flex-row items-stretch md:items-center justify-end gap-3">
                                                 {/* Copy to additional tanks (cryotanks only) OR Apply to other chambers (incubators only) */}
                                                 <div className="relative w-full md:w-auto">
-                                                    {primaryContainer?.is_incubator ? (
+                                                    {primaryContainer?.is_incubator && selectedChamberId !== null ? (
                                                         <>
                                                             <button
                                                                 type="button"
@@ -3194,7 +3209,7 @@ export default function AlertSetting() {
                                                                 );
                                                             })()}
                                                         </>
-                                                    ) : (
+                                                    ) : !primaryContainer?.is_incubator ? (
                                                         <>
                                                             <button
                                                                 type="button"
@@ -3302,7 +3317,7 @@ export default function AlertSetting() {
                                                                 );
                                                             })()}
                                                         </>
-                                                    )}
+                                                    ) : null}
                                                 </div>
                                                 {/* Save Changes */}
                                                 <button
