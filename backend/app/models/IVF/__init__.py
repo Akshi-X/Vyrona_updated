@@ -13,6 +13,8 @@ from .critical_alert_model import CriticalAlert, AlertType, AlertSource, AlertTr
 from .reservoir_model import Reservoir
 from .reservoir_log_model import ReservoirLog
 from .ln2_refill_detection_model import Ln2RefillDetection
+from .ivf_cycle_model import IvfCycle
+from .ivf_cycle_log_model import IvfCycleLog
 
 # Register UIRouteVariant so Hospital.ui_variants relationship resolves (same Base registry).
 # Without this, any code that touches Hospital (e.g. CriticalAlert -> ... -> Hospital) fails with
