@@ -894,17 +894,6 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             />
           )}
 
-          {(isInitialLoading || hasAlert('ln2_evaporation_rate')) && (
-            <KpiTile
-              icon={<EvaporationIcon className="text-[#6B1176]" />}
-              label="Evaporation Rate"
-              value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
-              danger={isEvaporationMissing}
-              loading={isInitialLoading}
-              timestamp={evapTimestamp}
-            />
-          )}
-
           {(isInitialLoading || hasAlert('shock')) && (
             <KpiTile
               icon={<ShockIcon className="text-[#6B1176]" />}
