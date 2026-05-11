@@ -19,6 +19,7 @@ from app.schemas.IVF.critical_alert_schema import (
     AcknowledgeAlertResponse,
     AcknowledgeAlertsRequest,
     AcknowledgeAlertsResponse,
+    IncubatorAlertsResponse,
     TankAlertsResponse,
     HospitalAlertsResponse
 )
@@ -55,6 +56,28 @@ def get_tank_alerts(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting tank alerts: {str(e)}")
+
+
+@router.get("/incubator/{incubator_id}", response_model=IncubatorAlertsResponse)
+def get_incubator_alerts(
+    incubator_id: int = Path(..., description="Incubator ID"),
+    chamber_id: Optional[str] = Query(None, description="Filter by chamber (None = all chambers)"),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """Get all alerts for a specific incubator, optionally filtered by chamber."""
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        hospital_id = getattr(getattr(request.state, "current_user", None), "hospital_id", None) if request else None
+        service = CriticalAlertService(db)
+        result = service.get_incubator_alerts(incubator_id, chamber_id=chamber_id, branch_id=branch_id, hospital_id=hospital_id)
+        return result
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting incubator alerts: {str(e)}")
 
 
 @router.get("/hospital", response_model=HospitalAlertsResponse)

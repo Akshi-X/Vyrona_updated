@@ -272,14 +272,6 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
         }
     };
 
-    const handleCanisterIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value.toUpperCase();
-        setCanisterId(value);
-        setCanisterCheckMessage(null);
-        setCanisterCheckError(null);
-        setHasInTransitShipments(null);
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 

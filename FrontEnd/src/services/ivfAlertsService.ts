@@ -35,6 +35,14 @@ export interface CanisterAlertsResponse {
   total_count: number;
 }
 
+export interface IncubatorAlertsResponse {
+  incubator_id: number;
+  incubator_code?: string;
+  chamber_id?: string | null;
+  alerts: IVFAlert[];
+  total_count: number;
+}
+
 export interface HospitalAlertsResponse {
   alerts: IVFAlert[];
   total_count: number;
@@ -111,6 +119,17 @@ export class IvfAlertsService extends BaseApiService {
     return await this.post<AcknowledgeAlertsResponse>(
       '/api/ivf/alerts/acknowledge-all',
       { alert_id: alertIds }
+    );
+  }
+
+  /**
+   * Get alerts for a specific incubator (optionally filtered by chamber)
+   */
+  async getIncubatorAlerts(incubatorId: number, chamberId?: string): Promise<IncubatorAlertsResponse> {
+    const query = chamberId ? `?chamber_id=${encodeURIComponent(chamberId)}` : '';
+    return await this.request<IncubatorAlertsResponse>(
+      `/api/ivf/alerts/incubator/${incubatorId}${query}`,
+      { method: 'GET' }
     );
   }
 

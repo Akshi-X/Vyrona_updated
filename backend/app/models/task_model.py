@@ -32,7 +32,11 @@ class Tasks(Base):
     
     # Tank Reference (for IVF flow)
     tank_id = Column(Integer, ForeignKey("tanks.tank_id"), nullable=True)
-    
+
+    # Incubator Reference (for incubator tracking)
+    incubator_id = Column(Integer, ForeignKey("incubators.incubator_id"), nullable=True)
+    chamber_id = Column(String(255), nullable=True)
+
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -43,4 +47,5 @@ class Tasks(Base):
     updated_by = relationship("User", foreign_keys=[updated_by_id], backref="updated_tasks")
     patient = relationship("Patient", backref="tasks")
     tank = relationship("Tank", backref="tasks")
+    incubator = relationship("Incubator", backref="tasks")
 

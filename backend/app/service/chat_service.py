@@ -12,6 +12,8 @@ from ..config.database import SessionLocal
 from ..models.chat_model import ChatMessage
 from ..models.chat_read_status import ChatReadStatus
 from ..models.chat_read_status_canister import ChatReadStatusCanister
+from ..models.chat_read_status_incubator import ChatReadStatusIncubator
+from ..models.IVF.incubator_model import Incubator
 from ..models.chat_message_tag import ChatMessageTag
 from ..models.user_model import User
 from ..models.patient_model import Patient
@@ -19,7 +21,7 @@ from ..models.pharma_model import Pharma
 from ..models.IVF.tank_model import Tank
 from ..schemas.chat_schema import (
     ChatMessageCreateRequest, ChatMessageCreateResponse, ChatMessageResponse,
-    PatientMessagesResponse, UnreadMessageResponse, UnreadMessagesResponse
+    PatientMessagesResponse, IncubatorMessagesResponse, UnreadMessageResponse, UnreadMessagesResponse
 )
 from ..exceptions.custom_exceptions import (
     ChatMessageCreateFailedException, ChatMessageNotFoundException,
@@ -223,6 +225,58 @@ def mark_canister_as_read(user_id: str, tank_id: int, db: Session) -> int:
     return latest_message or 0
 
 
+def get_or_create_read_status_incubator(
+    user_id: str, incubator_id: int, chamber_id: Optional[str], db: Session
+) -> ChatReadStatusIncubator:
+    """Get or create read status for user-incubator-chamber combination."""
+    read_status = db.query(ChatReadStatusIncubator).filter(
+        ChatReadStatusIncubator.user_id == user_id,
+        ChatReadStatusIncubator.incubator_id == incubator_id,
+        ChatReadStatusIncubator.chamber_id == chamber_id,
+    ).first()
+    if not read_status:
+        read_status = ChatReadStatusIncubator(
+            user_id=user_id,
+            incubator_id=incubator_id,
+            chamber_id=chamber_id,
+            last_read_message_id=None,
+        )
+        db.add(read_status)
+        db.flush()
+    return read_status
+
+
+def get_incubator_unread_count(
+    user_id: str, incubator_id: int, chamber_id: Optional[str], db: Session
+) -> int:
+    """Count messages for this incubator (and optional chamber) after last_read."""
+    read_status = get_or_create_read_status_incubator(user_id, incubator_id, chamber_id, db)
+    last_read_id = read_status.last_read_message_id or 0
+    query = db.query(func.count(ChatMessage.id)).filter(
+        ChatMessage.incubator_id == incubator_id,
+        ChatMessage.id > last_read_id,
+    )
+    if chamber_id:
+        query = query.filter(ChatMessage.chamber_id == chamber_id)
+    return query.scalar() or 0
+
+
+def mark_incubator_as_read(
+    user_id: str, incubator_id: int, chamber_id: Optional[str], db: Session
+) -> int:
+    """Mark all messages for an incubator (and optional chamber) as read."""
+    query = db.query(func.max(ChatMessage.id)).filter(ChatMessage.incubator_id == incubator_id)
+    if chamber_id:
+        query = query.filter(ChatMessage.chamber_id == chamber_id)
+    latest_message = query.scalar()
+
+    read_status = get_or_create_read_status_incubator(user_id, incubator_id, chamber_id, db)
+    read_status.last_read_message_id = latest_message
+    read_status.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return latest_message or 0
+
+
 async def broadcast_unread_messages_update(
     user_id: str,
     pharma_id: Optional[int],
@@ -302,7 +356,7 @@ async def broadcast_new_message(
             "data": message_broadcast.model_dump(mode='json', exclude_none=False, exclude_unset=False)
         }
         
-        # Broadcast to all users subscribed to this patient (CGT) or canister (IVF)
+        # Broadcast to all users subscribed to this patient (CGT) or canister (IVF) or incubator
         if result.patient_id:
             # CGT flow: broadcast to patient subscribers
             await connection_manager.broadcast_to_patient(
@@ -313,8 +367,13 @@ async def broadcast_new_message(
             )
         elif result.tank_code:
             # IVF flow: broadcast to tank subscribers (handled via websocket manager)
-            # The websocket manager already supports tank_code broadcasting
-            pass  # Will be handled by existing tank subscription logic
+            pass  # Handled by existing tank subscription logic
+        elif result.incubator_id:
+            # Incubator flow: broadcast to incubator subscribers
+            await connection_manager.broadcast_to_incubator(
+                str(result.incubator_id),
+                broadcast_payload
+            )
         
         # Send to tagged users (even if not subscribed to patient)
         if result.tagged_user_ids:
@@ -553,12 +612,22 @@ def create_chat_message(
             if not tank:
                 raise ChatPatientNotFoundException(f"Tank with code '{request.tank_code}' not found")
             tank_id = tank.tank_id
+
+        # Validate incubator ownership (hospital isolation for incubator flow)
+        if request.incubator_id is not None:
+            incubator_q = db.query(Incubator).filter(Incubator.incubator_id == request.incubator_id)
+            if sender_hospital_id is not None:
+                incubator_q = incubator_q.filter(Incubator.hospital_id == sender_hospital_id)
+            if not incubator_q.first():
+                raise ChatPatientNotFoundException(f"Incubator with id '{request.incubator_id}' not found")
         
         insert_start = time.time()
         chat_message = ChatMessage(
             message_content=request.message_content,
             patient_id=request.patient_id,
             tank_id=tank_id,
+            incubator_id=request.incubator_id,
+            chamber_id=request.chamber_id if request.incubator_id else None,
             sender_id=sender_id,
             tagged_user_ids=tagged_user_ids_json,
             created_by=sender_id
@@ -597,6 +666,13 @@ def create_chat_message(
             sender_read_status = get_or_create_read_status_canister(sender_id, tank_id, db)
             sender_read_status.last_read_message_id = chat_message.id
             sender_read_status.updated_at = datetime.now(timezone.utc)
+        elif request.incubator_id:
+            # Incubator flow: use incubator read status
+            sender_read_status = get_or_create_read_status_incubator(
+                sender_id, request.incubator_id, request.chamber_id, db
+            )
+            sender_read_status.last_read_message_id = chat_message.id
+            sender_read_status.updated_at = datetime.now(timezone.utc)
         read_status_time = time.time() - read_status_start
         
         # Note: Tagged users don't get read status entries created here
@@ -620,6 +696,8 @@ def create_chat_message(
             message_id=chat_message.id,
             patient_id=chat_message.patient_id,
             tank_code=tank_code,
+            incubator_id=chat_message.incubator_id,
+            chamber_id=chat_message.chamber_id,
             message_content=chat_message.message_content,
             sender_id=chat_message.sender_id,
             sender_name=sender_name,
@@ -1034,6 +1112,107 @@ async def get_canister_messages(
             db.rollback()
         except Exception:
             pass
+
+
+async def get_incubator_messages(
+    incubator_id: int,
+    current_user_id: str,
+    current_user_hospital_id: Optional[int],
+    db: Session,
+    chamber_id: Optional[str] = None,
+    mark_as_read: bool = False
+) -> IncubatorMessagesResponse:
+    """Get all messages for a specific incubator (and optional chamber)."""
+    try:
+        incubator_query = db.query(Incubator).filter(Incubator.incubator_id == incubator_id)
+        if current_user_hospital_id is not None:
+            incubator_query = incubator_query.filter(Incubator.hospital_id == current_user_hospital_id)
+        incubator = incubator_query.first()
+        if not incubator:
+            raise ChatPatientNotFoundException(f"Incubator with id '{incubator_id}' not found")
+
+        query = db.query(ChatMessage).filter(ChatMessage.incubator_id == incubator_id)
+        if chamber_id:
+            query = query.filter(ChatMessage.chamber_id == chamber_id)
+        messages = query.order_by(ChatMessage.created_at.asc()).all()
+
+        message_ids: List[int] = [m.id for m in messages]
+        sender_ids: Set[str] = {m.sender_id for m in messages if m.sender_id}
+
+        tags = db.query(ChatMessageTag).filter(ChatMessageTag.message_id.in_(message_ids)).all()
+        parsed_tagged_user_ids: Dict[int, List[str]] = {mid: [] for mid in message_ids}
+        all_tagged_user_ids: Set[str] = set()
+        for tag in tags:
+            parsed_tagged_user_ids.setdefault(tag.message_id, []).append(tag.user_id)
+            all_tagged_user_ids.add(tag.user_id)
+
+        sender_map: Dict[str, Dict[str, Optional[str]]] = {}
+        if sender_ids:
+            senders = db.query(User).filter(User.user_id.in_(sender_ids)).all()
+            sender_map = {
+                u.user_id: {"name": f"{u.first_name} {u.last_name}", "role": u.role.value if u.role else None}
+                for u in senders
+            }
+
+        tagged_user_map: Dict[str, str] = {}
+        if all_tagged_user_ids:
+            tagged_users = db.query(User).filter(User.user_id.in_(all_tagged_user_ids)).all()
+            tagged_user_map = {u.user_id: f"{u.first_name} {u.last_name}" for u in tagged_users}
+
+        read_status = get_or_create_read_status_incubator(current_user_id, incubator_id, chamber_id, db)
+        last_read_id = read_status.last_read_message_id or 0
+
+        if mark_as_read and messages:
+            latest_id = max(m.id for m in messages)
+            if latest_id > last_read_id:
+                read_status.last_read_message_id = latest_id
+                read_status.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                db.refresh(read_status)
+                last_read_id = read_status.last_read_message_id or 0
+
+        message_responses = []
+        for message in messages:
+            sender_info = sender_map.get(message.sender_id, {"name": "Unknown", "role": None})
+            is_read = message.id <= last_read_id
+            read_at = read_status.updated_at if is_read else None
+            tagged_ids = parsed_tagged_user_ids.get(message.id, [])
+            tagged_names = [tagged_user_map.get(uid, "Unknown") for uid in tagged_ids] if tagged_ids else []
+            message_responses.append(ChatMessageResponse(
+                id=message.id,
+                message_content=message.message_content,
+                incubator_id=message.incubator_id,
+                chamber_id=message.chamber_id,
+                sender_id=message.sender_id,
+                sender_name=sender_info["name"],
+                sender_role=sender_info["role"],
+                tagged_user_ids=tagged_ids,
+                tagged_user_names=tagged_names if tagged_names else None,
+                created_at=message.created_at,
+                is_read=is_read,
+                read_at=read_at,
+            ))
+
+        unread_count = get_incubator_unread_count(current_user_id, incubator_id, chamber_id, db)
+        return IncubatorMessagesResponse(
+            incubator_id=incubator_id,
+            chamber_id=chamber_id,
+            messages=message_responses,
+            total_messages=len(message_responses),
+            unread_count=unread_count,
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get incubator messages: {str(e)}", exc_info=True)
+        if isinstance(e, ChatPatientNotFoundException):
+            raise
+        raise ChatMessageCreateFailedException(reason=f"Failed to get incubator messages: {str(e)}")
+    finally:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
 
 def get_unread_messages(
     current_user_id: str,

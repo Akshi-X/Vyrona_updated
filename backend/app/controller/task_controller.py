@@ -182,6 +182,30 @@ def get_canister_tasks(
     )
 
 
+@router.get("/incubators/{incubator_id}/tasks", response_model=PatientTaskListResponse)
+def get_incubator_tasks(
+    incubator_id: int = Path(..., description="Incubator ID"),
+    chamber_id: Optional[str] = Query(None, description="Filter by chamber (None = all chambers)"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    status: Optional[TaskStatus] = Query(None),
+    priority: Optional[TaskPriority] = Query(None),
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Retrieve paginated tasks linked to an incubator with optional filters."""
+    return task_service.get_tasks_by_incubator(
+        incubator_id=incubator_id,
+        current_user=current_user,
+        db=db,
+        chamber_id=chamber_id,
+        status=status,
+        priority=priority,
+        page=page,
+        page_size=page_size
+    )
+
+
 # ---------------------------
 # 4. Update Task (Full Update - Creator or Assignee)
 # ---------------------------

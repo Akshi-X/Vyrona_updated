@@ -343,7 +343,7 @@ class ShipmentService extends BaseApiService {
   /**
    * GET /api/ivf/control_tower/active_incubators
    */
-  async getActiveIncubators(filters?: { branch_name?: string }): Promise<{
+  async getActiveIncubators(filters?: { branch_id?: number }): Promise<{
     branches: Array<{
       branch_id: number;
       branch_name: string;
@@ -360,7 +360,7 @@ class ShipmentService extends BaseApiService {
     total: number;
   }> {
     const params = new URLSearchParams();
-    if (filters?.branch_name) params.append('branch_name', filters.branch_name);
+    if (filters?.branch_id != null) params.append('branch_id', String(filters.branch_id));
     const qs = params.toString();
     return this.get(qs ? `/api/ivf/control_tower/active_incubators?${qs}` : '/api/ivf/control_tower/active_incubators');
   }

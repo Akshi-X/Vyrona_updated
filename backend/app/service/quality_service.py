@@ -40,6 +40,7 @@ from app.models.IVF.ivf_geolocation_model import IVFGeolocation
 from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
+from app.models.IVF.incubator_model import Incubator
 from app.models.IVF.tank_model import Tank
 from app.models.patient_model import Patient
 from app.models.user_model import User
@@ -922,6 +923,101 @@ class QualityService:
                     created += 1
         return {"updated": updated, "created": created}
 
+    def bulk_upsert_kpi_config_for_incubator(
+        self,
+        incubator_id: int,
+        chamber_id: Optional[str],
+        configs: List[Dict],
+        hospital_id: int,
+        branch_id: int,
+    ) -> Dict:
+        """
+        For each config: if a row exists for (incubator_id, chamber_id, kpi_name, alert_name) update it;
+        otherwise create. Returns {"updated": count, "created": count}.
+        """
+        from app.models.IVF.incubator_model import Incubator
+        updated = 0
+        created = 0
+        for cfg in configs:
+            kpi_name = (cfg.get("kpi_name") or "").strip()
+            if not kpi_name:
+                continue
+            alert_name = cfg.get("alert_name")
+            if alert_name is not None and isinstance(alert_name, str):
+                alert_name = alert_name.strip() or None
+            def _to_float(v):
+                if v is None:
+                    return None
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return None
+            min_val = _to_float(cfg.get("min"))
+            max_val = _to_float(cfg.get("max"))
+            unit = (cfg.get("unit") or "").strip() or None
+            alert_type_val = (cfg.get("alert_type") or "").strip() or None
+            status_val = cfg.get("status")
+            if status_val is None:
+                status_val = alert_type_val in ("critical", "soft")
+            cooldown_val = cfg.get("cooldown_minutes")
+            try:
+                cooldown_val = int(cooldown_val) if cooldown_val is not None else None
+            except (TypeError, ValueError):
+                cooldown_val = None
+            escalation_threshold = cfg.get("unack_escalation_threshold")
+            try:
+                escalation_threshold = int(escalation_threshold) if escalation_threshold is not None else None
+            except (TypeError, ValueError):
+                escalation_threshold = None
+
+            query = self.db.query(KpiConfig).filter(
+                KpiConfig.incubator_id == incubator_id,
+                KpiConfig.kpi_name == kpi_name,
+            )
+            if chamber_id is not None:
+                query = query.filter(KpiConfig.chamber_id == chamber_id)
+            else:
+                query = query.filter(KpiConfig.chamber_id.is_(None))
+            if alert_name is None:
+                query = query.filter(KpiConfig.alert_name.is_(None))
+            else:
+                query = query.filter(KpiConfig.alert_name == alert_name)
+
+            existing = query.first()
+            if existing:
+                existing.min = min_val
+                existing.max = max_val
+                existing.alert_type = alert_type_val
+                existing.status = bool(status_val)
+                if unit is not None:
+                    existing.unit = unit
+                if cooldown_val is not None:
+                    existing.cooldown_minutes = cooldown_val
+                existing.unack_escalation_threshold = escalation_threshold
+                self.db.flush()
+                updated += 1
+            else:
+                row = KpiConfig(
+                    hospital_id=hospital_id,
+                    branch_id=branch_id,
+                    tank_id=None,
+                    incubator_id=incubator_id,
+                    chamber_id=chamber_id,
+                    kpi_name=kpi_name,
+                    alert_name=alert_name,
+                    min=min_val,
+                    max=max_val,
+                    unit=unit,
+                    alert_type=alert_type_val,
+                    cooldown_minutes=cooldown_val if cooldown_val is not None else 60,
+                    unack_escalation_threshold=escalation_threshold,
+                    status=bool(status_val),
+                )
+                self.db.add(row)
+                self.db.flush()
+                created += 1
+        return {"updated": updated, "created": created}
+
     def get_last_n_readings_per_kpi(self, tank_id: int, n: int):
         db = self.db
         row_number = (
@@ -1113,6 +1209,247 @@ class QualityService:
             return latest_ts
         except Exception as e:
             logger.error(f"Error getting latest KPI timestamp for tank {tank_id}: {e}")
+            self.db.rollback()
+            return None
+
+    # ------------------------------------------------------------------
+    # Incubator KPI methods (mirror tank methods, filter on incubator_id + chamber_id)
+    # ------------------------------------------------------------------
+
+    def get_incubator_kpi_config(
+        self, incubator_id: int, incubator_code: str, chamber_id: Optional[str] = None
+    ) -> dict:
+        """Return KPI limits config for an incubator (optionally scoped to a chamber)."""
+        try:
+            incubator = self.db.query(Incubator).filter(Incubator.incubator_id == incubator_id).first()
+            branch = None
+            if incubator and incubator.branch_id is not None:
+                branch = (
+                    self.db.query(HospitalBranch)
+                    .filter(HospitalBranch.branch_id == incubator.branch_id)
+                    .first()
+                )
+
+            q = self.db.query(KpiConfig).filter(KpiConfig.incubator_id == incubator_id)
+            if chamber_id is not None:
+                q = q.filter(KpiConfig.chamber_id == chamber_id)
+            rows = q.all()
+
+            kpi_limits: dict = {}
+            for r in rows:
+                alert_type = (r.alert_type or "").strip() or None
+                if not bool(r.status) and alert_type is None:
+                    continue
+                kpi_limits.setdefault(r.kpi_name, {})[r.alert_name] = {
+                    "min": float(r.min) if r.min is not None else None,
+                    "max": float(r.max) if r.max is not None else None,
+                    "alert_type": alert_type,
+                }
+            return {
+                "incubator_id": incubator_id,
+                "incubator_code": incubator_code,
+                "chamber_id": chamber_id,
+                "branch_id": incubator.branch_id if incubator else None,
+                "branch_name": branch.branch_name if branch else None,
+                "kpi_limits": kpi_limits,
+            }
+        except Exception as e:
+            logger.error(f"Error retrieving KPI config for incubator {incubator_id}: {e}")
+            self.db.rollback()
+            return {
+                "incubator_id": incubator_id,
+                "incubator_code": incubator_code,
+                "chamber_id": chamber_id,
+                "branch_id": None,
+                "branch_name": None,
+                "kpi_limits": {},
+            }
+
+    def get_last_n_readings_per_kpi_incubator(
+        self, incubator_id: int, chamber_id: str, n: int
+    ) -> Optional[dict]:
+        """Last N readings per KPI config for an incubator chamber (mirrors get_last_n_readings_per_kpi)."""
+        db = self.db
+        row_number = (
+            func.row_number()
+            .over(
+                partition_by=Readings.kpi_config_id, order_by=Readings.timestamp.desc()
+            )
+            .label("rn")
+        )
+        subquery = (
+            db.query(Readings.id, row_number)
+            .filter(
+                Readings.incubator_id == incubator_id,
+                Readings.chamber_id == chamber_id,
+            )
+            .subquery()
+        )
+        valid_ids = db.query(subquery.c.id).filter(subquery.c.rn <= n).subquery()
+
+        results = (
+            db.query(
+                Readings.kpi_config_id,
+                Readings.kpi_value,
+                Readings.timestamp,
+                KpiConfig.kpi_name,
+                KpiConfig.unit,
+            )
+            .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
+            .filter(Readings.id.in_(valid_ids))
+            .order_by(Readings.kpi_config_id, Readings.timestamp.desc())
+            .all()
+        )
+
+        if not results:
+            return None
+
+        kpis = defaultdict(list)
+        for row in results:
+            ts = (
+                row.timestamp.isoformat()
+                if hasattr(row.timestamp, "isoformat")
+                else str(row.timestamp)
+            )
+            kpis[row.kpi_config_id].append(
+                {
+                    "name": row.kpi_name,
+                    "value": float(row.kpi_value),
+                    "unit": row.unit or "",
+                    "timestamp": ts,
+                }
+            )
+        return {
+            "incubator_id": incubator_id,
+            "chamber_id": chamber_id,
+            "kpis": [reading for readings in kpis.values() for reading in readings],
+        }
+
+    def get_readings_per_kpi_since_incubator(
+        self, incubator_id: int, chamber_id: str, since: datetime
+    ) -> Optional[dict]:
+        """All KPI readings for an incubator chamber since a timestamp."""
+        db = self.db
+        results = (
+            db.query(
+                Readings.kpi_value,
+                Readings.timestamp,
+                KpiConfig.kpi_name,
+                KpiConfig.unit,
+            )
+            .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
+            .filter(
+                Readings.incubator_id == incubator_id,
+                Readings.chamber_id == chamber_id,
+                Readings.timestamp >= since,
+            )
+            .order_by(Readings.timestamp.desc())
+            .all()
+        )
+        if not results:
+            return None
+        kpis = []
+        for row in results:
+            ts = (
+                row.timestamp.isoformat()
+                if hasattr(row.timestamp, "isoformat")
+                else str(row.timestamp)
+            )
+            kpis.append(
+                {
+                    "name": row.kpi_name,
+                    "value": float(row.kpi_value),
+                    "unit": row.unit or "",
+                    "timestamp": ts,
+                }
+            )
+        return {"incubator_id": incubator_id, "chamber_id": chamber_id, "kpis": kpis}
+
+    def get_incubator_kpi_history_aggregated(
+        self,
+        incubator_id: int,
+        chamber_id: str,
+        since: datetime,
+        bucket_minutes: int,
+        until: Optional[datetime] = None,
+    ) -> Optional[dict]:
+        """Aggregated KPI history for an incubator chamber (mirrors get_tank_kpi_history_aggregated)."""
+        bucket_seconds = bucket_minutes * 60
+        sql = text("""
+            SELECT
+                to_timestamp(
+                    floor(extract(epoch from r.timestamp AT TIME ZONE 'UTC') / :bucket_sec) * :bucket_sec
+                ) AT TIME ZONE 'UTC' AS bucket_start,
+                k.kpi_name,
+                k.unit,
+                AVG(r.kpi_value)::double precision AS avg_value,
+                MIN(r.kpi_value)::double precision AS min_value,
+                MAX(r.kpi_value)::double precision AS max_value,
+                COUNT(*)::integer AS sample_count
+            FROM readings r
+            JOIN kpi_config k ON r.kpi_config_id = k.id
+            WHERE r.incubator_id = :incubator_id
+              AND r.chamber_id = :chamber_id
+              AND r.timestamp >= :since
+              AND (:until IS NULL OR r.timestamp <= :until)
+            GROUP BY bucket_start, k.id, k.kpi_name, k.unit
+            ORDER BY bucket_start ASC
+        """)
+        try:
+            rows = self.db.execute(
+                sql,
+                {
+                    "incubator_id": incubator_id,
+                    "chamber_id": chamber_id,
+                    "since": since,
+                    "until": until,
+                    "bucket_sec": bucket_seconds,
+                },
+            ).fetchall()
+        except Exception as e:
+            logger.error(f"Error in get_incubator_kpi_history_aggregated: {e}", exc_info=True)
+            self.db.rollback()
+            return None
+        if not rows:
+            return None
+        kpis = []
+        for row in rows:
+            ts = (
+                row.bucket_start.isoformat()
+                if hasattr(row.bucket_start, "isoformat")
+                else str(row.bucket_start)
+            )
+            kpis.append(
+                {
+                    "name": row.kpi_name or "",
+                    "value": float(row.avg_value) if row.avg_value is not None else 0,
+                    "avg": float(row.avg_value) if row.avg_value is not None else 0,
+                    "min": float(row.min_value) if row.min_value is not None else None,
+                    "max": float(row.max_value) if row.max_value is not None else None,
+                    "count": int(row.sample_count) if row.sample_count is not None else 0,
+                    "unit": row.unit or "",
+                    "timestamp": ts,
+                }
+            )
+        return {"incubator_id": incubator_id, "chamber_id": chamber_id, "kpis": kpis}
+
+    def get_latest_incubator_kpi_timestamp(
+        self, incubator_id: int, chamber_id: str
+    ) -> Optional[datetime]:
+        """Return latest readings.timestamp for an incubator chamber (None when no data)."""
+        try:
+            return (
+                self.db.query(func.max(Readings.timestamp))
+                .filter(
+                    Readings.incubator_id == incubator_id,
+                    Readings.chamber_id == chamber_id,
+                )
+                .scalar()
+            )
+        except Exception as e:
+            logger.error(
+                f"Error getting latest KPI timestamp for incubator {incubator_id} chamber {chamber_id}: {e}"
+            )
             self.db.rollback()
             return None
 
@@ -1622,6 +1959,112 @@ def append_tank_kpi_snapshot_to_db(
     ]
     payload = {"kpis": kpis_with_ts}
     push_tank_kpi_to_redis(tank_id, tank_code, payload, publish=True)
+
+
+def append_incubator_kpi_snapshot_to_db(
+    db: Session,
+    incubator_id: int,
+    incubator_code: str,
+    chamber_id: str,
+    timestamp,
+    kpis: List[dict],
+) -> None:
+    """
+    Append an incubator KPI snapshot to readings table (one row per kpi) and push to Redis.
+    Mirrors append_tank_kpi_snapshot_to_db but for incubator/chamber.
+    kpis: list of { name, value, unit }.
+    """
+    incubator = db.query(Incubator).filter(Incubator.incubator_id == incubator_id).first()
+    if not incubator:
+        return
+    branch = (
+        db.query(HospitalBranch)
+        .filter(HospitalBranch.branch_id == incubator.branch_id)
+        .first()
+    )
+    hospital_id = branch.hospital_id if branch else None
+    branch_id = incubator.branch_id
+    if hospital_id is None:
+        return
+
+    config_by_name = {
+        c.kpi_name: c.id
+        for c in db.query(KpiConfig)
+        .filter(
+            KpiConfig.incubator_id == incubator_id,
+            KpiConfig.chamber_id == chamber_id,
+            KpiConfig.status == True,
+            KpiConfig.alert_name.is_(None),
+        )
+        .all()
+    }
+    for k in kpis:
+        name = (k.get("name") or "").strip()
+        if not name or name not in config_by_name:
+            continue
+        try:
+            val = k.get("value")
+            if val is None:
+                continue
+            if not isinstance(val, (int, float)):
+                val = float(val) if val else 0
+        except (TypeError, ValueError):
+            continue
+        row = Readings(
+            hospital_id=hospital_id,
+            branch_id=branch_id,
+            device_id=None,
+            tank_id=None,
+            incubator_id=incubator_id,
+            chamber_id=chamber_id,
+            kpi_config_id=config_by_name[name],
+            kpi_value=val,
+            timestamp=timestamp,
+            deviation=False,
+            deviation_alert_sent=False,
+        )
+        db.add(row)
+    db.flush()
+    ts_iso = (
+        timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
+    )
+    kpis_with_ts = [
+        {
+            "timestamp": ts_iso,
+            "name": k.get("name"),
+            "value": k.get("value"),
+            "unit": k.get("unit", ""),
+        }
+        for k in kpis
+    ]
+    push_incubator_kpi_to_redis(
+        incubator_id, incubator_code, chamber_id, {"kpis": kpis_with_ts}, publish=True
+    )
+
+
+def push_incubator_kpi_to_redis(
+    incubator_id: int, incubator_code: str, chamber_id: str,
+    payload: dict, publish: bool = True
+) -> None:
+    """Push incubator KPI snapshot to Redis (history list + optionally publish for live graph)."""
+    try:
+        r = get_redis()
+        data = dict(payload)
+        data["incubator_id"] = incubator_id
+        data["incubator_code"] = incubator_code
+        data["chamber_id"] = chamber_id
+        data["type"] = "incubator_kpi"
+        msg = json.dumps(data)
+        history_key = f"incubator_kpi_history:{incubator_id}:{chamber_id}"
+        r.lpush(history_key, msg)
+        r.ltrim(history_key, 0, 49)
+        if publish:
+            r.publish("incubator_kpi_readings_channel", msg)
+        logger.debug(
+            f"Pushed incubator KPI to Redis for {incubator_code} chamber {chamber_id} (id={incubator_id})"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to push incubator KPI to Redis: {e}")
 
 
 def push_tank_kpi_to_redis(
