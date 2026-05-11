@@ -25,6 +25,7 @@ const REPORT_TYPES = [
     { value: "critical-alerts", label: "Critical Alert Report" },
     { value: "refill-logs", label: "Refill Logs Report" },
     { value: "activity-logs", label: "Activity Logs" },
+    { value: "embryo-tracking", label: "Embryo Tracking Report" },
 ] as const;
 
 type ReportType = (typeof REPORT_TYPES)[number]["value"];
@@ -153,8 +154,10 @@ const ACTION_LABELS: Record<string, string> = {
     "task.status_updated": "Task Status Updated",
     "task.deleted": "Task Deleted",
     "alert.acknowledged": "Alert Acknowledged",
+    "alert.acknowledged_all": "All Alerts Acknowledged",
     "alert.created": "Critical Alert Created",
     "email.critical_alert_sent": "Critical Alert Email Sent",
+    "email.escalation_sent": "Escalation Email Sent",
     "refill_detection.created": "Refill Detection Created",
     "refill_detection.reviewed": "Refill Detection Reviewed",
     "alert_configuration.notification_settings_updated": "Alert Notification Settings Updated",
@@ -162,6 +165,17 @@ const ACTION_LABELS: Record<string, string> = {
     "alert_configuration.kpi_config_updated": "Alert Configuration Updated",
     "alert_configuration.kpi_config_deleted": "Alert Configuration Deleted",
     "alert_configuration.kpi_config_bulk_upserted": "Alert Configuration Bulk Updated",
+    "integration.auth.login": "Integration Login",
+    "integration.auth.token_revoked": "Integration Token Revoked",
+    "patient_crylock.hms_update": "Patient Crylock HMS Updated",
+    "ivf_cycle.created": "IVF Cycle Created",
+    "ivf_cycle.updated": "IVF Cycle Updated",
+    "ivf_cycle.oocyte_log.d0_saved": "Oocyte Day 0 Saved",
+    "ivf_cycle.oocyte_log.d1_updated": "Oocyte Day 1 Updated",
+    "ivf_cycle.oocyte_log.d3_updated": "Oocyte Day 3 Updated",
+    "ivf_cycle.oocyte_log.d5_updated": "Oocyte Day 5 Updated",
+    "ivf_cycle.oocyte_log.d6_updated": "Oocyte Day 6 Updated",
+    "ivf_cycle.oocyte_log.fate_set": "Oocyte Fate Set",
     "report.ivf.monthly_summary.downloaded": "Monthly Summary Downloaded",
     "report.ivf.critical_alerts.downloaded": "Critical Alerts Downloaded",
     "report.ivf.refill_logs.downloaded": "Refill Logs Downloaded",
@@ -169,6 +183,11 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ACTIVITY_ACTION_OPTIONS = Object.keys(ACTION_LABELS)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => ({ label: ACTION_LABELS[key], value: key }));
+
+const EMBRYO_ACTION_OPTIONS = Object.keys(ACTION_LABELS)
+    .filter((key) => key.startsWith("ivf_cycle."))
     .sort((a, b) => a.localeCompare(b))
     .map((key) => ({ label: ACTION_LABELS[key], value: key }));
 
@@ -465,7 +484,7 @@ export default function ReportsPage() {
 
     useEffect(() => {
         if (!isAuthenticated) return;
-        const isActivityLogReport = filters.reportType === "activity-logs";
+        const isActivityLogReport = filters.reportType === "activity-logs" || filters.reportType === "embryo-tracking";
         const canViewReport = isActivityLogReport
             ? canViewActivityLogs
             : isIvfUser;
@@ -535,6 +554,24 @@ export default function ReportsPage() {
                                 ? undefined
                                 : filters.actorType,
                         search: filters.search || undefined,
+                        date_from: filters.dateFrom || undefined,
+                        date_to: filters.dateTo || undefined,
+                        page,
+                        page_size: pageSize,
+                    });
+                    setActivityLogRows(response.logs || []);
+                    setTotalCount(response.total_count ?? 0);
+                    return;
+                }
+
+                if (filters.reportType === "embryo-tracking") {
+                    const response = await activityLogService.getActivityLogs({
+                        action_prefix: filters.actions.length === 0 ? "ivf_cycle." : undefined,
+                        actions: filters.actions.length > 0 ? filters.actions : undefined,
+                        actor_type:
+                            filters.actorType === "All"
+                                ? undefined
+                                : filters.actorType,
                         date_from: filters.dateFrom || undefined,
                         date_to: filters.dateTo || undefined,
                         page,
@@ -639,7 +676,7 @@ export default function ReportsPage() {
         if (filters.reportType === "refill-logs") {
             return refillLogRows.length;
         }
-        if (filters.reportType === "activity-logs") {
+        if (filters.reportType === "activity-logs" || filters.reportType === "embryo-tracking") {
             return activityLogRows.length;
         }
         return 0;
@@ -784,6 +821,31 @@ export default function ReportsPage() {
             if (filters.outcome !== "All") filtersForLog.outcome = filters.outcome;
             if (filters.actorType !== "All") filtersForLog.actor_type = filters.actorType;
             if (filters.search) filtersForLog.search = filters.search;
+        } else if (filters.reportType === "embryo-tracking") {
+            headers = [
+                "Timestamp",
+                "Event",
+                "Cycle ID",
+                "HIS ID",
+                "Actor",
+                "Outcome",
+                "Details",
+            ];
+            rows = activityLogRows.map((row) => [
+                row.created_at,
+                ACTION_LABELS[row.action] || row.action,
+                row.metadata?.cycle_id ?? row.target_id ?? "-",
+                row.metadata?.his_id ?? row.target_label ?? "-",
+                formatActorLabel(row),
+                row.outcome,
+                formatMetadataSummary(row.metadata),
+            ]);
+            filename = "embryo-tracking.csv";
+            reportTypeForLog = "ivf.embryo_tracking";
+            if (filters.dateFrom) filtersForLog.date_from = filters.dateFrom;
+            if (filters.dateTo) filtersForLog.date_to = filters.dateTo;
+            if (filters.actions.length > 0) filtersForLog.actions = filters.actions;
+            if (filters.actorType !== "All") filtersForLog.actor_type = filters.actorType;
         }
 
         ivfReportsService
@@ -843,7 +905,7 @@ export default function ReportsPage() {
                                     disabled={
                                         !isIvfUser &&
                                         !(
-                                            filters.reportType === "activity-logs" &&
+                                            (filters.reportType === "activity-logs" || filters.reportType === "embryo-tracking") &&
                                             canViewActivityLogs
                                         )
                                     }
@@ -1121,6 +1183,70 @@ export default function ReportsPage() {
                                     </div>
                                 </>
                             )}
+
+                            {filters.reportType === "embryo-tracking" && (
+                                <>
+                                    <div className="flex flex-col">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Date From
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            value={filters.dateFrom}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    dateFrom: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!canViewActivityLogs}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Date To
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            value={filters.dateTo}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    dateTo: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!canViewActivityLogs}
+                                        />
+                                    </div>
+                                    <div>
+                                        <MultiSelectDropdown
+                                            label="Actions"
+                                            options={EMBRYO_ACTION_OPTIONS}
+                                            selected={filters.actions}
+                                            placeholder="All actions"
+                                            disabled={!canViewActivityLogs}
+                                            onChange={(selected) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    actions: selected,
+                                                }))
+                                            }
+                                        />
+                                    </div>
+                                    <div>
+                                        <FilterSelect
+                                            label="Actor Type"
+                                            value={filters.actorType}
+                                            onChange={(val) =>
+                                                setFilters((prev) => ({ ...prev, actorType: val }))
+                                            }
+                                            options={ACTOR_TYPE_OPTIONS}
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </section>
 
@@ -1141,7 +1267,7 @@ export default function ReportsPage() {
                                 onClick={downloadCsv}
                                 disabled={
                                     activeRowsCount === 0 ||
-                                    (filters.reportType === "activity-logs"
+                                    (filters.reportType === "activity-logs" || filters.reportType === "embryo-tracking"
                                         ? !canViewActivityLogs
                                         : !isIvfUser)
                                 }
@@ -1207,12 +1333,12 @@ export default function ReportsPage() {
                             </div>
                         </div>
 
-                        {!loading && filters.reportType !== "activity-logs" && !isIvfUser && (
+                        {!loading && filters.reportType !== "activity-logs" && filters.reportType !== "embryo-tracking" && !isIvfUser && (
                             <div className="mt-4 text-sm text-gray-500">
                                 Reports are available for IVF users only.
                             </div>
                         )}
-                        {!loading && filters.reportType === "activity-logs" && !canViewActivityLogs && (
+                        {!loading && (filters.reportType === "activity-logs" || filters.reportType === "embryo-tracking") && !canViewActivityLogs && (
                             <div className="mt-4 text-sm text-gray-500">
                                 Activity logs are available for Admin and Manager roles only.
                             </div>
@@ -1477,7 +1603,7 @@ export default function ReportsPage() {
                                 </table>
                             )}
 
-                            {filters.reportType === "activity-logs" && (
+                            {(filters.reportType === "activity-logs" || filters.reportType === "embryo-tracking") && (
                                 <table className="min-w-full text-sm">
                                     <thead className="bg-[#fdeeff]">
                                         <tr>

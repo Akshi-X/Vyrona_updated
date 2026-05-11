@@ -1323,6 +1323,129 @@ export class IvfService extends BaseApiService {
             },
         );
     }
+    // ── IVF Cycles ────────────────────────────────────────────────────────────
+
+    async listCycles(params?: { his_id?: string; status?: string; skip?: number; limit?: number }): Promise<IvfCycle[]> {
+        const q = new URLSearchParams();
+        if (params?.his_id) q.set('his_id', params.his_id);
+        if (params?.status) q.set('status', params.status);
+        if (params?.skip != null) q.set('skip', String(params.skip));
+        if (params?.limit != null) q.set('limit', String(params.limit));
+        const qs = q.toString();
+        return this.request<IvfCycle[]>(`/api/ivf/cycles${qs ? `?${qs}` : ''}`, { method: 'GET' });
+    }
+
+    async getCycleWithLogs(cycleId: number): Promise<IvfCycleWithLogs> {
+        return this.request<IvfCycleWithLogs>(`/api/ivf/cycles/${cycleId}`, { method: 'GET' });
+    }
+
+    async createCycle(data: IvfCycleCreate): Promise<IvfCycle> {
+        return this.request<IvfCycle>('/api/ivf/cycles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+    }
+
+    async upsertLog(cycleId: number, data: IvfLogUpsert): Promise<IvfCycleLog> {
+        return this.request<IvfCycleLog>(`/api/ivf/cycles/${cycleId}/logs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+    }
+
+    async deleteLog(cycleId: number, logId: number): Promise<void> {
+        return this.request<void>(`/api/ivf/cycles/${cycleId}/logs/${logId}`, { method: 'DELETE' });
+    }
+}
+
+// ── IVF Cycle types ───────────────────────────────────────────────────────────
+
+export interface IvfCycle {
+    cycle_id: number;
+    hospital_id: number;
+    branch_id: number | null;
+    his_id: string;
+    patient_name: string | null;
+    incubator_id: number | null;
+    chamber_position: string | null;
+    injection_method: string | null;
+    sperm_quality: string | null;
+    oocyte_quality: string | null;
+    cycle_type: string | null;
+    oocyte_m2: number | null;
+    oocyte_m1: number | null;
+    oocyte_gv: number | null;
+    oocyte_others: number | null;
+    status: string | null;
+    created_at: string;
+    updated_at: string | null;
+}
+
+export interface IvfCycleLog {
+    log_id: number;
+    cycle_id: number;
+    oocyte_no: number;
+    oocyte_comments: string | null;
+    d0_maturity: string | null;
+    d0_drop_no: string | null;
+    d1_pn: string | null;
+    d1_zygote_status: string | null;
+    d3_drop_no: string | null;
+    d3_grade: string | null;
+    d3_symmetry: string | null;
+    d5_stage: string | null;
+    d5_grade: string | null;
+    d6_stage: string | null;
+    d6_grade: string | null;
+    d6_progression: string | null;
+    fate: string | null;
+    freeze_no: string | null;
+    meta: Record<string, string> | null;
+    created_at: string;
+    updated_at: string | null;
+}
+
+export interface IvfCycleWithLogs extends IvfCycle {
+    logs: IvfCycleLog[];
+}
+
+export interface IvfCycleCreate {
+    his_id: string;
+    patient_name?: string;
+    branch_id?: number | null;
+    incubator_id?: number | null;
+    chamber_position?: string;
+    injection_method?: string;
+    sperm_quality?: string;
+    oocyte_quality?: string;
+    cycle_type?: string;
+    oocyte_m2?: number;
+    oocyte_m1?: number;
+    oocyte_gv?: number;
+    oocyte_others?: number;
+    status?: string;
+}
+
+export interface IvfLogUpsert {
+    oocyte_no: number;
+    oocyte_comments?: string;
+    d0_maturity?: string;
+    d0_drop_no?: string;
+    d1_pn?: string;
+    d1_zygote_status?: string;
+    d3_drop_no?: string;
+    d3_grade?: string;
+    d3_symmetry?: string;
+    d5_stage?: string;
+    d5_grade?: string;
+    d6_stage?: string;
+    d6_grade?: string;
+    d6_progression?: string;
+    fate?: string;
+    freeze_no?: string;
+    meta?: Record<string, string>;
 }
 
 export const ivfService = new IvfService();
