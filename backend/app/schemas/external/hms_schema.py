@@ -13,6 +13,14 @@ class HMSCryolockUpdate(BaseModel):
         min_length=1,
         description="Format Tank/Canister/Cane/Position, e.g. 'T10/C5/E1/3'",
     )
+    oldCryolockNumber: Optional[str] = Field(
+        None,
+        description=(
+            "Previous cryolock number when the sample physically moved to a new position. "
+            "When provided and different from cryolockNumber, the old record is deleted and "
+            "a new one is created atomically, preserving user-managed fields."
+        ),
+    )
     canisterNumber: Optional[str] = Field(None, description="Fallback if cryolockNumber lacks it")
     tankID: Optional[str] = Field(None, description="HMS-internal tank ID")
     caneID: Optional[str] = Field(None, description="HMS-internal cane ID")
@@ -26,8 +34,9 @@ HMSCryolockPayload = Union[HMSCryolockUpdate, List[HMSCryolockUpdate]]
 
 class HMSCryolockItemResult(BaseModel):
     status: str  # "success" | "skipped" | "failed"
-    operation: Optional[str] = None  # "create" | "update" | "noop"
+    operation: Optional[str] = None  # "create" | "update" | "noop" | "move"
     patient_crylock_id: Optional[int] = None
+    old_patient_crylock_id: Optional[int] = None  # populated for "move" operations
     tank_id: Optional[int] = None
     branch_id: Optional[int] = None
     reason: Optional[str] = None  # populated when status != "success"
@@ -37,6 +46,7 @@ class HMSCryolockUpdateResponse(BaseModel):
     accepted: int
     created: int
     updated: int
+    moved: int
     noop: int
     skipped: int
     failed: int

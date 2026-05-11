@@ -177,6 +177,7 @@
         "content": "Click this card to open the Cryocan Quality Tracking tool and check the storage health of your liquid nitrogen tanks.",
         "placement": "bottom",
         "requireClick": true,
+        "clickOnlyId": ["#onboarding-dashboard-cryocan-card"],
         "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
@@ -220,6 +221,7 @@
         "content": "The red badge here means something needs immediate action — a tank temperature breach, a missing check, or an escalated deviation. Click the icon to review what's critical right now.",
         "placement": "bottom",
         "requireClick": true,
+        "clickOnlyId": ["#onboarding-dashboard-critical-alerts-icon"],
         "genieImage": "/genie/shock.webp"
     },
     {
@@ -242,6 +244,7 @@
         "content": "Coordinate with clinicians, embryologists, and operations teams without leaving the platform. Click the chat icon to see pending conversations.",
         "placement": "bottom",
         "requireClick": true,
+        "clickOnlyId": ["#onboarding-dashboard-stakeholder-icon"],
         "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
@@ -264,6 +267,7 @@
         "content": "Your personal task queue — scheduled QC checks, follow-ups, and action items assigned to you. Click the icon to see what's pending.",
         "placement": "bottom",
         "requireClick": true,
+        "clickOnlyId": ["#onboarding-dashboard-mytasks-icon"],
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {

@@ -63,7 +63,7 @@
     {
         "id": "level-2",
         "title": "Control Tower Quest",
-        "route": "/onboarding/dashboard",
+        "route": "/onboarding/control-tower",
         "pointsRequired": 70,
         "scoreRequired": 60,
         "unlockDelayHours": 0,
@@ -138,7 +138,7 @@
     {
         "id": "level-4",
         "title": "Alert Configuration",
-        "route": "/onboarding/dashboard",
+        "route": "/onboarding/alert-setting",
         "pointsRequired": 60,
         "scoreRequired": 190,
         "unlockDelayHours": 0,
@@ -175,7 +175,7 @@
     {
         "id": "level-5",
         "title": "Refill Log",
-        "route": "/onboarding/dashboard",
+        "route": "/onboarding/refill-log",
         "pointsRequired": 60,
         "scoreRequired": 250,
         "unlockDelayHours": 0,
@@ -212,7 +212,7 @@
     {
         "id": "level-6",
         "title": "Reports",
-        "route": "/onboarding/dashboard",
+        "route": "/onboarding/reports",
         "pointsRequired": 60,
         "scoreRequired": 310,
         "unlockDelayHours": 0,
@@ -250,7 +250,7 @@
     {
         "id": "level-7",
         "title": "Profile",
-        "route": "/onboarding/dashboard",
+        "route": "/onboarding/user-profile",
         "pointsRequired": 60,
         "scoreRequired": 370,
         "unlockDelayHours": 0,
@@ -288,7 +288,7 @@
     {
         "id": "level-8",
         "title": "Users",
-        "route": "/onboarding/dashboard",
+        "route": "/onboarding/users",
         "pointsRequired": 60,
         "scoreRequired": 430,
         "unlockDelayHours": 0,
@@ -316,10 +316,10 @@
             ]
         },
         "completion": {
-            "headerTitle": "Quiz Scorecard",
-            "title": "Team Managed!",
-            "message": "You have full control over your clinic's user access. Adding, filtering, and managing team members is now second nature.",
-            "badge": "🏆"
+            "headerTitle": "Onboarding Complete",
+            "title": "You're Certified!",
+            "message": "You've completed all 8 levels of mgSCALE onboarding. From monitoring tanks and managing alerts to running reports and controlling user access — you're ready to run your clinic at full power.",
+            "badge": "🎓"
         }
     }
 ]
