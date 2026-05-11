@@ -10,11 +10,12 @@ import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
-import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import StakeholderChatBox from '../../components/StakeholderChatBox';
 import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { userService, type UserProfileDto } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useIncubatorChatWebSocket } from '../../hooks/useChatWebSocket';
 
 type IllustrationMetrics = {
   temp: string;
@@ -313,6 +314,13 @@ export default function IncubatorDetailPage() {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfileDto | null>(null);
 
+  const chamberIdForApi = chamberId || undefined;
+
+  const { unreadCount: chatUnreadCount } = useIncubatorChatWebSocket(
+    hasIncubatorId ? incubatorId : undefined,
+    chamberIdForApi
+  );
+
   const criticalAlertsCount = criticalAlerts.filter((a) => a.acknowledged_at == null).length;
   const myTasksCount = myTasks.filter((t) => t.status === 'Not started' || t.status === 'In progress').length;
   const resolvedCode = incubatorCode !== '-' ? incubatorCode : '';
@@ -349,8 +357,8 @@ export default function IncubatorDetailPage() {
   const fetchCriticalAlerts = async () => {
     setLoadingAlerts(true);
     try {
-      const response = id
-        ? await ivfAlertsService.getCanisterAlerts(id)
+      const response = hasIncubatorId
+        ? await ivfAlertsService.getIncubatorAlerts(incubatorId, chamberIdForApi)
         : await ivfAlertsService.getHospitalAlerts();
       setCriticalAlerts(response.alerts || []);
     } catch {
@@ -364,8 +372,8 @@ export default function IncubatorDetailPage() {
     setLoadingTasks(true);
     try {
       let allTasks: Task[] = [];
-      if (id) {
-        const res = await tasksService.getCanisterTasks(id);
+      if (hasIncubatorId) {
+        const res = await tasksService.getIncubatorTasks(incubatorId, chamberIdForApi);
         allTasks = Array.isArray(res.tasks) ? res.tasks : [];
       } else {
         const res = await tasksService.getMyTasks();
@@ -386,7 +394,7 @@ export default function IncubatorDetailPage() {
     fetchCriticalAlerts();
     fetchMyTasks();
     userService.getProfile().then(setCurrentUser).catch(() => {});
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [incubatorId, chamberId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageActions = (
     <div className="flex items-center gap-6">
@@ -416,6 +424,11 @@ export default function IncubatorDetailPage() {
           src={StakeholderChatsIcon}
           onClick={() => setShowStakeholderChats(true)}
         />
+        {chatUnreadCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-white flex items-center justify-center">
+            <span className="font-semibold text-white text-[10px]">{chatUnreadCount}</span>
+          </div>
+        )}
         <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
           <div className="font-semibold text-black text-xs whitespace-nowrap">Stakeholder Chats</div>
           <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]" />
@@ -557,9 +570,9 @@ export default function IncubatorDetailPage() {
         tasks={myTasks.map((task) => ({
           id: task.id.toString(),
           patientId: task.patient_id || 'N/A',
-          tankCode: (task.tank_code && String(task.tank_code).trim()) || resolvedCode || undefined,
+          tankCode: (task.tank_code && String(task.tank_code).trim()) || undefined,
           tankId: task.tank_id ?? undefined,
-          canisterNumber: task.canister_number || resolvedCode || 'N/A',
+          canisterNumber: resolvedCode || 'N/A',
           taskName: task.task_name,
           description: task.description || '',
           assigneeBy: task.created_by
@@ -573,11 +586,13 @@ export default function IncubatorDetailPage() {
           status: task.status,
         }))}
         loading={loadingTasks}
-        variant="ivf"
+        variant="incubator"
         currentUserName={currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : ''}
         currentUserId={currentUser?.user_id ?? ''}
         userRole={userRole || currentUser?.role || ''}
         defaultCanisterNumber={resolvedCode}
+        defaultIncubatorId={hasIncubatorId ? incubatorId : undefined}
+        defaultChamberId={chamberIdForApi}
         onTaskCreated={fetchMyTasks}
         onAdd={() => {}}
         onEdit={async (task: MyTask) => {
@@ -602,10 +617,12 @@ export default function IncubatorDetailPage() {
         }}
         onDelete={() => {}}
       />
-      <StakeholderChatsModal
+      <StakeholderChatBox
         isOpen={showStakeholderChats}
         onClose={() => setShowStakeholderChats(false)}
-        chats={[]}
+        incubatorId={hasIncubatorId ? incubatorId : undefined}
+        chamberId={chamberIdForApi}
+        onMessagesUpdated={fetchCriticalAlerts}
       />
     </>
   );

@@ -36,6 +36,7 @@ from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.tank_model import Tank
+from ...models.IVF.incubator_model import Incubator
 from ...models.user_model import User
 from ...schemas.IVF.critical_alert_schema import (
     AcknowledgeAlertResponse,
@@ -43,6 +44,7 @@ from ...schemas.IVF.critical_alert_schema import (
     CriticalAlertListResponse,
     CriticalAlertResponse,
     HospitalAlertsResponse,
+    IncubatorAlertsResponse,
     TankAlertsResponse,
 )
 from ...service.email_service import send_email
@@ -2238,6 +2240,46 @@ class CriticalAlertService:
             raise ValueError(f"Tank '{tank_code}' not found: {str(e)}")
 
         return self.get_tank_alerts(tank_id)
+
+    def get_incubator_alerts(
+        self,
+        incubator_id: int,
+        chamber_id: Optional[str] = None,
+        branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
+    ) -> IncubatorAlertsResponse:
+        """Get all alerts for a specific incubator, optionally filtered by chamber."""
+        incubator_query = self.db.query(Incubator).filter(Incubator.incubator_id == incubator_id)
+        if hospital_id is not None:
+            incubator_query = incubator_query.filter(Incubator.hospital_id == hospital_id)
+        if branch_id is not None:
+            incubator_query = incubator_query.filter(Incubator.branch_id == branch_id)
+        incubator = incubator_query.first()
+        if not incubator:
+            raise ValueError(f"Incubator {incubator_id} not found")
+
+        alert_query = (
+            self.db.query(CriticalAlert)
+            .filter(CriticalAlert.incubator_id == incubator_id)
+            .order_by(desc(CriticalAlert.occurred_at))
+        )
+        if chamber_id:
+            alert_query = alert_query.filter(CriticalAlert.chamber_id == chamber_id)
+        alerts = alert_query.all()
+
+        incubator_code = incubator.incubator_code or f"Incubator-{incubator_id}"
+        alert_responses = []
+        for alert in alerts:
+            alert_dict = {**alert.__dict__, "incubator_code": incubator_code}
+            alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
+
+        return IncubatorAlertsResponse(
+            incubator_id=incubator_id,
+            incubator_code=incubator_code,
+            chamber_id=chamber_id,
+            alerts=alert_responses,
+            total_count=len(alert_responses),
+        )
 
     def get_hospital_alerts(
         self,
