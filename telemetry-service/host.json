@@ -1,0 +1,30 @@
+{
+  "version": "2.0",
+  "logging": {
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": true,
+        "maxTelemetryItemsPerSecond": 20,
+        "excludedTypes": "Request"
+      }
+    }
+  },
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.*, 5.0.0)"
+  },
+  "extensions": {
+    "eventHubs": {
+      "batchCheckpointFrequency": 1,
+      "eventProcessorOptions": {
+        "maxBatchSize": 100,
+        "prefetchCount": 300,
+        "enableReceiverRuntimeMetric": false
+      },
+      "initialOffsetOptions": {
+        "type": "fromEnd"
+      }
+    }
+  },
+  "functionTimeout": "00:10:00"
+}
