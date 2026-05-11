@@ -3059,7 +3059,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 borderRadius: 18,
                 padding: "18px 20px",
                 boxShadow: "0 6px 16px #40115308",
-                opacity: 0,
+                opacity: isEmbedded ? 1 : 0,
               }}
             >
               <div
@@ -3109,7 +3109,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 borderRadius: 18,
                 padding: "16px 16px 12px",
                 boxShadow: "0 6px 16px #40115308",
-                opacity: 0,
+                opacity: isEmbedded ? 1 : 0,
               }}
             >
               <div
