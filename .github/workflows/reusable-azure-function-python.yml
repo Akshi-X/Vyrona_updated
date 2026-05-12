@@ -1,0 +1,51 @@
+name: Reusable Azure Function Deployment
+
+on:
+  workflow_call:
+    inputs:
+      function_app_name:
+        required: true
+        type: string
+      function_app_path:
+        required: true
+        type: string
+      python_version:
+        required: false
+        type: string
+        default: "3.11"
+    secrets:
+      AZURE_CREDENTIALS:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Install Azure Functions Core Tools
+        run: |
+          npm install -g azure-functions-core-tools@4 --unsafe-perm true
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install Python dependencies
+        working-directory: ${{ inputs.function_app_path }}
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Publish Function App (NO ZIP)
+        working-directory: ${{ inputs.function_app_path }}
+        run: |
+          func azure functionapp publish ${{ inputs.function_app_name }} --nozip
