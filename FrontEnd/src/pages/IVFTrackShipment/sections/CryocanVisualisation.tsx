@@ -5,6 +5,7 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
+import type { ActivityLogRecord } from "../../../services/activityLogService";
 import * as THREE from "three";
 import type {
   Material,
@@ -105,6 +106,7 @@ type CryocanVisualizerProps = {
   hideSidebar?: boolean;
   sensorTiles?: CryocanSensorTile[];
   selectedSensorId?: string | null;
+  systemActivity?: ActivityLogRecord[];
   onSensorSelect?: (sensorId: string) => void;
   onCanisterSelect?: (canisterId: string) => void;
   onStrawSelect?: (canisterId: string, strawId: string) => void;
@@ -232,6 +234,172 @@ DEFAULT_CANISTERS.forEach((c) => {
   }));
 });
 
+// ─── Activity log helpers (mirror of Reports page) ───────────────────────────
+
+const ACTIVITY_ACTION_LABELS: Record<string, string> = {
+  "alert.acknowledged": "Alert Acknowledged",
+  "alert.acknowledged_all": "All Alerts Acknowledged",
+  "alert.created": "Critical Alert Created",
+  "alert_configuration.kpi_config_bulk_upserted": "Alert Configuration Bulk Updated",
+  "alert_configuration.kpi_config_created": "Alert Configuration Created",
+  "alert_configuration.kpi_config_deleted": "Alert Configuration Deleted",
+  "alert_configuration.kpi_config_updated": "Alert Configuration Updated",
+  "alert_configuration.notification_settings_updated": "Alert Notification Settings Updated",
+  "email.critical_alert_sent": "Critical Alert Email Sent",
+  "email.escalation_sent": "Escalation Email Sent",
+  "email.otp_sent": "OTP Email Sent",
+  "email.password_reset_sent": "Password Reset Email Sent",
+  "email.support_ticket_comment_queued": "Support Ticket Comment Queued",
+  "email.support_ticket_comment_sent": "Support Ticket Comment Sent",
+  "email.support_ticket_created": "Support Ticket Email Sent",
+  "email.support_ticket_status_queued": "Support Ticket Status Queued",
+  "email.support_ticket_status_sent": "Support Ticket Status Email Sent",
+  "email.user_approval_requested": "Approval Email Sent",
+  "email.user_approved_sent": "Approval Confirmation Sent",
+  "integration.auth.login": "Integration Login",
+  "integration.auth.token_revoked": "Integration Token Revoked",
+  "ivf_cycle.created": "IVF Cycle Created",
+  "ivf_cycle.oocyte_log.d0_saved": "Oocyte Day 0 Saved",
+  "ivf_cycle.oocyte_log.d1_updated": "Oocyte Day 1 Updated",
+  "ivf_cycle.oocyte_log.d3_updated": "Oocyte Day 3 Updated",
+  "ivf_cycle.oocyte_log.d5_updated": "Oocyte Day 5 Updated",
+  "ivf_cycle.oocyte_log.d6_updated": "Oocyte Day 6 Updated",
+  "ivf_cycle.oocyte_log.fate_set": "Oocyte Fate Set",
+  "ivf_cycle.updated": "IVF Cycle Updated",
+  "patient_crylock.hms_update": "Patient Crylock HMS Updated",
+  "refill_detection.created": "Refill Detection Created",
+  "refill_detection.reviewed": "Refill Detection Reviewed",
+  "report.activity_logs.downloaded": "Activity Logs Downloaded",
+  "report.ivf.critical_alerts.downloaded": "Critical Alerts Downloaded",
+  "report.ivf.monthly_summary.downloaded": "Monthly Summary Downloaded",
+  "report.ivf.refill_logs.downloaded": "Refill Logs Downloaded",
+  "support_ticket.comment_added": "Support Ticket Commented",
+  "support_ticket.created": "Support Ticket Created",
+  "support_ticket.status_updated": "Support Ticket Status Updated",
+  "task.created": "Task Created",
+  "task.deleted": "Task Deleted",
+  "task.status_updated": "Task Status Updated",
+  "task.updated": "Task Updated",
+  "user.approved": "User Approved",
+  "user.invite_registered": "User Registered via Invite",
+  "user.invited": "User Invited",
+  "user.login": "Login Successful",
+  "user.login_requested": "Login Requested",
+  "user.logout": "Logged Out",
+  "user.password_reset_completed": "Password Reset Completed",
+  "user.profile_updated": "Profile Updated",
+  "user.registered": "User Registered",
+  "user.rejected": "User Rejected",
+};
+
+function formatActivityActionLabel(action: string) {
+  if (ACTIVITY_ACTION_LABELS[action]) return ACTIVITY_ACTION_LABELS[action];
+  return action
+    .replace(/_/g, " ")
+    .replace(/\./g, " · ")
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function getActivityMetadataLines(action: string, metadata?: Record<string, any> | null): string[] {
+  if (!metadata) return [];
+  const lines: string[] = [];
+  const val = (v: any) => (v === null || v === undefined || v === "" ? null : String(v));
+
+  if (action.startsWith("task.")) {
+    if (val(metadata.status)) lines.push(`Status: ${metadata.status}`);
+    if (val(metadata.priority)) lines.push(`Priority: ${metadata.priority}`);
+    return lines;
+  }
+  if (action.startsWith("refill_detection.")) {
+    if (metadata.is_confirmed !== undefined)
+      lines.push(`Confirmed: ${metadata.is_confirmed ? "Yes" : "No"}`);
+    if (val(metadata.refill_weight)) lines.push(`Weight: ${metadata.refill_weight} kg`);
+    if (val(metadata.notes)) lines.push(`Notes: ${String(metadata.notes).slice(0, 60)}`);
+    return lines;
+  }
+  if (action.startsWith("alert.")) {
+    if (val(metadata.message))
+      lines.push(String(metadata.message).slice(0, 70));
+    else if (val(metadata.alert_type))
+      lines.push(`KPI: ${metadata.alert_type}`);
+    if (val(metadata.severity)) lines.push(`Severity: ${metadata.severity}`);
+    return lines;
+  }
+  if (action.startsWith("alert_configuration.")) {
+    if (metadata.before || metadata.after) {
+      const b = metadata.before || {};
+      const a = metadata.after || {};
+      if (b.kpi_name && b.kpi_name !== a.kpi_name) lines.push(`KPI: ${b.kpi_name} → ${a.kpi_name}`);
+      else if (b.kpi_name) lines.push(`KPI: ${b.kpi_name}`);
+      if (b.max !== a.max && a.max !== undefined) lines.push(`Max: ${b.max} → ${a.max}`);
+    } else {
+      if (val(metadata.kpi_name)) lines.push(`KPI: ${metadata.kpi_name}`);
+      if (val(metadata.alert_name)) lines.push(`Alert: ${metadata.alert_name}`);
+    }
+    return lines;
+  }
+  if (action.startsWith("email.")) {
+    if (action === "email.critical_alert_sent") {
+      if (val(metadata.email_message))
+        lines.push(String(metadata.email_message).slice(0, 70));
+      else if (val(metadata.alert_type))
+        lines.push(`KPI: ${metadata.alert_type}`);
+      if (val(metadata.severity)) lines.push(`Severity: ${metadata.severity}`);
+    } else {
+      if (val(metadata.recipient_email)) lines.push(`To: ${metadata.recipient_email}`);
+    }
+    return lines;
+  }
+  if (action.startsWith("report.")) {
+    if (val(metadata.month)) lines.push(`Month: ${metadata.month}`);
+    if (val(metadata.start_date) || val(metadata.end_date))
+      lines.push(`Range: ${metadata.start_date || ""} – ${metadata.end_date || ""}`);
+    return lines;
+  }
+  if (action.startsWith("user.")) {
+    if (val(metadata.role)) lines.push(`Role: ${metadata.role}`);
+    if (val(metadata.branch_name)) lines.push(`Branch: ${metadata.branch_name}`);
+    return lines;
+  }
+  if (action.startsWith("ivf_cycle.")) {
+    if (val(metadata.his_id)) lines.push(`HIS: ${metadata.his_id}`);
+    if (val(metadata.patient_name)) lines.push(`Patient: ${metadata.patient_name}`);
+    return lines;
+  }
+  return [];
+}
+
+type ActivityIconType = "refill" | "alert" | "config" | "task" | "email" | "user" | "report" | "ivf" | "default";
+
+function getActivityIconType(action: string): ActivityIconType {
+  if (action.startsWith("refill_detection.")) return "refill";
+  if (action.startsWith("alert.") || action.startsWith("email.critical_alert")) return "alert";
+  if (action.startsWith("alert_configuration.")) return "config";
+  if (action.startsWith("task.")) return "task";
+  if (action.startsWith("email.")) return "email";
+  if (action.startsWith("user.")) return "user";
+  if (action.startsWith("report.")) return "report";
+  if (action.startsWith("ivf_cycle.")) return "ivf";
+  return "default";
+}
+
+const ACTIVITY_BADGE_STYLE: Record<ActivityIconType, { bg: string; color: string; label: string }> = {
+  refill:  { bg: "#e8f4fd", color: "#1a6fa8", label: "Refill"  },
+  alert:   { bg: "#fef3c7", color: "#92400e", label: "Alert"   },
+  config:  { bg: "#f1e7f4", color: "#401153", label: "Config"  },
+  task:    { bg: "#ecfdf5", color: "#065f46", label: "Task"    },
+  email:   { bg: "#eff6ff", color: "#1e40af", label: "Email"   },
+  user:    { bg: "#f9fafb", color: "#374151", label: "User"    },
+  report:  { bg: "#e8f4fd", color: "#1a6fa8", label: "Export"  },
+  ivf:     { bg: "#f5f3ff", color: "#4c1d95", label: "IVF"    },
+  default: { bg: "#f1e7f4", color: "#401153", label: "System"  },
+};
+
+// ─── End activity log helpers ─────────────────────────────────────────────────
+
 const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerProps>(function CryocanVisualizer(
   {
     ln2Level = 78,
@@ -245,6 +413,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     hideSidebar = false,
     sensorTiles = [],
     selectedSensorId = null,
+    systemActivity = [],
     onSensorSelect,
     onCanisterSelect,
     onStrawSelect,
@@ -2218,7 +2387,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         ? { label: "Monitor", color: "#a8751a", dot: "#d49220" }
         : { label: "Refill Required", color: "#a82020", dot: "#d43030" };
 
-  const daysLeft = Math.max(0, Math.round((fill / 100) * 42));
   const isEmbedded = variant === "embedded";
   const effectiveCanisters =
     canisters ?? (isEmbedded ? [] : DEFAULT_CANISTERS);
@@ -2478,11 +2646,162 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           className="cryo-main-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: showSidebar ? "minmax(0, 1fr) 320px" : "minmax(0, 1fr)",
+            gridTemplateColumns:
+              showSensorTiles && showSidebar
+                ? "220px minmax(0, 1fr) 300px"
+                : showSensorTiles
+                  ? "220px minmax(0, 1fr)"
+                  : showSidebar
+                    ? "minmax(0, 1fr) 300px"
+                    : "minmax(0, 1fr)",
             gap: isEmbedded ? 16 : 18,
             alignItems: "stretch",
           }}
         >
+          {/* Left sensor column — Live Conditions card */}
+          {showSensorTiles && (
+            <div
+              className="cryo-fade-in bg-white flex flex-col"
+              style={{
+                height: isEmbedded ? 520 : 620,
+                border: "1px solid #e4d4ea",
+                borderRadius: 18,
+                boxShadow: "0 6px 16px #40115308",
+                overflow: "hidden",
+              }}
+            >
+              {/* Card header */}
+              <div
+                className="flex items-center justify-between"
+                style={{
+                  padding: "14px 16px 10px",
+                  borderBottom: "1px solid #f0e8f4",
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  className="cryo-mono"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.2em",
+                    textTransform: "uppercase",
+                    color: "#6b5a70",
+                    fontWeight: 600,
+                  }}
+                >
+                  Live Conditions
+                </span>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#7a1a88"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                  <polyline points="17 6 23 6 23 12" />
+                </svg>
+              </div>
+
+              {/* Scrollable tile list */}
+              <div
+                className="flex flex-col"
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  gap: 6,
+                  padding: "10px 12px",
+                }}
+              >
+                {sensorTiles.map((tile) => {
+                  const isActive = selectedSensorId === tile.id;
+                  return (
+                    <button
+                      key={tile.id}
+                      type="button"
+                      onClick={() => onSensorSelect && onSensorSelect(tile.id)}
+                      className="text-left"
+                      style={{
+                        cursor: "pointer",
+                        borderRadius: 12,
+                        padding: "10px 12px",
+                        border: isActive ? "1px solid #7a1a8850" : "1px solid #e4d4ea",
+                        background: isActive
+                          ? "linear-gradient(135deg, #7a1a8810 0%, #7a1a8805 100%)"
+                          : "#f9f5fc",
+                        boxShadow: isActive ? "0 4px 14px #7a1a8820" : "none",
+                        opacity: tile.isMuted ? 0.6 : 1,
+                        flexShrink: 0,
+                      }}
+                      title={tile.tooltip}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div
+                          className="cryo-mono"
+                          style={{
+                            fontSize: 10,
+                            letterSpacing: "0.12em",
+                            textTransform: "uppercase",
+                            color: "#6b5a70",
+                          }}
+                        >
+                          {tile.label}
+                        </div>
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: "50%",
+                            background: tile.isMissing || tile.isMuted ? "#d1d5db" : "#22c55e",
+                            boxShadow: tile.isMissing || tile.isMuted ? "none" : "0 0 0 3px #22c55e22",
+                            flexShrink: 0,
+                          }}
+                        />
+                      </div>
+                      <div
+                        className="cryo-display"
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 500,
+                          color: tile.isMissing ? "#9ca3af" : "#401153",
+                        }}
+                      >
+                        {tile.value}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Card footer — last updated */}
+              <div
+                style={{
+                  padding: "8px 16px 12px",
+                  borderTop: "1px solid #f0e8f4",
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                  <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                </svg>
+                <span
+                  className="cryo-mono"
+                  style={{ fontSize: 9, color: "#9ca3af", letterSpacing: "0.1em", textTransform: "uppercase" }}
+                >
+                  Last updated:{" "}
+                  {sensorTiles.find((t) => t.timestamp)?.timestamp ?? "—"}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* 3D canvas column */}
           <div
             className="cryo-fade-in relative overflow-hidden"
@@ -2912,111 +3231,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               </div>
             )}
 
-            {isEmbedded && showSensorTiles && (
-              <div
-                className="absolute"
-                style={{
-                  left: 16,
-                  top: 16,
-                  bottom: 16,
-                  width: 230,
-                  zIndex: 4,
-                  pointerEvents: "auto",
-                }}
-              >
-                <div
-                  className="flex flex-col"
-                  style={{
-                    gap: 10,
-                    height: "100%",
-                    padding: 12,
-                    borderRadius: 14,
-                    border: "1px solid #e4d4ea",
-                    background: "rgba(255,255,255,0.9)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 6px 20px #40115312",
-                  }}
-                >
-                  <div
-                    className="cryo-mono"
-                    style={{
-                      fontSize: 10,
-                      letterSpacing: "0.2em",
-                      textTransform: "uppercase",
-                      color: "#6b5a70",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Sensors
-                  </div>
-                  <div
-                    className="flex flex-col"
-                    style={{ gap: 8, overflowY: "auto", paddingRight: 4 }}
-                  >
-                    {sensorTiles.map((tile) => {
-                      const isActive = selectedSensorId === tile.id;
-                      return (
-                        <button
-                          key={tile.id}
-                          type="button"
-                          onClick={() => onSensorSelect && onSensorSelect(tile.id)}
-                          className="text-left"
-                          style={{
-                            cursor: "pointer",
-                            borderRadius: 12,
-                            padding: "10px 12px",
-                            border: isActive ? "1px solid #7a1a8850" : "1px solid #e4d4ea",
-                            background: isActive
-                              ? "linear-gradient(135deg, #7a1a8810 0%, #7a1a8805 100%)"
-                              : "#ffffff",
-                            boxShadow: isActive ? "0 4px 14px #7a1a8820" : "none",
-                            opacity: tile.isMuted ? 0.6 : 1,
-                          }}
-                          title={tile.tooltip}
-                        >
-                          <div
-                            className="cryo-mono"
-                            style={{
-                              fontSize: 10,
-                              letterSpacing: "0.12em",
-                              textTransform: "uppercase",
-                              color: "#6b5a70",
-                              marginBottom: 4,
-                            }}
-                          >
-                            {tile.label}
-                          </div>
-                          <div
-                            className="cryo-display"
-                            style={{
-                              fontSize: 18,
-                              fontWeight: 500,
-                              color: tile.isMissing ? "#9ca3af" : "#401153",
-                            }}
-                          >
-                            {tile.value}
-                          </div>
-                          {tile.timestamp && (
-                            <div
-                              className="cryo-mono"
-                              style={{
-                                fontSize: 9,
-                                letterSpacing: "0.12em",
-                                textTransform: "uppercase",
-                                color: "#6b5a70",
-                                marginTop: 6,
-                              }}
-                            >
-                              {tile.timestamp}
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {!isEmbedded && (
               <div
@@ -3051,15 +3265,19 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 paddingRight: 4,
               }}
             >
+            {/* System Activity panel */}
             <div
               className="cryo-fade-in bg-white"
               style={{
                 flexShrink: 0,
                 border: "1px solid #e4d4ea",
                 borderRadius: 18,
-                padding: "18px 20px",
+                padding: "16px 16px 12px",
                 boxShadow: "0 6px 16px #40115308",
                 opacity: isEmbedded ? 1 : 0,
+                maxHeight: 260,
+                display: "flex",
+                flexDirection: "column",
               }}
             >
               <div
@@ -3070,37 +3288,148 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   textTransform: "uppercase",
                   color: "#6b5a70",
                   fontWeight: 600,
-                  marginBottom: 8,
+                  marginBottom: 12,
+                  flexShrink: 0,
                 }}
               >
-                Autonomy
+                System Activity
               </div>
               <div
-                className="cryo-display"
-                style={{
-                  fontSize: 38,
-                  fontWeight: 500,
-                  color: "#1a0a1f",
-                  lineHeight: 1,
-                  letterSpacing: "-0.02em",
-                  fontVariantNumeric: "tabular-nums",
-                }}
+                className="flex flex-col"
+                style={{ gap: 8, overflowY: "auto" }}
               >
-                {daysLeft}
-                <span
-                  style={{ fontSize: 18, marginLeft: 4, color: "#7a1a88" }}
-                >
-                  d
-                </span>
-              </div>
-              <div
-                style={{ marginTop: 8, fontSize: 12, color: "#6b5a70" }}
-              >
-                est. before next top-up at current evap. rate
+                {systemActivity.length === 0 ? (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#9ca3af",
+                      textAlign: "center",
+                      padding: "16px 0",
+                    }}
+                  >
+                    No recent activity
+                  </div>
+                ) : (
+                  systemActivity.map((log) => {
+                    const action = log.action ?? "";
+                    const iconType = getActivityIconType(action);
+                    const badge = ACTIVITY_BADGE_STYLE[iconType];
+                    const timeStr = log.created_at
+                      ? new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      : "";
+                    const title = formatActivityActionLabel(action);
+                    const metaLines = getActivityMetadataLines(action, log.metadata).slice(0, 2);
+                    const actorName = log.actor_label || (log.actor_details
+                      ? `${(log.actor_details as any).first_name || ""} ${(log.actor_details as any).last_name || ""}`.trim()
+                      : "");
+                    return (
+                      <div
+                        key={log.id}
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          padding: "8px 10px",
+                          borderRadius: 10,
+                          border: "1px solid #f0e8f4",
+                          background: "#fdfbfe",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            background: badge.bg,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {iconType === "refill" ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 2L8 6h3v8a4 4 0 008 0V6h3L12 2z"/>
+                            </svg>
+                          ) : iconType === "alert" ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                          ) : iconType === "config" ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/>
+                            </svg>
+                          ) : iconType === "task" ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                            </svg>
+                          ) : iconType === "email" ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+                            </svg>
+                          ) : iconType === "user" ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                            </svg>
+                          ) : iconType === "report" ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                          ) : iconType === "ivf" ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                            <span
+                              className="cryo-mono"
+                              style={{ fontSize: 9, color: "#6b5a70", letterSpacing: "0.1em", textTransform: "uppercase" }}
+                            >
+                              {timeStr}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 9,
+                                fontWeight: 600,
+                                padding: "1px 6px",
+                                borderRadius: 999,
+                                background: badge.bg,
+                                color: badge.color,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.08em",
+                              }}
+                            >
+                              {badge.label}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: "#1a0a1f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {title}
+                          </div>
+                          {actorName && (
+                            <div style={{ fontSize: 10, color: "#6b5a70", marginTop: 1 }}>
+                              {actorName}
+                            </div>
+                          )}
+                          {metaLines.map((line, i) => (
+                            <div key={i} style={{ fontSize: 10, color: "#6b5a70", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {line}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 
-            {/* Canister list */}
+            {/* Inventory Overview */}
             <div
               className="cryo-fade-in bg-white"
               style={{
@@ -3128,7 +3457,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                       marginBottom: 4,
                     }}
                   >
-                    Canisters
+                    Inventory Overview
                   </div>
                   <div
                     className="cryo-display"

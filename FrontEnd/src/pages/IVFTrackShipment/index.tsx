@@ -24,6 +24,8 @@ import {
 } from "../../services/ivfAlertsService";
 import { tasksService, type Task } from "../../services/tasksService";
 import { ivfService } from "../../services/ivfService";
+import { activityLogService } from "../../services/activityLogService";
+import type { ActivityLogRecord } from "../../services/activityLogService";
 import StakeholderChatBox from "../../components/StakeholderChatBox";
 import { useDashboardChatWebSocket } from "../../hooks/useChatWebSocket";
 
@@ -60,6 +62,7 @@ export default function IVFTrackShipmentPage() {
     >([]);
     const [exporting, setExporting] = useState(false);
     const [useNewCryocan, setUseNewCryocan] = useState(false);
+    const [systemActivity, setSystemActivity] = useState<ActivityLogRecord[]>([]);
     const [selectedKpiKey, setSelectedKpiKey] = useState<string | null>(null);
     const [cryocanCanisters, setCryocanCanisters] = useState<
         Array<{ id: string; label: string; sampleCount?: number; status?: string }>
@@ -329,6 +332,19 @@ export default function IVFTrackShipmentPage() {
         };
     }, [useNewCryocan, tankId]);
 
+    useEffect(() => {
+        if (!useNewCryocan || !tankId) {
+            setSystemActivity([]);
+            return;
+        }
+        let cancelled = false;
+        activityLogService
+            .getActivityLogs({ target_type: "tank", target_id: tankId, page_size: 20 })
+            .then((res) => { if (!cancelled) setSystemActivity(res.logs ?? []); })
+            .catch(() => { if (!cancelled) setSystemActivity([]); });
+        return () => { cancelled = true; };
+    }, [useNewCryocan, tankId]);
+
     // Update stakeholder chats from WebSocket data
     useEffect(() => {
         if (wsUnreadMessages && wsUnreadMessages.length > 0) {
@@ -386,55 +402,40 @@ export default function IVFTrackShipmentPage() {
                 </div>
             </div>
             {/* Critical Alerts */}
-            <div id="onboarding-ivf-critical-alerts-icon" className="relative group cursor-pointer" onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
-                <img
-                    className="w-[25px] h-[25px]"
-                    alt="Critical Alerts"
-                    src={CriticalAlertsIcon}
-                />
-                {criticalAlertsCount > 0 && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                        <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
-                    </div>
-                )}
-                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                    <div className="font-semibold text-black text-xs whitespace-nowrap">Critical Alerts</div>
-                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+            <div id="onboarding-ivf-critical-alerts-icon" className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
+                <div className="relative">
+                    <img className="w-[28px] h-[28px]" alt="Critical Alerts" src={CriticalAlertsIcon} />
+                    {criticalAlertsCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                            <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+                        </div>
+                    )}
                 </div>
+                <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Alerts</span>
             </div>
             {/* Stakeholder Chats */}
-            <div id="onboarding-ivf-stakeholder-chats-icon" className="relative group cursor-pointer" onClick={() => setShowStakeholderChatScreen(true)}>
-                <img
-                    className="w-[25px] h-[25px]"
-                    alt="Stakeholder Chats"
-                    src={StakeholderChatsIcon}
-                />
-                {stakeholderChatCount > 0 && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                        <span className="font-semibold text-white text-[10px]">{stakeholderChatCount}</span>
-                    </div>
-                )}
-                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                    <div className="font-semibold text-black text-xs whitespace-nowrap">Stakeholder Chats</div>
-                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+            <div id="onboarding-ivf-stakeholder-chats-icon" className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => setShowStakeholderChatScreen(true)}>
+                <div className="relative">
+                    <img className="w-[28px] h-[28px]" alt="Stakeholder Chats" src={StakeholderChatsIcon} />
+                    {stakeholderChatCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                            <span className="font-semibold text-white text-[10px]">{stakeholderChatCount}</span>
+                        </div>
+                    )}
                 </div>
+                <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Messages</span>
             </div>
             {/* My Tasks */}
-            <div id="onboarding-ivf-my-tasks-icon" className="relative group cursor-pointer" onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
-                <img
-                    className="w-[25px] h-[25px]"
-                    alt="My Tasks"
-                    src={MyTasksIcon}
-                />
-                {myTasksCount > 0 && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                        <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
-                    </div>
-                )}
-                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                    <div className="font-semibold text-black text-xs whitespace-nowrap">My Tasks</div>
-                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+            <div id="onboarding-ivf-my-tasks-icon" className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
+                <div className="relative">
+                    <img className="w-[28px] h-[28px]" alt="My Tasks" src={MyTasksIcon} />
+                    {myTasksCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                            <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
+                        </div>
+                    )}
                 </div>
+                <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Tasks</span>
             </div>
         </div>
     );
@@ -525,13 +526,24 @@ export default function IVFTrackShipmentPage() {
                                     </div>
                                 </div>
                             ) : (
-                                <div
-                                    className={`grid grid-cols-1 gap-6 items-stretch ${
-                                        selectedKpiKey ? 'lg:grid-cols-2' : 'lg:grid-cols-1'
-                                    }`}
-                                >
+                                <>
+                                    <CryocanVisualizer
+                                        variant="embedded"
+                                        ln2Level={ln2Level ?? undefined}
+                                        internalTemp={internalTemp ?? undefined}
+                                        externalTemp={externalTemp ?? undefined}
+                                        lidStatus={lidStatus ?? undefined}
+                                        sensorTiles={sensorTiles}
+                                        selectedSensorId={selectedKpiKey}
+                                        canisters={cryocanCanisters}
+                                        canisterContents={cryocanContents}
+                                        systemActivity={systemActivity}
+                                        onSensorSelect={(kpiKey) => {
+                                            setSelectedKpiKey(kpiKey);
+                                        }}
+                                    />
                                     {selectedKpiKey && (
-                                        <div className="h-full">
+                                        <div>
                                             <IVFQualityTrackingChart
                                                 canisterNumber={tankId}
                                                 selectedKpiKey={selectedKpiKey}
@@ -540,30 +552,7 @@ export default function IVFTrackShipmentPage() {
                                             />
                                         </div>
                                     )}
-                                    <div
-                                        className={
-                                            selectedKpiKey
-                                                ? 'h-full'
-                                                : 'h-full lg:col-span-2'
-                                        }
-                                    >
-                                        <CryocanVisualizer
-                                            variant="embedded"
-                                            hideSidebar={!!selectedKpiKey}
-                                            ln2Level={ln2Level ?? undefined}
-                                            internalTemp={internalTemp ?? undefined}
-                                            externalTemp={externalTemp ?? undefined}
-                                            lidStatus={lidStatus ?? undefined}
-                                            sensorTiles={sensorTiles}
-                                            selectedSensorId={selectedKpiKey}
-                                            canisters={cryocanCanisters}
-                                            canisterContents={cryocanContents}
-                                            onSensorSelect={(kpiKey) => {
-                                                setSelectedKpiKey(kpiKey);
-                                            }}
-                                        />
-                                    </div>
-                                </div>
+                                </>
                             )}
 
                             {/* Row 2: Container Data (full width) */}
@@ -573,10 +562,12 @@ export default function IVFTrackShipmentPage() {
                                 </div>
                             )}
 
-                            {/* Row 3: Refill Log (full width) */}
-                            <div>
-                                <RefillLogTable canisterNumber={tankId} />
-                            </div>
+                            {/* Row 3: Refill Log — old UI only */}
+                            {!useNewCryocan && (
+                                <div>
+                                    <RefillLogTable canisterNumber={tankId} />
+                                </div>
+                            )}
           </PageLayout>
 
             {/* Stakeholder Chat Box */}
@@ -619,9 +610,9 @@ export default function IVFTrackShipmentPage() {
                 }))}
                 loading={loadingAlerts}
                 patientIdLabel=""
-                onAcknowledge={async (alertId) => {
+                onAcknowledge={async (alertId, reason) => {
                     try {
-                        await ivfAlertsService.acknowledgeAlert(alertId);
+                        await ivfAlertsService.acknowledgeAlert(alertId, reason);
                         // Refresh alerts after acknowledgment
                         fetchCriticalAlerts();
                     } catch (error) {
@@ -629,9 +620,9 @@ export default function IVFTrackShipmentPage() {
                         throw error;
                     }
                 }}
-                onAcknowledgeAll={async (alertIds) => {
+                onAcknowledgeAll={async (alertIds, reason) => {
                     try {
-                        await ivfAlertsService.acknowledgeAlerts(alertIds);
+                        await ivfAlertsService.acknowledgeAlerts(alertIds, reason);
                         fetchCriticalAlerts();
                     } catch (error) {
                         console.error("Error acknowledging alerts:", error);
