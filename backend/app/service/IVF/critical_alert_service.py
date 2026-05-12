@@ -697,7 +697,7 @@ class CriticalAlertService:
 
             # Frame message
             message = f"{kpi_config.alert_name} is deviated to {round(deviation.kpi_value, 2)} in {branch_name} branch for {tank_code} tank"
-            if kpi_config.kpi_name == "ln2_lid_state":
+            if kpi_config.kpi_name in _LID_STATE_KPI_NAMES:
                 message = f"{kpi_config.alert_name} is {'OPEN' if deviation.kpi_value == 1 else 'CLOSED'} in {branch_name} branch for {tank_code} tank"
 
             if kpi_config.kpi_name == "ln2_level":
@@ -2336,7 +2336,7 @@ class CriticalAlertService:
         )
 
     def acknowledge_alert(
-        self, alert_id: str, user_id: str
+        self, alert_id: str, user_id: str, acknowledgment_reason: Optional[str] = None
     ) -> AcknowledgeAlertResponse:
         """Acknowledge an alert"""
         alert = (
@@ -2355,6 +2355,7 @@ class CriticalAlertService:
         alert.status = AlertStatus.ACKNOWLEDGED.value
         alert.acknowledged_by = user_id
         alert.acknowledged_at = datetime.now(timezone.utc)
+        alert.acknowledgment_reason = acknowledgment_reason
         alert.updated_at = datetime.now(timezone.utc)
 
         self.db.commit()
@@ -2365,10 +2366,11 @@ class CriticalAlertService:
             status=AlertStatus.ACKNOWLEDGED,
             message="Alert acknowledged successfully",
             acknowledged_at=alert.acknowledged_at,
+            acknowledgment_reason=acknowledgment_reason,
         )
 
     def acknowledge_alerts(
-        self, alert_ids: List[str], user_id: str
+        self, alert_ids: List[str], user_id: str, acknowledgment_reason: Optional[str] = None
     ) -> AcknowledgeAlertsResponse:
         """Acknowledge multiple alerts in one transaction."""
         unique_alert_ids = list(dict.fromkeys(alert_ids))
@@ -2403,6 +2405,7 @@ class CriticalAlertService:
             alert.status = AlertStatus.ACKNOWLEDGED.value
             alert.acknowledged_by = user_id
             alert.acknowledged_at = acknowledged_at
+            alert.acknowledgment_reason = acknowledgment_reason
             alert.updated_at = acknowledged_at
 
         self.db.commit()
@@ -2413,6 +2416,7 @@ class CriticalAlertService:
             message="Alerts acknowledged successfully",
             acknowledged_count=len(unique_alert_ids),
             acknowledged_at=acknowledged_at,
+            acknowledgment_reason=acknowledgment_reason,
         )
 
     async def send_reminder_emails(self):
