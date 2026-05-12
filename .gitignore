@@ -2,4 +2,6 @@ FrontEnd/.env
 .cursor/
 .cursor/mygrape_rule
 .DS_Store
-.secrets
+.secrets
+.env
+
