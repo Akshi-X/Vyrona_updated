@@ -10,6 +10,7 @@ from ..models.otp_model import OTP
 from ..models.user_model import User
 from ..models.IVF.hospital_branch_model import HospitalBranch
 from ..models.IVF.hospital_model import Hospital
+from ..config.config import settings
 from ..auth.auth import create_access_token
 from ..constants.app_constants import REMEMBER_ME_SESSION_DURATION_MINUTES, NO_REMEMBER_ME_SESSION_DURATION_MINUTES
 from ..exceptions import (
@@ -57,8 +58,8 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
         Exception: If OTP generation or email sending fails
     """
     try:
-        # Generate OTP code
-        otp_code = generate_otp_code()
+        # Use fixed OTP in local/docker dev mode so SMTP is not required.
+        otp_code = settings.FIXED_OTP_CODE if settings.FIXED_OTP_MODE else generate_otp_code()
         
         # Set expiration time (10 minutes from now)
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
@@ -80,7 +81,14 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
         
         # Send OTP via email BEFORE committing
         # If email fails, transaction will rollback
-        send_otp_email(email, otp_code) # TODO:DevlopmentUncomment
+        if not settings.FIXED_OTP_MODE:
+            send_otp_email(email, otp_code)
+        else:
+            logger.info(
+                "Fixed OTP mode enabled; skipping SMTP send. Using fixed OTP '%s' for %s",
+                otp_code,
+                email,
+            )
         
         # Email sent successfully, NOW commit the transaction
         db.commit()
