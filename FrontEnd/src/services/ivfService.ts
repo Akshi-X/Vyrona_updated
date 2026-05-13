@@ -654,6 +654,17 @@ export class IvfService extends BaseApiService {
         );
     }
 
+    /** Latest single reading for incubator_temp, incubator_o2, incubator_co2 for a chamber. */
+    async getChamberLatest(incubatorId: number, chamberId?: string): Promise<ChamberLatestItem[]> {
+        const params = new URLSearchParams();
+        if (chamberId != null) params.set("chamber_id", chamberId);
+        const qs = params.toString();
+        return this.request<ChamberLatestItem[]>(
+            `/api/ivf/quality/incubators/${encodeURIComponent(incubatorId)}/chamber-latest${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+        );
+    }
+
     /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank. */
     async getKpiConfigList(id: number, type: "tank" | "incubator" = "tank", chamberId?: string | null): Promise<{
         tank_id?: number;
@@ -1347,6 +1358,14 @@ export class IvfService extends BaseApiService {
         });
     }
 
+    async updateCycle(cycleId: number, data: Partial<IvfCycleCreate>): Promise<IvfCycle> {
+        return this.request<IvfCycle>(`/api/ivf/cycles/${cycleId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+    }
+
     async upsertLog(cycleId: number, data: IvfLogUpsert): Promise<IvfCycleLog> {
         return this.request<IvfCycleLog>(`/api/ivf/cycles/${cycleId}/logs`, {
             method: 'POST',
@@ -1358,6 +1377,15 @@ export class IvfService extends BaseApiService {
     async deleteLog(cycleId: number, logId: number): Promise<void> {
         return this.request<void>(`/api/ivf/cycles/${cycleId}/logs/${logId}`, { method: 'DELETE' });
     }
+}
+
+// ── Chamber health ────────────────────────────────────────────────────────────
+
+export interface ChamberLatestItem {
+    kpi_name: string;
+    label: string;
+    value: number | null;
+    unit: string;
 }
 
 // ── IVF Cycle types ───────────────────────────────────────────────────────────
@@ -1379,6 +1407,7 @@ export interface IvfCycle {
     oocyte_gv: number | null;
     oocyte_others: number | null;
     status: string | null;
+    opu_date: string | null;
     created_at: string;
     updated_at: string | null;
 }
@@ -1425,6 +1454,7 @@ export interface IvfCycleCreate {
     oocyte_m1?: number;
     oocyte_gv?: number;
     oocyte_others?: number;
+    opu_date?: string;
     status?: string;
 }
 

@@ -1009,26 +1009,26 @@ const ControlTower = () => {
                                                                     className="grid grid-cols-3 pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
                                                                     onClick={() => {
                                                                         try {
-                                                                            if (
-                                                                                canister.branchId &&
-                                                                                canister.branchId !==
-                                                                                    "N/A"
-                                                                            ) {
-                                                                                sessionStorage.setItem(
-                                                                                    "ivf_selected_branch_id",
-                                                                                    String(
-                                                                                        canister.branchId,
-                                                                                    ),
-                                                                                );
-                                                                            }
-                                                                            const tankParam = encodeURIComponent(
-                                                                                canister.tankId &&
-                                                                                    canister.tankId !== "N/A"
-                                                                                    ? canister.tankId
-                                                                                    : canister.canisterId,
-                                                                            );
                                                                             const prefix = isOnboarding ? "/onboarding" : "";
-                                                                            navigate(`${prefix}/ivf-track-shipment/${tankParam}`);
+                                                                            if (deviceType === "incubators") {
+                                                                                navigate(`${prefix}/incubator-tracking/${canister.tankId}`);
+                                                                            } else {
+                                                                                if (
+                                                                                    canister.branchId &&
+                                                                                    canister.branchId !== "N/A"
+                                                                                ) {
+                                                                                    sessionStorage.setItem(
+                                                                                        "ivf_selected_branch_id",
+                                                                                        String(canister.branchId),
+                                                                                    );
+                                                                                }
+                                                                                const tankParam = encodeURIComponent(
+                                                                                    canister.tankId && canister.tankId !== "N/A"
+                                                                                        ? canister.tankId
+                                                                                        : canister.canisterId,
+                                                                                );
+                                                                                navigate(`${prefix}/ivf-track-shipment/${tankParam}`);
+                                                                            }
                                                                         } catch {}
                                                                     }}
                                                                 >
