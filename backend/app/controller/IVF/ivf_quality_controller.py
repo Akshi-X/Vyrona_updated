@@ -44,6 +44,7 @@ from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.models.IVF.tank_model import Tank
 from app.models.IVF.incubator_model import Incubator
 from app.models.kpi_config_model import KpiConfig
+from app.models.readings_model import Readings
 from app.models.user_model import User
 from app.service.activity_log_service import (
     ActivityLogService,
@@ -2015,6 +2016,73 @@ def get_incubator_kpi_history_by_date(
         "chamber_id": effective_chamber_id,
         "kpi_series": kpi_series,
     }
+
+
+_CHAMBER_HEALTH_KPIS = {
+    "incubator_temp": ("Temperature", "°C"),
+    "incubator_o2": ("O₂ Level", "%"),
+    "incubator_co2": ("CO₂ Level", "%"),
+}
+
+
+@router.get("/incubators/{incubator_id}/chamber-latest")
+def get_incubator_chamber_latest(
+    incubator_id: int = Path(..., description="Incubator ID"),
+    chamber_id: Optional[str] = Query(None, description="Chamber ID (e.g. A1)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the single latest reading for incubator_temp, incubator_o2, incubator_co2."""
+    incubator = (
+        db.query(Incubator)
+        .filter(
+            Incubator.incubator_id == incubator_id,
+            Incubator.hospital_id == current_user.hospital_id,
+        )
+        .first()
+    )
+    if not incubator:
+        raise HTTPException(status_code=404, detail=f"Incubator '{incubator_id}' not found")
+
+    effective_chamber_id = chamber_id or ""
+
+    from sqlalchemy import func as sa_func
+
+    subq = (
+        db.query(
+            KpiConfig.kpi_name,
+            Readings.kpi_value,
+            KpiConfig.unit,
+            sa_func.row_number()
+            .over(
+                partition_by=KpiConfig.kpi_name,
+                order_by=Readings.timestamp.desc(),
+            )
+            .label("rn"),
+        )
+        .join(Readings, Readings.kpi_config_id == KpiConfig.id)
+        .filter(
+            Readings.incubator_id == incubator_id,
+            Readings.chamber_id == effective_chamber_id,
+            KpiConfig.kpi_name.in_(list(_CHAMBER_HEALTH_KPIS.keys())),
+        )
+        .subquery()
+    )
+
+    rows = db.query(subq.c.kpi_name, subq.c.kpi_value, subq.c.unit).filter(subq.c.rn == 1).all()
+
+    result = []
+    for kpi_name, default_label_unit in _CHAMBER_HEALTH_KPIS.items():
+        default_label, default_unit = default_label_unit
+        match = next((r for r in rows if r.kpi_name == kpi_name), None)
+        result.append({
+            "kpi_name": kpi_name,
+            "label": default_label,
+            "value": float(match.kpi_value) if match else None,
+            "unit": (match.unit if match and match.unit else default_unit),
+        })
+
+    return result
 
 
 @router.post("/incubators/{incubator_code}/kpi-readings")
