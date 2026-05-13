@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import mGScaleLogo from '../../assets/mGScale.svg';
 import { ivfService, type IvfCycle, type IvfCycleLog, type IvfCycleWithLogs } from '../../services/ivfService';
 
-const fmt = (v: string | number | null | undefined) => v ?? '—';
+const fmt = (v: string | number | null | undefined): string => v != null ? String(v) : '—';
 
 const parseD3 = (g: string | null) => {
   if (!g) return { cells: '—', frag: '—' };
