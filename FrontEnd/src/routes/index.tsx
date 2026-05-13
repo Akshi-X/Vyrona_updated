@@ -17,7 +17,11 @@ import ReportsPage from "../pages/Reports";
 import UsersPage from "../pages/Users";
 import InviteSignup from "../pages/InviteSignup";
 import EmbryoGradingPage from "../pages/EmbryoGrading";
+import EmbryoGradingDetailPage from "../pages/EmbryoGrading/EmbryoGradingDetailPage";
 import AdvancedEmbryoGradingPage from "../pages/EmbryoGrading/AdvancedToolPage";
+import EmbryoComparePage from "../pages/EmbryoGrading/EmbryoComparePage";
+import EmbryoReportsPage from "../pages/EmbryoGrading/EmbryoReportsPage";
+import EmbryoShell from "../pages/EmbryoGrading/EmbryoShell";
 import IncubatorTrackingDashboardPage from "../pages/IncubatorTracking";
 import IncubatorDetailPage from "../pages/IncubatorTracking/IncubatorDetailPage";
 import SidebarLayout from "../components/SidebarLayout";
@@ -182,9 +186,9 @@ const EmbryoGradingWithAuth = () => (
     </RoleBasedRoute>
 );
 
-const AdvancedEmbryoGradingWithAuth = () => (
+const EmbryoShellWithAuth = () => (
     <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
-        <AdvancedEmbryoGradingPage />
+        <EmbryoShell />
     </RoleBasedRoute>
 );
 
@@ -307,8 +311,16 @@ export const router = createBrowserRouter([
             { path: "/alert-setting", element: <AlertSettingWithAuth /> },
             { path: "/refill-log", element: <RefillLogWithAuth /> },
             { path: "/embryo-grading", element: <EmbryoGradingWithAuth /> },
-            { path: "/embryo-grading/:his", element: <EmbryoGradingWithAuth /> },
-            { path: "/embryo-grading/:his/advanced", element: <AdvancedEmbryoGradingWithAuth /> },
+            {
+                path: "/embryo-grading/:his",
+                element: <EmbryoShellWithAuth />,
+                children: [
+                    { index: true,         element: <EmbryoGradingDetailPage /> },
+                    { path: "advanced",    element: <AdvancedEmbryoGradingPage /> },
+                    { path: "compare",     element: <EmbryoComparePage /> },
+                    { path: "reports",     element: <EmbryoReportsPage /> },
+                ],
+            },
             { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
             { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
             { path: "/database", element: <DatabaseWithAuth /> },
