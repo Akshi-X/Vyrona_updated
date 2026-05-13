@@ -63,7 +63,6 @@ export default function IVFTrackShipmentPage() {
     const [exporting, setExporting] = useState(false);
     const [useNewCryocan, setUseNewCryocan] = useState(false);
     const [systemActivity, setSystemActivity] = useState<ActivityLogRecord[]>([]);
-    const [selectedKpiKey, setSelectedKpiKey] = useState<string | null>(null);
     const [cryocanCanisters, setCryocanCanisters] = useState<
         Array<{ id: string; label: string; sampleCount?: number; status?: string }>
     >([]);
@@ -100,6 +99,12 @@ export default function IVFTrackShipmentPage() {
     const criticalAlertsCount = criticalAlerts.filter(
         (alert) => alert.acknowledged_at == null,
     ).length;
+    const externalTempAlert = criticalAlerts.some(
+        (a) => a.acknowledged_at == null && /temp.?external|external.?temp/i.test(a.alert_type),
+    );
+    const internalTempAlert = criticalAlerts.some(
+        (a) => a.acknowledged_at == null && /temp.?internal|internal.?temp/i.test(a.alert_type),
+    );
     const myTasksCount = myTasks.filter(
         (task) =>
             task.status === "Not started" || task.status === "In progress",
@@ -245,11 +250,6 @@ export default function IVFTrackShipmentPage() {
         const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
         return () => clearTimeout(timer);
     }, [accessDenied, countdown, navigate]);
-
-    useEffect(() => {
-        if (!useNewCryocan) return;
-        setSelectedKpiKey(null);
-    }, [useNewCryocan]);
 
     useEffect(() => {
         if (!useNewCryocan || !tankId) {
@@ -534,24 +534,13 @@ export default function IVFTrackShipmentPage() {
                                         externalTemp={externalTemp ?? undefined}
                                         lidStatus={lidStatus ?? undefined}
                                         sensorTiles={sensorTiles}
-                                        selectedSensorId={selectedKpiKey}
                                         canisters={cryocanCanisters}
                                         canisterContents={cryocanContents}
                                         systemActivity={systemActivity}
-                                        onSensorSelect={(kpiKey) => {
-                                            setSelectedKpiKey(kpiKey);
-                                        }}
+                                        externalTempAlert={externalTempAlert}
+                                        internalTempAlert={internalTempAlert}
                                     />
-                                    {selectedKpiKey && (
-                                        <div>
-                                            <IVFQualityTrackingChart
-                                                canisterNumber={tankId}
-                                                selectedKpiKey={selectedKpiKey}
-                                                hideTabs
-                                                onClose={() => setSelectedKpiKey(null)}
-                                            />
-                                        </div>
-                                    )}
+                                    <IVFQualityTrackingChart canisterNumber={tankId} />
                                 </>
                             )}
 
