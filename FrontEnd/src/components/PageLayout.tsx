@@ -13,7 +13,7 @@ type PageLayoutProps = {
 
 const PageLayout = ({ title, icon, iconAlt, lucideIcon, actions, children, hideHeaderOnDesktop = false }: PageLayoutProps) => {
     return (
-        <main id="onboarding-page-layout" className="flex flex-col h-screen overflow-hidden">
+        <main id="onboarding-page-layout" className="flex flex-col h-screen overflow-hidden page-enter">
             <div className={`${hideHeaderOnDesktop ? "md:hidden" : "md:px-6 md:pt-10 md:pb-6"} flex-shrink-0 px-4`}>
                 <PageHeader title={title} icon={icon} iconAlt={iconAlt} lucideIcon={lucideIcon} actions={actions} />
             </div>
