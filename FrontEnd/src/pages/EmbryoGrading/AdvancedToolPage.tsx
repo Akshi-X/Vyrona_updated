@@ -1,858 +1,510 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Download, RefreshCw, Maximize2, ChevronRight, Upload, Info, Check } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import type { IVFTreatment } from '../../types/ivf';
 
-interface EmbryologyLogEntry {
-  id: number;
-  oocyteNo: string;
-  day0Dish: string;
-  pn: string;
-  dropNo: string;
-  day3Label?: string;
-  day5Label?: string;
-  day6Label?: string;
-  fate: string;
-  fzNo: string;
-  notes: string;
-}
-
-interface AdvancedEmbryoRouteState {
-  embryo?: IVFTreatment;
-  logs?: EmbryologyLogEntry[];
-}
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface BoundingBox {
-  id: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  linkedOocyteId?: number;
+  id: number; x: number; y: number; width: number; height: number;
 }
-
 interface BoxEditState {
-  boxId: number;
-  mode: 'move' | 'resize';
-  startPoint: { x: number; y: number };
-  originalBox: BoundingBox;
+  boxId: number; mode: 'move' | 'resize';
+  startPoint: { x: number; y: number }; originalBox: BoundingBox;
 }
+interface EmbryoImageOption { id: string; name: string; src: string; isUploaded?: boolean; }
+interface AdvancedEmbryoRouteState { embryo?: IVFTreatment; }
 
-interface EmbryoImageOption {
-  id: string;
-  name: string;
-  src: string;
-  isUploaded?: boolean;
-}
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
 
-interface GardnerGrade {
-  grade: string;
-  expansion: string;
-  icm: string;
-  te: string;
-  confidence: number;
-}
+// ── Mock static data ──────────────────────────────────────────────────────────
 
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-
-const parseGardnerGrade = (rawGrade?: string | null, confidence = 0): GardnerGrade | null => {
-  if (!rawGrade) return null;
-  const match = rawGrade.trim().toUpperCase().match(/([1-6])\s*([A-C])\s*([A-C])/);
-  if (!match) return null;
-
-  const expansion = match[1];
-  const icm = match[2];
-  const te = match[3];
-
-  return {
-    grade: `${expansion}${icm}${te}`,
-    expansion,
-    icm,
-    te,
-    confidence,
-  };
+const MOCK_AI = {
+  grade: '5AA', expansion: '5', expansionLabel: 'Expanded Blastocyst', expansionConf: 88,
+  icm: 'A', icmLabel: 'Many Cells', icmConf: 87,
+  te: 'A', teLabel: 'Many Cells', teConf: 85,
+  confidence: 86.1, quality: 'High Quality',
 };
 
-const pickAiGrade = (candidates: string[]): string => {
-  const valid = candidates
-    .map((grade) => parseGardnerGrade(grade, 0)?.grade)
-    .filter((grade): grade is string => Boolean(grade));
+const DEV_TIMELINE = [
+  { time: '16.1 h', event: '2 PN', active: false },
+  { time: '40.3 h', event: '4 Cell', active: false },
+  { time: '65.2 h', event: '8 Cell', active: false },
+  { time: '89.5 h', event: 'Morula', active: false },
+  { time: '113.7 h', event: 'Early Blastocyst', active: false },
+  { time: '17.57 h (Day 5)', event: 'Expanded Blastocyst', active: true },
+];
 
-  if (valid.length > 0) {
-    return valid[0];
-  }
+const AI_JUSTIFICATION =
+  'The embryo is a fully expanded blastocyst with a well-defined inner cell mass containing many tightly packed cells and a trophectoderm with many cells forming a cohesive epithelium. Overall characteristics indicate high implantation potential.';
 
-  const fallback = ['4AA', '4AB', '4BA', '3AA', '3AB', '5AA'];
-  return fallback[Math.floor(Math.random() * fallback.length)];
-};
+const KEY_OBSERVATIONS = [
+  'Blastocoel fully fills the embryo',
+  'ICM is dense with many cells',
+  'TE is cohesive with many cells',
+  'Zona pellucida is intact',
+  'No major fragmentation observed',
+];
 
-const createEmbryoPlaceholder = (title: string, palette: { bg1: string; bg2: string; ring: string; core: string }) => {
-  const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
-    <defs>
-      <radialGradient id="bg" cx="45%" cy="40%" r="80%">
-        <stop offset="0%" stop-color="${palette.bg1}" />
-        <stop offset="70%" stop-color="${palette.bg2}" />
-      </radialGradient>
-      <radialGradient id="core" cx="55%" cy="55%" r="65%">
-        <stop offset="0%" stop-color="#cce8f7" />
-        <stop offset="100%" stop-color="${palette.core}" />
-      </radialGradient>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#bg)"/>
-    <circle cx="340" cy="300" r="215" fill="none" stroke="${palette.ring}" stroke-width="28" opacity="0.9"/>
-    <circle cx="470" cy="305" r="128" fill="url(#core)" stroke="#6f8ca1" stroke-width="3"/>
-    <text x="26" y="46" fill="#ffffff" font-size="22" font-family="Arial" opacity="0.9">${title}</text>
-  </svg>`;
+const ANNOTATIONS = [
+  { label: 'ICM', x: 68, y: 22, color: 'bg-[#5b8de8] text-white' },
+  { label: 'TE', x: 84, y: 52, color: 'bg-[#d94f8c] text-white' },
+  { label: 'Expansion', x: 70, y: 78, color: 'bg-[#6b1176] text-white' },
+];
 
+// ── Placeholder embryo SVG ────────────────────────────────────────────────────
+
+const mkPlaceholder = (label: string, c1: string, c2: string) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><defs><radialGradient id="bg" cx="45%" cy="40%" r="80%"><stop offset="0%" stop-color="${c1}"/><stop offset="70%" stop-color="${c2}"/></radialGradient></defs><rect width="100%" height="100%" fill="url(#bg)"/><circle cx="340" cy="300" r="215" fill="none" stroke="#c0c0c0" stroke-width="28" opacity="0.6"/><circle cx="470" cy="305" r="128" fill="#cce8f7" stroke="#6f8ca1" stroke-width="3"/><text x="26" y="46" fill="#fff" font-size="22" font-family="Arial" opacity="0.9">${label}</text></svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 };
 
-const defaultImageOptions: EmbryoImageOption[] = [
-  {
-    id: 'img-a',
-    name: 'Embryo Sample 01',
-    src: '/embryo/embryo_01.jpg',
-  },
-  {
-    id: 'img-b',
-    name: 'Embryo B',
-    src: createEmbryoPlaceholder('Embryo B', { bg1: '#e2f1fa', bg2: '#5f88a5', ring: '#f4f8ff', core: '#5e8ca6' }),
-  },
-  {
-    id: 'img-c',
-    name: 'Embryo C',
-    src: createEmbryoPlaceholder('Embryo C', { bg1: '#d7eaf6', bg2: '#5d83a0', ring: '#f1f6ff', core: '#688ea5' }),
-  },
+const DEFAULT_IMAGES: EmbryoImageOption[] = [
+  { id: 'img-a', name: 'Embryo Sample 01', src: '/embryo/embryo_01.jpg' },
+  { id: 'img-b', name: 'Embryo B', src: mkPlaceholder('Embryo B', '#e2f1fa', '#5f88a5') },
+  { id: 'img-c', name: 'Embryo C', src: mkPlaceholder('Embryo C', '#d7eaf6', '#5d83a0') },
 ];
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AdvancedEmbryoGradingPage() {
   const navigate = useNavigate();
   const { his } = useParams<{ his: string }>();
   const location = useLocation();
-  const state = (location.state as AdvancedEmbryoRouteState) || {};
-  const selectedEmbryo = state.embryo;
-  const selectedEmbryologyLogs = useMemo(() => state.logs || [], [state.logs]);
+  const embryo = ((location.state as AdvancedEmbryoRouteState) || {}).embryo;
 
-  const viewerRef = useRef<HTMLDivElement | null>(null);
+  // Viewer state
+  const viewerRef = useRef<HTMLDivElement>(null);
   const [boxes, setBoxes] = useState<BoundingBox[]>([]);
   const [draftBox, setDraftBox] = useState<BoundingBox | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [selectedBoxId, setSelectedBoxId] = useState<number | null>(null);
   const [boxEditState, setBoxEditState] = useState<BoxEditState | null>(null);
   const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
-  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [isAiGrading, setIsAiGrading] = useState(false);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  // UI state
+  const [showAnnotations, setShowAnnotations] = useState(true);
+  const [componentGradesOpen, setComponentGradesOpen] = useState(true);
+  const [uploadedImage, setUploadedImage] = useState<EmbryoImageOption | null>(null);
+  const [selectedImageId, setSelectedImageId] = useState(DEFAULT_IMAGES[0].id);
   const [noteDraft, setNoteDraft] = useState('');
-  const [uploadedImageOption, setUploadedImageOption] = useState<EmbryoImageOption | null>(null);
-  const [selectedImageId, setSelectedImageId] = useState<string>(defaultImageOptions[0].id);
-  const [aiGrade, setAiGrade] = useState<GardnerGrade | null>(() => {
-    const primaryEmbryoGrade = selectedEmbryo?.embryoGrading?.split(',')[0]?.trim();
-    return parseGardnerGrade(primaryEmbryoGrade, 0);
-  });
-  const [manualGrade, setManualGrade] = useState<GardnerGrade | null>(null);
-  const [showManualOverrideEditor, setShowManualOverrideEditor] = useState(false);
-  const [overrideExpansion, setOverrideExpansion] = useState('4');
-  const [overrideIcm, setOverrideIcm] = useState('A');
-  const [overrideTe, setOverrideTe] = useState('A');
+  const [notes, setNotes] = useState<string[]>([]);
 
-  const availableImageOptions = useMemo(
-    () => (uploadedImageOption ? [...defaultImageOptions, uploadedImageOption] : defaultImageOptions),
-    [uploadedImageOption],
+  const images = useMemo(
+    () => (uploadedImage ? [...DEFAULT_IMAGES, uploadedImage] : DEFAULT_IMAGES),
+    [uploadedImage],
   );
+  const selectedImage = images.find(i => i.id === selectedImageId) || images[0];
 
-  const selectedImage = useMemo(
-    () => availableImageOptions.find((option) => option.id === selectedImageId) || availableImageOptions[0],
-    [availableImageOptions, selectedImageId],
-  );
+  // ── Viewer interaction ────────────────────────────────────────────────────
 
-  const pastGrades = useMemo(() => {
-    const labels = selectedEmbryologyLogs
-      .flatMap((row) => [row.day5Label, row.day6Label])
-      .filter((value): value is string => Boolean(value && value !== '—'));
-
-    return Array.from(new Set(labels));
-  }, [selectedEmbryologyLogs]);
-
-  const getRelativePercent = (event: React.MouseEvent<HTMLDivElement>) => {
+  const relPct = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!viewerRef.current) return null;
-    const rect = viewerRef.current.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return null;
-
-    const localX = event.clientX - rect.left;
-    const localY = event.clientY - rect.top;
-    const adjustedX = (localX - panOffset.x) / zoomLevel;
-    const adjustedY = (localY - panOffset.y) / zoomLevel;
-
-    const x = clamp((adjustedX / rect.width) * 100, 0, 100);
-    const y = clamp((adjustedY / rect.height) * 100, 0, 100);
-    return { x, y };
+    const r = viewerRef.current.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    const lx = (e.clientX - r.left - panOffset.x) / zoomLevel;
+    const ly = (e.clientY - r.top - panOffset.y) / zoomLevel;
+    return { x: clamp((lx / r.width) * 100, 0, 100), y: clamp((ly / r.height) * 100, 0, 100) };
   };
 
-  const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-
-    if (zoomLevel > 1) {
-      setPanStart({
-        x: event.clientX - panOffset.x,
-        y: event.clientY - panOffset.y,
-      });
-      return;
-    }
-
-    const point = getRelativePercent(event);
-    if (!point) return;
-
-    setDragStart(point);
-    setDraftBox({
-      id: Date.now(),
-      x: point.x,
-      y: point.y,
-      width: 0,
-      height: 0,
-    });
+  const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if (zoomLevel > 1) { setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y }); return; }
+    const p = relPct(e); if (!p) return;
+    setDragStart(p);
+    setDraftBox({ id: Date.now(), x: p.x, y: p.y, width: 0, height: 0 });
   };
 
-  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+  const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (boxEditState) {
-      const point = getRelativePercent(event);
-      if (!point) return;
-
-      const deltaX = point.x - boxEditState.startPoint.x;
-      const deltaY = point.y - boxEditState.startPoint.y;
-
-      setBoxes((previous) => previous.map((box) => {
-        if (box.id !== boxEditState.boxId) return box;
-
-        if (boxEditState.mode === 'move') {
-          const nextX = clamp(boxEditState.originalBox.x + deltaX, 0, 100 - boxEditState.originalBox.width);
-          const nextY = clamp(boxEditState.originalBox.y + deltaY, 0, 100 - boxEditState.originalBox.height);
-          return { ...box, x: nextX, y: nextY };
-        }
-
-        const nextWidth = clamp(boxEditState.originalBox.width + deltaX, 2, 100 - boxEditState.originalBox.x);
-        const nextHeight = clamp(boxEditState.originalBox.height + deltaY, 2, 100 - boxEditState.originalBox.y);
-        return { ...box, width: nextWidth, height: nextHeight };
+      const p = relPct(e); if (!p) return;
+      const dx = p.x - boxEditState.startPoint.x, dy = p.y - boxEditState.startPoint.y;
+      setBoxes(prev => prev.map(b => {
+        if (b.id !== boxEditState.boxId) return b;
+        if (boxEditState.mode === 'move') return { ...b, x: clamp(boxEditState.originalBox.x + dx, 0, 100 - boxEditState.originalBox.width), y: clamp(boxEditState.originalBox.y + dy, 0, 100 - boxEditState.originalBox.height) };
+        return { ...b, width: clamp(boxEditState.originalBox.width + dx, 2, 100 - boxEditState.originalBox.x), height: clamp(boxEditState.originalBox.height + dy, 2, 100 - boxEditState.originalBox.y) };
       }));
       return;
     }
-
-    if (panStart && zoomLevel > 1) {
-      setPanOffset({
-        x: event.clientX - panStart.x,
-        y: event.clientY - panStart.y,
-      });
-      return;
-    }
-
+    if (panStart && zoomLevel > 1) { setPanOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y }); return; }
     if (!dragStart) return;
-    const point = getRelativePercent(event);
-    if (!point) return;
-
-    const x = Math.min(dragStart.x, point.x);
-    const y = Math.min(dragStart.y, point.y);
-    const width = Math.abs(point.x - dragStart.x);
-    const height = Math.abs(point.y - dragStart.y);
-
-    setDraftBox((previous) => previous ? { ...previous, x, y, width, height } : null);
+    const p = relPct(e); if (!p) return;
+    setDraftBox(prev => prev ? { ...prev, x: Math.min(dragStart.x, p.x), y: Math.min(dragStart.y, p.y), width: Math.abs(p.x - dragStart.x), height: Math.abs(p.y - dragStart.y) } : null);
   };
 
-  const handleMouseUp = () => {
-    if (boxEditState) {
-      setBoxEditState(null);
-      return;
-    }
-
-    if (panStart) {
-      setPanStart(null);
-      return;
-    }
-
-    if (draftBox && draftBox.width > 2 && draftBox.height > 2) {
-      setBoxes((previous) => [...previous, draftBox]);
-      setSelectedBoxId(draftBox.id);
-    }
-
-    setDraftBox(null);
-    setDragStart(null);
+  const onMouseUp = () => {
+    if (boxEditState) { setBoxEditState(null); return; }
+    if (panStart) { setPanStart(null); return; }
+    if (draftBox && draftBox.width > 2 && draftBox.height > 2) { setBoxes(p => [...p, draftBox]); setSelectedBoxId(draftBox.id); }
+    setDraftBox(null); setDragStart(null);
   };
 
-  const handleDeleteBox = (boxId: number) => {
-    setBoxes((previous) => previous.filter((box) => box.id !== boxId));
-    setSelectedBoxId((previous) => (previous === boxId ? null : previous));
-    setBoxEditState((previous) => (previous?.boxId === boxId ? null : previous));
-  };
-
-  const handleBoxMouseDown = (
-    event: React.MouseEvent<HTMLDivElement>,
-    box: BoundingBox,
-    mode: 'move' | 'resize',
-  ) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-
-    const point = getRelativePercent(event as React.MouseEvent<HTMLDivElement>);
-    if (!point) return;
-
+  const onBoxMouseDown = (e: React.MouseEvent<HTMLDivElement>, box: BoundingBox, mode: 'move' | 'resize') => {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const p = relPct(e as React.MouseEvent<HTMLDivElement>); if (!p) return;
     setSelectedBoxId(box.id);
-    setBoxEditState({
-      boxId: box.id,
-      mode,
-      startPoint: point,
-      originalBox: { ...box },
-    });
+    setBoxEditState({ boxId: box.id, mode, startPoint: p, originalBox: { ...box } });
   };
 
-  const handleViewerContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const point = getRelativePercent(event);
-    if (!point) return;
-
-    const reversed = [...boxes].reverse();
-    const boxToDelete = reversed.find((box) => (
-      point.x >= box.x
-      && point.x <= box.x + box.width
-      && point.y >= box.y
-      && point.y <= box.y + box.height
-    ));
-
-    if (boxToDelete) {
-      handleDeleteBox(boxToDelete.id);
-    }
+  const handleZoom = (next: number) => {
+    const z = clamp(next, 1, 3); setZoomLevel(z);
+    if (z === 1) { setPanOffset({ x: 0, y: 0 }); setPanStart(null); }
   };
 
-  const handleAssignOocyte = (rowId: number) => {
-    if (!selectedBoxId) return;
-
-    setBoxes((previous) => previous.map((box) => {
-      if (box.id !== selectedBoxId) return box;
-      return { ...box, linkedOocyteId: rowId };
-    }));
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const id = `upload-${Date.now()}`;
+    setUploadedImage(prev => { if (prev?.isUploaded) URL.revokeObjectURL(prev.src); return { id, name: file.name, src: URL.createObjectURL(file), isUploaded: true }; });
+    setSelectedImageId(id); e.target.value = '';
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const capturedOn = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    const objectUrl = URL.createObjectURL(file);
-    const imageId = `upload-${Date.now()}`;
-    setUploadedImageOption((previous) => {
-      if (previous?.isUploaded) {
-        URL.revokeObjectURL(previous.src);
-      }
-      return {
-        id: imageId,
-        name: file.name,
-        src: objectUrl,
-        isUploaded: true,
-      };
-    });
-    setSelectedImageId(imageId);
-    event.target.value = '';
-  };
-
-  const handleReset = () => {
-    setBoxes([]);
-    setDraftBox(null);
-    setDragStart(null);
-    setSelectedBoxId(null);
-    setBoxEditState(null);
-    setPanStart(null);
-    setPanOffset({ x: 0, y: 0 });
-    setZoomLevel(1);
-  };
-
-  const openManualOverrideEditor = () => {
-    const source = manualGrade || aiGrade;
-    setOverrideExpansion(source?.expansion || '4');
-    setOverrideIcm(source?.icm || 'A');
-    setOverrideTe(source?.te || 'A');
-    setShowManualOverrideEditor(true);
-  };
-
-  const applyManualOverride = () => {
-    const parsed = parseGardnerGrade(`${overrideExpansion}${overrideIcm}${overrideTe}`, 100);
-    if (parsed) {
-      setManualGrade(parsed);
-      setShowManualOverrideEditor(false);
-    }
-  };
-
-  const handleZoomChange = (nextZoom: number) => {
-    const normalized = clamp(nextZoom, 1, 3);
-    setZoomLevel(normalized);
-    if (normalized === 1) {
-      setPanOffset({ x: 0, y: 0 });
-      setPanStart(null);
-    }
-  };
-
-  const handleAiGrading = () => {
-    setIsAiGrading(true);
-    const gradeCandidates = [
-      ...pastGrades,
-      ...selectedEmbryologyLogs.flatMap((row) => [row.day5Label || '', row.day6Label || '']),
-      selectedEmbryo?.embryoGrading || '',
-    ];
-
-    window.setTimeout(() => {
-      const aiGradeValue = pickAiGrade(gradeCandidates);
-      const confidence = Number((86 + Math.random() * 12).toFixed(1));
-      const parsed = parseGardnerGrade(aiGradeValue, confidence);
-      if (parsed) {
-        setAiGrade(parsed);
-      }
-      setIsAiGrading(false);
-    }, 1200);
-  };
-
-  const oocyteLinkedMap = useMemo(() => {
-    const map = new Map<number, number[]>();
-    boxes.forEach((box, index) => {
-      if (!box.linkedOocyteId) return;
-      const existing = map.get(box.linkedOocyteId) || [];
-      map.set(box.linkedOocyteId, [...existing, index + 1]);
-    });
-    return map;
-  }, [boxes]);
-
-  const oocyteNoById = useMemo(() => {
-    const map = new Map<number, string>();
-    selectedEmbryologyLogs.forEach((row) => {
-      map.set(row.id, row.oocyteNo || '—');
-    });
-    return map;
-  }, [selectedEmbryologyLogs]);
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <PageLayout
       title="Advanced Embryo Grading"
       icon={EmbryosIcon}
       actions={
-        <button
-          type="button"
-          onClick={() => navigate(his ? `/embryo-grading/${his}` : '/embryo-grading')}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-[#E7E1E1] bg-white text-sm text-gray-700 hover:bg-gray-50"
-        >
-          <ArrowLeft size={16} />
-          Back to Log Sheet
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" className="p-2 rounded-md border border-[#E7E1E1] bg-white text-gray-500 hover:bg-gray-50">
+            <Download size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(his ? `/embryo-grading/${his}` : '/embryo-grading')}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-[#E7E1E1] bg-white text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <ArrowLeft size={15} />
+            Back to Log Sheet
+          </button>
+        </div>
       }
     >
-      <div className="h-full min-h-0 rounded-xl border border-[#E7E1E1] bg-[#FCF9FF] p-3 md:p-4 shadow-sm">
-        <div className="grid grid-cols-1 gap-3 h-full min-h-0 xl:grid-cols-[330px_minmax(0,1fr)_360px]">
-          <aside className="h-full min-h-0 rounded-lg border border-[#E7E1E1] bg-white p-3 flex flex-col gap-3 text-gray-900 overflow-y-auto">
-            <div className="text-xs text-gray-500">Treatment page</div>
+      {/* Sub-header: patient info */}
+      <div className="px-1 pb-3">
+        <p className="text-sm font-semibold text-gray-800">{embryo?.hisNumber || his || '—'} | TID —</p>
+        <p className="text-xs text-gray-400 mt-0.5">Event | tEB</p>
+      </div>
 
-            <div className="rounded-md border border-[#E7E1E1] bg-[#FCF9FF] px-3 py-2">
-              <p className="text-sm font-semibold tracking-wide">{selectedEmbryo?.hisNumber || his || '—'} | TID {selectedEmbryo?.cryolockNum || '—'}</p>
-              <p className="text-xs text-gray-500 mt-1">Event | tEB</p>
-            </div>
+      {/* 3-column grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-[440px_minmax(0,1fr)_460px] gap-4 h-full min-h-0">
 
-            <div className="rounded-md border border-[#E7E1E1] bg-white p-3 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-gray-900">Gardner's Grade</p>
-                <span className="text-[11px] text-gray-500">{manualGrade ? 'Manual override active' : 'AI/Manual grading'}</span>
+        {/* ── LEFT PANEL ── */}
+        <aside className="flex flex-col gap-3 overflow-y-auto pr-0.5">
+
+          {/* AI Grade */}
+          <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
+            <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-2">AI Grade</p>
+            <p className="text-5xl font-extrabold text-[#6b1176] leading-none">{MOCK_AI.grade}</p>
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-gray-500">Confidence Score</span>
+                <button type="button" className="text-gray-300 hover:text-gray-400"><Info size={13} /></button>
               </div>
-
-              {!(aiGrade || manualGrade) ? (
-                <div className="rounded-md border border-dashed border-[#D8C7E3] bg-[#FCF9FF] px-3 py-3 text-xs text-[#6b1176]">
-                  Yet to be graded
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-[#6b1176]" style={{ width: `${MOCK_AI.confidence}%` }} />
                 </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-md border border-[#E7E1E1] bg-[#FCF9FF] p-2">
-                      <p className="text-[10px] text-gray-500 uppercase">Expansion</p>
-                      <p className="text-xl font-semibold text-[#6b1176] mt-1">{(manualGrade || aiGrade)?.expansion || '—'}</p>
-                    </div>
-                    <div className="rounded-md border border-[#E7E1E1] bg-[#FCF9FF] p-2">
-                      <p className="text-[10px] text-gray-500 uppercase">ICM</p>
-                      <p className="text-xl font-semibold text-[#6b1176] mt-1">{(manualGrade || aiGrade)?.icm || '—'}</p>
-                    </div>
-                    <div className="rounded-md border border-[#E7E1E1] bg-[#FCF9FF] p-2">
-                      <p className="text-[10px] text-gray-500 uppercase">TE</p>
-                      <p className="text-xl font-semibold text-[#6b1176] mt-1">{(manualGrade || aiGrade)?.te || '—'}</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-md border border-[#E7E1E1] bg-white px-3 py-2">
-                    <p className="text-[11px] text-gray-500">Confidence Score</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">{(manualGrade || aiGrade)?.confidence ? `${(manualGrade || aiGrade)?.confidence}%` : '—'}</p>
-                  </div>
-                </>
-              )}
-
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-medium text-gray-600">Manual Override</p>
-                <div className="flex flex-wrap gap-1.5 items-center">
-                  <button
-                    type="button"
-                    onClick={openManualOverrideEditor}
-                    className="px-2.5 py-1 rounded border border-[#E7E1E1] text-[11px] text-[#6b1176] hover:bg-[#F7ECFF]"
-                  >
-                    Override Grade
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setManualGrade(null)}
-                    className="px-2 py-1 rounded border border-[#E7E1E1] text-[11px] text-gray-600 hover:bg-gray-50"
-                  >
-                    Clear Override
-                  </button>
-                </div>
-
-                {showManualOverrideEditor && (
-                  <div className="rounded-md border border-[#E7E1E1] bg-[#FCF9FF] p-2 space-y-2">
-                    <div className="grid grid-cols-3 gap-2">
-                      <label className="text-[10px] text-gray-600 flex flex-col gap-1">
-                        Expansion
-                        <select
-                          value={overrideExpansion}
-                          onChange={(event) => setOverrideExpansion(event.target.value)}
-                          className="rounded border border-[#E7E1E1] bg-white px-2 py-1 text-[11px]"
-                        >
-                          {['1', '2', '3', '4', '5', '6'].map((value) => (
-                            <option key={value} value={value}>{value}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="text-[10px] text-gray-600 flex flex-col gap-1">
-                        ICM
-                        <select
-                          value={overrideIcm}
-                          onChange={(event) => setOverrideIcm(event.target.value)}
-                          className="rounded border border-[#E7E1E1] bg-white px-2 py-1 text-[11px]"
-                        >
-                          {['A', 'B', 'C'].map((value) => (
-                            <option key={value} value={value}>{value}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="text-[10px] text-gray-600 flex flex-col gap-1">
-                        TE
-                        <select
-                          value={overrideTe}
-                          onChange={(event) => setOverrideTe(event.target.value)}
-                          className="rounded border border-[#E7E1E1] bg-white px-2 py-1 text-[11px]"
-                        >
-                          {['A', 'B', 'C'].map((value) => (
-                            <option key={value} value={value}>{value}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                    <div className="flex justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setShowManualOverrideEditor(false)}
-                        className="px-2 py-1 rounded border border-[#E7E1E1] text-[11px] text-gray-600 hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={applyManualOverride}
-                        className="px-2.5 py-1 rounded bg-[#6b1176] text-white text-[11px] hover:bg-[#5a0f62]"
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <span className="text-sm font-bold text-gray-800 whitespace-nowrap">{MOCK_AI.confidence}%</span>
               </div>
-
-              {(aiGrade || manualGrade) && (
-                <div className="rounded-md border border-[#E7E1E1] bg-white px-3 py-2 text-[11px] text-gray-600 space-y-1">
-                  <p>AI Grade: <span className="font-semibold text-[#6b1176]">{aiGrade?.grade || 'Yet to be graded'}</span></p>
-                  <p>Manual Grade: <span className="font-semibold text-[#6b1176]">{manualGrade?.grade || 'Not overridden'}</span></p>
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-md border border-[#E7E1E1] bg-white p-3 mt-auto min-h-24">
-              <p className="text-xs font-semibold text-gray-900">AI Insights</p>
-              <p className="text-xs text-gray-500 mt-2">Insights about this embryo will appear here as it progresses.</p>
-            </div>
-
-            <div className="rounded-md border border-[#E7E1E1] bg-white p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-gray-900">Embryo Images</p>
-                <label className="inline-flex items-center px-2.5 py-1.5 rounded border border-[#E7E1E1] text-xs text-[#6b1176] hover:bg-[#F7ECFF] cursor-pointer">
-                  Upload
-                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                </label>
-              </div>
-              <p className="text-[11px] text-gray-500 mt-1">Select image first, then draw boxes in center viewer.</p>
-              <div className="grid grid-cols-3 gap-2 mt-3">
-                {availableImageOptions.map((imageOption) => {
-                  const isSelected = selectedImageId === imageOption.id;
-
-                  return (
-                    <button
-                      key={imageOption.id}
-                      type="button"
-                      onClick={() => setSelectedImageId(imageOption.id)}
-                      className={`rounded-md border overflow-hidden text-left ${isSelected ? 'border-[#6b1176] ring-1 ring-[#6b1176]' : 'border-[#E7E1E1] hover:border-[#c8b2d1]'}`}
-                    >
-                      <img src={imageOption.src} alt={imageOption.name} className="h-16 w-full object-cover" />
-                      <div className="px-2 py-1 text-[10px] text-gray-600 truncate" title={imageOption.name}>{imageOption.name}</div>
-                    </button>
-                  );
-                })}
+              <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[11px] font-semibold text-emerald-700">{MOCK_AI.quality}</span>
               </div>
             </div>
+          </div>
 
-            {!selectedEmbryo && (
-              <div className="rounded-md border border-[#f1d7a3] bg-[#fff8e8] px-3 py-2 text-xs text-[#926019]">
-                Opened without selected embryo context. Some details are placeholders.
+          {/* Component Grades */}
+          <div className="rounded-lg border border-[#E7E1E1] bg-white">
+            <button
+              type="button"
+              className="w-full flex items-center gap-2 px-4 py-3 text-left"
+              onClick={() => setComponentGradesOpen(o => !o)}
+            >
+              <ChevronRight size={14} className={`text-gray-400 transition-transform ${componentGradesOpen ? 'rotate-90' : ''}`} />
+              <span className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase">Component Grades</span>
+            </button>
+            {componentGradesOpen && (
+              <div className="grid grid-cols-3 gap-2 px-4 pb-4">
+                {[
+                  { label: 'Expansion', value: MOCK_AI.expansion, sub: MOCK_AI.expansionLabel, conf: MOCK_AI.expansionConf },
+                  { label: 'ICM', value: MOCK_AI.icm, sub: MOCK_AI.icmLabel, conf: MOCK_AI.icmConf },
+                  { label: 'TE', value: MOCK_AI.te, sub: MOCK_AI.teLabel, conf: MOCK_AI.teConf },
+                ].map(c => (
+                  <div key={c.label} className="rounded-lg border border-[#E7E1E1] bg-[#FCF9FF] p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-semibold text-[#6b1176]">{c.label}</span>
+                      <Info size={11} className="text-gray-300" />
+                    </div>
+                    <p className="text-2xl font-extrabold text-[#6b1176]">{c.value}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">{c.sub}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Confidence: {c.conf}%</p>
+                  </div>
+                ))}
               </div>
             )}
-          </aside>
+          </div>
 
-          <section className="h-full min-h-[560px] rounded-lg border border-[#E7E1E1] bg-white overflow-hidden flex flex-col">
-            <div className="px-3 py-2 border-b border-[#E7E1E1] flex items-center justify-between gap-2 text-gray-600 text-xs bg-[#FCF9FF]">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-1 rounded border border-[#E7E1E1] bg-white">EID 1</span>
-                <span className="px-2 py-1 rounded border border-[#E7E1E1] bg-white">17.57 H</span>
-              </div>
+          {/* AI Justification */}
+          <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
+            <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-2">AI Justification</p>
+            <p className="text-xs text-gray-700 leading-relaxed">{AI_JUSTIFICATION}</p>
+          </div>
+
+          {/* Key Observations */}
+          <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
+            <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Key Observations</p>
+            <ul className="space-y-2">
+              {KEY_OBSERVATIONS.map(obs => (
+                <li key={obs} className="flex items-start gap-2 text-xs text-gray-600">
+                  <Check size={12} className="text-[#6b1176] mt-0.5 shrink-0" />
+                  {obs}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Embryo Images */}
+          <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Embryo Images</p>
+              <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-[#E7E1E1] text-[11px] text-[#6b1176] hover:bg-[#F7ECFF] cursor-pointer">
+                <Upload size={11} /> Upload
+                <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
+              </label>
+            </div>
+            <p className="text-[11px] text-gray-400 mb-3">Select image first, then draw boxes in center viewer.</p>
+            <div className="grid grid-cols-3 gap-2">
+              {images.map(img => {
+                const active = img.id === selectedImageId;
+                return (
+                  <button
+                    key={img.id}
+                    type="button"
+                    onClick={() => setSelectedImageId(img.id)}
+                    className={`relative rounded-lg overflow-hidden border-2 transition-all ${active ? 'border-[#6b1176]' : 'border-[#E7E1E1] hover:border-[#c8b2d1]'}`}
+                  >
+                    <img src={img.src} alt={img.name} className="h-16 w-full object-cover" />
+                    {active && (
+                      <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#6b1176] flex items-center justify-center">
+                        <Check size={9} className="text-white" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </aside>
+
+        {/* ── CENTER PANEL ── */}
+        <section className="rounded-lg border border-[#E7E1E1] bg-white overflow-hidden flex flex-col min-h-[500px]">
+
+          {/* EID tabs */}
+          <div className="px-4 py-2.5 border-b border-[#E7E1E1] flex items-center gap-2 bg-[#FDFAFF]">
+            <button type="button" className="px-3 py-1 rounded border border-[#6b1176] bg-[#F7ECFF] text-[#6b1176] text-xs font-semibold">EID 1</button>
+            <button type="button" className="px-3 py-1 rounded border border-[#E7E1E1] text-gray-500 text-xs">17.57 H</button>
+          </div>
+
+          {/* Viewer toolbar */}
+          <div className="px-4 py-2 border-b border-[#E7E1E1] flex items-center justify-between bg-white">
+            <span className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Viewer</span>
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={handleReset}
-                className="inline-flex items-center gap-1.5 rounded border border-[#E7E1E1] px-2 py-1 hover:bg-[#F7ECFF] text-[#6b1176]"
+                onClick={() => setShowAnnotations(true)}
+                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${showAnnotations ? 'bg-[#6b1176] text-white' : 'border border-[#E7E1E1] text-gray-500 hover:bg-gray-50'}`}
               >
-                <Trash2 size={13} />
-                Clear Boxes
+                Annotations
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAnnotations(false)}
+                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${!showAnnotations ? 'bg-[#6b1176] text-white' : 'border border-[#E7E1E1] text-gray-500 hover:bg-gray-50'}`}
+              >
+                Overlay
+              </button>
+              <button type="button" className="p-1 rounded border border-[#E7E1E1] text-gray-400 hover:bg-gray-50">
+                <Maximize2 size={13} />
               </button>
             </div>
+          </div>
 
-            <div className="flex-1 min-h-0 p-3">
-              <div className="relative h-full min-h-[430px] rounded-md border border-[#E7E1E1] bg-[#f8fbff] overflow-hidden flex isolate">
-                <div className="w-11 shrink-0 border-r border-[#E7E1E1] bg-[#F7ECFF] flex flex-col items-center py-2 text-[10px] text-[#6b1176] relative z-20">
-                  <span className="mb-2">Zoom</span>
-                  <button
-                    type="button"
-                    onClick={() => handleZoomChange(zoomLevel + 0.25)}
-                    className="h-5 w-5 rounded border border-[#D8C7E3] bg-white text-[11px]"
+          {/* Viewer body */}
+          <div className="flex-1 flex min-h-0">
+            {/* Zoom rail */}
+            <div className="w-10 shrink-0 border-r border-[#E7E1E1] bg-[#FDFAFF] flex flex-col items-center py-3 gap-1 text-[10px] text-[#6b1176]">
+              <button type="button" onClick={() => handleZoom(zoomLevel + 0.25)} className="w-6 h-6 rounded border border-[#D8C7E3] bg-white text-sm leading-none hover:bg-[#F7ECFF]">+</button>
+              <span className="font-semibold text-[9px] my-1">{Math.round(zoomLevel * 100)}%</span>
+              <button type="button" onClick={() => handleZoom(zoomLevel - 0.25)} className="w-6 h-6 rounded border border-[#D8C7E3] bg-white text-sm leading-none hover:bg-[#F7ECFF]">−</button>
+              <div className="flex-1 flex items-center justify-center w-full mt-1">
+                <input
+                  type="range" min={1} max={3} step={0.25} value={zoomLevel}
+                  onChange={e => handleZoom(Number(e.target.value))}
+                  className="w-16 -rotate-90 accent-[#6b1176]"
+                />
+              </div>
+            </div>
+
+            {/* Image viewer */}
+            <div
+              ref={viewerRef}
+              className={`relative flex-1 bg-[#1a1a2e] overflow-hidden ${zoomLevel > 1 ? 'cursor-grab' : 'cursor-crosshair'} ${panStart ? 'cursor-grabbing' : ''}`}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={onMouseUp}
+            >
+              <div
+                className="absolute inset-0"
+                style={{ transform: `translate(${panOffset.x}px,${panOffset.y}px) scale(${zoomLevel})`, transformOrigin: 'center center' }}
+              >
+                <img src={selectedImage.src} alt={selectedImage.name} className="absolute inset-0 h-full w-full object-cover" />
+
+                {/* Static annotation labels */}
+                {showAnnotations && ANNOTATIONS.map(a => (
+                  <div
+                    key={a.label}
+                    className={`absolute px-2.5 py-1 rounded-md text-xs font-bold shadow-lg pointer-events-none ${a.color}`}
+                    style={{ left: `${a.x}%`, top: `${a.y}%`, transform: 'translate(-50%,-50%)' }}
                   >
-                    +
-                  </button>
-                  <span className="my-1 text-[10px] font-semibold">{Math.round(zoomLevel * 100)}%</span>
-                  <button
-                    type="button"
-                    onClick={() => handleZoomChange(zoomLevel - 0.25)}
-                    className="h-5 w-5 rounded border border-[#D8C7E3] bg-white text-[11px]"
+                    {a.label}
+                  </div>
+                ))}
+
+                {/* User bounding boxes */}
+                {boxes.map((box, idx) => (
+                  <div
+                    key={box.id}
+                    className={`absolute border-2 ${box.id === selectedBoxId ? 'border-[#6b1176] bg-[#6b1176]/20' : 'border-[#8E63FF] bg-[#8E63FF]/15'}`}
+                    style={{ left: `${box.x}%`, top: `${box.y}%`, width: `${box.width}%`, height: `${box.height}%` }}
+                    onMouseDown={e => onBoxMouseDown(e, box, 'move')}
+                    onClick={e => { e.stopPropagation(); setSelectedBoxId(box.id); }}
                   >
-                    -
-                  </button>
-                  <div className="mt-2 h-24 w-full flex items-center justify-center">
-                    <input
-                      type="range"
-                      min={1}
-                      max={3}
-                      step={0.25}
-                      value={zoomLevel}
-                      onChange={(event) => handleZoomChange(Number(event.target.value))}
-                      className="w-20 -rotate-90 accent-[#6b1176]"
+                    <span className="absolute -top-5 left-0 text-[9px] font-semibold px-1 py-0.5 rounded bg-[#8E63FF] text-white whitespace-nowrap">
+                      Embryo {idx + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onMouseDown={e => onBoxMouseDown(e as unknown as React.MouseEvent<HTMLDivElement>, box, 'resize')}
+                      className="absolute -bottom-1 -right-1 h-3 w-3 rounded-sm border border-white bg-[#6b1176]"
                     />
                   </div>
-                </div>
-
-                <div
-                  ref={viewerRef}
-                  className={`relative flex-1 overflow-hidden z-0 ${zoomLevel > 1 ? 'cursor-grab' : 'cursor-crosshair'} ${panStart ? 'cursor-grabbing' : ''}`}
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
-                  onContextMenu={handleViewerContextMenu}
-                >
+                ))}
+                {draftBox && (
                   <div
-                    className="absolute inset-0 z-0"
-                    style={{
-                      transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
-                      transformOrigin: 'center center',
-                    }}
-                  >
-                    <img src={selectedImage.src} alt={selectedImage.name} className="absolute inset-0 h-full w-full object-cover" />
-
-                    {boxes.map((box, index) => (
-                      <div
-                        key={box.id}
-                        className={`absolute border-2 ${box.id === selectedBoxId ? 'border-[#6b1176] bg-[#6b1176]/30' : 'border-[#8E63FF] bg-[#8E63FF]/20'}`}
-                        style={{
-                          left: `${box.x}%`,
-                          top: `${box.y}%`,
-                          width: `${box.width}%`,
-                          height: `${box.height}%`,
-                        }}
-                        onMouseDown={(event) => handleBoxMouseDown(event, box, 'move')}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setSelectedBoxId(box.id);
-                        }}
-                        onContextMenu={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          handleDeleteBox(box.id);
-                        }}
-                      >
-                        <span className="absolute -top-6 left-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#8E63FF] text-white">
-                          Embryo {index + 1}{box.linkedOocyteId ? ` → Oocyte ${oocyteNoById.get(box.linkedOocyteId) || box.linkedOocyteId}` : ''}
-                        </span>
-                        <button
-                          type="button"
-                          onMouseDown={(event) => handleBoxMouseDown(event as unknown as React.MouseEvent<HTMLDivElement>, box, 'resize')}
-                          className="absolute -bottom-1 -right-1 h-3 w-3 rounded-sm border border-white bg-[#6b1176]"
-                          title="Resize box"
-                        />
-                      </div>
-                    ))}
-
-                    {draftBox && (
-                      <div
-                        className="absolute border-2 border-dashed border-[#8E63FF] bg-[#8E63FF]/20"
-                        style={{
-                          left: `${draftBox.x}%`,
-                          top: `${draftBox.y}%`,
-                          width: `${draftBox.width}%`,
-                          height: `${draftBox.height}%`,
-                        }}
-                      />
-                    )}
-                  </div>
-
-                  {isAiGrading && (
-                    <div className="absolute inset-0 z-20 bg-white/75 backdrop-blur-[1px] flex items-center justify-center">
-                      <div className="rounded-md border border-[#E7E1E1] bg-white px-4 py-3 text-center">
-                        <div className="h-5 w-5 border-2 border-[#D8C7E3] border-t-[#6b1176] rounded-full animate-spin mx-auto" />
-                        <p className="text-xs text-gray-700 mt-2">AI grading in progress...</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    className="absolute border-2 border-dashed border-[#8E63FF] bg-[#8E63FF]/15"
+                    style={{ left: `${draftBox.x}%`, top: `${draftBox.y}%`, width: `${draftBox.width}%`, height: `${draftBox.height}%` }}
+                  />
+                )}
               </div>
             </div>
+          </div>
 
-            <div className="px-3 py-2 border-t border-[#E7E1E1] flex flex-wrap items-center justify-between gap-2 text-xs text-gray-600 bg-[#FCF9FF]">
-              <div className="flex items-center gap-2">
-                <button type="button" className="px-2.5 py-1.5 rounded border border-[#E7E1E1] bg-white hover:bg-[#F7ECFF]">Download Image</button>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleAiGrading}
-                  disabled={isAiGrading}
-                  className="px-3 py-1.5 rounded bg-[#6b1176] text-white font-medium hover:bg-[#5a0f62] disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  Grade with AI
-                </button>
-              </div>
-            </div>
-          </section>
+          {/* Timeline scrubber */}
+        </section>
 
-          <section className="h-full min-h-[560px] rounded-lg border border-[#E7E1E1] bg-white overflow-hidden flex flex-col text-gray-900">
-            <div className="px-3 py-2 border-b border-[#E7E1E1] text-xs flex items-center gap-2 bg-[#FCF9FF]">
-              <span className="px-2 py-1 rounded border border-[#E7E1E1] bg-[#F7ECFF] text-[#6b1176]">Embryology Log Sheet</span>
-              <span className="px-2 py-1 rounded border border-[#E7E1E1] text-gray-500">Live Data</span>
-            </div>
+        {/* ── RIGHT PANEL ── */}
+        <aside className="flex flex-col gap-0 overflow-y-auto rounded-lg border border-[#E7E1E1] bg-white divide-y divide-[#F0EAF4]">
 
-            <div className="px-3 py-2 border-b border-[#E7E1E1] flex items-center gap-2 text-xs bg-white">
-              <span className="px-2 py-1 rounded-md bg-[#F7ECFF] border border-[#EAD4F8] text-[#6b1176]">Rows: {selectedEmbryologyLogs.length}</span>
-              <span className="px-2 py-1 rounded-md border border-[#E7E1E1] text-gray-500">Patient: {selectedEmbryo?.hisNumber || his || '—'}</span>
-              <span className="px-2 py-1 rounded-md border border-[#E7E1E1] text-gray-500">Selected Box: {selectedBoxId ? `Embryo ${boxes.findIndex((box) => box.id === selectedBoxId) + 1}` : 'None'}</span>
-            </div>
-
-            <div className="flex-1 overflow-auto">
-              <table className="min-w-[920px] w-full text-xs">
-                <thead className="text-gray-500 bg-[#FCF9FF] sticky top-0 z-10">
-                  <tr>
-                    <th className="px-2 py-2 text-left font-medium">S.No</th>
-                    <th className="px-2 py-2 text-left font-medium">Oocyte No</th>
-                    <th className="px-2 py-2 text-left font-medium">Day 0 Dish</th>
-                    <th className="px-2 py-2 text-left font-medium">PN</th>
-                    <th className="px-2 py-2 text-left font-medium">Drop No</th>
-                    <th className="px-2 py-2 text-left font-medium">Day 3</th>
-                    <th className="px-2 py-2 text-left font-medium">Day 5</th>
-                    <th className="px-2 py-2 text-left font-medium">Day 6</th>
-                    <th className="px-2 py-2 text-left font-medium">Fate</th>
-                    <th className="px-2 py-2 text-left font-medium">FZ No</th>
-                    <th className="px-2 py-2 text-left font-medium">Mapped Box</th>
-                    <th className="px-2 py-2 text-left font-medium">Notes</th>
+          {/* Embryo Details */}
+          <div className="p-4">
+            <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Embryo Details</p>
+            <table className="w-full text-xs">
+              <tbody className="divide-y divide-[#F8F4FD]">
+                {[
+                  { label: 'Patient ID', value: embryo?.hisNumber || his || '—' },
+                  { label: 'Oocyte No.', value: '12' },
+                  { label: 'Day / Time', value: 'Day 5 / 17.57 h' },
+                  { label: 'Fertilization', value: 'ICSI' },
+                  { label: 'Embryo ID', value: 'EID 1' },
+                  { label: 'Captured On', value: capturedOn },
+                ].map(r => (
+                  <tr key={r.label}>
+                    <td className="py-1.5 text-gray-400 font-medium">{r.label}</td>
+                    <td className="py-1.5 text-gray-800 text-right">{r.value}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {selectedEmbryologyLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={12} className="px-3 py-8 text-center text-gray-500">
-                        No log rows available. Open this page from an embryo detail log sheet.
-                      </td>
-                    </tr>
-                  ) : (
-                    selectedEmbryologyLogs.map((row, index) => (
-                      <tr
-                        key={row.id || index}
-                        onClick={() => handleAssignOocyte(row.id)}
-                        className={`border-t border-[#F1F1F1] hover:bg-[#FCF9FF] ${selectedBoxId ? 'cursor-pointer' : ''}`}
-                      >
-                        <td className="px-2 py-2">{index + 1}</td>
-                        <td className="px-2 py-2">{row.oocyteNo || '—'}</td>
-                        <td className="px-2 py-2">{row.day0Dish || '—'}</td>
-                        <td className="px-2 py-2">{row.pn || '—'}</td>
-                        <td className="px-2 py-2">{row.dropNo || '—'}</td>
-                        <td className="px-2 py-2">{row.day3Label || '—'}</td>
-                        <td className="px-2 py-2 font-semibold text-[#6b1176]">{row.day5Label || '—'}</td>
-                        <td className="px-2 py-2 font-semibold text-[#6b1176]">{row.day6Label || '—'}</td>
-                        <td className="px-2 py-2">{row.fate || '—'}</td>
-                        <td className="px-2 py-2">{row.fzNo || '—'}</td>
-                        <td className="px-2 py-2">
-                          <div className="flex flex-wrap gap-1">
-                            {(oocyteLinkedMap.get(row.id) || []).length > 0 ? (
-                              (oocyteLinkedMap.get(row.id) || []).map((embryoNo) => (
-                                <span key={`${row.id}-${embryoNo}`} className="px-1.5 py-0.5 rounded bg-[#F7ECFF] text-[#6b1176] text-[10px] font-medium">
-                                  E{embryoNo}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-gray-400 text-[10px]">Unmapped</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 max-w-[180px] truncate" title={row.notes || '—'}>{row.notes || '—'}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-            <div className="mt-auto border-t border-[#E7E1E1] bg-white px-3 py-2">
-              <p className="text-[11px] text-[#6b1176] mb-2">
-                Past grades: {pastGrades.length > 0 ? pastGrades.join(', ') : 'No grade labels available'}
-              </p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={noteDraft}
-                  onChange={(event) => setNoteDraft(event.target.value)}
-                  placeholder="Add note..."
-                  className="w-full rounded-full border border-[#E7E1E1] bg-white px-3 py-1.5 text-xs text-gray-700 placeholder:text-gray-400 outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setNoteDraft('')}
-                  className="rounded-full px-3 py-1.5 text-xs bg-[#6b1176] text-white font-semibold hover:bg-[#5a0f62]"
-                >
-                  Add
-                </button>
+          {/* Grading History */}
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Grading History</p>
+              <button type="button" className="text-gray-300 hover:text-[#6b1176]"><RefreshCw size={13} /></button>
+            </div>
+            <div className="rounded-lg border border-[#E7E1E1] bg-[#FDFAFF] px-3 py-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <RefreshCw size={11} className="text-[#6b1176]" />
+                  <span className="font-semibold">Day 5 / 17.57 h</span>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-[#F7ECFF] border border-[#D8C7E3] text-[#6b1176] text-[11px] font-bold">{MOCK_AI.grade}</span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-gray-400">
+                <span>AI Grade</span>
+                <span>·</span>
+                <span>{capturedOn}</span>
               </div>
             </div>
-          </section>
-        </div>
+          </div>
+
+          {/* Development Timeline */}
+          <div className="p-4">
+            <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Development Timeline</p>
+            <div className="relative">
+              <div className="absolute left-[7px] top-2 bottom-2 w-px bg-[#E8D5F5]" />
+              <ul className="space-y-2.5">
+                {DEV_TIMELINE.map((item, i) => (
+                  <li key={i} className="flex items-start gap-3 pl-0.5">
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 mt-0.5 z-10 ${item.active ? 'bg-[#6b1176] border-[#6b1176]' : 'bg-white border-[#c084fc]'}`} />
+                    <div className="flex-1 flex items-center justify-between min-w-0">
+                      <span className={`text-xs ${item.active ? 'text-[#6b1176] font-semibold' : 'text-gray-500'}`}>{item.time}</span>
+                      <span className={`text-xs ml-2 text-right ${item.active ? 'text-[#6b1176] font-bold' : 'text-gray-600'}`}>{item.event}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Clinician Notes */}
+          <div className="p-4 flex-1 flex flex-col">
+            <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Clinician Notes</p>
+            {notes.length > 0 && (
+              <ul className="space-y-1.5 mb-3">
+                {notes.map((n, i) => (
+                  <li key={i} className="text-xs text-gray-600 bg-[#FDFAFF] rounded px-2.5 py-1.5 border border-[#F0EAF4]">{n}</li>
+                ))}
+              </ul>
+            )}
+            <textarea
+              value={noteDraft}
+              onChange={e => setNoteDraft(e.target.value)}
+              placeholder="Add note..."
+              rows={3}
+              className="w-full rounded-lg border border-[#E7E1E1] bg-white px-3 py-2 text-xs text-gray-700 placeholder:text-gray-300 outline-none resize-none focus:border-[#6b1176] transition-colors"
+            />
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => { if (noteDraft.trim()) { setNotes(n => [...n, noteDraft.trim()]); setNoteDraft(''); } }}
+                className="px-4 py-2 rounded-lg bg-[#3b0764] text-white text-xs font-semibold hover:bg-[#6b1176] transition-colors"
+              >
+                Add Note
+              </button>
+            </div>
+          </div>
+        </aside>
       </div>
     </PageLayout>
   );
