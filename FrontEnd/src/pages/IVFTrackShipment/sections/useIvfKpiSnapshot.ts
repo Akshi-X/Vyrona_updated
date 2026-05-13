@@ -133,6 +133,7 @@ export type CryocanSensorTile = {
   isMissing: boolean;
   isMuted: boolean;
   tooltip?: string;
+  history: number[];
 };
 
 export type IvfKpiSnapshot = {
@@ -157,6 +158,7 @@ export function useIvfKpiSnapshot({ tankId, enabled = true }: UseIvfKpiSnapshotO
   const isMountedRef = useRef(true);
   const latestKpiTimestampRef = useRef<Record<string, number>>({});
   const latestByNameRef = useRef<Record<string, LatestKpi>>({});
+  const kpiHistoryRef = useRef<Record<string, number[]>>({});
 
   const [kpiLimits, setKpiLimits] = useState<KpiLimits>({});
   const [latestByName, setLatestByName] = useState<Record<string, LatestKpi>>({});
@@ -210,6 +212,10 @@ export function useIvfKpiSnapshot({ tankId, enabled = true }: UseIvfKpiSnapshotO
         if (!existing || kpi.tsMs >= existing.tsMs) {
           next[kpi.name] = kpi;
           latestByNameRef.current[kpi.name] = kpi;
+          const hist = kpiHistoryRef.current[kpi.name] ?? [];
+          hist.push(kpi.value);
+          if (hist.length > 20) hist.splice(0, hist.length - 20);
+          kpiHistoryRef.current[kpi.name] = hist;
           hasUpdate = true;
           latestTs = latestTs == null ? kpi.tsMs : Math.max(latestTs, kpi.tsMs);
           if (kpi.name === 'tive_battery_percentage') {
@@ -254,6 +260,7 @@ export function useIvfKpiSnapshot({ tankId, enabled = true }: UseIvfKpiSnapshotO
     setIsInitialLoading(true);
     latestKpiTimestampRef.current = {};
     latestByNameRef.current = {};
+    kpiHistoryRef.current = {};
     setLatestByName({});
 
     ivfService
@@ -439,6 +446,7 @@ export function useIvfKpiSnapshot({ tankId, enabled = true }: UseIvfKpiSnapshotO
         isMissing: value == null,
         isMuted,
         tooltip: isMuted ? DEAD_BATTERY_TOOLTIP : undefined,
+        history: kpiHistoryRef.current[tab.id]?.slice() ?? [],
       };
     });
     return tiles;

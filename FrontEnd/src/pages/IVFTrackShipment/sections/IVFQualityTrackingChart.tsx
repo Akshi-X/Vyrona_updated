@@ -24,6 +24,42 @@ ChartJS.register(
   Legend
 );
 
+const KPI_TAB_ICONS: Record<string, string> = {
+  temp_external: 'M12 2.69l5.66 5.66a8 8 0 11-11.31 0z', // droplet sun
+  temp_internal: 'M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z', // thermometer
+  ln2_level: 'M12 2.69l5.66 5.66a8 8 0 11-11.31 0z', // droplet
+  ln2_evaporation_rate: 'M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2', // wind
+  tive_battery_percentage: '', // battery — use rect
+  ln2_lid_state: 'M7 11V7a5 5 0 0110 0v4', // lock
+  shock: 'M13 2 3 14h9l-1 8 10-12h-9l1-8z', // zap
+};
+
+const KpiTabIcon = ({ id }: { id: string }) => {
+  if (id === 'tive_battery_percentage') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="6" width="18" height="12" rx="2" ry="2"/><line x1="23" y1="13" x2="23" y2="11"/>
+      </svg>
+    );
+  }
+  if (id === 'temp_external') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+      </svg>
+    );
+  }
+  const d = KPI_TAB_ICONS[id];
+  if (!d) return null;
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  );
+};
+
 export const KPI_TABS = [
   { id: 'temp_external', label: 'External Temperature', unit: '°C' },
   { id: 'temp_internal', label: 'Internal Temperature', unit: '°C' },
@@ -1105,7 +1141,7 @@ export default function IVFQualityTrackingChart({
       plugins: {
         legend: {
           display: true,
-          position: 'top' as const,
+          position: 'bottom' as const,
           labels: {
             boxWidth: 10,
             boxHeight: 10,
@@ -1303,12 +1339,13 @@ export default function IVFQualityTrackingChart({
                 id={tab.id === 'ln2_level' ? 'onboarding-chart-tab-ln2' : undefined}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
                   activeTab === tab.id
                     ? 'bg-purple-100 border-purple-300 text-purple-900'
                     : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                 }`}
               >
+                <KpiTabIcon id={tab.id} />
                 {tab.label}
               </button>
             ))
