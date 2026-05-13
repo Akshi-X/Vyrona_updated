@@ -539,6 +539,8 @@ export default function IVFTrackShipmentPage() {
                                         systemActivity={systemActivity}
                                         externalTempAlert={externalTempAlert}
                                         internalTempAlert={internalTempAlert}
+                                        tankCode={headerTankCode !== "-" ? headerTankCode : undefined}
+                                        branchName={headerBranchName !== "-" ? headerBranchName : undefined}
                                     />
                                     <IVFQualityTrackingChart canisterNumber={tankId} />
                                 </>

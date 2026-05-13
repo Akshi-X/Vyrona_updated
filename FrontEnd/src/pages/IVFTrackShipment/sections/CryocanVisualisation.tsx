@@ -115,6 +115,8 @@ type CryocanVisualizerProps = {
   onSensorSelect?: (sensorId: string) => void;
   onCanisterSelect?: (canisterId: string) => void;
   onStrawSelect?: (canisterId: string, strawId: string) => void;
+  tankCode?: string;
+  branchName?: string;
 };
 
 type MaterialLike = Material & {
@@ -152,7 +154,7 @@ type CanisterRuntime = {
   homePos: Vector3;
   homeAngle: number;
   index: number;
-  labelSprite: THREE.Sprite;
+  labelSprite: THREE.Mesh;
 };
 
 type CryocanVisualizerHandle = {
@@ -206,6 +208,8 @@ const LID_OPEN_Y = LIFT_Y + CAN_HEIGHT / 2 + ROD_LENGTH_DYN + 0.6;
 const LID_CLOSED_Y = TANK_HEIGHT / 2 + 0.05;
 const PARK_DIST = TANK_RADIUS + 1.6;
 const PARK_Y = -TANK_HEIGHT / 2 + CAN_HEIGHT / 2 + 0.4;
+const PARK_Z_FORWARD = 2.8;  // canister Z offset toward camera during inspection
+const ORBIT_R = CAN_RADIUS * 0.55;  // cane orbit radius inside canister ≈ 0.121
 
 // Straw configuration — colors and synthetic IVF sample metadata
 const STRAW_COLORS = [
@@ -236,6 +240,12 @@ const STRAW_TEMPLATE = [
   { type: "Embryo", stage: "Day 5 Blastocyst", grade: "4AA", patient: "P-1331" },
   { type: "Oocyte", stage: "MII Vitrified",   grade: "—",     patient: "P-1331" },
 ];
+
+const GOBLET_COLOR_MAP: Record<string, string> = {
+  red: "#ef4444", blue: "#3b82f6", green: "#22c55e", yellow: "#eab308",
+  orange: "#f97316", purple: "#a855f7", pink: "#ec4899", white: "#e5e7eb",
+  black: "#1f2937", gray: "#9ca3af", grey: "#9ca3af", brown: "#92400e",
+};
 
 // Default canister list (used when no prop provided)
 const DEFAULT_CANISTERS = Array.from({ length: 6 }, (_, i) => ({
@@ -521,6 +531,8 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     onSensorSelect,
     onCanisterSelect,
     onStrawSelect,
+    tankCode,
+    branchName,
   } = {},
   ref,
 ) {
@@ -541,6 +553,8 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   // Set to true once all inspection animations complete so auto-rotate can restart
   const inspectionReadyRef = useRef<boolean>(false);
   const sceneCanisterCountRef = useRef<number>(CAN_COUNT);
+  const canisterGlowRef = useRef<THREE.Group | null>(null);
+  const glowRingMatsRef = useRef<THREE.MeshBasicMaterial[]>([]);
 
   // Material handles for live tweaking from a dev panel
   const materialsRef = useRef<MaterialMap>({});
@@ -554,6 +568,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   // Stage progresses idle → inspecting on canister click; back to idle on dismiss
   const [viewStage, setViewStage] = useState<"idle" | "extracted" | "inspecting">("idle"); // 'idle' | 'extracted' | 'inspecting'
   const [selectedStraw, setSelectedStraw] = useState<number | null>(null); // null | 0..8
+  const [loadedCaneCount, setLoadedCaneCount] = useState<number>(0);
   const autoRotateRef = useRef<boolean>(true);
   const selectedCanisterRef = useRef<number | null>(null);
   const viewStageRef = useRef<"idle" | "extracted" | "inspecting">("idle");
@@ -564,6 +579,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   type CanvasTooltip = { x: number; y: number; item: StrawInfo; caneCode: string };
   const [canvasTooltip, setCanvasTooltip] = useState<CanvasTooltip | null>(null);
 
+  const [hoveredCane, setHoveredCane] = useState<number | null>(null);
+  const hoveredCaneRef = useRef<number | null>(null);
+  type CaneHoverCard = { x: number; y: number; caneIdx: number; caneCode: string; count: number };
+  const [caneHoverCard, setCaneHoverCard] = useState<CaneHoverCard | null>(null);
+
   useEffect(() => {
     selectedCanisterRef.current = selectedCanister;
   }, [selectedCanister]);
@@ -573,6 +593,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   useEffect(() => {
     selectedStrawRef.current = selectedStraw;
   }, [selectedStraw]);
+  useEffect(() => {
+    hoveredCaneRef.current = hoveredCane;
+  }, [hoveredCane]);
 
   // ---------- Load anime.js from CDN ----------
   useEffect(() => {
@@ -748,18 +771,18 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     }
     const shellGeo = new THREE.LatheGeometry(shellProfile, 72);
     const shellMat = new THREE.MeshPhysicalMaterial({
-      color: 0xf8f4fa,
+      color: 0xf2ecf8,
       metalness: 0.06,
-      roughness: 0.28,
-      transmission: 0.18,
+      roughness: 0.22,
+      transmission: 0,
       transparent: true,
-      opacity: 0.84,
+      opacity: 0.78,
       thickness: 0.6,
       ior: 1.38,
       side: THREE.DoubleSide,
-      clearcoat: 0.7,
-      clearcoatRoughness: 0.18,
-      attenuationColor: new THREE.Color(0xe2d0ee),
+      clearcoat: 0.8,
+      clearcoatRoughness: 0.14,
+      attenuationColor: new THREE.Color(0xd8c4ec),
       attenuationDistance: 1.8,
     });
     materialsRef.current.tankShell = shellMat;
@@ -821,18 +844,18 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     ];
     const innerShellGeo = new THREE.LatheGeometry(innerProfile, 64);
     const innerShellMat = new THREE.MeshPhysicalMaterial({
-      color: 0xf0eaf5,
+      color: 0xeae0f2,
       metalness: 0.04,
-      roughness: 0.28,
-      transmission: 0.28,
+      roughness: 0.24,
+      transmission: 0,
       transparent: true,
-      opacity: 0.68,
+      opacity: 0.60,
       thickness: 0.5,
       ior: 1.4,
       side: THREE.DoubleSide,
       clearcoat: 0.8,
-      clearcoatRoughness: 0.12,
-      attenuationColor: new THREE.Color(0xd8c8e8),
+      clearcoatRoughness: 0.1,
+      attenuationColor: new THREE.Color(0xc8b4e0),
       attenuationDistance: 1.4,
     });
     materialsRef.current.innerVessel = innerShellMat;
@@ -1404,26 +1427,39 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       topRing.userData.clickable = true;
       g.add(topRing);
 
-      // ===== Billboard label sprite (always faces camera) =====
+      // ===== Label plate on canister outer surface =====
       const lblCanvas = document.createElement('canvas');
-      lblCanvas.width = 128;
-      lblCanvas.height = 48;
+      lblCanvas.width = 512;
+      lblCanvas.height = 128;
       const lctx = lblCanvas.getContext('2d')!;
-      lctx.fillStyle = 'rgba(255,255,255,0.88)';
+      // Metallic dark background band
+      const grad = lctx.createLinearGradient(0, 0, 0, 128);
+      grad.addColorStop(0, 'rgba(80, 20, 100, 0.95)');
+      grad.addColorStop(1, 'rgba(50, 10, 70, 0.95)');
+      lctx.fillStyle = grad;
       lctx.beginPath();
-      lctx.roundRect(2, 2, 124, 44, 8);
+      lctx.roundRect(4, 4, 504, 120, 14);
       lctx.fill();
-      lctx.fillStyle = '#401153';
-      lctx.font = 'bold 22px monospace';
+      // Top highlight line
+      lctx.strokeStyle = 'rgba(200,120,255,0.6)';
+      lctx.lineWidth = 2;
+      lctx.beginPath();
+      lctx.moveTo(20, 8);
+      lctx.lineTo(492, 8);
+      lctx.stroke();
+      // Label text
+      lctx.fillStyle = '#ffffff';
+      lctx.font = 'bold 72px monospace';
       lctx.textAlign = 'center';
       lctx.textBaseline = 'middle';
-      lctx.fillText(`C${idx + 1}`, 64, 24);
+      lctx.fillText(`C${idx + 1}`, 256, 68);
       const lblTex = new THREE.CanvasTexture(lblCanvas);
-      const labelSprite = new THREE.Sprite(
-        new THREE.SpriteMaterial({ map: lblTex, transparent: true }),
+      const labelSprite = new THREE.Mesh(
+        new THREE.PlaneGeometry(CAN_RADIUS * 1.55, CAN_RADIUS * 0.88),
+        new THREE.MeshBasicMaterial({ map: lblTex, transparent: true, depthWrite: false }),
       );
-      labelSprite.scale.set(0.45, 0.17, 1);
-      labelSprite.position.set(0, CAN_HEIGHT / 2 + 0.32, 0);
+      // Sit flush on the canister outer wall, facing +Z
+      labelSprite.position.set(0, CAN_HEIGHT * 0.12, CAN_RADIUS + 0.003);
       g.add(labelSprite);
 
       // ===== IVF straws bundled inside the canister =====
@@ -1665,6 +1701,106 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     shadow.position.y = -TANK_HEIGHT / 2 - 0.25;
     scene.add(shadow);
 
+    // ===== Canister portal ring glow (neon halo shown when canister is parked) =====
+    const RING_R = 0.68;           // ring radius — a bit wider than canister
+    const RING_TUBE = 0.045;       // main ring tube thickness
+    const RING_Y = PARK_Y - CAN_HEIGHT / 2 + 0.06;
+
+    const glowGroup = new THREE.Group();
+    glowGroup.position.set(PARK_DIST, RING_Y, 0);
+    glowGroup.visible = false;
+    scene.add(glowGroup);
+    canisterGlowRef.current = glowGroup;
+
+    const ringMats: THREE.MeshBasicMaterial[] = [];
+
+    // Core bright ring
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: 0xd050ff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    ringMats.push(coreMat);
+    const coreRing = new THREE.Mesh(
+      new THREE.TorusGeometry(RING_R, RING_TUBE, 16, 100),
+      coreMat,
+    );
+    coreRing.rotation.x = Math.PI / 2;
+    glowGroup.add(coreRing);
+
+    // Outer soft glow ring (wider tube, dimmer)
+    const outerMat = new THREE.MeshBasicMaterial({
+      color: 0x8820cc,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    ringMats.push(outerMat);
+    const outerRing = new THREE.Mesh(
+      new THREE.TorusGeometry(RING_R, RING_TUBE * 3.5, 8, 100),
+      outerMat,
+    );
+    outerRing.rotation.x = Math.PI / 2;
+    glowGroup.add(outerRing);
+
+    // Inner thin bright highlight ring
+    const innerMat = new THREE.MeshBasicMaterial({
+      color: 0xf090ff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    ringMats.push(innerMat);
+    const innerRing = new THREE.Mesh(
+      new THREE.TorusGeometry(RING_R * 0.96, RING_TUBE * 0.35, 8, 100),
+      innerMat,
+    );
+    innerRing.rotation.x = Math.PI / 2;
+    glowGroup.add(innerRing);
+
+    // Dot nodes evenly distributed around the ring
+    const DOT_COUNT = 32;
+    const dotBaseMat = new THREE.MeshBasicMaterial({
+      color: 0xee88ff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    ringMats.push(dotBaseMat);
+    for (let di = 0; di < DOT_COUNT; di++) {
+      const a = (di / DOT_COUNT) * Math.PI * 2;
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.026, 6, 6),
+        dotBaseMat,
+      );
+      dot.position.set(Math.cos(a) * RING_R, 0, Math.sin(a) * RING_R);
+      glowGroup.add(dot);
+    }
+
+    // Wide floor glow disc for ambient color spill
+    const floorMat = new THREE.MeshBasicMaterial({
+      color: 0x5500aa,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    ringMats.push(floorMat);
+    const floorDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(RING_R * 1.6, 48),
+      floorMat,
+    );
+    floorDisc.rotation.x = -Math.PI / 2;
+    floorDisc.position.y = -0.005;
+    glowGroup.add(floorDisc);
+
+    glowRingMatsRef.current = ringMats;
+
     // ===== Pointer: drag to rotate (when exterior, no canister selected) + click on canisters =====
     let dragging = false;
     let pressed = false;
@@ -1788,9 +1924,43 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         const stage = viewStageRef.current;
         let actionable = false;
         if (stage === "inspecting") {
-          actionable = pickStraw(x, y) !== null;
-        } else if (stage === "idle") {
-          actionable = pickCanister(x, y) !== null;
+          const strawIdx = pickStraw(x, y);
+          actionable = strawIdx !== null;
+
+          // Cane hover card
+          const sel = selectedCanisterRef.current;
+          if (sel !== null) {
+            const flatMap = cryolockFlatMapRef.current[sel] ?? [];
+            const caneIdx = strawIdx !== null ? (flatMap[strawIdx]?.caneIdx ?? null) : null;
+            if (caneIdx !== hoveredCaneRef.current) {
+              hoveredCaneRef.current = caneIdx;
+              setHoveredCane(caneIdx);
+              if (caneIdx !== null && canistersRef.current[sel]) {
+                const sub = canistersRef.current[sel].strawSubgroups[caneIdx];
+                if (sub) {
+                  const _wp = new THREE.Vector3();
+                  sub.group.getWorldPosition(_wp);
+                  const projected = _wp.clone().project(camera);
+                  const rect = renderer.domElement.getBoundingClientRect();
+                  const sx = (projected.x + 1) / 2 * rect.width;
+                  const sy = (-projected.y + 1) / 2 * rect.height;
+                  const caneCount = flatMap.filter((m) => m.caneIdx === caneIdx).length;
+                  setCaneHoverCard({ x: sx, y: sy, caneIdx, caneCode: sub.caneCode, count: caneCount });
+                }
+              } else {
+                setCaneHoverCard(null);
+              }
+            }
+          }
+        } else {
+          if (hoveredCaneRef.current !== null) {
+            hoveredCaneRef.current = null;
+            setHoveredCane(null);
+            setCaneHoverCard(null);
+          }
+          if (stage === "idle") {
+            actionable = pickCanister(x, y) !== null;
+          }
         }
         renderer.domElement.style.cursor = actionable
           ? "pointer"
@@ -1811,20 +1981,46 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       t += 0.02;
 
       if (autoRotateRef.current && !dragging) {
-        if (viewStageRef.current === "idle") {
+        const stage = viewStageRef.current;
+        if (stage === "idle") {
           group.rotation.y += 0.00384;
-        } else if (
-          viewStageRef.current === "inspecting" &&
-          inspectionReadyRef.current
-        ) {
-          group.rotation.y += 0.00384;
-          // Keep extracted canister at world (PARK_DIST, PARK_Y, 0) while tank spins
+          // Hide ring when idle
+          if (canisterGlowRef.current && canisterGlowRef.current.visible) {
+            canisterGlowRef.current.visible = false;
+          }
+        } else if (stage === "extracted" || stage === "inspecting") {
+          // Tank does not rotate while a canister is extracted/inspecting
+          // (group stays at targetGroupRot so local tilt = world tilt)
+
           const selIdx = selectedCanisterRef.current;
           if (selIdx !== null && canistersRef.current[selIdx]) {
             const c = canistersRef.current[selIdx];
-            const h = group.rotation.y;
-            c.group.position.x = Math.cos(h) * PARK_DIST;
-            c.group.position.z = Math.sin(h) * PARK_DIST;
+
+            if (stage === "inspecting" && inspectionReadyRef.current) {
+              // Orbit all canes together via strawGroup rotation
+              c.strawGroup.rotation.y += 0.022;
+            }
+
+            // Portal ring — follow canister world position, pulsate
+            const glowGrp = canisterGlowRef.current;
+            if (glowGrp) {
+              glowGrp.visible = true;
+              // Must use world position: c.group is a child of the rotating tank group
+              const _wp = new THREE.Vector3();
+              c.group.getWorldPosition(_wp);
+              glowGrp.position.x = _wp.x;
+              glowGrp.position.z = _wp.z;
+              // Slow ring rotation for the portal effect
+              glowGrp.rotation.y += 0.012;
+
+              const pulse = 0.72 + Math.sin(t * 2.2) * 0.18;
+              const mats = glowRingMatsRef.current;
+              if (mats[0]) mats[0].opacity = pulse;                    // core
+              if (mats[1]) mats[1].opacity = pulse * 0.42;             // outer soft
+              if (mats[2]) mats[2].opacity = 0.55 + Math.sin(t * 3.5 + 1) * 0.25; // inner highlight
+              if (mats[3]) mats[3].opacity = 0.6 + Math.sin(t * 2.8 + 0.5) * 0.2; // dots
+              if (mats[4]) mats[4].opacity = pulse * 0.22;             // floor disc
+            }
           }
         }
       }
@@ -2065,6 +2261,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
     if (selectedCanister === null) {
       clearAllCaps();
+      setLoadedCaneCount(0);
       return;
     }
 
@@ -2127,6 +2324,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     });
 
     cryolockFlatMapRef.current[selectedCanister] = flatMap;
+    setLoadedCaneCount(caneEntries.length);
   }, [selectedCanister, canisterContents, canisters, variant]);
 
   // ---------- Canister extraction + straw inspection animation ----------
@@ -2143,23 +2341,18 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
     const anime = window.anime;
 
-    // Stage 1 (extracted) framing — show tank + extracted canister together.
-    // Pull back and center between tank (x=0) and canister (x=PARK_DIST≈3.1).
-    const STAGE1_TARGET = { x: 1.5, y: 0.0, z: 0 };
-    const STAGE1_CAM = { x: 1.5, y: 1.5, z: 11.5 };
+    // Canister parks at world (-3.1, PARK_Y, PARK_Z_FORWARD); tank at origin.
+    // Stage 1 (extracted) — centered between them, slightly left.
+    const STAGE1_TARGET = { x: -0.8, y: 0.0, z: 0.8 };
+    const STAGE1_CAM    = { x: -0.8, y: 2.0, z: 10.5 };
 
-    // Stage 2 (inspecting) framing — show tank, canister, and all fanned canes+cryolocks.
-    // Canes fan out to x≈5-6 from canister at x≈3.1; tank spans x≈-1.5 to 1.5.
-    // FOV=38, aspect≈1.3 → hFOV≈47°; at z=13, visible half-width≈7 → range [-5.5, 5.5]+offset.
-    // Center at x=2 to show [-3.5, 7.5] which comfortably frames everything.
-    const STRAW_SHELF_X = PARK_DIST + 2.0; // = 5.1 (keep for reference)
-    const ROW_SPACING = 0.22;
-    const STAGE2_TARGET = { x: 2.0, y: -0.2, z: 0 };
-    const STAGE2_CAM = { x: 2.0, y: 1.8, z: 13.0 };
+    // Stage 2 (inspecting) — pull back slightly, raise to look down into canister opening.
+    const STAGE2_TARGET = { x: -1.0, y: 0.2, z: 1.0 };
+    const STAGE2_CAM    = { x: -1.0, y: 3.5, z: 11.5 };
 
-    // Idle framing — tank centered (sensors are now in a separate left column outside the canvas)
+    // Idle framing — tank centered
     const IDLE_TARGET = { x: 0, y: 0, z: 0 };
-    const IDLE_CAM = { x: 0, y: 0.5, z: 11.0 };
+    const IDLE_CAM    = { x: 0, y: 0.5, z: 11.0 };
 
     // ---------- STAGE: idle (return to default) ----------
     if (selectedCanister === null) {
@@ -2172,6 +2365,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             s.group.position.copy(s.homeLocalPos),
           );
           c.strawGroup.position.set(0, 0, 0);
+          c.strawGroup.rotation.set(0, 0, 0);
           c.strawGroup.parent !== c.group && c.group.add(c.strawGroup);
         });
         lidPivot.position.y = LID_CLOSED_Y;
@@ -2208,16 +2402,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       // 2) Return any displaced straws to their canister, then displaced canisters home
       let returningCan = null;
       cans.forEach((c) => {
-        // Reparent stray straws back into canister if they were detached
+        // Stop orbit and reset strawGroup rotation
+        anime.remove(c.strawGroup.rotation);
+        anime({ targets: c.strawGroup.rotation, y: 0, duration: 500, easing: "easeOutQuad" });
+
         c.strawSubgroups.forEach((s) => {
-          if (s.group.parent !== c.strawGroup) {
-            const wp = new THREE.Vector3();
-            s.group.getWorldPosition(wp);
-            c.strawGroup.add(s.group);
-            // Convert world -> strawGroup-local (the new parent)
-            const lp = c.strawGroup.worldToLocal(wp.clone());
-            s.group.position.copy(lp);
-          }
           anime.remove(s.group.position);
           anime({
             targets: s.group.position,
@@ -2228,6 +2417,8 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             easing: "easeInOutCubic",
             delay: 200,
           });
+          anime.remove(s.group.rotation);
+          anime({ targets: s.group.rotation, x: 0, y: 0, z: 0, duration: 600, easing: "easeInOutCubic", delay: 200 });
         });
 
         // Canister return motion
@@ -2252,6 +2443,16 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             },
             { x: c.homePos.x, y: c.homePos.y, z: c.homePos.z, duration: 800 },
           ],
+          easing: "easeInOutCubic",
+          delay: 1100,
+        });
+
+        // Reset tilt when returning to tank
+        anime.remove(c.group.rotation);
+        anime({
+          targets: c.group.rotation,
+          x: 0, y: 0, z: 0,
+          duration: 700,
           easing: "easeInOutCubic",
           delay: 1100,
         });
@@ -2294,8 +2495,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     const dirZ = Math.sin(can.homeAngle);
     const liftLocalX = dirX * CAN_RING_R;
     const liftLocalZ = dirZ * CAN_RING_R;
-    const parkLocalX = dirX * PARK_DIST;
-    const parkLocalZ = dirZ * PARK_DIST;
+    // World target: (-PARK_DIST, PARK_Y, PARK_Z_FORWARD). Derived local coords for Y-rotation group:
+    const parkLocalX = -dirX * PARK_DIST - dirZ * PARK_Z_FORWARD;
+    const parkLocalZ = -dirZ * PARK_DIST + dirX * PARK_Z_FORWARD;
 
     // ---------- STAGE: extracted ----------
     if (viewStage === "extracted") {
@@ -2324,62 +2526,49 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       anime.remove(interior.position);
       anime.remove(can.handleMat);
 
-      // Determine if we're entering from idle (full lift sequence) or from inspecting (reverse straws)
-      const comingFromInspecting =
-        can.strawSubgroups.some((s) => s.group.parent !== can.strawGroup);
+      // Determine if we're entering from inspecting (canes at orbit positions) or from idle
+      const comingFromInspecting = can.strawSubgroups.some(
+        (s) => s.group.position.distanceTo(s.homeLocalPos) > 0.1
+      );
 
       if (comingFromInspecting) {
-        // Reverse: straws fly back into canister
+        // Stop orbit and animate canes back to home positions inside canister
+        anime.remove(can.strawGroup.rotation);
+        anime({ targets: can.strawGroup.rotation, y: 0, duration: 600, easing: "easeOutQuad" });
         can.strawSubgroups.forEach((s, i) => {
-          // Reparent back to canister's strawGroup
-          const wp = new THREE.Vector3();
-          s.group.getWorldPosition(wp);
-          can.strawGroup.add(s.group);
-          const lp = can.strawGroup.worldToLocal(wp.clone());
-          s.group.position.copy(lp);
-
           anime.remove(s.group.position);
           anime({
             targets: s.group.position,
             x: s.homeLocalPos.x,
             y: s.homeLocalPos.y,
             z: s.homeLocalPos.z,
-            duration: 700,
+            duration: 600,
             easing: "easeInOutCubic",
             delay: i * 30,
           });
+          anime.remove(s.group.rotation);
+          anime({ targets: s.group.rotation, x: 0, y: 0, z: 0, duration: 500, easing: "easeInOutCubic", delay: i * 30 });
         });
+        // Reset canister to correct world tilt (opening faces camera)
+        {
+          const h = targetGroupRot;
+          const TILT = Math.PI * 0.4;
+          const ct = Math.cos(TILT / 2), st = Math.sin(TILT / 2);
+          const ch = Math.cos(h / 2), sh = Math.sin(h / 2);
+          anime.remove(can.group.quaternion);
+          anime({
+            targets: can.group.quaternion,
+            x: ch * st, y: -sh * ct, z: sh * st, w: ch * ct,
+            duration: 700, easing: "easeInOutCubic",
+            update: () => can.group.quaternion.normalize(),
+          });
+        }
         // Restore handle
-        anime({
-          targets: can.handleMat,
-          opacity: 1,
-          duration: 500,
-          easing: "easeOutQuad",
-          delay: 600,
-        });
+        anime({ targets: can.handleMat, opacity: 1, duration: 500, easing: "easeOutQuad", delay: 600 });
         // Camera back to stage 1 framing
-        anime({
-          targets: cam.position,
-          x: STAGE1_CAM.x,
-          y: STAGE1_CAM.y,
-          z: STAGE1_CAM.z,
-          duration: 1000,
-          easing: "easeInOutCubic",
-        });
-        anime({
-          targets: target,
-          x: STAGE1_TARGET.x,
-          y: STAGE1_TARGET.y,
-          z: STAGE1_TARGET.z,
-          duration: 1000,
-          easing: "easeInOutCubic",
-        });
-        anime({
-          targets: interior,
-          intensity: 0.5,
-          duration: 800,
-          easing: "easeInOutQuad",
-        });
+        anime({ targets: cam.position, x: STAGE1_CAM.x, y: STAGE1_CAM.y, z: STAGE1_CAM.z, duration: 1000, easing: "easeInOutCubic" });
+        anime({ targets: target, x: STAGE1_TARGET.x, y: STAGE1_TARGET.y, z: STAGE1_TARGET.z, duration: 1000, easing: "easeInOutCubic" });
+        anime({ targets: interior, intensity: 0.5, duration: 800, easing: "easeInOutQuad" });
         return;
       }
 
@@ -2413,11 +2602,27 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         delay: 1500,
       });
 
-      // 4) Camera shifts to stage 1 framing — tank LEFT, canister CENTER
+      // Tilt canister so opening faces camera.
+      // Group is frozen at targetGroupRot; correct world tilt = Ry(-h) * Rx(0.4π) as quaternion.
+      {
+        const h = targetGroupRot;
+        const TILT = Math.PI * 0.4;
+        const ct = Math.cos(TILT / 2), st = Math.sin(TILT / 2);
+        const ch = Math.cos(h / 2), sh = Math.sin(h / 2);
+        anime.remove(can.group.quaternion);
+        anime({
+          targets: can.group.quaternion,
+          x: ch * st, y: -sh * ct, z: sh * st, w: ch * ct,
+          duration: 900, easing: "easeOutBack", delay: 2800,
+          update: () => can.group.quaternion.normalize(),
+        });
+      }
+
+      // 4) Camera shifts to stage 1 framing — tank RIGHT, canister LEFT
       anime({
         targets: cam.position,
         keyframes: [
-          { x: 1.0, y: 2.0, z: 8.0, duration: 1100 },
+          { x: -0.5, y: 2.0, z: 8.0, duration: 1100 },
           {
             x: STAGE1_CAM.x,
             y: STAGE1_CAM.y,
@@ -2431,7 +2636,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       anime({
         targets: target,
         keyframes: [
-          { x: 0.5, y: 0.5, z: 0, duration: 1100 },
+          { x: -0.5, y: 0.5, z: 0, duration: 1100 },
           {
             x: STAGE1_TARGET.x,
             y: STAGE1_TARGET.y,
@@ -2443,12 +2648,12 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         delay: 1700,
       });
 
-      // 5) Soft fill light positions near the parked canister (subtle highlight)
+      // 5) Soft fill light positions near the parked canister (LEFT side)
       anime({
         targets: interior.position,
-        x: PARK_DIST,
+        x: -PARK_DIST,
         y: PARK_Y + 1.2,
-        z: 1.0,
+        z: PARK_Z_FORWARD,
         duration: 1800,
         easing: "easeInOutCubic",
         delay: 2000,
@@ -2467,29 +2672,31 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     if (viewStage === "inspecting") {
       inspectionReadyRef.current = false;
 
-      // Detect if canister is still inside the tank (coming directly from idle, no intermediate extracted stage)
+      // Detect if canister is still inside the tank (coming directly from idle)
       const comingFromIdle =
         can.group.position.y < PARK_Y + 0.5 &&
-        !can.strawSubgroups.some((s) => s.group.parent !== can.strawGroup);
+        !can.strawSubgroups.some((s) => s.group.position.distanceTo(s.homeLocalPos) > 0.1);
 
       const visibleSubs = can.strawSubgroups.filter((s) => s.group.visible);
       const N = visibleSubs.length || 1;
 
       if (!animeReady || !anime) {
-        // Fallback: position canister at park, open lid, fan canes
+        // Fallback: position canister at park, open lid, place canes in orbit
         grp.rotation.y = can.homeAngle;
         lidPivot.position.y = LID_OPEN_Y;
         can.group.position.set(parkLocalX, PARK_Y, parkLocalZ);
+        {
+          const h = targetGroupRot;
+          const TILT = Math.PI * 0.4;
+          const ct = Math.cos(TILT / 2), st = Math.sin(TILT / 2);
+          const ch = Math.cos(h / 2), sh = Math.sin(h / 2);
+          can.group.quaternion.set(ch * st, -sh * ct, sh * st, ch * ct);
+          can.group.quaternion.normalize();
+        }
         visibleSubs.forEach((s, i) => {
-          if (s.group.parent !== scene) {
-            const wp = new THREE.Vector3();
-            s.group.getWorldPosition(wp);
-            scene.add(s.group);
-            s.group.position.copy(wp);
-          }
-          const desiredWorldX = STRAW_SHELF_X + (i - (N - 1) / 2) * ROW_SPACING;
-          s.group.position.set(desiredWorldX, PARK_Y + 0.1, 0);
-          s.group.rotation.set(0, 0, 0);
+          const angle = (i / N) * Math.PI * 2;
+          s.group.position.set(ORBIT_R * Math.cos(angle), 0, ORBIT_R * Math.sin(angle));
+          s.group.rotation.set(0, angle, 0);
         });
         cam.position.set(STAGE2_CAM.x, STAGE2_CAM.y, STAGE2_CAM.z);
         target.set(STAGE2_TARGET.x, STAGE2_TARGET.y, STAGE2_TARGET.z);
@@ -2511,24 +2718,13 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         anime.remove(lidPivot.position);
         anime.remove(can.group.position);
 
-        // 1) Align group so chosen canister faces +X
-        anime({
-          targets: grp.rotation,
-          y: targetGroupRot,
-          duration: 800,
-          easing: "easeInOutCubic",
-        });
+        // 1) Align group so chosen canister faces outward
+        anime({ targets: grp.rotation, y: targetGroupRot, duration: 800, easing: "easeInOutCubic" });
 
         // 2) Lid lifts straight up
-        anime({
-          targets: lidPivot.position,
-          y: LID_OPEN_Y,
-          duration: 1100,
-          easing: "easeOutQuart",
-          delay: 600,
-        });
+        anime({ targets: lidPivot.position, y: LID_OPEN_Y, duration: 1100, easing: "easeOutQuart", delay: 600 });
 
-        // 3) Canister rises out, then arcs to park position
+        // 3) Canister rises out, then arcs to LEFT park position
         anime({
           targets: can.group.position,
           keyframes: [
@@ -2540,11 +2736,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           delay: 1500,
         });
 
-        // 4) Camera sweeps to stage 1 framing while extraction happens
+        // 4) Camera sweeps to stage 1 framing
         anime({
           targets: cam.position,
           keyframes: [
-            { x: 1.0, y: 2.0, z: 8.0, duration: 1100 },
+            { x: -0.5, y: 2.0, z: 8.0, duration: 1100 },
             { x: STAGE1_CAM.x, y: STAGE1_CAM.y, z: STAGE1_CAM.z, duration: 1500 },
           ],
           easing: "easeInOutCubic",
@@ -2553,87 +2749,56 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         anime({
           targets: target,
           keyframes: [
-            { x: 0.5, y: 0.5, z: 0, duration: 1100 },
+            { x: -0.5, y: 0.5, z: 0, duration: 1100 },
             { x: STAGE1_TARGET.x, y: STAGE1_TARGET.y, z: STAGE1_TARGET.z, duration: 1500 },
           ],
           easing: "easeInOutCubic",
           delay: 1700,
         });
+
+        // Tilt canister for top-down view — quaternion animation accounts for group rotation
+        {
+          const h = targetGroupRot;
+          const TILT = Math.PI * 0.4;
+          const ct = Math.cos(TILT / 2), st = Math.sin(TILT / 2);
+          const ch = Math.cos(h / 2), sh = Math.sin(h / 2);
+          anime.remove(can.group.quaternion);
+          anime({
+            targets: can.group.quaternion,
+            x: ch * st, y: -sh * ct, z: sh * st, w: ch * ct,
+            duration: 900, easing: "easeOutBack", delay: 2800,
+            update: () => can.group.quaternion.normalize(),
+          });
+        }
       }
 
-      // 2) Reparent each visible cane from canister-local to scene (world) space,
-      //    then animate to its grid slot. Canes live in scene-world space so the
-      //    tank group can continue to auto-rotate without dragging them along.
+      // 2) Animate each visible cane to orbit positions inside canister (no reparenting)
       visibleSubs.forEach((s, i) => {
-        // Compute current world position before reparenting
-        const wp = new THREE.Vector3();
-        s.group.getWorldPosition(wp);
-        // Reparent to scene (world space) so grp.rotation has no effect on them
-        scene.add(s.group);
-        s.group.position.copy(wp);
-
-        // Canes fan out along world +X axis. With grp rotated to homeAngle,
-        // the canister sits at world (PARK_DIST, PARK_Y, 0), so fans to the right.
-        const desiredWorldX = STRAW_SHELF_X + (i - (N - 1) / 2) * ROW_SPACING;
-
+        const angle = (i / N) * Math.PI * 2;
         anime.remove(s.group.position);
         anime({
           targets: s.group.position,
-          keyframes: [
-            {
-              x: s.group.position.x,
-              y: PARK_Y + CAN_HEIGHT / 2 + 0.6,
-              z: s.group.position.z,
-              duration: 600,
-            },
-            { x: desiredWorldX, y: PARK_Y + 0.1, z: 0, duration: 1100 },
-          ],
-          easing: "easeInOutCubic",
-          delay: EXTRACT_DELAY + 500 + i * 60,
+          x: ORBIT_R * Math.cos(angle),
+          y: 0,
+          z: ORBIT_R * Math.sin(angle),
+          duration: 900,
+          easing: "easeOutBack",
+          delay: EXTRACT_DELAY + 400 + i * 80,
         });
+        anime.remove(s.group.rotation);
+        anime({ targets: s.group.rotation, x: 0, y: angle, z: 0, duration: 700, easing: "easeOutQuad", delay: EXTRACT_DELAY + 400 });
       });
 
-      // 3) Camera shifts to stage 2 framing — wider view to show all three areas
-      anime({
-        targets: cam.position,
-        x: STAGE2_CAM.x,
-        y: STAGE2_CAM.y,
-        z: STAGE2_CAM.z,
-        duration: 1400,
-        easing: "easeInOutCubic",
-        delay: EXTRACT_DELAY + 400,
-      });
-      anime({
-        targets: target,
-        x: STAGE2_TARGET.x,
-        y: STAGE2_TARGET.y,
-        z: STAGE2_TARGET.z,
-        duration: 1400,
-        easing: "easeInOutCubic",
-        delay: EXTRACT_DELAY + 400,
-      });
+      // 3) Camera shifts to stage 2 framing
+      anime({ targets: cam.position, x: STAGE2_CAM.x, y: STAGE2_CAM.y, z: STAGE2_CAM.z, duration: 1400, easing: "easeInOutCubic", delay: EXTRACT_DELAY + 400 });
+      anime({ targets: target, x: STAGE2_TARGET.x, y: STAGE2_TARGET.y, z: STAGE2_TARGET.z, duration: 1400, easing: "easeInOutCubic", delay: EXTRACT_DELAY + 400 });
 
-      // 4) Light moves to highlight straw shelf
-      anime({
-        targets: interior.position,
-        x: STRAW_SHELF_X,
-        y: PARK_Y + 1.0,
-        z: 1.5,
-        duration: 1400,
-        easing: "easeInOutCubic",
-        delay: EXTRACT_DELAY + 800,
-      });
-      anime({
-        targets: interior,
-        intensity: 1.5,
-        duration: 1200,
-        easing: "easeOutQuad",
-        delay: EXTRACT_DELAY + 800,
-      });
+      // 4) Light moves to illuminate canister area (LEFT side)
+      anime({ targets: interior.position, x: -PARK_DIST, y: PARK_Y + 1.0, z: PARK_Z_FORWARD, duration: 1400, easing: "easeInOutCubic", delay: EXTRACT_DELAY + 800 });
+      anime({ targets: interior, intensity: 1.5, duration: 1200, easing: "easeOutQuad", delay: EXTRACT_DELAY + 800 });
 
-      // 5) After all animations complete, enable auto-rotate. The last animation
-      // to settle is the furthest cane fan-out + some margin.
-      const readyDelay = EXTRACT_DELAY + 500 + (N - 1) * 60 + 1800;
+      // 5) After orbit animation settles, enable inspection ready
+      const readyDelay = EXTRACT_DELAY + 400 + (N - 1) * 80 + 1200;
       const selCanSnap = selectedCanister;
       setTimeout(() => {
         if (viewStageRef.current === "inspecting" && selectedCanisterRef.current === selCanSnap) {
@@ -2824,7 +2989,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     }
   }, [selectedCanister, sceneCanisterCount]);
 
-  // ---------- Update canister label sprites from prop ----------
+  // ---------- Update canister label plates from prop ----------
   useEffect(() => {
     const cans = canistersRef.current;
     if (!cans.length) return;
@@ -2832,19 +2997,28 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     cans.forEach((can, idx) => {
       const canData = effCanisters[idx];
       const label = canData?.id ?? `C${idx + 1}`;
-      const mat = can.labelSprite.material as THREE.SpriteMaterial;
+      const mat = can.labelSprite.material as THREE.MeshBasicMaterial;
       const c = document.createElement('canvas');
-      c.width = 128; c.height = 48;
+      c.width = 512; c.height = 128;
       const ctx = c.getContext('2d')!;
-      ctx.fillStyle = 'rgba(255,255,255,0.88)';
+      const gr = ctx.createLinearGradient(0, 0, 0, 128);
+      gr.addColorStop(0, 'rgba(80, 20, 100, 0.95)');
+      gr.addColorStop(1, 'rgba(50, 10, 70, 0.95)');
+      ctx.fillStyle = gr;
       ctx.beginPath();
-      ctx.roundRect(2, 2, 124, 44, 8);
+      ctx.roundRect(4, 4, 504, 120, 14);
       ctx.fill();
-      ctx.fillStyle = '#401153';
-      ctx.font = 'bold 22px monospace';
+      ctx.strokeStyle = 'rgba(200,120,255,0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(20, 8);
+      ctx.lineTo(492, 8);
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 72px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, 64, 24);
+      ctx.fillText(label, 256, 68);
       mat.map?.dispose();
       mat.map = new THREE.CanvasTexture(c);
       mat.needsUpdate = true;
@@ -3296,8 +3470,8 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 zIndex: 0,
                 pointerEvents: "none",
                 background: externalTempAlert
-                  ? "radial-gradient(ellipse 80% 75% at 50% 52%, rgba(255,230,230,0.88) 0%, rgba(255,210,210,0.45) 55%, transparent 78%)"
-                  : "radial-gradient(ellipse 80% 75% at 50% 52%, rgba(255,255,255,0.90) 0%, rgba(240,230,250,0.50) 55%, transparent 78%)",
+                  ? "radial-gradient(ellipse 70% 65% at 50% 50%, rgba(255,220,220,0.62) 0%, transparent 72%)"
+                  : "radial-gradient(ellipse 70% 65% at 50% 50%, rgba(255,255,255,0.62) 0%, transparent 72%)",
               }}
             />
             {/* Floor gradient at the base of the tank */}
@@ -3711,66 +3885,246 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 className="absolute pointer-events-none"
                 style={{
                   left: canvasTooltip.x,
-                  top: canvasTooltip.y - 10,
+                  top: canvasTooltip.y - 12,
                   transform: "translate(-50%, -100%)",
                   zIndex: 10,
                 }}
               >
                 <div
                   style={{
-                    background: "rgba(255,255,255,0.96)",
-                    backdropFilter: "blur(12px)",
-                    border: "1px solid #e4d4ea",
-                    borderRadius: 10,
-                    padding: "8px 12px",
-                    boxShadow: "0 8px 24px #40115318",
-                    minWidth: 140,
-                    maxWidth: 200,
+                    background: "rgba(255,255,255,0.97)",
+                    backdropFilter: "blur(16px)",
+                    border: "1.5px solid #c8a8dc",
+                    borderRadius: 12,
+                    padding: "10px 14px",
+                    boxShadow: "0 8px 32px #6B117628, 0 2px 8px #6B117614",
+                    minWidth: 158,
+                    maxWidth: 220,
                   }}
                 >
+                  {/* Purple accent bar at top */}
+                  <div style={{ position: "absolute", top: 0, left: 12, right: 12, height: 3, borderRadius: "0 0 3px 3px", background: "linear-gradient(90deg, #6B1176, #9b4aaa)" }} />
                   {canvasTooltip.caneCode && (
-                    <div
-                      className="cryo-mono"
-                      style={{ fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: "#7a1a88", fontWeight: 600, marginBottom: 4 }}
-                    >
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#6B1176", letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 5, marginTop: 2 }}>
                       Cane {canvasTooltip.caneCode}
                     </div>
                   )}
                   {canvasTooltip.item.cryolockNumber && (
-                    <div
-                      className="cryo-mono"
-                      style={{ fontSize: 11, fontWeight: 600, color: "#401153", marginBottom: 2 }}
-                    >
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a0a1f", marginBottom: 3 }}>
                       {canvasTooltip.item.cryolockNumber}
                     </div>
                   )}
                   {canvasTooltip.item.stage && (
-                    <div style={{ fontSize: 11, color: "#1a0a1f", fontWeight: 500, marginBottom: 1 }}>
+                    <div style={{ fontSize: 11, color: "#401153", fontWeight: 500, marginBottom: 2 }}>
                       {canvasTooltip.item.stage}
                     </div>
                   )}
                   {canvasTooltip.item.grade && (
-                    <div style={{ fontSize: 10, color: "#6b5a70" }}>
-                      Grade {canvasTooltip.item.grade}
-                      {canvasTooltip.item.patient && <span> · {canvasTooltip.item.patient}</span>}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                      <span style={{ fontSize: 10, background: "#FDF4FF", color: "#6B1176", fontWeight: 600, borderRadius: 4, padding: "1px 6px" }}>
+                        {canvasTooltip.item.grade}
+                      </span>
+                      {canvasTooltip.item.patient && (
+                        <span style={{ fontSize: 10, color: "#6b7280" }}>{canvasTooltip.item.patient}</span>
+                      )}
                     </div>
                   )}
                   {canvasTooltip.item.type && !canvasTooltip.item.stage && (
-                    <div style={{ fontSize: 10, color: "#6b5a70" }}>{canvasTooltip.item.type}</div>
+                    <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>{canvasTooltip.item.type}</div>
                   )}
                 </div>
-                {/* Downward-pointing arrow */}
+                {/* Downward-pointing arrow matching card border */}
+                <div style={{ position: "relative", height: 10, margin: "0 auto", width: 20 }}>
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      width: 0,
+                      height: 0,
+                      borderLeft: "9px solid transparent",
+                      borderRight: "9px solid transparent",
+                      borderTop: "9px solid #c8a8dc",
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      width: 0,
+                      height: 0,
+                      borderLeft: "7px solid transparent",
+                      borderRight: "7px solid transparent",
+                      borderTop: "8px solid rgba(255,255,255,0.97)",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Canister info cards — bottom-left of canvas when inspecting */}
+            {isInspecting && selectedCanisterData && (
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: 14,
+                  bottom: 14,
+                  zIndex: 8,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  maxWidth: 220,
+                }}
+              >
+                {/* Canister identity card */}
                 <div
                   style={{
-                    width: 0,
-                    height: 0,
-                    margin: "0 auto",
-                    borderLeft: "7px solid transparent",
-                    borderRight: "7px solid transparent",
-                    borderTop: "7px solid rgba(255,255,255,0.96)",
-                    filter: "drop-shadow(0 2px 2px #40115310)",
+                    background: "rgba(255,255,255,0.88)",
+                    backdropFilter: "blur(14px)",
+                    border: "1px solid #d8c6e8",
+                    borderRadius: 12,
+                    padding: "10px 14px",
+                    boxShadow: "0 4px 18px #40115322",
                   }}
-                />
+                >
+                  <div style={{ fontSize: 9, fontWeight: 600, color: "#6B1176", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 4 }}>
+                    Selected Canister
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#1a0a1f" }}>
+                    {selectedCanisterData.label}
+                  </div>
+                  {selectedCanisterData.status && (
+                    <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>{selectedCanisterData.status}</div>
+                  )}
+                </div>
+
+                {/* Cane slots card */}
+                <div
+                  style={{
+                    background: "rgba(255,255,255,0.88)",
+                    backdropFilter: "blur(14px)",
+                    border: "1px solid #d8c6e8",
+                    borderRadius: 12,
+                    padding: "10px 14px",
+                    boxShadow: "0 4px 18px #40115322",
+                  }}
+                >
+                  <div style={{ fontSize: 9, fontWeight: 600, color: "#6B1176", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8 }}>
+                    Cane Slots
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 6 }}>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: "#6B1176", lineHeight: 1 }}>{loadedCaneCount}</span>
+                    <span style={{ fontSize: 12, color: "#9ca3af" }}>/ 17 slots</span>
+                  </div>
+                  {/* Slot grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 3 }}>
+                    {Array.from({ length: 17 }).map((_, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 4,
+                          background: i < loadedCaneCount
+                            ? "linear-gradient(135deg, #6B1176, #9b4aaa)"
+                            : "#f0e8f5",
+                          border: `1px solid ${i < loadedCaneCount ? "#6B117640" : "#ddd"}`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#6b7280", marginTop: 6 }}>
+                    {17 - loadedCaneCount} slots available
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* LN2 scale — right side of tank (middle of canvas) */}
+            {isInspecting && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: "63%",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  zIndex: 8,
+                  pointerEvents: "none",
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                  <span style={{ fontSize: 9, fontWeight: 600, color: "#6B1176", letterSpacing: "0.1em" }}>LN2</span>
+                  <div style={{ position: "relative", width: 14, height: 140, background: "#e8ddf2", borderRadius: 8, overflow: "hidden", border: "1px solid #c8a8dc" }}>
+                    <div style={{ position: "absolute", bottom: 0, width: "100%", height: `${displayPct}%`, background: "linear-gradient(to top, #1258b8, #2888f0)", transition: "height 1s ease", borderRadius: 8 }} />
+                    {[25, 50, 75].map((pct) => (
+                      <div key={pct} style={{ position: "absolute", left: 0, right: 0, bottom: `${pct}%`, height: 1, background: "rgba(107,17,118,0.25)" }} />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#6B1176" }}>{Math.round(displayPct)}%</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: 140, paddingTop: 2, paddingBottom: 2 }}>
+                  {[100, 75, 50, 25, 0].map((tick) => (
+                    <span key={tick} style={{ fontSize: 8, color: "#9ca3af", lineHeight: 1 }}>{tick}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tank code / branch name — bottom center */}
+            {isInspecting && (tankCode || branchName) && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 52,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  background: "rgba(255,255,255,0.88)",
+                  backdropFilter: "blur(14px)",
+                  border: "1px solid #d8c6e8",
+                  borderRadius: 10,
+                  padding: "6px 14px",
+                  zIndex: 8,
+                  textAlign: "center",
+                  pointerEvents: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#1a0a1f" }}>{tankCode || "—"}</div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>{branchName || "—"}</div>
+              </div>
+            )}
+
+            {/* Cane hover popup */}
+            {caneHoverCard && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: Math.min(caneHoverCard.x + 12, (mountRef.current?.offsetWidth ?? 600) - 160),
+                  top: Math.max(caneHoverCard.y - 48, 8),
+                  background: "rgba(255,255,255,0.97)",
+                  border: "1px solid #c8a8dc",
+                  borderRadius: 10,
+                  padding: "8px 12px",
+                  zIndex: 12,
+                  pointerEvents: "none",
+                  boxShadow: "0 4px 16px #40115330",
+                  minWidth: 120,
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#6B1176", marginBottom: 3 }}>
+                  Cane {caneHoverCard.caneCode || `#${caneHoverCard.caneIdx + 1}`}
+                </div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>
+                  {caneHoverCard.count} cryolock{caneHoverCard.count !== 1 ? "s" : ""}
+                </div>
               </div>
             )}
 
@@ -3778,18 +4132,278 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               <div
                 className="cryo-mono absolute"
                 style={{
-                  right: 16,
+                  right: isInspecting ? 272 : 16,
                   bottom: 16,
                   fontSize: 10,
                   letterSpacing: "0.18em",
                   color: "#6b5a70",
                   textTransform: "uppercase",
                   zIndex: 3,
+                  transition: "right 0.35s ease",
                 }}
               >
                 {viewStage === "inspecting"
                   ? `inspecting canister #${selectedCanister! + 1} · ${samplesPerCanister} samples`
                   : "click a canister · drag to rotate"}
+              </div>
+            )}
+
+            {/* Cryolock Details — right side overlay inside canvas during inspection */}
+            {isInspecting && (
+              <div
+                className="cryo-fade-in"
+                style={{
+                  position: "absolute",
+                  right: 12,
+                  top: 12,
+                  bottom: 12,
+                  width: 252,
+                  zIndex: 9,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 0,
+                  pointerEvents: "none",
+                }}
+              >
+                <div
+                  style={{
+                    background: "rgba(255,255,255,0.90)",
+                    backdropFilter: "blur(18px)",
+                    border: "1px solid #d8c6e8",
+                    borderRadius: 16,
+                    boxShadow: "0 8px 28px #40115320",
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                    height: "100%",
+                  }}
+                >
+                  {/* Panel header */}
+                  <div
+                    style={{
+                      padding: "13px 14px 11px",
+                      borderBottom: "1px solid #ede5f5",
+                      background: "linear-gradient(135deg, #f9f4fc 0%, #ffffff 100%)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: "#9ca3af", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 3 }}>
+                          {selectedCanisterData?.label ?? "Canister"}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#6B1176" }}>
+                          Cryolock Details
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#6B1176",
+                          background: "#f0e6f8",
+                          borderRadius: 8,
+                          padding: "3px 9px",
+                        }}
+                      >
+                        {selectedContents.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Scrollable card list */}
+                  {selectedContents.length === 0 ? (
+                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 11 }}>
+                      No contents recorded
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        flex: 1,
+                        overflowY: "auto",
+                        padding: "10px 10px 14px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 7,
+                        pointerEvents: "auto",
+                      }}
+                    >
+                      {selectedContents.map((item, i) => {
+                        const parts = item.cryolockNumber?.split("/") ?? [];
+                        const caneId    = parts[2] ?? null;
+                        const lockId    = parts[3] ?? null;
+                        const gobletHex = GOBLET_COLOR_MAP[item.gobletColor?.toLowerCase() ?? ""] ?? null;
+                        const lockHex   = GOBLET_COLOR_MAP[item.cryolockColor?.toLowerCase() ?? ""] ?? null;
+                        const typeLabel = item.type || (item.cryolockNumber ? "Cryolock" : "Sample");
+                        const typeBg =
+                          typeLabel === "Embryo"  ? { bg: "#7a1a8812", color: "#7a1a88" }
+                          : typeLabel === "Sperm"   ? { bg: "#1f7a3a12", color: "#1f7a3a" }
+                          : typeLabel === "Oocyte"  ? { bg: "#1a4a7a12", color: "#1a4a7a" }
+                          : { bg: "#6b728012", color: "#6b7280" };
+                        return (
+                          <div
+                            key={i}
+                            style={{
+                              border: "1px solid #ede5f5",
+                              borderRadius: 12,
+                              overflow: "hidden",
+                              background: "#fdfbfe",
+                              boxShadow: "0 2px 8px #40115308",
+                            }}
+                          >
+                            {/* Card header */}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 7,
+                                padding: "8px 10px 6px",
+                                borderBottom: "1px solid #f0e8f4",
+                                background: "linear-gradient(135deg, #fbf6fc 0%, #ffffff 100%)",
+                              }}
+                            >
+                              {gobletHex && (
+                                <div
+                                  style={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: 3,
+                                    background: gobletHex,
+                                    flexShrink: 0,
+                                    boxShadow: `0 0 0 2px ${gobletHex}44`,
+                                  }}
+                                />
+                              )}
+                              <span
+                                className="cryo-mono"
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: "#401153",
+                                  flex: 1,
+                                  minWidth: 0,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {item.cryolockNumber || item.id || `Sample ${i + 1}`}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 8,
+                                  fontWeight: 600,
+                                  padding: "2px 6px",
+                                  borderRadius: 999,
+                                  background: typeBg.bg,
+                                  color: typeBg.color,
+                                  letterSpacing: "0.07em",
+                                  textTransform: "uppercase",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {typeLabel}
+                              </span>
+                            </div>
+                            {/* Card body */}
+                            <div
+                              style={{
+                                padding: "7px 10px 9px",
+                                display: "grid",
+                                gridTemplateColumns: "auto 1fr",
+                                gap: "3px 8px",
+                                fontSize: 10,
+                              }}
+                            >
+                              {caneId && (
+                                <>
+                                  <span style={{ color: "#9ca3af", fontWeight: 500 }}>Cane</span>
+                                  <span style={{ color: "#1a0a1f", fontWeight: 600 }}>{caneId}</span>
+                                </>
+                              )}
+                              {lockId && (
+                                <>
+                                  <span style={{ color: "#9ca3af", fontWeight: 500 }}>Lock #</span>
+                                  <span style={{ color: "#1a0a1f", fontWeight: 600 }}>{lockId}</span>
+                                </>
+                              )}
+                              {item.hisNumber && (
+                                <>
+                                  <span style={{ color: "#9ca3af", fontWeight: 500 }}>HIS</span>
+                                  <span style={{ color: "#1a0a1f" }}>{item.hisNumber}</span>
+                                </>
+                              )}
+                              {item.patient && (
+                                <>
+                                  <span style={{ color: "#9ca3af", fontWeight: 500 }}>Patient</span>
+                                  <span style={{ color: "#1a0a1f" }}>{item.patient}</span>
+                                </>
+                              )}
+                              {item.stage && (
+                                <>
+                                  <span style={{ color: "#9ca3af", fontWeight: 500 }}>Stage</span>
+                                  <span style={{ color: "#1a0a1f" }}>{item.stage}</span>
+                                </>
+                              )}
+                              {item.grade && (
+                                <>
+                                  <span style={{ color: "#9ca3af", fontWeight: 500 }}>Grade</span>
+                                  <span style={{ color: "#6B1176", fontWeight: 600 }}>{item.grade}</span>
+                                </>
+                              )}
+                              {item.caneCode && (
+                                <>
+                                  <span style={{ color: "#9ca3af", fontWeight: 500 }}>Code</span>
+                                  <span style={{ color: "#1a0a1f" }}>{item.caneCode}</span>
+                                </>
+                              )}
+                              {item.gobletColor && (
+                                <>
+                                  <span style={{ color: "#9ca3af", fontWeight: 500 }}>Goblet</span>
+                                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    {gobletHex && <span style={{ width: 8, height: 8, borderRadius: 2, background: gobletHex, display: "inline-block", flexShrink: 0 }} />}
+                                    <span style={{ color: "#1a0a1f", textTransform: "capitalize" }}>{item.gobletColor}</span>
+                                  </span>
+                                </>
+                              )}
+                              {item.cryolockColor && (
+                                <>
+                                  <span style={{ color: "#9ca3af", fontWeight: 500 }}>Lock</span>
+                                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    {lockHex && <span style={{ width: 8, height: 8, borderRadius: 2, background: lockHex, display: "inline-block", flexShrink: 0 }} />}
+                                    <span style={{ color: "#1a0a1f", textTransform: "capitalize" }}>{item.cryolockColor}</span>
+                                  </span>
+                                </>
+                              )}
+                              {item.vitrificationDate && (
+                                <>
+                                  <span style={{ color: "#9ca3af", fontWeight: 500 }}>Vitrified</span>
+                                  <span style={{ color: "#1a0a1f" }}>{item.vitrificationDate}</span>
+                                </>
+                              )}
+                              {item.description && (
+                                <span
+                                  style={{
+                                    gridColumn: "1 / -1",
+                                    marginTop: 4,
+                                    color: "#6b5a70",
+                                    fontStyle: "italic",
+                                    fontSize: 10,
+                                    lineHeight: 1.5,
+                                    borderTop: "1px solid #f0e8f4",
+                                    paddingTop: 4,
+                                  }}
+                                >
+                                  {item.description}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
