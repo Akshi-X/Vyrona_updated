@@ -22,14 +22,14 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM nginx:stable-alpine
+FROM node:20-slim
+
+# Install serve globally
+RUN npm install -g serve
 
 # Copy built assets from build stage
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Copy nginx config if needed (optional, using default for now)
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /home/site/wwwroot
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["npx", "serve", "-s", "/home/site/wwwroot", "-l", "80"]
