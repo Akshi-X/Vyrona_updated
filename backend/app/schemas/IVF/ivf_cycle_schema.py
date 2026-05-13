@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import date, datetime
 
 
 # ── Cycle ────────────────────────────────────────────────────────────────────
@@ -19,6 +19,7 @@ class CycleCreate(BaseModel):
     oocyte_m1: Optional[int] = None
     oocyte_gv: Optional[int] = None
     oocyte_others: Optional[int] = None
+    opu_date: Optional[date] = None
     status: Optional[str] = "Active"
 
 
@@ -35,6 +36,7 @@ class CycleUpdate(BaseModel):
     oocyte_m1: Optional[int] = None
     oocyte_gv: Optional[int] = None
     oocyte_others: Optional[int] = None
+    opu_date: Optional[date] = None
     status: Optional[str] = None
 
 
@@ -54,6 +56,7 @@ class CycleResponse(BaseModel):
     oocyte_m1: Optional[int]
     oocyte_gv: Optional[int]
     oocyte_others: Optional[int]
+    opu_date: Optional[date]
     status: Optional[str]
     created_at: datetime
     updated_at: Optional[datetime]

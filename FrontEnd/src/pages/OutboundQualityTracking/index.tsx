@@ -279,9 +279,9 @@ export default function OutboundQualityTrackingPage() {
                 }))}
                 loading={loadingAlerts}
                 patientIdLabel="Tank Code"
-                onAcknowledge={async (alertId) => {
+                onAcknowledge={async (alertId, reason) => {
                     try {
-                        await ivfAlertsService.acknowledgeAlert(alertId);
+                        await ivfAlertsService.acknowledgeAlert(alertId, reason);
                         // Refresh alerts after acknowledgment
                         fetchCriticalAlerts();
                     } catch (error) {
@@ -289,9 +289,9 @@ export default function OutboundQualityTrackingPage() {
                         throw error;
                     }
                 }}
-                onAcknowledgeAll={async (alertIds) => {
+                onAcknowledgeAll={async (alertIds, reason) => {
                     try {
-                        await ivfAlertsService.acknowledgeAlerts(alertIds);
+                        await ivfAlertsService.acknowledgeAlerts(alertIds, reason);
                         fetchCriticalAlerts();
                     } catch (error) {
                         console.error('Error acknowledging alerts:', error);

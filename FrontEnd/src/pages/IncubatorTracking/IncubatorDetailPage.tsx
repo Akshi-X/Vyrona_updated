@@ -555,12 +555,12 @@ export default function IncubatorDetailPage() {
         }))}
         loading={loadingAlerts}
         patientIdLabel=""
-        onAcknowledge={async (alertId) => {
-          await ivfAlertsService.acknowledgeAlert(alertId);
+        onAcknowledge={async (alertId, reason) => {
+          await ivfAlertsService.acknowledgeAlert(alertId, reason);
           fetchCriticalAlerts();
         }}
-        onAcknowledgeAll={async (alertIds) => {
-          await ivfAlertsService.acknowledgeAlerts(alertIds);
+        onAcknowledgeAll={async (alertIds, reason) => {
+          await ivfAlertsService.acknowledgeAlerts(alertIds, reason);
           fetchCriticalAlerts();
         }}
       />
