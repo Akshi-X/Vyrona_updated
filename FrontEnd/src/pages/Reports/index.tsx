@@ -369,6 +369,50 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
         return lines;
     }
 
+    if (action.startsWith("ivf_cycle.")) {
+        if (metadata.patient_name) lines.push(`Patient: ${metadata.patient_name}`);
+        if (metadata.his_id) lines.push(`HIS ID: ${metadata.his_id}`);
+
+        if (action === "ivf_cycle.created") {
+            if (metadata.injection_method) lines.push(`Method: ${metadata.injection_method}`);
+            const parts: string[] = [];
+            if (metadata.oocyte_m2 != null) parts.push(`MII: ${metadata.oocyte_m2}`);
+            if (metadata.oocyte_m1 != null) parts.push(`MI: ${metadata.oocyte_m1}`);
+            if (metadata.oocyte_others != null) parts.push(`Others: ${metadata.oocyte_others}`);
+            if (parts.length) lines.push(`Oocytes: ${parts.join(", ")}`);
+            return lines;
+        }
+
+        if (action === "ivf_cycle.updated") {
+            if (Array.isArray(metadata.fields_updated) && metadata.fields_updated.length) {
+                lines.push(`Updated: ${metadata.fields_updated.join(", ")}`);
+            }
+            return lines;
+        }
+
+        if (metadata.oocyte_no != null) lines.push(`Oocyte #${metadata.oocyte_no}`);
+
+        if (action === "ivf_cycle.oocyte_log.d0_saved") {
+            if (metadata.d0_maturity) lines.push(`Maturity: ${metadata.d0_maturity}`);
+        } else if (action === "ivf_cycle.oocyte_log.d1_updated") {
+            if (metadata.d1_pn) lines.push(`PN: ${metadata.d1_pn}`);
+            if (metadata.d1_zygote_status) lines.push(`Zygote: ${metadata.d1_zygote_status}`);
+        } else if (action === "ivf_cycle.oocyte_log.d3_updated") {
+            if (metadata.d3_grade) lines.push(`Grade: ${metadata.d3_grade}`);
+            if (metadata.d3_symmetry) lines.push(`Symmetry: ${metadata.d3_symmetry}`);
+        } else if (action === "ivf_cycle.oocyte_log.d5_updated") {
+            if (metadata.d5_grade) lines.push(`Grade: ${metadata.d5_grade}`);
+            if (metadata.d5_stage) lines.push(`Stage: ${metadata.d5_stage}`);
+        } else if (action === "ivf_cycle.oocyte_log.d6_updated") {
+            if (metadata.d6_grade) lines.push(`Grade: ${metadata.d6_grade}`);
+            if (metadata.d6_progression) lines.push(`Progression: ${metadata.d6_progression}`);
+        } else if (action === "ivf_cycle.oocyte_log.fate_set") {
+            if (metadata.fate) lines.push(`Fate: ${metadata.fate}`);
+        }
+
+        return lines;
+    }
+
     return [formatMetadataSummary(metadata)];
 };
 
