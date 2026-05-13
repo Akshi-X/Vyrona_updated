@@ -29,6 +29,14 @@ services:
       timeout: 5s
       retries: 5
 
+  smtp4dev:
+    image: rnwood/smtp4dev:latest
+    container_name: mgscale-smtp4dev
+    ports:
+      - "5000:80"
+      - "2525:25"
+      - "110:110"
+    
   backend:
     build:
       context: ./backend
@@ -41,6 +49,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      smtp4dev:
+        condition: service_started
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -50,7 +60,7 @@ services:
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_SSL=${REDIS_SSL:-false}
-      - SMTP_SERVER=smtp
+      - SMTP_SERVER=smtp4dev
       - SMTP_PORT=25
       - SMTP_USERNAME=${SMTP_USERNAME}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
@@ -69,6 +79,9 @@ services:
       - IOT_CLIENT_SECRET=${IOT_CLIENT_SECRET}
       - IOT_ACCOUNT_ID=${IOT_ACCOUNT_ID}
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - ENVIRONMENT=development
+      - DEBUG=true
+
     volumes:
       - ./backend/app:/app/app
       - ./backend/static:/app/static
@@ -78,7 +91,7 @@ services:
       context: ./FrontEnd
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8001}
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
         - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}
     container_name: mgscale-frontend
     ports:
