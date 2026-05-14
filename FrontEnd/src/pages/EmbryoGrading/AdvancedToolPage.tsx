@@ -165,7 +165,7 @@ export default function AdvancedEmbryoGradingPage() {
             <OocyteList logs={logs} loading={logsLoading} selectedOocyteNo={selectedOocyteNo} oocyteImages={oocyteImages} locked={step === 3 || step === 4} onSelect={handleOocyteSelect} />
 
             <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
-              <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Embryo Details</p>
+              <p className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase mb-3">Embryo Details</p>
               <table className="w-full text-xs">
                 <tbody className="divide-y divide-[#F8F4FD]">
                   {[
@@ -177,8 +177,8 @@ export default function AdvancedEmbryoGradingPage() {
                     { label: 'Fate',       value: selectedLog?.fate || '—' },
                   ].map(r => (
                     <tr key={r.label}>
-                      <td className="py-1.5 text-gray-400 font-medium">{r.label}</td>
-                      <td className="py-1.5 text-gray-800 text-right">{r.value}</td>
+                      <td className="py-1.5 text-gray-600 font-medium">{r.label}</td>
+                      <td className="py-1.5 text-gray-900 font-semibold text-right">{r.value}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -187,17 +187,17 @@ export default function AdvancedEmbryoGradingPage() {
 
             {/* Horizontal Development Timeline */}
             <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
-              <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-4">Development Timeline</p>
+              <p className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase mb-4">Development Timeline</p>
               <div className="relative flex items-start justify-between">
                 {/* connecting line */}
                 <div className="absolute top-[7px] left-0 right-0 h-px bg-[#E8D5F5]" />
                 {DEV_TIMELINE.map((item, i) => (
                   <div key={i} className="relative flex flex-col items-center gap-1.5 flex-1">
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center z-10 shrink-0 transition-colors ${item.active ? 'bg-[#6b1176] border-[#6b1176]' : 'bg-white border-[#c084fc]'}`}>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center z-10 shrink-0 transition-colors ${item.active ? 'bg-primary border-primary' : 'bg-white border-[#c084fc]'}`}>
                       {item.active && <span className="w-1 h-1 rounded-full bg-white" />}
                     </div>
-                    <p className={`text-[9px] font-bold text-center leading-tight ${item.active ? 'text-[#6b1176]' : 'text-gray-400'}`}>{item.day}</p>
-                    <p className={`text-[9px] text-center leading-tight ${item.active ? 'text-[#6b1176] font-semibold' : 'text-gray-400'}`}>{item.event}</p>
+                    <p className={`text-[9px] font-bold text-center leading-tight ${item.active ? 'text-primary' : 'text-gray-600'}`}>{item.day}</p>
+                    <p className={`text-[9px] text-center leading-tight ${item.active ? 'text-primary font-semibold' : 'text-gray-600'}`}>{item.event}</p>
                   </div>
                 ))}
               </div>
@@ -209,9 +209,9 @@ export default function AdvancedEmbryoGradingPage() {
           {/* Step 1 — Upload */}
           {step === 1 && (
             <section className="rounded-lg border border-[#E7E1E1] bg-white overflow-hidden flex flex-col min-h-0">
-              <div className="px-5 py-3.5 border-b border-[#E7E1E1] bg-[#FDFAFF] shrink-0">
-                <p className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase">Upload Embryo Image</p>
-                <p className="text-xs text-gray-400 mt-0.5">Select an oocyte from the list, then upload its microscopy image</p>
+              <div className="px-4 py-3 border-b border-[#F0EBF4] bg-gradient-to-r from-[#faf7fc] to-white shrink-0">
+                <p className="text-sm font-bold text-gray-800">Upload Embryo Image</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">Select an oocyte from the list, then upload its microscopy image</p>
               </div>
               <div className="flex-1 p-5 flex flex-col gap-4 min-h-0">
                 {currentSrc ? (
@@ -224,19 +224,19 @@ export default function AdvancedEmbryoGradingPage() {
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
-                    <label className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg bg-white/90 border border-[#E7E1E1] text-[#6b1176] text-xs font-semibold cursor-pointer hover:bg-white transition-colors">
+                    <label className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg bg-white/90 border border-[#E7E1E1] text-primary text-xs font-semibold cursor-pointer hover:bg-white transition-colors">
                       Replace
                       <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
                     </label>
                   </div>
                 ) : (
                   <label
-                    className={`flex-1 flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-all cursor-pointer ${isDragging ? 'border-[#6b1176] bg-[#F7ECFF]' : 'border-[#E7E1E1] hover:border-[#c8b2d1] hover:bg-[#FDFAFF]'} ${selectedOocyteNo == null ? 'opacity-50 pointer-events-none' : ''}`}
+                    className={`flex-1 flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-all cursor-pointer ${isDragging ? 'border-primary bg-[#F7ECFF]' : 'border-[#E7E1E1] hover:border-[#c8b2d1] hover:bg-[#FDFAFF]'} ${selectedOocyteNo == null ? 'opacity-50 pointer-events-none' : ''}`}
                     onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                     onDragLeave={() => setIsDragging(false)}
                     onDrop={handleDrop}
                   >
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${isDragging ? 'bg-[#6b1176] text-white' : 'bg-[#F7ECFF] text-[#6b1176]'}`}>
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${isDragging ? 'bg-primary text-white' : 'bg-[#F7ECFF] text-primary'}`}>
                       <Upload size={28} />
                     </div>
                     <div className="text-center">
@@ -247,7 +247,7 @@ export default function AdvancedEmbryoGradingPage() {
                       <p className="text-[11px] text-gray-300 mt-1.5">PNG, JPG, TIFF</p>
                     </div>
                     {selectedOocyteNo != null && (
-                      <span className="px-5 py-2 rounded-lg border border-[#D8C7E3] text-[#6b1176] text-sm font-medium bg-white hover:bg-[#F7ECFF] transition-colors">
+                      <span className="px-5 py-2 rounded-lg border border-[#D8C7E3] text-primary text-sm font-medium bg-white hover:bg-[#F7ECFF] transition-colors">
                         Browse Files
                       </span>
                     )}
@@ -262,17 +262,17 @@ export default function AdvancedEmbryoGradingPage() {
           {step === 2 && (
             <div className="col-span-1 xl:col-span-3 flex flex-col items-center justify-center min-h-[420px] gap-6 rounded-lg border border-[#E7E1E1] bg-white">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full border-4 border-[#E8D5F5] border-t-[#6b1176] animate-spin" />
+                <div className="w-24 h-24 rounded-full border-4 border-[#E8D5F5] border-t-primary animate-spin" />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-12 h-12 rounded-full bg-[#F7ECFF] flex items-center justify-center">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 2a10 10 0 0 1 0 20"/><circle cx="12" cy="12" r="3"/>
                     </svg>
                   </div>
                 </div>
               </div>
               <div className="text-center">
-                <p className="text-xl font-bold text-[#6b1176]">AI Grading in Progress</p>
+                <p className="text-xl font-bold text-primary">AI Grading in Progress</p>
                 <p className="text-sm text-gray-400 mt-1">
                   Analyzing Oocyte #{selectedOocyteNo ?? '—'}
                   {selectedLog?.d0_maturity ? ` · ${selectedLog.d0_maturity}` : ''}
@@ -280,16 +280,16 @@ export default function AdvancedEmbryoGradingPage() {
               </div>
               <div className="w-72">
                 <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                  <div className="h-full rounded-full bg-[#6b1176] animate-[ai-progress_2.8s_ease-out_forwards]" />
+                  <div className="h-full rounded-full bg-primary animate-[ai-progress_2.8s_ease-out_forwards]" />
                 </div>
                 <div className="flex justify-between mt-1.5">
                   <span className="text-[10px] text-gray-400">Analyzing morphology...</span>
-                  <span className="text-[10px] text-[#6b1176] font-semibold">Processing</span>
+                  <span className="text-[10px] text-primary font-semibold">Processing</span>
                 </div>
               </div>
               <div className="flex gap-2 flex-wrap justify-center">
                 {['Expansion grading', 'ICM classification', 'TE scoring', 'Quality assessment'].map((label, i) => (
-                  <span key={label} className="px-3 py-1 rounded-full bg-[#F7ECFF] text-[#6b1176] text-[11px] font-medium"
+                  <span key={label} className="px-3 py-1 rounded-full bg-[#F7ECFF] text-primary text-[11px] font-medium"
                     style={{ opacity: 0, animation: `fade-in 0.3s ease forwards ${0.4 + i * 0.3}s` }}>
                     {label}
                   </span>
@@ -304,8 +304,8 @@ export default function AdvancedEmbryoGradingPage() {
               <div className="px-4 py-2 border-b border-[#E7E1E1] flex items-center justify-between bg-white shrink-0">
                 <span className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Image Viewer</span>
                 <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => setShowAnnotations(true)} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${showAnnotations ? 'bg-[#6b1176] text-white' : 'border border-[#E7E1E1] text-gray-500 hover:bg-gray-50'}`}>Annotations</button>
-                  <button type="button" onClick={() => setShowAnnotations(false)} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${!showAnnotations ? 'bg-[#6b1176] text-white' : 'border border-[#E7E1E1] text-gray-500 hover:bg-gray-50'}`}>Original</button>
+                  <button type="button" onClick={() => setShowAnnotations(true)} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${showAnnotations ? 'bg-primary text-white' : 'border border-[#E7E1E1] text-gray-500 hover:bg-gray-50'}`}>Annotations</button>
+                  <button type="button" onClick={() => setShowAnnotations(false)} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${!showAnnotations ? 'bg-primary text-white' : 'border border-[#E7E1E1] text-gray-500 hover:bg-gray-50'}`}>Original</button>
                 </div>
               </div>
               <div className="relative flex-1 bg-black min-h-0">
@@ -333,35 +333,60 @@ export default function AdvancedEmbryoGradingPage() {
           {/* ── RIGHT PANEL — steps 1 & 3 (AI results, placeholder on step 1) ── */}
           <aside className="flex flex-col gap-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 14rem)' }}>
 
-            {/* Step 1 — Awaiting analysis placeholder */}
+            {/* Step 1 — placeholder (same layout as step 3, values dimmed) */}
             {step === 1 && (
               <div className="flex flex-col gap-3">
-                <div className="rounded-xl overflow-hidden shrink-0 flex flex-col items-center justify-center gap-3 py-10 px-6 text-center" style={{ background: 'linear-gradient(135deg, #4a0260 0%, #6b1176 45%, #8b2a96 100%)' }}>
-                  <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2a10 10 0 0 1 0 20"/><circle cx="12" cy="12" r="3"/>
-                    </svg>
+                {/* AI Grade card — placeholder */}
+                <div className="rounded-xl overflow-hidden shrink-0" style={{ height: '205.45px', background: 'var(--gradient-primary)' }}>
+                  <div className="px-4 pt-4 pb-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[10px] font-semibold tracking-widest text-white/50 uppercase">AI Grade</p>
+                      <button type="button" className="text-white/30"><Info size={13} /></button>
+                    </div>
+                    <p className="text-6xl font-extrabold text-white/20 leading-none tracking-tight">—</p>
                   </div>
-                  <div>
-                    <p className="text-base font-bold text-white">AI Grade</p>
-                    <p className="text-xs text-white/60 mt-1">Upload an embryo image and start analysis to see the AI grade here.</p>
+                  <div className="px-4 pb-4" style={{ background: 'rgba(0,0,0,0.15)' }}>
+                    <div className="pt-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs text-white/70">Confidence Score</span>
+                        <span className="text-sm font-bold text-white/30">—</span>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                      <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                        <span className="text-[11px] font-semibold text-white/30">—</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
+
+                {/* Component Grades — placeholder */}
                 <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
                   <p className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase mb-3">Component Grades</p>
                   <div className="grid grid-cols-3 gap-2">
-                    {['Expansion', 'ICM', 'TE'].map(label => (
-                      <div key={label} className="rounded-lg border border-[#E7E1E1] bg-[#FAFAFA] p-3 flex flex-col items-center justify-center gap-1 min-h-[72px]">
-                        <span className="text-[10px] font-semibold text-gray-400">{label}</span>
-                        <span className="text-2xl font-extrabold text-gray-200">—</span>
+                    {[
+                      { label: 'Expansion', sub: '—', conf: '—' },
+                      { label: 'ICM',       sub: '—', conf: '—' },
+                      { label: 'TE',        sub: '—', conf: '—' },
+                    ].map(c => (
+                      <div key={c.label} className="rounded-lg border border-[#E7E1E1] bg-[#FCF9FF] p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-semibold text-primary">{c.label}</span>
+                          <Info size={11} className="text-gray-300" />
+                        </div>
+                        <p className="text-2xl font-extrabold text-primary opacity-20">—</p>
+                        <p className="text-[10px] text-gray-300 mt-0.5 leading-tight">{c.sub}</p>
+                        <p className="text-[10px] text-gray-300 mt-1">Confidence: {c.conf}</p>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="rounded-lg border border-dashed border-[#E7E1E1] bg-[#FAFAFA] p-6 flex flex-col items-center justify-center gap-2 text-center">
-                  <Info size={18} className="text-gray-300" />
-                  <p className="text-xs font-medium text-gray-400">Results will appear here after AI analysis.</p>
-                  <p className="text-[10px] text-gray-300">Select an oocyte, upload its image, then click Start AI Analysis.</p>
+
+                {/* Hint */}
+                <div className="rounded-lg border border-dashed border-[#D8C7E3] bg-[#F7ECFF] p-6 flex flex-col items-center justify-center gap-2 text-center">
+                  <Info size={18} className="text-primary" />
+                  <p className="text-xs font-semibold text-gray-800">Results will appear here after AI analysis.</p>
+                  <p className="text-[10px] text-primary font-medium">Select an oocyte, upload its image, then click Start AI Analysis.</p>
                 </div>
               </div>
             )}
@@ -369,7 +394,7 @@ export default function AdvancedEmbryoGradingPage() {
             {/* Step 3 — AI results */}
             {step === 3 && (<>
               {/* AI Grade card */}
-              <div className="rounded-xl overflow-hidden shrink-0" style={{ height: '205.45px', background: 'linear-gradient(135deg, #4a0260 0%, #6b1176 45%, #8b2a96 100%)' }}>
+              <div className="rounded-xl overflow-hidden shrink-0" style={{ height: '205.45px', background: 'var(--gradient-primary)' }}>
                 <div className="px-4 pt-4 pb-3">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[10px] font-semibold tracking-widest text-white/50 uppercase">AI Grade</p>
@@ -405,10 +430,10 @@ export default function AdvancedEmbryoGradingPage() {
                   ].map(c => (
                     <div key={c.label} className="rounded-lg border border-[#E7E1E1] bg-[#FCF9FF] p-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-semibold text-[#6b1176]">{c.label}</span>
+                        <span className="text-[10px] font-semibold text-primary">{c.label}</span>
                         <Info size={11} className="text-gray-300" />
                       </div>
-                      <p className="text-2xl font-extrabold text-[#6b1176]">{c.value}</p>
+                      <p className="text-2xl font-extrabold text-primary">{c.value}</p>
                       <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{c.sub}</p>
                       <p className="text-[10px] text-gray-400 mt-1">Confidence: {c.conf}</p>
                     </div>
@@ -428,7 +453,7 @@ export default function AdvancedEmbryoGradingPage() {
                 <ul className="space-y-2">
                   {mockAI.observations.map(obs => (
                     <li key={obs} className="flex items-start gap-2 text-xs text-gray-600">
-                      <Check size={12} className="text-[#6b1176] mt-0.5 shrink-0" />{obs}
+                      <Check size={12} className="text-primary mt-0.5 shrink-0" />{obs}
                     </li>
                   ))}
                 </ul>
@@ -442,9 +467,9 @@ export default function AdvancedEmbryoGradingPage() {
                     {notes.map((n, i) => <li key={i} className="text-xs text-gray-600 bg-[#FDFAFF] rounded px-2.5 py-1.5 border border-[#F0EAF4]">{n}</li>)}
                   </ul>
                 )}
-                <textarea value={noteDraft} onChange={e => setNoteDraft(e.target.value)} placeholder="Add note..." rows={3} className="w-full rounded-lg border border-[#E7E1E1] bg-white px-3 py-2 text-xs text-gray-700 placeholder:text-gray-300 outline-none resize-none focus:border-[#6b1176] transition-colors" />
+                <textarea value={noteDraft} onChange={e => setNoteDraft(e.target.value)} placeholder="Add note..." rows={3} className="w-full rounded-lg border border-[#E7E1E1] bg-white px-3 py-2 text-xs text-gray-700 placeholder:text-gray-300 outline-none resize-none focus:border-primary transition-colors" />
                 <div className="flex justify-end mt-2">
-                  <button type="button" onClick={() => { if (noteDraft.trim()) { setNotes(n => [...n, noteDraft.trim()]); setNoteDraft(''); } }} className="px-4 py-2 rounded-lg bg-[#3b0764] text-white text-xs font-semibold hover:bg-[#6b1176] transition-colors">Add Note</button>
+                  <button type="button" onClick={() => { if (noteDraft.trim()) { setNotes(n => [...n, noteDraft.trim()]); setNoteDraft(''); } }} className="px-4 py-2 rounded-lg bg-[#3b0764] text-white text-xs font-semibold hover:bg-primary transition-colors">Add Note</button>
                 </div>
               </div>
             </>)}
@@ -452,7 +477,7 @@ export default function AdvancedEmbryoGradingPage() {
             {/* Step 4 — Override panel */}
             {step === 4 && (<>
               {/* AI Suggestion card */}
-              <div className="rounded-xl overflow-hidden shrink-0" style={{ background: 'linear-gradient(135deg, #4a0260 0%, #6b1176 45%, #8b2a96 100%)' }}>
+              <div className="rounded-xl overflow-hidden shrink-0" style={{ background: 'var(--gradient-primary)' }}>
                 <div className="px-4 pt-4 pb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
                   {/* Left — AI Suggestion */}
                   <div>
@@ -485,12 +510,12 @@ export default function AdvancedEmbryoGradingPage() {
                     <div key={field}>
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-xs font-semibold text-gray-700">{field}</p>
-                        <span className="text-[10px] text-gray-400">AI: <span className="font-bold text-[#6b1176]">{aiVal}</span></span>
+                        <span className="text-[10px] text-gray-400">AI: <span className="font-bold text-primary">{aiVal}</span></span>
                       </div>
                       <div className="flex gap-2 flex-wrap">
                         {opts.map(o => (
                           <button key={o} type="button" onClick={() => setter(o)}
-                            className={`w-10 h-10 rounded-lg border-2 text-sm font-bold transition-all ${value === o ? 'border-[#6b1176] bg-[#6b1176] text-white scale-105' : 'border-[#E7E1E1] text-gray-500 hover:border-[#c084fc] hover:text-[#6b1176]'}`}>
+                            className={`w-10 h-10 rounded-lg border-2 text-sm font-bold transition-all ${value === o ? 'border-primary bg-primary text-white scale-105' : 'border-[#E7E1E1] text-gray-500 hover:border-[#c084fc] hover:text-primary'}`}>
                             {o}
                           </button>
                         ))}
@@ -505,12 +530,12 @@ export default function AdvancedEmbryoGradingPage() {
                     onChange={e => setOverrideReason(e.target.value)}
                     placeholder="Explain why you are overriding the AI grade..."
                     rows={3}
-                    className="w-full rounded-lg border border-[#E7E1E1] px-3 py-2 text-xs text-gray-700 placeholder:text-gray-300 outline-none resize-none focus:border-[#6b1176] transition-colors"
+                    className="w-full rounded-lg border border-[#E7E1E1] px-3 py-2 text-xs text-gray-700 placeholder:text-gray-300 outline-none resize-none focus:border-primary transition-colors"
                   />
                 </div>
                 <div className="rounded-lg bg-[#FDFAFF] border border-[#F0EBF4] px-4 py-3 text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Override Grade</p>
-                  <p className="text-4xl font-extrabold text-[#6b1176]">{overrideExpansion || '—'}{overrideIcm}{overrideTe}</p>
+                  <p className="text-4xl font-extrabold text-primary">{overrideExpansion || '—'}{overrideIcm}{overrideTe}</p>
                 </div>
               </div>
             </>)}
@@ -528,7 +553,7 @@ export default function AdvancedEmbryoGradingPage() {
               type="button"
               disabled={selectedOocyteNo == null || !currentSrc}
               onClick={() => setStep(2)}
-              className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-[#6b1176] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Start AI Analysis
               <ChevronRight size={15} />
@@ -540,14 +565,14 @@ export default function AdvancedEmbryoGradingPage() {
         )}
         {step === 3 && (
           <>
-            <button type="button" onClick={() => setStep(1)} className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-[#6b1176] transition-colors">
+            <button type="button" onClick={() => setStep(1)} className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-primary transition-colors">
               <ArrowLeft size={14} /> Back to Upload
             </button>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={enterOverride} className="px-4 py-2 rounded-lg border border-[#6b1176] text-[#6b1176] text-sm font-semibold hover:bg-[#F7ECFF] transition-colors">
+              <button type="button" onClick={enterOverride} className="px-4 py-2 rounded-lg border border-primary text-primary text-sm font-semibold hover:bg-[#F7ECFF] transition-colors">
                 Override Grade
               </button>
-              <button type="button" onClick={handleComplete} className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-[#6b1176] transition-colors">
+              <button type="button" onClick={handleComplete} className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-primary transition-colors">
                 <Check size={14} />
                 Accept &amp; Complete
               </button>
@@ -556,14 +581,14 @@ export default function AdvancedEmbryoGradingPage() {
         )}
         {step === 4 && (
           <>
-            <button type="button" onClick={() => setStep(3)} className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-[#6b1176] transition-colors">
+            <button type="button" onClick={() => setStep(3)} className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-primary transition-colors">
               <ArrowLeft size={14} /> Cancel Override
             </button>
             <button
               type="button"
               disabled={!overrideExpansion || !overrideIcm || !overrideTe}
               onClick={handleComplete}
-              className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-[#6b1176] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Check size={14} />
               Apply Override &amp; Complete
@@ -600,7 +625,7 @@ function OocyteList({ logs, loading, selectedOocyteNo, oocyteImages, locked, onS
       : icmTe === 'BB'
       ? 'bg-yellow-50 border-yellow-200 text-yellow-700'
       : grade.includes('C')
-      ? 'bg-[#F7ECFF] border-[#c084fc]/40 text-[#6b1176]'
+      ? 'bg-[#F7ECFF] border-[#c084fc]/40 text-primary'
       : 'bg-amber-50 border-amber-200 text-amber-700';
   };
 
@@ -642,15 +667,15 @@ function OocyteList({ logs, loading, selectedOocyteNo, oocyteImages, locked, onS
               >
                 {/* Active indicator bar */}
                 {active && (
-                  <span className="absolute left-0 top-0 bottom-0 w-1 rounded-r bg-[#6b1176]" />
+                  <span className="absolute left-0 top-0 bottom-0 w-1 rounded-r bg-primary" />
                 )}
 
-                <span className={`text-[10px] font-bold w-5 shrink-0 ${active ? 'text-[#6b1176]' : 'text-gray-300'}`}>
+                <span className={`text-[10px] font-bold w-5 shrink-0 ${active ? 'text-primary' : 'text-gray-300'}`}>
                   {String(idx + 1).padStart(2, '0')}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <p className={`text-xs font-semibold ${active ? 'text-[#6b1176]' : 'text-gray-700'}`}>
+                    <p className={`text-xs font-semibold ${active ? 'text-primary' : 'text-gray-700'}`}>
                       Oocyte #{log.oocyte_no}
                     </p>
                     {hasImage && (
@@ -697,11 +722,11 @@ function StepBar({ step }: { step: 1 | 2 | 3 | 4 }) {
           <React.Fragment key={s.n}>
             <div className="flex flex-col items-center gap-1 shrink-0">
               <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-colors
-                ${done || active ? 'bg-[#6b1176] text-white' : 'bg-gray-100 text-gray-400'}
+                ${done || active ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'}
                 ${active ? 'ring-4 ring-[#E8D5F5]' : ''}`}>
                 {done ? <Check size={16} /> : s.n}
               </div>
-              <p className={`text-[10px] font-semibold text-center whitespace-nowrap ${active || done ? 'text-[#6b1176]' : 'text-gray-400'}`}>
+              <p className={`text-[10px] font-semibold text-center whitespace-nowrap ${active || done ? 'text-primary' : 'text-gray-400'}`}>
                 {s.title}
               </p>
               <p className={`text-[9px] text-center whitespace-nowrap ${active || done ? 'text-gray-400' : 'text-gray-300'}`}>
@@ -709,7 +734,7 @@ function StepBar({ step }: { step: 1 | 2 | 3 | 4 }) {
               </p>
             </div>
             {i < steps.length - 1 && (
-              <div className={`flex-1 h-px mx-3 mt-4 ${s.n < step ? 'bg-[#6b1176]' : 'bg-gray-200'}`} />
+              <div className={`flex-1 h-px mx-3 mt-4 ${s.n < step ? 'bg-primary' : 'bg-gray-200'}`} />
             )}
           </React.Fragment>
         );

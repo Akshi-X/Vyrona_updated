@@ -146,7 +146,7 @@ export default function UsersPage() {
                             <input
                                 type="email"
                                 placeholder="user@example.com"
-                                className={`border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1176]/30 ${inviteEmailError ? "border-red-400" : "border-[#E7E1E1]"}`}
+                                className={`border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${inviteEmailError ? "border-red-400" : "border-[#E7E1E1]"}`}
                                 value={inviteEmail}
                                 onChange={(e) => { setInviteEmail(e.target.value); setInviteEmailError(null); }}
                                 disabled={inviteLoading}
@@ -197,7 +197,7 @@ export default function UsersPage() {
                             type="button"
                             onClick={closeInviteModal}
                             disabled={inviteLoading}
-                            className="px-4 py-2 bg-[#F2E4FF] text-[#6b1176] rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
+                            className="px-4 py-2 bg-[#F2E4FF] text-primary rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
                         >
                             Cancel
                         </button>
@@ -211,7 +211,7 @@ export default function UsersPage() {
                                 !validateEmail(inviteEmail) ||
                                 (inviteRole === "User" && !inviteBranch)
                             }
-                            className="px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
+                            className="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
                         >
                             {inviteLoading ? "Sending..." : "Send Invite"}
                         </button>
@@ -227,7 +227,7 @@ export default function UsersPage() {
                     id="onboarding-users-add-btn"
                     type="button"
                     onClick={() => setShowInviteModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
                 >
                     <UserPlus className="w-4 h-4" />
                     Add User
@@ -298,14 +298,14 @@ export default function UsersPage() {
                     <table className="min-w-full text-sm">
                         <thead className="bg-[#fdeeff]">
                             <tr>
-                                <th id="onboarding-users-col-name" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Name</th>
-                                <th id="onboarding-users-col-email" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Email</th>
-                                <th id="onboarding-users-col-role" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Role</th>
-                                <th id="onboarding-users-col-branch" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Branch</th>
-                                <th id="onboarding-users-col-status" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Status</th>
-                                <th id="onboarding-users-col-approved" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Approved</th>
-                                <th id="onboarding-users-col-lastlogin" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Last Login</th>
-                                <th id="onboarding-users-col-invite" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Invite</th>
+                                <th id="onboarding-users-col-name" className="px-4 py-3 text-left font-semibold text-primary">Name</th>
+                                <th id="onboarding-users-col-email" className="px-4 py-3 text-left font-semibold text-primary">Email</th>
+                                <th id="onboarding-users-col-role" className="px-4 py-3 text-left font-semibold text-primary">Role</th>
+                                <th id="onboarding-users-col-branch" className="px-4 py-3 text-left font-semibold text-primary">Branch</th>
+                                <th id="onboarding-users-col-status" className="px-4 py-3 text-left font-semibold text-primary">Status</th>
+                                <th id="onboarding-users-col-approved" className="px-4 py-3 text-left font-semibold text-primary">Approved</th>
+                                <th id="onboarding-users-col-lastlogin" className="px-4 py-3 text-left font-semibold text-primary">Last Login</th>
+                                <th id="onboarding-users-col-invite" className="px-4 py-3 text-left font-semibold text-primary">Invite</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -361,7 +361,7 @@ export default function UsersPage() {
                                                     type="button"
                                                     onClick={() => handleResendInvite(user.user_id)}
                                                     disabled={resendingId === user.user_id}
-                                                    className="text-xs font-semibold text-[#6b1176] hover:underline disabled:opacity-50"
+                                                    className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
                                                 >
                                                     {resendingId === user.user_id ? "Sending…" : "Resend Invite"}
                                                 </button>

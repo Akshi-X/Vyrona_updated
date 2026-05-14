@@ -1315,7 +1315,7 @@ export default function ReportsPage() {
                                         ? !canViewActivityLogs
                                         : !isIvfUser)
                                 }
-                                className="px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Download CSV
                             </button>
@@ -1393,13 +1393,13 @@ export default function ReportsPage() {
                                 <table className="min-w-full text-sm">
                                     <thead className="bg-[#fdeeff]">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 KPI Config
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Alerts Sent
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 KPI Deviations
                                             </th>
                                         </tr>
@@ -1455,22 +1455,22 @@ export default function ReportsPage() {
                                 <table className="min-w-full text-sm">
                                     <thead className="bg-[#fdeeff]">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Occurred Date
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Occurred Time
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Severity
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Status
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Tank Code
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Message
                                             </th>
                                         </tr>
@@ -1549,31 +1549,31 @@ export default function ReportsPage() {
                                 <table className="min-w-full text-sm">
                                     <thead className="bg-[#fdeeff]">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Refill Date
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Refill Time
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Tank Code
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Branch
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Refilled By
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Description
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Reservoir
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 LN2 Ordered
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 LN2 Received
                                             </th>
                                         </tr>
@@ -1651,19 +1651,19 @@ export default function ReportsPage() {
                                 <table className="min-w-full text-sm">
                                     <thead className="bg-[#fdeeff]">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Action
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Actor
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Target
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Outcome
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Details
                                             </th>
                                         </tr>
@@ -1713,7 +1713,7 @@ export default function ReportsPage() {
                                                             {row.metadata?.tank_id ? (
                                                                 <Link
                                                                     to={`/ivf-track-shipment/${row.metadata.tank_id}`}
-                                                                    className="text-[#6b1176] hover:underline"
+                                                                    className="text-primary hover:underline"
                                                                 >
                                                                     {row.metadata?.tank_code || row.metadata?.tank_id}
                                                                 </Link>
@@ -1732,7 +1732,7 @@ export default function ReportsPage() {
                                                         <div className="flex flex-col">
                                                             <Link
                                                                 to={`/ivf-track-shipment/${row.target_id}`}
-                                                                className="text-[#6b1176] hover:underline"
+                                                                className="text-primary hover:underline"
                                                             >
                                                                 {formatTargetLabel(row)}
                                                             </Link>

@@ -125,7 +125,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
     return (
       <div className="bg-white rounded-lg border border-[#E7E1E1] overflow-hidden">
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6b1176]"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <span className="ml-3 text-gray-600">Loading patients data...</span>
         </div>
       </div>
@@ -142,7 +142,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
             <div className="text-gray-600 mb-4">{error}</div>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-[#6b1176] text-white rounded-md hover:bg-[#5a0f66] transition-colors"
+              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-[#5a0f66] transition-colors"
             >
               Retry
             </button>
@@ -173,7 +173,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
           <thead className="sticky top-0 bg-[#fdeeff] z-10">
             <tr>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-4 text-left text-xs font-semibold text-primary uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('patient_id')}
               >
                 <div className="flex items-center gap-2">
@@ -182,7 +182,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 </div>
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-4 text-left text-xs font-semibold text-primary uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('condition')}
               >
                 <div className="flex items-center gap-2">
@@ -191,7 +191,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 </div>
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-4 text-left text-xs font-semibold text-primary uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('provider_name')}
               >
                 <div className="flex items-center gap-2">
@@ -200,7 +200,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 </div>
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-4 text-left text-xs font-semibold text-primary uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('hospital')}
               >
                 <div className="flex items-center gap-2">
@@ -209,7 +209,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 </div>
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider"
+                className="px-6 py-4 text-left text-xs font-semibold text-primary uppercase tracking-wider"
               >
                 <div className="flex items-center gap-2 relative" ref={dropdownRef}>
                   <span className="whitespace-nowrap">Stage</span>
@@ -223,7 +223,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                       className={`text-xs p-1.5 rounded transition-all duration-200 ${
                         stageFilter !== 'all' 
                           ? ' text-white' 
-                          : 'text-[#6b1176]'
+                          : 'text-primary'
                       }`}
                       title={stageFilter === 'all' ? 'All Stages' : `Filtered: ${stageFilter}`}
                     >
@@ -257,7 +257,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                                 setIsDropdownOpen(false);
                               }}
                               className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                stageFilter === value ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                                stageFilter === value ? 'bg-primary text-white' : 'text-primary hover:bg-gray-100'
                               }`}
                             >
                               {label}
@@ -270,7 +270,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 </div>
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-4 text-left text-xs font-semibold text-primary uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('location')}
               >
                 <div className="flex items-center gap-2">
@@ -280,7 +280,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
               </th>
               {/* As per client requirement as for now the document column is commended */}
               {/* <th
-                className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-4 text-left text-xs font-semibold text-primary uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-2">
                   Document
@@ -339,7 +339,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                   {/* As per client requirement as for now the document column is commended */}
                   {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <button
-                      className="text-[#6b1176] hover:text-[#5a0f66] font-medium underline"
+                      className="text-primary hover:text-[#5a0f66] font-medium underline"
                       onClick={() => {
                         if (!patient.docs_report) {
                           alert('No document available for download.');

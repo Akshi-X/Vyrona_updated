@@ -1046,7 +1046,7 @@ export default function Dashboard({ }: DashboardProps) {
                         {loadingUserProfile ? (
                           <span className="inline-block h-7 w-[150px] max-w-full animate-pulse rounded-md bg-gray-200" />
                         ) : (
-                          <span className="text-[#6b1176]">{displayName}</span>
+                          <span className="text-primary">{displayName}</span>
                         )}
                       </p>
                     );

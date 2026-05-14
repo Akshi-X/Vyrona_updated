@@ -748,7 +748,7 @@ const ControlTower = () => {
                                         ? deviceType === "incubators" ? "Active Incubators" : "Active Containers"
                                         : "Active Routes"}
                                 </h2>
-                                <div className="grid grid-cols-3 pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
+                                <div className="grid grid-cols-3 pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-primary gap-3">
                                     <div className="text-left">
                                         {isIvfUser
                                             ? deviceType === "incubators" ? "Incubators #" : "Containers #"
@@ -913,7 +913,7 @@ const ControlTower = () => {
                                                                         {route?.patientId ? (
                                                                             <Link
                                                                                 to={`${isOnboarding ? "/onboarding" : ""}/track/${route.patientId}`}
-                                                                                className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
+                                                                                className="text-primary text-xs font-bold hover:underline cursor-pointer truncate block"
                                                                                 onClick={(
                                                                                     e,
                                                                                 ) =>
@@ -925,7 +925,7 @@ const ControlTower = () => {
                                                                                 }
                                                                             </Link>
                                                                         ) : (
-                                                                            <span className="text-[#6b1176] text-xs font-bold">
+                                                                            <span className="text-primary text-xs font-bold">
                                                                                 N/A
                                                                             </span>
                                                                         )}
@@ -1034,14 +1034,14 @@ const ControlTower = () => {
                                                                 >
                                                                     <div className="min-w-0 text-left overflow-hidden">
                                                                         {canister.canisterId ? (
-                                                                            <span className="text-[#6b1176] text-xs font-bold hover:underline truncate block">
+                                                                            <span className="text-primary text-xs font-bold hover:underline truncate block">
                                                                                 {deviceType === "incubators" ? "Incubator" : "Container"}{" "}
                                                                                 {
                                                                                     canister.canisterId
                                                                                 }
                                                                             </span>
                                                                         ) : (
-                                                                            <span className="text-[#6b1176] text-xs font-bold">
+                                                                            <span className="text-primary text-xs font-bold">
                                                                                 {deviceType === "incubators" ? "Incubator" : "Container"}{" "}
                                                                                 {
                                                                                     canister.canisterId

@@ -34,7 +34,7 @@ export default function EmbryoTabBar({ his }: EmbryoTabBarProps) {
           onClick={() => navigate(tab.to)}
           className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors -mb-px ${
             active === tab.id
-              ? 'border-[#6b1176] text-[#6b1176]'
+              ? 'border-primary text-primary'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >

@@ -3,6 +3,8 @@
 @theme {
   --breakpoint-xl1: 1200px;
   --breakpoint-xl2: 1412px;
+  --color-primary: #6b1176;
+  --gradient-primary: linear-gradient(135deg, #4a0260 0%, var(--color-primary) 45%, #8b2a96 100%);
 }
 
 @keyframes page-enter {

@@ -70,7 +70,7 @@ const Login: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-screen">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6b1176]"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -297,7 +297,7 @@ const Login: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-3 mb-1 text-white rounded-md font-medium transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#6b1176] hover:bg-[#8b2a96] cursor-pointer"
+                            className={`w-full py-3 mb-1 text-white rounded-md font-medium transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-primary hover:bg-[#8b2a96] cursor-pointer"
                                 }`}
                         >
                             {loading ? "Signing in..." : "Sign in"}
@@ -317,7 +317,7 @@ const Login: React.FC = () => {
 
                 </div>
                 <p className="mt-2 text-center text-[#9a9a9a] text-sm">
-                    Having trouble signing in?<br className="md:hidden" /> Contact <a href="#" className="text-[#6b1176] inline">
+                    Having trouble signing in?<br className="md:hidden" /> Contact <a href="#" className="text-primary inline">
                         support@mygrape.org
                     </a>{" "} for help.
                 </p>

@@ -332,7 +332,7 @@ export default function EmbryoGradingPage() {
           <button
             type="button"
             onClick={() => setIsAddEmbryoFormOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
           >
             + Add Cycle
           </button>
@@ -368,7 +368,7 @@ export default function EmbryoGradingPage() {
 
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: 'Total Cycles', value: cycleStats.total,     sub: 'all time',    Icon: Layers,      valCls: 'text-[#6b1176]',    bg: 'bg-white border-[#E8E1F0]'    },
+                { label: 'Total Cycles', value: cycleStats.total,     sub: 'all time',    Icon: Layers,      valCls: 'text-primary',    bg: 'bg-white border-[#E8E1F0]'    },
                 { label: 'Active',       value: cycleStats.active,    sub: 'in progress', Icon: Activity,    valCls: 'text-emerald-700',  bg: 'bg-white border-[#E6F4EC]'    },
                 { label: 'Completed',    value: cycleStats.completed, sub: 'finished',    Icon: CheckCircle, valCls: 'text-sky-700',      bg: 'bg-white border-[#DDEFFA]'    },
               ].map(s => (
@@ -380,7 +380,7 @@ export default function EmbryoGradingPage() {
                       <p className="text-[10px] text-gray-400 mt-1.5">{s.sub}</p>
                     </div>
                     <div className="w-8 h-8 rounded-lg bg-[#F7ECFF] flex items-center justify-center shrink-0">
-                      <s.Icon size={15} className="text-[#6b1176]" />
+                      <s.Icon size={15} className="text-primary" />
                     </div>
                   </div>
                 </div>
@@ -394,18 +394,13 @@ export default function EmbryoGradingPage() {
 
           {/* Left — Active Cycles */}
           <div className="flex flex-col gap-3">
-            <div className="hidden md:block bg-white border border-[#E7E1E1] rounded-xl px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892] mb-2">Filter</p>
-              <FilterSelect label="Status" value={selectedStatus} onChange={setSelectedStatus} options={statusOptions} allLabel="All Statuses" />
-            </div>
-
             <div className="bg-white border border-[#E7E1E1] rounded-xl overflow-hidden flex flex-col">
               <div className="px-4 py-3 flex items-center justify-between border-b border-[#F0EBF4] bg-gradient-to-r from-[#FDFAFF] to-white shrink-0">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Patients</p>
                   <p className="text-sm font-bold text-gray-900">Active Cycles</p>
                 </div>
-                <span className="text-xs font-bold bg-[#F7ECFF] text-[#6b1176] px-2.5 py-1 rounded-full border border-[#e9d5ff]">{filteredCycles.length}</span>
+                <span className="text-xs font-bold bg-[#F7ECFF] text-primary px-2.5 py-1 rounded-full border border-[#e9d5ff]">{filteredCycles.length}</span>
               </div>
 
               <div className="overflow-y-auto divide-y divide-[#F8F4FD]" style={{ maxHeight: '560px', scrollbarWidth: 'thin' }}>
@@ -416,7 +411,7 @@ export default function EmbryoGradingPage() {
                 ) : filteredCycles.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-2 text-center px-4">
                     <div className="w-10 h-10 rounded-full bg-[#F7ECFF] flex items-center justify-center">
-                      <Layers size={16} className="text-[#6b1176]" />
+                      <Layers size={16} className="text-primary" />
                     </div>
                     <p className="text-xs font-medium text-gray-500">No cycles found</p>
                   </div>
@@ -450,7 +445,7 @@ export default function EmbryoGradingPage() {
                           </div>
 
                           <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-[11px] text-[#6b1176] font-semibold">{cycle.his_id}</p>
+                            <p className="text-[11px] text-primary font-semibold">{cycle.his_id}</p>
                             {dayTask && (
                               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                                 dayTask.urgency === 'urgent' ? 'bg-red-50 text-red-600' :
@@ -464,7 +459,7 @@ export default function EmbryoGradingPage() {
                             <div className="flex items-center gap-1 mt-2">
                               <div className="flex items-center gap-0.5 flex-1">
                                 {[1, 2, 3, 4, 5, 6].map(d => (
-                                  <div key={d} className={`h-1 flex-1 rounded-full ${day >= d ? 'bg-[#6b1176]' : 'bg-gray-100'}`} />
+                                  <div key={d} className={`h-1 flex-1 rounded-full ${day >= d ? 'bg-primary' : 'bg-gray-100'}`} />
                                 ))}
                               </div>
                               <span className="text-[10px] text-gray-400 ml-2 shrink-0 font-medium">Day {day}</span>
@@ -472,7 +467,7 @@ export default function EmbryoGradingPage() {
                           )}
                         </div>
 
-                        <svg className="text-gray-200 group-hover:text-[#6b1176] transition-colors mr-3 shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+                        <svg className="text-gray-200 group-hover:text-primary transition-colors mr-3 shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
                       </button>
                     );
                   })
@@ -526,7 +521,7 @@ export default function EmbryoGradingPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-gray-900 truncate">{item.cycle.patient_name || item.cycle.his_id}</p>
-                              <p className="text-[10px] text-[#6b1176] font-medium mt-0.5">{item.cycle.his_id} · {item.task}</p>
+                              <p className="text-[10px] text-primary font-medium mt-0.5">{item.cycle.his_id} · {item.task}</p>
                             </div>
                             <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                               item.urgency === 'urgent' ? 'bg-red-50 text-red-600 border-red-200' :
@@ -604,7 +599,7 @@ export default function EmbryoGradingPage() {
                   <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">All Cycles</p>
                   <p className="text-sm font-bold text-black mt-0.5">Patient Cycle Register</p>
                 </div>
-                <span className="text-[10px] font-semibold text-[#6b1176] bg-[#F7ECFF] px-2.5 py-1 rounded-full border border-[#e9d5ff]">{pastCycles.length} records</span>
+                <span className="text-[10px] font-semibold text-primary bg-[#F7ECFF] px-2.5 py-1 rounded-full border border-[#e9d5ff]">{pastCycles.length} records</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -621,7 +616,7 @@ export default function EmbryoGradingPage() {
                     ) : (
                       pastCycles.map(c => (
                         <tr key={c.cycle_id} className="hover:bg-[#FDFAFF] transition-colors cursor-pointer group" onClick={() => navigate(`/embryo-grading/${c.his_id}`)}>
-                          <td className="px-4 py-3 text-xs font-bold text-[#6b1176]">{c.his_id}</td>
+                          <td className="px-4 py-3 text-xs font-bold text-primary">{c.his_id}</td>
                           <td className="px-4 py-3 text-xs font-medium text-gray-800 max-w-[140px] truncate">{c.patient_name || '—'}</td>
                           <td className="px-4 py-3 text-xs text-gray-500">{c.injection_method || '—'}</td>
                           <td className="px-4 py-3 text-xs text-gray-500">{c.cycle_type || '—'}</td>
@@ -635,7 +630,7 @@ export default function EmbryoGradingPage() {
                           <td className="px-4 py-3 text-xs text-gray-500">
                             {c.opu_date ? new Date(c.opu_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                           </td>
-                          <td className="px-4 py-3 text-[10px] text-gray-300 group-hover:text-[#6b1176] font-semibold transition-colors">View →</td>
+                          <td className="px-4 py-3 text-[10px] text-gray-300 group-hover:text-primary font-semibold transition-colors">View →</td>
                         </tr>
                       ))
                     )}
@@ -777,7 +772,7 @@ export default function EmbryoGradingPage() {
               <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
                 Select Chamber Position
                 {newEmbryoForm.chamberPosition && (
-                  <span className="ml-2 text-[#6b1176]">— Slot {newEmbryoForm.chamberPosition} selected</span>
+                  <span className="ml-2 text-primary">— Slot {newEmbryoForm.chamberPosition} selected</span>
                 )}
               </p>
               <div
@@ -795,8 +790,8 @@ export default function EmbryoGradingPage() {
                         onClick={() => handleNewEmbryoFieldChange('chamberPosition', active ? '' : pos)}
                         className={`h-9 rounded-lg text-xs font-semibold transition-all duration-150 ${
                           active
-                            ? 'bg-[#6b1176] text-white scale-105'
-                            : 'bg-white text-gray-500 border border-gray-200 hover:border-[#6b1176] hover:text-[#6b1176] hover:scale-105'
+                            ? 'bg-primary text-white scale-105'
+                            : 'bg-white text-gray-500 border border-gray-200 hover:border-primary hover:text-primary hover:scale-105'
                         }`}
                       >
                         {pos}
@@ -865,7 +860,7 @@ export default function EmbryoGradingPage() {
               type="button"
               onClick={handleAddEmbryo}
               disabled={!newEmbryoForm.hisNumber.trim() || cycleCreating}
-              className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-3 py-2 rounded-md bg-primary text-white text-sm font-medium hover:bg-[#5a0f62] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {cycleCreating && <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
               {cycleCreating ? 'Adding...' : 'Add Cycle'}

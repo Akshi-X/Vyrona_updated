@@ -1111,7 +1111,7 @@ const Support: React.FC = () => {
                                                         className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors duration-200 ${
                                                             !canAddComment
                                                                 ? "bg-gray-400 cursor-not-allowed"
-                                                                : "bg-[#6b1176] hover:bg-[#8a2a95]"
+                                                                : "bg-primary hover:bg-[#8a2a95]"
                                                         }`}
                                                         aria-disabled={
                                                             !canAddComment
@@ -1170,7 +1170,7 @@ const Support: React.FC = () => {
                                             href="https://mygrape.org/contact/"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-[#6b1176] underline hover:text-[#8b2a96] font-semibold"
+                                            className="text-primary underline hover:text-[#8b2a96] font-semibold"
                                         >
                                             https://mygrape.org/contact/
                                         </a>
@@ -1220,7 +1220,7 @@ const Support: React.FC = () => {
                                         disabled={
                                             isSubmitting || !agreementChecked
                                         }
-                                        className={`inline-flex items-center px-4 py-3 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium`}
+                                        className={`inline-flex items-center px-4 py-3 bg-primary text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium`}
                                     >
                                         {isSubmitting
                                             ? "Submitting..."
