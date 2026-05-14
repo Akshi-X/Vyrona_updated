@@ -63,6 +63,12 @@ export default defineConfig({
     tailwindcss(),
     genieManifestPlugin(),
   ],
+
+   server: {
+    host: '0.0.0.0',  // listens on all interfaces, not just localhost
+    port: 5173,
+  },
+
   test: {
     environment: 'jsdom',
     globals: true,
