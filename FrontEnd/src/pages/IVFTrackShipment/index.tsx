@@ -542,7 +542,9 @@ export default function IVFTrackShipmentPage() {
                                         tankCode={headerTankCode !== "-" ? headerTankCode : undefined}
                                         branchName={headerBranchName !== "-" ? headerBranchName : undefined}
                                     />
-                                    <IVFQualityTrackingChart canisterNumber={tankId} />
+                                    <div style={{ marginBottom: 16 }}>
+                                        <IVFQualityTrackingChart canisterNumber={tankId} />
+                                    </div>
                                 </>
                             )}
 
