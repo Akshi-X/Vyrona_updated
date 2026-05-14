@@ -499,7 +499,7 @@ const UserProfilePage: React.FC = () => {
               <button
                 id="onboarding-profile-edit-btn"
                 onClick={handleEditProfile}
-                className="inline-flex items-center px-4 py-2 border border-[#6b1176] text-[#6b1176] rounded-lg hover:bg-[#6b1176]/10 transition-colors duration-200 bg-white"
+                className="inline-flex items-center px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors duration-200 bg-white"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -512,7 +512,7 @@ const UserProfilePage: React.FC = () => {
                   id="onboarding-profile-save-btn"
                   onClick={handleSaveProfile}
                   disabled={isSaving}
-                  className="inline-flex items-center px-4 py-2 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? (
                     <>
@@ -671,7 +671,7 @@ const UserProfilePage: React.FC = () => {
               <button
                 id="onboarding-profile-submit-request"
                 onClick={handleSubmitRequest}
-                className="px-4 py-3 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
+                className="px-4 py-3 bg-primary text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
               >
                 Submit New Request
               </button>
@@ -740,7 +740,7 @@ const UserProfilePage: React.FC = () => {
                       setSelectedBranch('All');
                       setSelectedSubmitter('All');
                     }}
-                    className="mt-1 w-full px-3 h-11 rounded-lg text-sm font-medium text-[#6b1176] border border-[#6b1176] hover:bg-[#6b1176]/10"
+                    className="mt-1 w-full px-3 h-11 rounded-lg text-sm font-medium text-primary border border-primary hover:bg-primary/10"
                   >
                     Clear filters
                   </button>
@@ -831,7 +831,7 @@ const UserProfilePage: React.FC = () => {
                         setSelectedBranch('All');
                         setSelectedSubmitter('All');
                       }}
-                      className="mt-1 w-full px-3 h-11 rounded-lg text-sm font-medium text-[#6b1176] border border-[#6b1176] hover:bg-[#6b1176]/10"
+                      className="mt-1 w-full px-3 h-11 rounded-lg text-sm font-medium text-primary border border-primary hover:bg-primary/10"
                     >
                       Clear filters
                     </button>
@@ -849,21 +849,21 @@ const UserProfilePage: React.FC = () => {
                 <table className="w-full">
                   <thead className="sticky top-0 bg-[#fdeeff] z-10">
                     <tr className="border-b border-[#eeeeee]">
-                      <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                      <th className="p-[15px] font-semibold text-primary text-sm text-left whitespace-nowrap">
                         Ticket ID
                       </th>
-                      <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                      <th className="p-[15px] font-semibold text-primary text-sm text-left whitespace-nowrap">
                         Title
                       </th>
                       {isMygrapeAdmin && (
-                        <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                        <th className="p-[15px] font-semibold text-primary text-sm text-left whitespace-nowrap">
                           Submitted By / Hospital / Branch
                         </th>
                       )}
-                      <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                      <th className="p-[15px] font-semibold text-primary text-sm text-left whitespace-nowrap">
                         Type
                       </th>
-                      <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                      <th className="p-[15px] font-semibold text-primary text-sm text-left whitespace-nowrap">
                         Status
                       </th>
                     </tr>
@@ -965,7 +965,7 @@ const UserProfilePage: React.FC = () => {
               <button
                 onClick={() => setIsEmailNotificationsEnabled(!isEmailNotificationsEnabled)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                  isEmailNotificationsEnabled ? 'bg-[#6b1176]' : 'bg-gray-200'
+                  isEmailNotificationsEnabled ? 'bg-primary' : 'bg-gray-200'
                 }`}
               >
                 <span

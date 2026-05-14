@@ -565,7 +565,7 @@ const Signup: React.FC = () => {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className={`h-[40px] w-full px-2 rounded-lg font-semibold text-white text-base ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#6b1176] hover:bg-[#5a0e62] cursor-pointer"
+                                    className={`h-[40px] w-full px-2 rounded-lg font-semibold text-white text-base ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-primary hover:bg-[#5a0e62] cursor-pointer"
                                         }`}
                                 >
                                     {loading ? "Submitting..." : "Sign up"}
@@ -580,24 +580,24 @@ const Signup: React.FC = () => {
 
                             <p className="mt-2 text-center font-normal text-base">
                                 <span className="text-[#6c6c6c]">Already have an account? </span>
-                                <Link to="/login" className="font-semibold text-[#6b1176] underline">
+                                <Link to="/login" className="font-semibold text-primary underline">
                                     Sign in
                                 </Link>
                             </p>
 
                             <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
-                                Having trouble Signing up? Contact <a href="#" className="text-[#6b1176] inline">
+                                Having trouble Signing up? Contact <a href="#" className="text-primary inline">
                                     support@mygrape.org
                                 </a>{" "} for help.
                             </p>
 
                             <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
                                 By signing up, you agree to myGrape's{" "}
-                                <a href="#" className="text-[#6b1176] inline">
+                                <a href="#" className="text-primary inline">
                                     Terms of Service
                                 </a>{" "}
                                 and{" "}
-                                <a href="#" className="text-[#6b1176] inline">
+                                <a href="#" className="text-primary inline">
                                     Privacy Policy
                                 </a>
                             </p>
@@ -606,16 +606,16 @@ const Signup: React.FC = () => {
 
                     {registrationSuccess && (
                         <div className="border border-[white] rounded-lg p-6 bg-[#F2E4FF]">
-                            <h2 className="text-xl font-bold text-[#6b1176] mb-2">
+                            <h2 className="text-xl font-bold text-primary mb-2">
                                 Registration successful
                             </h2>
-                            <p className="text-[#6b1176] mb-3">
+                            <p className="text-primary mb-3">
                                 Your request is pending. Once approved, you can log in.
                             </p>
                             <div>
                                 <Link
                                     to="/login"
-                                    className="inline-block h-[40px] px-4 bg-[#6b1176] hover:bg-[#5a0e62] rounded-lg font-semibold text-white text-base leading-[40px]"
+                                    className="inline-block h-[40px] px-4 bg-primary hover:bg-[#5a0e62] rounded-lg font-semibold text-white text-base leading-[40px]"
                                 >
                                     Go to Login
                                 </Link>

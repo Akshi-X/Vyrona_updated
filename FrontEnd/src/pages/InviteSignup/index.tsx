@@ -99,7 +99,7 @@ const InviteSignup: React.FC = () => {
                         <div className="text-center">
                             <h2 className="text-2xl font-bold text-gray-800 mb-3">Invalid Invite</h2>
                             <p className="text-red-600 text-sm mb-6">{tokenError}</p>
-                            <button onClick={() => navigate("/login")} className="text-[#6b1176] text-sm font-medium underline">
+                            <button onClick={() => navigate("/login")} className="text-primary text-sm font-medium underline">
                                 Go to Login
                             </button>
                         </div>
@@ -116,7 +116,7 @@ const InviteSignup: React.FC = () => {
                             </p>
                             <button
                                 onClick={() => navigate("/login")}
-                                className="px-6 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
+                                className="px-6 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
                             >
                                 Go to Login
                             </button>
@@ -154,7 +154,7 @@ const InviteSignup: React.FC = () => {
                                         <input
                                             type="text"
                                             placeholder="John"
-                                            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1176]/30"
+                                            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                                             value={firstName}
                                             onChange={(e) => setFirstName(e.target.value)}
                                             disabled={loading}
@@ -166,7 +166,7 @@ const InviteSignup: React.FC = () => {
                                         <input
                                             type="text"
                                             placeholder="Doe"
-                                            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1176]/30"
+                                            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                                             value={lastName}
                                             onChange={(e) => setLastName(e.target.value)}
                                             disabled={loading}
@@ -181,7 +181,7 @@ const InviteSignup: React.FC = () => {
                                         <input
                                             type={showPassword ? "text" : "password"}
                                             placeholder="Min. 8 characters"
-                                            className="w-full border border-gray-300 rounded-md px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1176]/30"
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             disabled={loading}
@@ -199,7 +199,7 @@ const InviteSignup: React.FC = () => {
                                         <input
                                             type={showConfirmPassword ? "text" : "password"}
                                             placeholder="Repeat password"
-                                            className="w-full border border-gray-300 rounded-md px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1176]/30"
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                                             value={confirmPassword}
                                             onChange={(e) => setConfirmPassword(e.target.value)}
                                             disabled={loading}
@@ -216,7 +216,7 @@ const InviteSignup: React.FC = () => {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="w-full py-2.5 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
+                                    className="w-full py-2.5 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
                                 >
                                     {loading ? "Creating Account..." : "Create Account"}
                                 </button>

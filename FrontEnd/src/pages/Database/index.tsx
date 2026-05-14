@@ -63,9 +63,9 @@ export default function Database() {
             {/* TODO: Add total patients and add patient button */}
             {/* <div className="flex items-center gap-4">
               <div className="text-sm text-gray-600">
-                Total Patients: <span className="font-semibold text-[#6b1176]">{patientData.patients.length}</span>
+                Total Patients: <span className="font-semibold text-primary">{patientData.patients.length}</span>
               </div>
-              <button className="bg-[#6b1176] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#5a0f66] transition-colors">
+              <button className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#5a0f66] transition-colors">
                 Add Patient
               </button>
             </div> */}

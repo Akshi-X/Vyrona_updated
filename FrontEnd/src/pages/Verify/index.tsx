@@ -393,7 +393,7 @@ const VerifyOtp: React.FC = () => {
                             disabled={loading || timer === 0}
                             className={`w-full py-3 mb-3 rounded-md font-medium text-white transition ${loading || timer === 0
                                 ? "bg-gray-400 cursor-not-allowed"
-                                : "bg-[#6b1176] hover:bg-[#8b2a96] cursor-pointer"
+                                : "bg-primary hover:bg-[#8b2a96] cursor-pointer"
                                 }`}
                         >
                             {loading ? "Verifying..." : "Verify OTP"}

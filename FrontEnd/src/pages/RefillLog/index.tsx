@@ -474,7 +474,7 @@ const RefillLog = () => {
                     <button
                         type="button"
                         onClick={() => { resetAddForm(); setAddModalTab("refill"); setIsAddRefillOpen(true); }}
-                        className="px-5 h-9 rounded-lg border border-[#6b1176] text-[#6b1176] text-sm font-medium hover:bg-[#f7ecff] transition-colors"
+                        className="px-5 h-9 rounded-lg border border-primary text-primary text-sm font-medium hover:bg-[#f7ecff] transition-colors"
                     >
                         Add Logs
                     </button>
@@ -485,7 +485,7 @@ const RefillLog = () => {
                 {detectionsLoading && (
                     <div>
                         <div className="flex items-center gap-2 mb-3">
-                            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-[#F2E4FF] text-[#6b1176]">
+                            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-[#F2E4FF] text-primary">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                     <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
                                 </svg>
@@ -526,13 +526,13 @@ const RefillLog = () => {
                             {/* Header row */}
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-md flex items-center justify-center bg-[#F2E4FF] text-[#6b1176]">
+                                    <div className="w-6 h-6 rounded-md flex items-center justify-center bg-[#F2E4FF] text-primary">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                             <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
                                         </svg>
                                     </div>
                                     <span className="text-sm font-semibold text-gray-800">Refill Detected</span>
-                                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-[#6b1176] text-white text-[10px] font-bold">
+                                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-white text-[10px] font-bold">
                                         {pendingDetections.length}
                                     </span>
                                 </div>
@@ -542,7 +542,7 @@ const RefillLog = () => {
                                         <button
                                             type="button"
                                             onClick={() => scrollDetections("left")}
-                                            className="w-7 h-7 rounded-lg border border-[#E7D4F0] bg-white flex items-center justify-center text-[#6b1176] hover:bg-[#F7ECFF] transition-colors"
+                                            className="w-7 h-7 rounded-lg border border-[#E7D4F0] bg-white flex items-center justify-center text-primary hover:bg-[#F7ECFF] transition-colors"
                                             aria-label="Scroll left"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
@@ -550,7 +550,7 @@ const RefillLog = () => {
                                         <button
                                             type="button"
                                             onClick={() => scrollDetections("right")}
-                                            className="w-7 h-7 rounded-lg border border-[#E7D4F0] bg-white flex items-center justify-center text-[#6b1176] hover:bg-[#F7ECFF] transition-colors"
+                                            className="w-7 h-7 rounded-lg border border-[#E7D4F0] bg-white flex items-center justify-center text-primary hover:bg-[#F7ECFF] transition-colors"
                                             aria-label="Scroll right"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
@@ -589,7 +589,7 @@ const RefillLog = () => {
                                         >
                                             {/* Tile top row: tank badge + dismiss */}
                                             <div className="flex items-start justify-between">
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F2E4FF] text-[#6b1176] text-xs font-semibold">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F2E4FF] text-primary text-xs font-semibold">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                                         <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
                                                     </svg>
@@ -638,7 +638,7 @@ const RefillLog = () => {
                                                         setAddModalTab("refill");
                                                         setIsAddRefillOpen(true);
                                                     }}
-                                                    className="w-full md:w-auto md:shrink-0 flex items-center justify-center gap-1.5 px-5 h-9 rounded-lg bg-[#6b1176] text-white text-xs font-medium hover:bg-[#5a0e63] transition-colors"
+                                                    className="w-full md:w-auto md:shrink-0 flex items-center justify-center gap-1.5 px-5 h-9 rounded-lg bg-primary text-white text-xs font-medium hover:bg-[#5a0e63] transition-colors"
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                                         <path d="M12 5v14M5 12h14" />
@@ -663,7 +663,7 @@ const RefillLog = () => {
                         </div>
 
                         {/* Table header */}
-                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)] px-4 py-2 bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] shrink-0">
+                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)] px-4 py-2 bg-[#F7ECFF] text-xs font-semibold text-primary shrink-0">
                             <div>Container #</div>
                             <div className="text-center">LN2 Level</div>
                             <div className="text-center">View</div>
@@ -692,7 +692,7 @@ const RefillLog = () => {
                                     className="grid grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)] px-4 py-2.5 items-center"
                                 >
                                     <div className="min-w-0">
-                                        <span className="text-[#6b1176] text-xs font-bold block truncate">
+                                        <span className="text-primary text-xs font-bold block truncate">
                                             {container.tankCode} ({container.tankId})
                                         </span>
                                         <span className="text-xs text-gray-500 truncate block">{container.branch}</span>
@@ -716,7 +716,7 @@ const RefillLog = () => {
                                                     <div className="relative h-2.5 rounded-full bg-[#E7D4F0] overflow-visible">
                                                         {ln2Pct != null && (
                                                             <div
-                                                                className="absolute inset-y-0 left-0 rounded-full bg-[#6b1176]"
+                                                                className="absolute inset-y-0 left-0 rounded-full bg-primary"
                                                                 style={{ width: `${ln2Pct}%` }}
                                                             />
                                                         )}
@@ -729,7 +729,7 @@ const RefillLog = () => {
                                                         )}
                                                     </div>
                                                     <div className="flex items-center justify-between mt-0.5">
-                                                        <span className="text-[10px] text-[#6b1176] font-medium">{ln2Pct != null ? `LN2 - ${ln2Pct}%` : '—'}</span>
+                                                        <span className="text-[10px] text-primary font-medium">{ln2Pct != null ? `LN2 - ${ln2Pct}%` : '—'}</span>
                                                         {l2Pct != null && (
                                                             <span className="text-[10px] text-orange-500 font-medium">L2 - {l2Pct}%</span>
                                                         )}
@@ -745,7 +745,7 @@ const RefillLog = () => {
                                             id={cIdx === 0 ? "onboarding-refill-tank-view-btn" : undefined}
                                             type="button"
                                             onClick={() => openView(container)}
-                                            className="px-2 h-6 rounded-md border border-[#6b1176] text-[#6b1176] text-[10px] font-medium hover:bg-[#f7ecff] transition-colors"
+                                            className="px-2 h-6 rounded-md border border-primary text-primary text-[10px] font-medium hover:bg-[#f7ecff] transition-colors"
                                         >
                                             View
                                         </button>
@@ -772,7 +772,7 @@ const RefillLog = () => {
                                 {/* Coming Soon overlay — hidden during onboarding */}
                                 {!isOnboarding && (
                                     <div className="absolute inset-0 backdrop-blur-sm bg-white/40 rounded z-10 flex items-center justify-center">
-                                        <span className="px-3 py-1 text-xs font-semibold text-[#6b1176] bg-[#F7ECFF] border border-[#d8b4fe] rounded-full shadow-sm">Coming Soon</span>
+                                        <span className="px-3 py-1 text-xs font-semibold text-primary bg-[#F7ECFF] border border-[#d8b4fe] rounded-full shadow-sm">Coming Soon</span>
                                     </div>
                                 )}
                                 {(() => {
@@ -845,7 +845,7 @@ const RefillLog = () => {
                                                     onClick={() => setIsReservoirDropdownOpen(!isReservoirDropdownOpen)}
                                                     className="w-full flex items-center justify-between gap-2 px-3 h-8 rounded-lg border border-[#E7E1E1] text-xs text-gray-700 hover:bg-gray-50 transition-colors bg-white"
                                                 >
-                                                    <span className="truncate text-[#6b1176] font-medium">
+                                                    <span className="truncate text-primary font-medium">
                                                         {reservoirs.find(r => r.reservoir_id === selectedReservoirId)?.branch_name
                                                             ?? reservoirs.find(r => r.reservoir_id === selectedReservoirId)?.reservoir_name
                                                             ?? "Select reservoir"}
@@ -867,8 +867,8 @@ const RefillLog = () => {
                                                                 onClick={() => { setSelectedReservoirId(r.reservoir_id); setIsReservoirDropdownOpen(false); }}
                                                                 className={`w-full text-left px-3 py-2 text-xs transition-colors ${
                                                                     selectedReservoirId === r.reservoir_id
-                                                                        ? "bg-[#6b1176] text-white"
-                                                                        : "text-[#6b1176] hover:bg-gray-50"
+                                                                        ? "bg-primary text-white"
+                                                                        : "text-primary hover:bg-gray-50"
                                                                 }`}
                                                             >
                                                                 {r.branch_name ?? r.reservoir_name}
@@ -885,7 +885,7 @@ const RefillLog = () => {
                             {/* Right: table */}
                             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                                 {/* Table header */}
-                                <div className="grid grid-cols-[minmax(0,1fr)_90px_90px_20px] gap-x-2 px-4 py-2 bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] shrink-0">
+                                <div className="grid grid-cols-[minmax(0,1fr)_90px_90px_20px] gap-x-2 px-4 py-2 bg-[#F7ECFF] text-xs font-semibold text-primary shrink-0">
                                     <div>Reservoir</div>
                                     <div>LN2 Ordered</div>
                                     <div>LN2 Received</div>
@@ -921,7 +921,7 @@ const RefillLog = () => {
                                                         type="date"
                                                         value={editLogForm.ln2_ordered_date}
                                                         onChange={(e) => setEditLogForm(f => ({ ...f, ln2_ordered_date: e.target.value }))}
-                                                        className="text-xs border border-[#6b1176] rounded px-1 py-0.5 w-full focus:outline-none"
+                                                        className="text-xs border border-primary rounded px-1 py-0.5 w-full focus:outline-none"
                                                     />
                                                 ) : (
                                                     <span className="text-xs text-gray-600 truncate text-center">{log.ln2_ordered_date ?? "—"}</span>
@@ -932,7 +932,7 @@ const RefillLog = () => {
                                                             type="date"
                                                             value={editLogForm.ln2_received_date}
                                                             onChange={(e) => setEditLogForm(f => ({ ...f, ln2_received_date: e.target.value }))}
-                                                            className="text-xs border border-[#6b1176] rounded px-1 py-0.5 w-full focus:outline-none"
+                                                            className="text-xs border border-primary rounded px-1 py-0.5 w-full focus:outline-none"
                                                         />
                                                     ) : (
                                                         <span className="text-xs text-gray-600 truncate text-center">{log.ln2_received_date ?? "—"}</span>
@@ -945,7 +945,7 @@ const RefillLog = () => {
                                                             type="button"
                                                             disabled={editLogSaving}
                                                             onClick={() => saveEditLog(log.log_id)}
-                                                            className="text-[#6b1176] hover:text-[#5a0e63] disabled:opacity-50"
+                                                            className="text-primary hover:text-[#5a0e63] disabled:opacity-50"
                                                             title="Save"
                                                         >
                                                             {editLogSaving ? (
@@ -965,7 +965,7 @@ const RefillLog = () => {
                                                                     ln2_received_date: log.ln2_received_date ?? "",
                                                                 });
                                                             }}
-                                                            className="text-[#6b1176] hover:text-[#5a0e63] transition-colors"
+                                                            className="text-primary hover:text-[#5a0e63] transition-colors"
                                                             title="Edit"
                                                         >
                                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2.414a2 2 0 01.586-1.414z" /></svg>
@@ -986,7 +986,7 @@ const RefillLog = () => {
                 <div id="onboarding-refill-activity-log" className="flex-1 min-h-0 bg-white border border-[#E7E1E1] rounded-xl overflow-hidden flex flex-col min-h-[500px]">
                     <div className="flex items-center justify-between px-5 py-4 border-b border-[#E7E1E1]">
                         <div className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#6b1176]">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
                                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                                 <path d="M3 3v5h5" />
                                 <path d="M12 7v5l4 2" />
@@ -999,10 +999,10 @@ const RefillLog = () => {
                                 onClick={() => setIsActivityBranchOpen(!isActivityBranchOpen)}
                                 className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-[#E7E1E1] text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                             >
-                                <svg className="w-4 h-4 text-[#6b1176]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                                 </svg>
-                                <span className={activityBranch !== "All" ? "text-[#6b1176] font-medium" : ""}>
+                                <span className={activityBranch !== "All" ? "text-primary font-medium" : ""}>
                                     {activityBranch === "All" ? "All Branches" : activityBranch}
                                 </span>
                                 <svg className={`w-3.5 h-3.5 transition-transform ${isActivityBranchOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1017,7 +1017,7 @@ const RefillLog = () => {
                                             type="button"
                                             onClick={() => { setActivityBranch(option); setIsActivityBranchOpen(false); }}
                                             className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                                                activityBranch === option ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-50"
+                                                activityBranch === option ? "bg-primary text-white" : "text-primary hover:bg-gray-50"
                                             }`}
                                         >
                                             {option === "All" ? "All Branches" : option}
@@ -1059,7 +1059,7 @@ const RefillLog = () => {
                                 {allActivityLogs.filter((r) => activityBranch === "All" || r.branch === activityBranch).map((row, i) => (
                                     <tr key={i} className="hover:bg-gray-50">
                                         <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{row.timestamp}</td>
-                                        <td className="px-4 py-2.5 font-semibold text-[#6b1176] whitespace-nowrap">{row.tankCode}</td>
+                                        <td className="px-4 py-2.5 font-semibold text-primary whitespace-nowrap">{row.tankCode}</td>
                                         <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{row.branch}</td>
                                         <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{row.operator}</td>
                                         <td className="px-4 py-2.5 text-gray-500 max-w-[160px] truncate">{row.description}</td>
@@ -1092,14 +1092,14 @@ const RefillLog = () => {
                             <button
                                 type="button"
                                 onClick={() => setAddModalTab("refill")}
-                                className={`px-4 h-8 rounded-md text-sm font-medium transition-colors ${addModalTab === "refill" ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-white/60"}`}
+                                className={`px-4 h-8 rounded-md text-sm font-medium transition-colors ${addModalTab === "refill" ? "bg-primary text-white" : "text-primary hover:bg-white/60"}`}
                             >
                                 Refill Logs
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setAddModalTab("reservoir")}
-                                className={`px-4 h-8 rounded-md text-sm font-medium transition-colors ${addModalTab === "reservoir" ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-white/60"}`}
+                                className={`px-4 h-8 rounded-md text-sm font-medium transition-colors ${addModalTab === "reservoir" ? "bg-primary text-white" : "text-primary hover:bg-white/60"}`}
                             >
                                 Reservoir
                             </button>
@@ -1194,7 +1194,7 @@ const RefillLog = () => {
                                 {addError && <div className="text-sm text-red-600">{addError}</div>}
                                 <div className="flex items-center justify-end gap-2 pt-2">
                                     <button type="button" onClick={() => { if (!addSubmitting) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="px-4 h-9 rounded-lg border border-[#E7E1E1] text-sm text-gray-700">Cancel</button>
-                                    <button id="onboarding-refill-add-save-btn" type="submit" disabled={addSubmitting} className="px-4 h-9 rounded-lg bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0e63] disabled:opacity-60">
+                                    <button id="onboarding-refill-add-save-btn" type="submit" disabled={addSubmitting} className="px-4 h-9 rounded-lg bg-primary text-white text-sm font-medium hover:bg-[#5a0e63] disabled:opacity-60">
                                         {addSubmitting ? "Saving..." : "Save"}
                                     </button>
                                 </div>
@@ -1228,7 +1228,7 @@ const RefillLog = () => {
                                 {reservoirError && <div className="text-sm text-red-600">{reservoirError}</div>}
                                 <div className="flex items-center justify-end gap-2 pt-2">
                                     <button type="button" onClick={() => { if (!reservoirSubmitting) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="px-4 h-9 rounded-lg border border-[#E7E1E1] text-sm text-gray-700">Cancel</button>
-                                    <button type="submit" disabled={reservoirSubmitting} className="px-4 h-9 rounded-lg bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0e63] disabled:opacity-60">
+                                    <button type="submit" disabled={reservoirSubmitting} className="px-4 h-9 rounded-lg bg-primary text-white text-sm font-medium hover:bg-[#5a0e63] disabled:opacity-60">
                                         {reservoirSubmitting ? "Saving..." : "Save"}
                                     </button>
                                 </div>
@@ -1246,7 +1246,7 @@ const RefillLog = () => {
                         <div className="flex items-center justify-between px-8 py-5 border-b border-[#E7E1E1]">
                             <div className="flex items-center gap-4">
                                 <div className="w-11 h-11 rounded-xl bg-[#F7ECFF] flex items-center justify-center shrink-0">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="3" y="3" width="18" height="18" rx="3" />
                                         <path d="M9 9h6M9 12h6M9 15h4" />
                                     </svg>
@@ -1275,7 +1275,7 @@ const RefillLog = () => {
                         <div className="px-8 py-5 bg-[#FAFAFA] border-b border-[#E7E1E1] flex gap-4">
                             <div className="flex-1 bg-white rounded-xl border border-[#E7E1E1] px-5 py-4">
                                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Last Refill</p>
-                                <p className="text-base font-semibold text-[#6b1176]">{formatDaysAgo(viewContainer.lastRefillDate)}</p>
+                                <p className="text-base font-semibold text-primary">{formatDaysAgo(viewContainer.lastRefillDate)}</p>
                             </div>
                             <div className="flex-1 bg-white rounded-xl border border-[#E7E1E1] px-5 py-4">
                                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Date</p>
@@ -1316,7 +1316,7 @@ const RefillLog = () => {
                                                 <td className="py-4 pr-4 text-gray-500 whitespace-nowrap">{log.refill_time || "—"}</td>
                                                 <td className="py-4 pr-4">
                                                     <span className="inline-flex items-center gap-2">
-                                                        <span className="w-7 h-7 rounded-full bg-[#F7ECFF] text-[#6b1176] text-[11px] font-bold flex items-center justify-center shrink-0">
+                                                        <span className="w-7 h-7 rounded-full bg-[#F7ECFF] text-primary text-[11px] font-bold flex items-center justify-center shrink-0">
                                                             {(log.refilled_by || "?")[0].toUpperCase()}
                                                         </span>
                                                         <span className="text-gray-700">{log.refilled_by || "—"}</span>
@@ -1361,7 +1361,7 @@ const RefillLog = () => {
 
                         {/* Reason textarea */}
                         <textarea
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#6b1176] focus:ring-1 focus:ring-[#6b1176] resize-none"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none"
                             rows={3}
                             placeholder="e.g. False positive, sensor malfunction…"
                             value={rejectReason}

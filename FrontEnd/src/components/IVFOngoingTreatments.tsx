@@ -266,7 +266,7 @@ export function IVFOngoingTreatments({
                                    setOpenDropdown(null);
                                  }}
                                  className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 flex items-center gap-2 ${
-                                   currentFilterValue === 'all' ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                                   currentFilterValue === 'all' ? 'bg-primary text-white' : 'text-primary hover:bg-gray-100'
                                  }`}
                                >
                                  All {header.label}
@@ -284,7 +284,7 @@ export function IVFOngoingTreatments({
                                      setOpenDropdown(null);
                                    }}
                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 flex items-center gap-2 ${
-                                     currentFilterValue === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                                     currentFilterValue === option ? 'bg-primary text-white' : 'text-primary hover:bg-gray-100'
                                    }`}
                                  >
                                    <span className="truncate">{option}</span>

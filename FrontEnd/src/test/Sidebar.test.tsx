@@ -144,21 +144,21 @@ describe('Sidebar', () => {
       renderSidebar('/dashboard')
       const dashboardButton = screen.getByText('Dashboard').closest('button')
       expect(dashboardButton).toHaveClass('bg-white')
-      expect(screen.getByText('Dashboard').closest('span')).toHaveClass('text-[#6b1176]')
+      expect(screen.getByText('Dashboard').closest('span')).toHaveClass('text-primary')
     })
 
     it('applies active styling to Database when on /database route', () => {
       renderSidebar('/database')
       const databaseButton = screen.getByText('Database').closest('button')
       expect(databaseButton).toHaveClass('bg-white')
-      expect(screen.getByText('Database').closest('span')).toHaveClass('text-[#6b1176]')
+      expect(screen.getByText('Database').closest('span')).toHaveClass('text-primary')
     })
 
     it('applies active styling to Control Tower when on /control-tower route', () => {
       renderSidebar('/control-tower')
       const controlTowerButton = screen.getByText('Control Tower').closest('button')
       expect(controlTowerButton).toHaveClass('bg-white')
-      expect(screen.getByText('Control Tower').closest('span')).toHaveClass('text-[#6b1176]')
+      expect(screen.getByText('Control Tower').closest('span')).toHaveClass('text-primary')
     })
 
     it('applies inactive styling when not on the route', () => {

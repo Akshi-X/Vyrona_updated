@@ -107,7 +107,7 @@ export default function MultiSelectDropdown({
                 <span
                     className={
                         selected.length > 0
-                            ? "text-[#6b1176]"
+                            ? "text-primary"
                             : "text-gray-500"
                     }
                 >
@@ -147,7 +147,7 @@ export default function MultiSelectDropdown({
                             <button
                                 type="button"
                                 onClick={toggleAll}
-                                className="text-[#6b1176] font-semibold hover:underline"
+                                className="text-primary font-semibold hover:underline"
                             >
                                 {selected.length === normalizedOptions.length
                                     ? "Clear all"
@@ -179,14 +179,14 @@ export default function MultiSelectDropdown({
                                     onClick={() => toggleOption(option.value)}
                                     className={`w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors ${
                                         isSelected
-                                            ? "bg-[#f7ecfb] text-[#6b1176]"
+                                            ? "bg-[#f7ecfb] text-primary"
                                             : "text-gray-700 hover:bg-gray-100"
                                     }`}
                                 >
                                     <span
                                         className={`w-4 h-4 border rounded-sm flex items-center justify-center ${
                                             isSelected
-                                                ? "border-[#6b1176] bg-[#6b1176]"
+                                                ? "border-primary bg-primary"
                                                 : "border-gray-300 bg-white"
                                         }`}
                                     >

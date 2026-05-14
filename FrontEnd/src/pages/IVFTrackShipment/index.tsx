@@ -451,8 +451,8 @@ export default function IVFTrackShipmentPage() {
                     </div>
                     <h2 className="text-lg font-semibold text-gray-800 mb-2">Access Denied</h2>
                     <p className="text-sm text-gray-500 mb-6">You don't have access to this page.</p>
-                    <div className="w-12 h-12 rounded-full border-4 border-[#6b1176] flex items-center justify-center mx-auto">
-                        <span className="text-xl font-bold text-[#6b1176]">{countdown}</span>
+                    <div className="w-12 h-12 rounded-full border-4 border-primary flex items-center justify-center mx-auto">
+                        <span className="text-xl font-bold text-primary">{countdown}</span>
                     </div>
                     <p className="text-xs text-gray-400 mt-3">Redirecting in {countdown} second{countdown !== 1 ? "s" : ""}…</p>
                 </div>

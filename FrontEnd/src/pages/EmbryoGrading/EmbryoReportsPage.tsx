@@ -15,7 +15,7 @@ const gradeChip = (grade: string | null, day: 'd3' | 'd5' | 'd6') => {
   if (!grade || grade === '—') return <span className="text-gray-300 text-xs">—</span>;
   if (day === 'd3') {
     return (
-      <span className="inline-block rounded px-1.5 py-0.5 text-xs font-semibold bg-[#F7ECFF] text-[#6b1176]">
+      <span className="inline-block rounded px-1.5 py-0.5 text-xs font-semibold bg-[#F7ECFF] text-primary">
         {grade}
       </span>
     );
@@ -88,7 +88,7 @@ export default function EmbryoReportsPage() {
 
         {/* Header */}
         <div className="flex items-stretch mb-6 rounded-xl overflow-hidden border border-[#E7E1E1]">
-          <div className="flex items-center justify-center bg-[#6b1176] px-6 py-4 shrink-0">
+          <div className="flex items-center justify-center bg-primary px-6 py-4 shrink-0">
             <img src={mGScaleLogo} alt="mG-SCALE" className="h-10 w-auto" />
           </div>
           <div className="flex items-center justify-between flex-1 px-6 py-4 bg-white">
@@ -144,7 +144,7 @@ export default function EmbryoReportsPage() {
                   { label: 'Others', value: cycle.oocyte_others },
                 ].map(s => (
                   <div key={s.label} className="text-center bg-white rounded-lg border border-[#E7E1E1] py-3 px-2">
-                    <p className="text-xl font-bold text-[#6b1176]">{s.value ?? '—'}</p>
+                    <p className="text-xl font-bold text-primary">{s.value ?? '—'}</p>
                     <p className="text-[10px] text-gray-500 mt-0.5">{s.label}</p>
                   </div>
                 ))}
@@ -162,7 +162,7 @@ export default function EmbryoReportsPage() {
                 { label: 'Frozen', value: stats.frozen },
               ].map(s => (
                 <div key={s.label} className="bg-white border border-[#E7E1E1] rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-[#6b1176]">{s.value}</p>
+                  <p className="text-2xl font-bold text-primary">{s.value}</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">{s.label}</p>
                 </div>
               ))}
