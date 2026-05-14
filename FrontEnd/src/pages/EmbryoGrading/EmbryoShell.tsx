@@ -38,7 +38,7 @@ export default function EmbryoShell() {
     <button
       type="button"
       onClick={() => navigate('/embryo-grading')}
-      className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-[#E7E1E1] bg-white text-sm text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
+      className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-line bg-white text-sm text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
     >
       <Home size={15} />
       Embryo Dashboard

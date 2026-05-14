@@ -201,7 +201,7 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
   );
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[347px] flex flex-col">
+    <div className="bg-white border border-line rounded-lg p-4 h-[347px] flex flex-col">
       <h3 className="font-semibold text-black text-base text-[16px] mb-2">Deviation Distribution (Site Level)</h3>
 
       {/* Legend above the graph - single row, wraps on small screens */}

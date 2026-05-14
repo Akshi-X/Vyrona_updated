@@ -819,7 +819,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 )?.message;
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                        <div id="onboarding-critical-alert-confirm-dialog" className="w-full max-w-md rounded-xl bg-white border border-[#E7E1E1] shadow-xl p-5">
+                        <div id="onboarding-critical-alert-confirm-dialog" className="w-full max-w-md rounded-xl bg-white border border-line shadow-xl p-5">
                             <h4 className="text-base font-semibold text-[#1f2937]">
                                 {pendingAcknowledgeAlertIds.length > 1
                                     ? "Acknowledge alerts"
@@ -842,7 +842,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                         <span className="text-red-500">*</span>
                                     </label>
                                     <textarea
-                                        className="w-full rounded-lg border border-[#E7E1E1] p-2.5 text-sm text-[#1f2937] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+                                        className="w-full rounded-lg border border-line p-2.5 text-sm text-[#1f2937] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
                                         rows={3}
                                         placeholder="e.g. Lid opened to start thawing for HIS123"
                                         value={pendingAcknowledgmentReason}
@@ -859,7 +859,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                         setPendingAcknowledgeAlertIds(null);
                                         setPendingAcknowledgmentReason("");
                                     }}
-                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-[#E7E1E1] text-gray-700 hover:bg-gray-50"
+                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-line text-gray-700 hover:bg-gray-50"
                                 >
                                     Cancel
                                 </button>
@@ -884,7 +884,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                     .some(isLidStateAlert);
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                        <div className="w-full max-w-md rounded-xl bg-white border border-[#E7E1E1] shadow-xl p-5">
+                        <div className="w-full max-w-md rounded-xl bg-white border border-line shadow-xl p-5">
                             <h4 className="text-base font-semibold text-[#1f2937]">
                                 Acknowledge all alerts
                             </h4>
@@ -899,7 +899,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                         <span className="text-red-500">*</span>
                                     </label>
                                     <textarea
-                                        className="w-full rounded-lg border border-[#E7E1E1] p-2.5 text-sm text-[#1f2937] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+                                        className="w-full rounded-lg border border-line p-2.5 text-sm text-[#1f2937] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
                                         rows={3}
                                         placeholder="e.g. Lid opened to start thawing for HIS123"
                                         value={pendingAcknowledgmentReason}
@@ -916,7 +916,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                         setIsAcknowledgeAllPending(false);
                                         setPendingAcknowledgmentReason("");
                                     }}
-                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-[#E7E1E1] text-gray-700 hover:bg-gray-50"
+                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-line text-gray-700 hover:bg-gray-50"
                                 >
                                     Cancel
                                 </button>

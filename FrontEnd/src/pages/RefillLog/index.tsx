@@ -474,7 +474,7 @@ const RefillLog = () => {
                     <button
                         type="button"
                         onClick={() => { resetAddForm(); setAddModalTab("refill"); setIsAddRefillOpen(true); }}
-                        className="px-5 h-9 rounded-lg border border-primary text-primary text-sm font-medium hover:bg-[#f7ecff] transition-colors"
+                        className="px-5 h-9 rounded-lg border border-primary text-primary text-sm font-medium hover:bg-primary-bg transition-colors"
                     >
                         Add Logs
                     </button>
@@ -485,7 +485,7 @@ const RefillLog = () => {
                 {detectionsLoading && (
                     <div>
                         <div className="flex items-center gap-2 mb-3">
-                            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-[#F2E4FF] text-primary">
+                            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-primary-bg text-primary">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                     <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
                                 </svg>
@@ -526,7 +526,7 @@ const RefillLog = () => {
                             {/* Header row */}
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-md flex items-center justify-center bg-[#F2E4FF] text-primary">
+                                    <div className="w-6 h-6 rounded-md flex items-center justify-center bg-primary-bg text-primary">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                             <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
                                         </svg>
@@ -542,7 +542,7 @@ const RefillLog = () => {
                                         <button
                                             type="button"
                                             onClick={() => scrollDetections("left")}
-                                            className="w-7 h-7 rounded-lg border border-[#E7D4F0] bg-white flex items-center justify-center text-primary hover:bg-[#F7ECFF] transition-colors"
+                                            className="w-7 h-7 rounded-lg border border-[#E7D4F0] bg-white flex items-center justify-center text-primary hover:bg-primary-bg transition-colors"
                                             aria-label="Scroll left"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
@@ -550,7 +550,7 @@ const RefillLog = () => {
                                         <button
                                             type="button"
                                             onClick={() => scrollDetections("right")}
-                                            className="w-7 h-7 rounded-lg border border-[#E7D4F0] bg-white flex items-center justify-center text-primary hover:bg-[#F7ECFF] transition-colors"
+                                            className="w-7 h-7 rounded-lg border border-[#E7D4F0] bg-white flex items-center justify-center text-primary hover:bg-primary-bg transition-colors"
                                             aria-label="Scroll right"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
@@ -580,7 +580,7 @@ const RefillLog = () => {
                                         <div
                                             key={detection.id}
                                             id={detIdx === 0 ? "onboarding-refill-first-card" : undefined}
-                                            className="flex-none w-[460px] rounded-xl border-2 border-[#E7D4F0] bg-gradient-to-br from-[#F7ECFF]/60 to-white p-4 flex flex-col gap-3"
+                                            className="flex-none w-[460px] rounded-xl border-2 border-[#E7D4F0] bg-gradient-to-br from-primary-bg/60 to-white p-4 flex flex-col gap-3"
                                             style={{
                                                 transition: "opacity 0.25s ease, transform 0.25s ease",
                                                 opacity: isDismissing ? 0 : 1,
@@ -589,7 +589,7 @@ const RefillLog = () => {
                                         >
                                             {/* Tile top row: tank badge + dismiss */}
                                             <div className="flex items-start justify-between">
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F2E4FF] text-primary text-xs font-semibold">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary-bg text-primary text-xs font-semibold">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                                         <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
                                                     </svg>
@@ -657,13 +657,13 @@ const RefillLog = () => {
                 <div className="grid grid-cols-1 min-[1436px]:grid-cols-2 min-[1436px]:h-[400px] gap-6">
 
                     {/* Left: Active Tank Status */}
-                    <div id="onboarding-refill-tank-status" className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden max-h-[420px]">
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-[#E7E1E1] shrink-0">
+                    <div id="onboarding-refill-tank-status" className="bg-white border border-line rounded-lg flex flex-col overflow-hidden max-h-[420px]">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-line shrink-0">
                             <h2 className="font-semibold text-black text-base">Active Tank Status</h2>
                         </div>
 
                         {/* Table header */}
-                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)] px-4 py-2 bg-[#F7ECFF] text-xs font-semibold text-primary shrink-0">
+                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)] px-4 py-2 bg-primary-bg text-xs font-semibold text-primary shrink-0">
                             <div>Container #</div>
                             <div className="text-center">LN2 Level</div>
                             <div className="text-center">View</div>
@@ -745,7 +745,7 @@ const RefillLog = () => {
                                             id={cIdx === 0 ? "onboarding-refill-tank-view-btn" : undefined}
                                             type="button"
                                             onClick={() => openView(container)}
-                                            className="px-2 h-6 rounded-md border border-primary text-primary text-[10px] font-medium hover:bg-[#f7ecff] transition-colors"
+                                            className="px-2 h-6 rounded-md border border-primary text-primary text-[10px] font-medium hover:bg-primary-bg transition-colors"
                                         >
                                             View
                                         </button>
@@ -762,17 +762,17 @@ const RefillLog = () => {
                     </div>
 
                     {/* Right: Reservoir Logs */}
-                    <div id="onboarding-refill-reservoir-logs" className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden max-h-[420px]">
-                        <div className="px-4 py-3 border-b border-[#E7E1E1] shrink-0">
+                    <div id="onboarding-refill-reservoir-logs" className="bg-white border border-line rounded-lg flex flex-col overflow-hidden max-h-[420px]">
+                        <div className="px-4 py-3 border-b border-line shrink-0">
                             <h2 className="font-semibold text-black text-base">Reservoir Logs</h2>
                         </div>
                         <div className="flex flex-1 min-h-0 overflow-hidden max-[880px]:flex-col">
                             {/* Left: Cryocan SVG + reservoir dropdown */}
-                            <div id="onboarding-refill-reservoir-svg-panel" className="relative flex flex-col items-center justify-center shrink-0 px-3 py-3 gap-3 border-r border-[#E7E1E1] max-[880px]:border-r-0 max-[880px]:border-b">
+                            <div id="onboarding-refill-reservoir-svg-panel" className="relative flex flex-col items-center justify-center shrink-0 px-3 py-3 gap-3 border-r border-line max-[880px]:border-r-0 max-[880px]:border-b">
                                 {/* Coming Soon overlay — hidden during onboarding */}
                                 {!isOnboarding && (
                                     <div className="absolute inset-0 backdrop-blur-sm bg-white/40 rounded z-10 flex items-center justify-center">
-                                        <span className="px-3 py-1 text-xs font-semibold text-primary bg-[#F7ECFF] border border-[#d8b4fe] rounded-full shadow-sm">Coming Soon</span>
+                                        <span className="px-3 py-1 text-xs font-semibold text-primary bg-primary-bg border border-[#d8b4fe] rounded-full shadow-sm">Coming Soon</span>
                                     </div>
                                 )}
                                 {(() => {
@@ -829,12 +829,12 @@ const RefillLog = () => {
                                                     )}
                                                 </g>
                                                 {/* Inner shadow */}
-                                                <rect x="30" y="50" width="140" height="220" rx="30" fill="none" stroke="#6B1176" strokeWidth="1" opacity="0.1" />
+                                                <rect x="30" y="50" width="140" height="220" rx="30" fill="none" stroke="var(--color-primary)" strokeWidth="1" opacity="0.1" />
                                                 {/* Percentage */}
-                                                <text x="100" y="163" textAnchor="middle" fontSize="24" fontWeight="bold" fill="#6B1176" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>{pct}%</text>
+                                                <text x="100" y="163" textAnchor="middle" fontSize="24" fontWeight="bold" fill="var(--color-primary)" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>{pct}%</text>
                                                 {/* Reservoir name — one word per line */}
                                                 {(selected?.reservoir_name ?? "").split(" ").map((word, i) => (
-                                                    <text key={i} x="100" y={183 + i * 14} textAnchor="middle" fontSize="11" fill="#6B1176" opacity="0.7" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>{word}</text>
+                                                    <text key={i} x="100" y={183 + i * 14} textAnchor="middle" fontSize="11" fill="var(--color-primary)" opacity="0.7" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>{word}</text>
                                                 ))}
                                             </svg>
                                             {/* Reservoir dropdown — custom UI */}
@@ -843,7 +843,7 @@ const RefillLog = () => {
                                                     id="onboarding-refill-reservoir-dropdown-btn"
                                                     type="button"
                                                     onClick={() => setIsReservoirDropdownOpen(!isReservoirDropdownOpen)}
-                                                    className="w-full flex items-center justify-between gap-2 px-3 h-8 rounded-lg border border-[#E7E1E1] text-xs text-gray-700 hover:bg-gray-50 transition-colors bg-white"
+                                                    className="w-full flex items-center justify-between gap-2 px-3 h-8 rounded-lg border border-line text-xs text-gray-700 hover:bg-gray-50 transition-colors bg-white"
                                                 >
                                                     <span className="truncate text-primary font-medium">
                                                         {reservoirs.find(r => r.reservoir_id === selectedReservoirId)?.branch_name
@@ -885,7 +885,7 @@ const RefillLog = () => {
                             {/* Right: table */}
                             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                                 {/* Table header */}
-                                <div className="grid grid-cols-[minmax(0,1fr)_90px_90px_20px] gap-x-2 px-4 py-2 bg-[#F7ECFF] text-xs font-semibold text-primary shrink-0">
+                                <div className="grid grid-cols-[minmax(0,1fr)_90px_90px_20px] gap-x-2 px-4 py-2 bg-primary-bg text-xs font-semibold text-primary shrink-0">
                                     <div>Reservoir</div>
                                     <div>LN2 Ordered</div>
                                     <div>LN2 Received</div>
@@ -983,8 +983,8 @@ const RefillLog = () => {
                 </div>
 
                 {/* Recent Activity Log */}
-                <div id="onboarding-refill-activity-log" className="flex-1 min-h-0 bg-white border border-[#E7E1E1] rounded-xl overflow-hidden flex flex-col min-h-[500px]">
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-[#E7E1E1]">
+                <div id="onboarding-refill-activity-log" className="flex-1 min-h-0 bg-white border border-line rounded-xl overflow-hidden flex flex-col min-h-[500px]">
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-line">
                         <div className="flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
                                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -997,7 +997,7 @@ const RefillLog = () => {
                             <button
                                 type="button"
                                 onClick={() => setIsActivityBranchOpen(!isActivityBranchOpen)}
-                                className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-[#E7E1E1] text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                                className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-line text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                             >
                                 <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
@@ -1046,7 +1046,7 @@ const RefillLog = () => {
                         ) : (
                         <table className="w-full text-sm">
                             <thead className="sticky top-0 bg-white z-10">
-                                <tr className="border-b border-[#E7E1E1]">
+                                <tr className="border-b border-line">
                                     <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Timestamp</th>
                                     <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Tank</th>
                                     <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Branch</th>
@@ -1081,14 +1081,14 @@ const RefillLog = () => {
             {/* Add Refill / Reservoir Modal */}
             {isAddRefillOpen && (
                 <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-                    <div id="onboarding-refill-add-modal" className="w-full max-w-xl bg-white rounded-lg border border-[#E7E1E1] p-5">
+                    <div id="onboarding-refill-add-modal" className="w-full max-w-xl bg-white rounded-lg border border-line p-5">
                         {/* Header */}
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold text-black">Add Log</h3>
                             <button type="button" onClick={() => { if (!(addSubmitting || reservoirSubmitting)) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="text-gray-500 hover:text-gray-700">✕</button>
                         </div>
                         {/* Toggle */}
-                        <div className="flex items-center gap-1 p-1 bg-[#F7ECFF] rounded-lg mb-4 w-fit">
+                        <div className="flex items-center gap-1 p-1 bg-primary-bg rounded-lg mb-4 w-fit">
                             <button
                                 type="button"
                                 onClick={() => setAddModalTab("refill")}
@@ -1120,7 +1120,7 @@ const RefillLog = () => {
                                                     : [];
                                                 const firstReservoir = branchReservoirs[0] ?? reservoirs[0];
                                                 setAddForm((p) => ({ ...p, reservoir_id: firstReservoir ? String(firstReservoir.reservoir_id) : "" }));
-                                            }} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm bg-white" required>
+                                            }} className="w-full h-10 px-3 border border-line rounded-lg text-sm bg-white" required>
                                             <option value="">Select tank</option>
                                             {containers.map((c) => (
                                                 <option key={c.tankId} value={c.tankId}>{c.tankCode} ({c.tankId})</option>
@@ -1129,7 +1129,7 @@ const RefillLog = () => {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Branch</label>
-                                        <input type="text" value={containers.find((c) => c.tankId === selectedTankId)?.branch ?? ""} readOnly className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm bg-gray-50 text-gray-500" placeholder="Auto-filled" />
+                                        <input type="text" value={containers.find((c) => c.tankId === selectedTankId)?.branch ?? ""} readOnly className="w-full h-10 px-3 border border-line rounded-lg text-sm bg-gray-50 text-gray-500" placeholder="Auto-filled" />
                                     </div>
                                 </div>
                                 <div>
@@ -1137,7 +1137,7 @@ const RefillLog = () => {
                                     <select
                                         value={addForm.reservoir_id}
                                         onChange={(e) => setAddForm((p) => ({ ...p, reservoir_id: e.target.value }))}
-                                        className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm bg-white"
+                                        className="w-full h-10 px-3 border border-line rounded-lg text-sm bg-white"
                                         required
                                     >
                                         <option value="">Select reservoir</option>
@@ -1154,17 +1154,17 @@ const RefillLog = () => {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Refill Date <span className="text-red-500">*</span></label>
-                                        <input type="date" value={addForm.refill_date} onChange={(e) => setAddForm((p) => ({ ...p, refill_date: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm" required />
+                                        <input type="date" value={addForm.refill_date} onChange={(e) => setAddForm((p) => ({ ...p, refill_date: e.target.value }))} className="w-full h-10 px-3 border border-line rounded-lg text-sm" required />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Refill Time <span className="text-red-500">*</span></label>
-                                        <input type="time" value={addForm.refill_time} onChange={(e) => setAddForm((p) => ({ ...p, refill_time: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm" required />
+                                        <input type="time" value={addForm.refill_time} onChange={(e) => setAddForm((p) => ({ ...p, refill_time: e.target.value }))} className="w-full h-10 px-3 border border-line rounded-lg text-sm" required />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Refilled By <span className="text-red-500">*</span></label>
-                                        <select value={addForm.refilled_by} onChange={(e) => setAddForm((p) => ({ ...p, refilled_by: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm bg-white" required>
+                                        <select value={addForm.refilled_by} onChange={(e) => setAddForm((p) => ({ ...p, refilled_by: e.target.value }))} className="w-full h-10 px-3 border border-line rounded-lg text-sm bg-white" required>
                                             <option value="">Select user</option>
                                             {users.map((u) => (
                                                 <option key={u.user_id} value={`${u.first_name} ${u.last_name}`}>{u.first_name} {u.last_name}</option>
@@ -1182,18 +1182,18 @@ const RefillLog = () => {
                                             value={addForm.refill_weight}
                                             onChange={(e) => setAddForm((p) => ({ ...p, refill_weight: e.target.value }))}
                                             placeholder="e.g. 12.5"
-                                            className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm"
+                                            className="w-full h-10 px-3 border border-line rounded-lg text-sm"
                                             required
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
-                                        <input type="text" value={addForm.description} onChange={(e) => setAddForm((p) => ({ ...p, description: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm" />
+                                        <input type="text" value={addForm.description} onChange={(e) => setAddForm((p) => ({ ...p, description: e.target.value }))} className="w-full h-10 px-3 border border-line rounded-lg text-sm" />
                                     </div>
                                 </div>
                                 {addError && <div className="text-sm text-red-600">{addError}</div>}
                                 <div className="flex items-center justify-end gap-2 pt-2">
-                                    <button type="button" onClick={() => { if (!addSubmitting) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="px-4 h-9 rounded-lg border border-[#E7E1E1] text-sm text-gray-700">Cancel</button>
+                                    <button type="button" onClick={() => { if (!addSubmitting) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="px-4 h-9 rounded-lg border border-line text-sm text-gray-700">Cancel</button>
                                     <button id="onboarding-refill-add-save-btn" type="submit" disabled={addSubmitting} className="px-4 h-9 rounded-lg bg-primary text-white text-sm font-medium hover:bg-[#5a0e63] disabled:opacity-60">
                                         {addSubmitting ? "Saving..." : "Save"}
                                     </button>
@@ -1206,7 +1206,7 @@ const RefillLog = () => {
                             <form onSubmit={submitReservoirLog} className="space-y-3">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Reservoir <span className="text-red-500">*</span></label>
-                                    <select value={reservoirForm.reservoir_id} onChange={(e) => setReservoirForm((p) => ({ ...p, reservoir_id: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm bg-white" required>
+                                    <select value={reservoirForm.reservoir_id} onChange={(e) => setReservoirForm((p) => ({ ...p, reservoir_id: e.target.value }))} className="w-full h-10 px-3 border border-line rounded-lg text-sm bg-white" required>
                                         <option value="">Select reservoir</option>
                                         {reservoirs.map((r) => (
                                             <option key={r.reservoir_id} value={r.reservoir_id}>
@@ -1218,16 +1218,16 @@ const RefillLog = () => {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">LN2 Ordered Date</label>
-                                        <input type="date" value={reservoirForm.ln2_ordered_date} onChange={(e) => setReservoirForm((p) => ({ ...p, ln2_ordered_date: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm" />
+                                        <input type="date" value={reservoirForm.ln2_ordered_date} onChange={(e) => setReservoirForm((p) => ({ ...p, ln2_ordered_date: e.target.value }))} className="w-full h-10 px-3 border border-line rounded-lg text-sm" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">LN2 Received Date</label>
-                                        <input type="date" value={reservoirForm.ln2_received_date} onChange={(e) => setReservoirForm((p) => ({ ...p, ln2_received_date: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm" />
+                                        <input type="date" value={reservoirForm.ln2_received_date} onChange={(e) => setReservoirForm((p) => ({ ...p, ln2_received_date: e.target.value }))} className="w-full h-10 px-3 border border-line rounded-lg text-sm" />
                                     </div>
                                 </div>
                                 {reservoirError && <div className="text-sm text-red-600">{reservoirError}</div>}
                                 <div className="flex items-center justify-end gap-2 pt-2">
-                                    <button type="button" onClick={() => { if (!reservoirSubmitting) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="px-4 h-9 rounded-lg border border-[#E7E1E1] text-sm text-gray-700">Cancel</button>
+                                    <button type="button" onClick={() => { if (!reservoirSubmitting) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="px-4 h-9 rounded-lg border border-line text-sm text-gray-700">Cancel</button>
                                     <button type="submit" disabled={reservoirSubmitting} className="px-4 h-9 rounded-lg bg-primary text-white text-sm font-medium hover:bg-[#5a0e63] disabled:opacity-60">
                                         {reservoirSubmitting ? "Saving..." : "Save"}
                                     </button>
@@ -1243,9 +1243,9 @@ const RefillLog = () => {
                 <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6">
                     <div id="onboarding-refill-view-modal" className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
                         {/* Header */}
-                        <div className="flex items-center justify-between px-8 py-5 border-b border-[#E7E1E1]">
+                        <div className="flex items-center justify-between px-8 py-5 border-b border-line">
                             <div className="flex items-center gap-4">
-                                <div className="w-11 h-11 rounded-xl bg-[#F7ECFF] flex items-center justify-center shrink-0">
+                                <div className="w-11 h-11 rounded-xl bg-primary-bg flex items-center justify-center shrink-0">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="3" y="3" width="18" height="18" rx="3" />
                                         <path d="M9 9h6M9 12h6M9 15h4" />
@@ -1272,12 +1272,12 @@ const RefillLog = () => {
                         </div>
 
                         {/* Info cards */}
-                        <div className="px-8 py-5 bg-[#FAFAFA] border-b border-[#E7E1E1] flex gap-4">
-                            <div className="flex-1 bg-white rounded-xl border border-[#E7E1E1] px-5 py-4">
+                        <div className="px-8 py-5 bg-[#FAFAFA] border-b border-line flex gap-4">
+                            <div className="flex-1 bg-white rounded-xl border border-line px-5 py-4">
                                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Last Refill</p>
                                 <p className="text-base font-semibold text-primary">{formatDaysAgo(viewContainer.lastRefillDate)}</p>
                             </div>
-                            <div className="flex-1 bg-white rounded-xl border border-[#E7E1E1] px-5 py-4">
+                            <div className="flex-1 bg-white rounded-xl border border-line px-5 py-4">
                                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Date</p>
                                 <p className="text-base font-semibold text-gray-800">{viewContainer.lastRefillDate}</p>
                             </div>
@@ -1302,7 +1302,7 @@ const RefillLog = () => {
                             {!viewLoading && !viewError && viewLogs.length > 0 && (
                                 <table className="w-full text-sm border-collapse">
                                     <thead className="sticky top-0 bg-white">
-                                        <tr className="border-b border-[#E7E1E1]">
+                                        <tr className="border-b border-line">
                                             <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-8 py-3 pr-4">Date</th>
                                             <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-widest py-3 pr-4">Time</th>
                                             <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-widest py-3 pr-4">Refilled By</th>
@@ -1316,7 +1316,7 @@ const RefillLog = () => {
                                                 <td className="py-4 pr-4 text-gray-500 whitespace-nowrap">{log.refill_time || "—"}</td>
                                                 <td className="py-4 pr-4">
                                                     <span className="inline-flex items-center gap-2">
-                                                        <span className="w-7 h-7 rounded-full bg-[#F7ECFF] text-primary text-[11px] font-bold flex items-center justify-center shrink-0">
+                                                        <span className="w-7 h-7 rounded-full bg-primary-bg text-primary text-[11px] font-bold flex items-center justify-center shrink-0">
                                                             {(log.refilled_by || "?")[0].toUpperCase()}
                                                         </span>
                                                         <span className="text-gray-700">{log.refilled_by || "—"}</span>

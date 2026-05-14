@@ -564,7 +564,7 @@ const UserProfilePage: React.FC = () => {
                   isEditingProfile
                     ? firstNameError
                       ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
+                      : 'border-gray-300 bg-white text-gray-900 focus:ring-primary-light'
                     : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
                 }`}
                 placeholder="Enter your first name"
@@ -593,7 +593,7 @@ const UserProfilePage: React.FC = () => {
                   isEditingProfile
                     ? lastNameError
                       ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
+                      : 'border-gray-300 bg-white text-gray-900 focus:ring-primary-light'
                     : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
                 }`}
                 placeholder="Enter your last name"
@@ -638,7 +638,7 @@ const UserProfilePage: React.FC = () => {
                   isEditingProfile
                     ? phoneNumberError
                       ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
+                      : 'border-gray-300 bg-white text-gray-900 focus:ring-primary-light'
                     : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
                 }`}
               />
@@ -686,7 +686,7 @@ const UserProfilePage: React.FC = () => {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search tickets"
-                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                      className="w-full px-3 h-12 border border-line rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-muted focus:border-transparent bg-white"
                     />
                   </div>
                   <FilterSelect
@@ -777,7 +777,7 @@ const UserProfilePage: React.FC = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search tickets"
-                        className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                        className="w-full px-3 h-12 border border-line rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-muted focus:border-transparent bg-white"
                       />
                     </div>
                     <FilterSelect
@@ -839,7 +839,7 @@ const UserProfilePage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div id="onboarding-profile-support-table" className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+            <div id="onboarding-profile-support-table" className="w-full bg-white rounded-[10px] overflow-hidden border border-line">
               <div
                 className="max-h-[415px] overflow-y-auto"
                 style={{
@@ -847,7 +847,7 @@ const UserProfilePage: React.FC = () => {
                 }}
               >
                 <table className="w-full">
-                  <thead className="sticky top-0 bg-[#fdeeff] z-10">
+                  <thead className="sticky top-0 bg-surface z-10">
                     <tr className="border-b border-[#eeeeee]">
                       <th className="p-[15px] font-semibold text-primary text-sm text-left whitespace-nowrap">
                         Ticket ID

@@ -201,13 +201,13 @@ export function IVFOngoingTreatments({
       {countLabel != null && (
         <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
           <p className="text-xs text-gray-600">
-            <span className="font-medium text-[#6B1176]">{countLabel}</span>
+            <span className="font-medium text-primary">{countLabel}</span>
           </p>
           {hasActiveFilter && onClearFilters && (
             <button
               type="button"
               onClick={onClearFilters}
-              className="text-xs font-medium text-[#6B1176] hover:underline shrink-0"
+              className="text-xs font-medium text-primary hover:underline shrink-0"
             >
               Clear filter
             </button>
@@ -220,7 +220,7 @@ export function IVFOngoingTreatments({
       >
         <table className="min-w-max w-full ">
             <thead className="sticky top-0 z-10">
-             <tr className="bg-[#FDF4FF]">
+             <tr className="bg-surface">
                {tableHeaders.map((header, index) => {
                  const filterKey = header.filterKey;
                  const currentFilterValue = filterKey ? getFilterValue(filterKey) : 'all';
@@ -231,7 +231,7 @@ export function IVFOngoingTreatments({
                  return (
                    <th
                      key={index}
-                     className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap"
+                     className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap"
                    >
                      {header.hasFilter && filterKey ? (
                        <div className="flex items-center gap-2 relative" ref={dropdownRef}>

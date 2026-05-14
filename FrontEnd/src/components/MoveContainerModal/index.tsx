@@ -187,7 +187,7 @@ const MoveContainerModal: React.FC<MoveContainerModalProps> = ({
                   setIsMoveTypeDropdownOpen(false);
                 }
               }}
-              className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${error ? "border-red-500" : "border-gray-300"} text-black`}
+              className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-light ${error ? "border-red-500" : "border-gray-300"} text-black`}
             >
               <div className="flex justify-between items-center">
                 <span>{moveTypeLabel}</span>
@@ -215,8 +215,8 @@ const MoveContainerModal: React.FC<MoveContainerModalProps> = ({
                       className={`px-3 py-2 transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${
                         disabled
                           ? "text-gray-400 cursor-not-allowed"
-                          : "cursor-pointer hover:bg-[#8b2a96] hover:text-white"
-                      } ${selected ? "bg-[#8b2a96] text-white" : ""}`}
+                          : "cursor-pointer hover:bg-primary-light hover:text-white"
+                      } ${selected ? "bg-primary-light text-white" : ""}`}
                       onClick={() => {
                         if (disabled) return;
                         applyMoveType(opt.value);
@@ -243,7 +243,7 @@ const MoveContainerModal: React.FC<MoveContainerModalProps> = ({
                   setFromLocation(e.target.value);
                   setError(null);
                 }}
-                className="w-[140px] px-3 py-2 border-b-2 border-gray-300 focus:border-[#6B1176] focus:outline-none text-sm bg-transparent"
+                className="w-[140px] px-3 py-2 border-b-2 border-gray-300 focus:border-primary focus:outline-none text-sm bg-transparent"
                 placeholder="From location"
               />
               <span className="text-[14px] text-black font-medium">to</span>
@@ -254,7 +254,7 @@ const MoveContainerModal: React.FC<MoveContainerModalProps> = ({
                   setToLocation(e.target.value);
                   setError(null);
                 }}
-                className="w-[140px] px-3 py-2 border-b-2 border-gray-300 focus:border-[#6B1176] focus:outline-none text-sm bg-transparent"
+                className="w-[140px] px-3 py-2 border-b-2 border-gray-300 focus:border-primary focus:outline-none text-sm bg-transparent"
                 placeholder="To location"
               />
               <span className="text-[14px] text-black font-medium ml-2 whitespace-nowrap">Device Id:</span>
@@ -265,7 +265,7 @@ const MoveContainerModal: React.FC<MoveContainerModalProps> = ({
                   setDeviceId(e.target.value);
                   setError(null);
                 }}
-                className="w-[120px] px-3 py-2 border-b-2 border-gray-300 focus:border-[#6B1176] focus:outline-none text-sm bg-transparent"
+                className="w-[120px] px-3 py-2 border-b-2 border-gray-300 focus:border-primary focus:outline-none text-sm bg-transparent"
                 placeholder="device ID"
               />
             </div>
@@ -293,7 +293,7 @@ const MoveContainerModal: React.FC<MoveContainerModalProps> = ({
             (moveType === 'embryoTransfer' && !onMoveToIncubator) ||
             (moveType === 'transit' && (!onMoveToTransit || !canSubmitTransit))
           }
-          className="w-full mt-2 px-4 py-3 rounded-md bg-gradient-to-r from-[#9C3AA6] to-[#6B1176] text-white hover:opacity-95 transition-opacity font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full mt-2 px-4 py-3 rounded-md bg-gradient-to-r from-primary-muted to-primary text-white hover:opacity-95 transition-opacity font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {(moveType === 'embryoTransfer' ? loadingEmbryoTransfer : loading) ? (
             <>

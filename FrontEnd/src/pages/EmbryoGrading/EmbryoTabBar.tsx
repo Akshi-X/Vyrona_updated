@@ -26,7 +26,7 @@ export default function EmbryoTabBar({ his }: EmbryoTabBarProps) {
   ];
 
   return (
-    <div className="flex border-b border-[#E7E1E1] -mx-4 md:-mx-6 px-4 md:px-6 mb-3 bg-white shrink-0">
+    <div className="flex border-b border-line -mx-4 md:-mx-6 px-4 md:px-6 mb-3 bg-white shrink-0">
       {tabs.map(tab => (
         <button
           key={tab.id}

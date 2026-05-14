@@ -386,7 +386,7 @@ export default function EmbryoGradingDetailPage() {
     <>
       <div className="flex flex-col min-w-0 w-full flex-1 min-h-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
           {/* Chamber Health strip */}
-          <div className="px-6 py-3 border-b border-gray-100 bg-[#FDFAFF] flex items-center gap-6">
+          <div className="px-6 py-3 border-b border-gray-100 bg-surface flex items-center gap-6">
             <p className="text-[10px] font-semibold text-[#8A7892] uppercase tracking-widest shrink-0">Chamber Health</p>
             {[
               { kpi_name: 'incubator_temp', label: 'Temperature' },
@@ -414,7 +414,7 @@ export default function EmbryoGradingDetailPage() {
                   const pct = (n: number, of: number) => of > 0 ? Math.round((n / of) * 100) : 0;
                   const stages = [
                     { label: 'Oocytes',    value: totalOocytes,             base: totalOocytes,             bar: 'from-[#c084fc] to-[#a855f7]' },
-                    { label: 'Injected',   value: injected,                 base: totalOocytes,             bar: 'from-[#d8b4fe] to-[#9c3aa6]' },
+                    { label: 'Injected',   value: injected,                 base: totalOocytes,             bar: 'from-[#d8b4fe] to-primary-muted' },
                     { label: 'Fertilized', value: logSummary.fertilized,    base: injected,                 bar: 'from-[#f9a8d4] to-[#ec4899]' },
                     { label: 'Cleaved',    value: logSummary.cleaved,       base: logSummary.fertilized,    bar: 'from-[#fcd34d] to-[#f59e0b]' },
                     { label: 'Day 3 Good', value: logSummary.day3GoodGrade, base: logSummary.cleaved,       bar: 'from-[#86efac] to-[#22c55e]' },
@@ -427,17 +427,17 @@ export default function EmbryoGradingDetailPage() {
                     { label: 'Others', value: selectedCycle.oocyte_others ?? 0, color: 'text-white/80' },
                   ];
                   return (
-                    <div className="rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-[#3b0764] via-primary to-[#4a044e] border border-[#9c3aa6]/40">
+                    <div className="rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-[#3b0764] via-primary to-[#4a044e] border border-primary-muted/40">
                       <div className="flex divide-x divide-white/10">
                         {stages.map((s, i) => (
                           <div key={s.label} className="flex-1 flex flex-col items-center px-3 py-4 relative">
                             <div className="absolute bottom-0 left-0 right-0 h-[6px] bg-white/10">
                               <div className={`h-full bg-gradient-to-r ${s.bar} transition-all duration-700`} style={{ width: `${pct(s.value, s.base)}%` }} />
                             </div>
-                            <span className="text-xs font-extrabold uppercase tracking-widest mb-2 text-[#e9d5ff]">{s.label}</span>
+                            <span className="text-xs font-extrabold uppercase tracking-widest mb-2 text-primary-ring">{s.label}</span>
                             <span className="text-3xl font-black text-white leading-none tabular-nums">{s.value}</span>
                             {i > 0 ? (
-                              <span className="mt-1.5 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/10 text-[#e9d5ff]">
+                              <span className="mt-1.5 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/10 text-primary-ring">
                                 {pct(s.value, s.base)}%
                               </span>
                             ) : (
@@ -452,7 +452,7 @@ export default function EmbryoGradingDetailPage() {
                           </div>
                         ))}
                         <div className="flex-1 flex flex-col items-center px-3 py-4">
-                          <span className="text-xs font-extrabold uppercase tracking-widest mb-2 text-[#e9d5ff]">Good Grade</span>
+                          <span className="text-xs font-extrabold uppercase tracking-widest mb-2 text-primary-ring">Good Grade</span>
                           <span className="text-sm font-black text-white leading-snug text-center">{logSummary.blastGoodGrades || '—'}</span>
                         </div>
                       </div>
@@ -465,10 +465,10 @@ export default function EmbryoGradingDetailPage() {
                   const dayNum = parseInt(rawDay.replace('Day ', ''), 10);
                   const dayDisplay = dayNum > 6 ? '6+' : rawDay;
                   return (
-                    <div className="rounded-lg border border-[#E7E1E1] bg-white overflow-hidden">
-                      <div className="flex divide-x divide-[#F0EAF4] overflow-x-auto">
-                        <div className="px-4 py-3 bg-[#F7ECFF] min-w-[110px]">
-                          <p className="text-xs font-extrabold text-[#9c3aa6] uppercase tracking-wide mb-1 whitespace-nowrap">Current Day</p>
+                    <div className="rounded-lg border border-line bg-white overflow-hidden">
+                      <div className="flex divide-x divide-line-light overflow-x-auto">
+                        <div className="px-4 py-3 bg-primary-bg min-w-[110px]">
+                          <p className="text-xs font-extrabold text-primary-muted uppercase tracking-wide mb-1 whitespace-nowrap">Current Day</p>
                           <p className="text-sm font-black text-primary">{dayDisplay}</p>
                         </div>
                         {([
@@ -479,12 +479,12 @@ export default function EmbryoGradingDetailPage() {
                           { label: 'Chamber',          value: selectedCycle.chamber_position || '—' },
                         ] as { label: string; value: string }[]).map((item) => (
                           <div key={item.label} className="flex-1 min-w-[110px] px-4 py-3">
-                            <p className="text-xs font-extrabold uppercase tracking-wide mb-1 whitespace-nowrap text-[#9c3aa6]">{item.label}</p>
+                            <p className="text-xs font-extrabold uppercase tracking-wide mb-1 whitespace-nowrap text-primary-muted">{item.label}</p>
                             <p className="text-sm font-semibold text-gray-900">{item.value}</p>
                           </div>
                         ))}
                         <div className="px-4 py-3 min-w-[110px]">
-                          <p className="text-xs font-extrabold uppercase tracking-wide mb-1 whitespace-nowrap text-[#9c3aa6]">Best Grade</p>
+                          <p className="text-xs font-extrabold uppercase tracking-wide mb-1 whitespace-nowrap text-primary-muted">Best Grade</p>
                           <p className="text-sm font-semibold text-gray-900">{primaryGradeDetails?.grade || '—'}</p>
                         </div>
                       </div>
@@ -508,7 +508,7 @@ export default function EmbryoGradingDetailPage() {
                   const thCls = () => 'px-2 py-2 text-left font-semibold';
                   const tdCls = (col: number, log: IvfCycleLog, extra = '') => {
                     const needsFill = col <= activeCol && !isFilled(col, log);
-                    return `px-2 py-2 cursor-pointer transition-colors ${extra} ${needsFill ? 'bg-[#F7ECFF] hover:bg-[#ecd9f9]' : 'hover:bg-[#F7ECFF]/60'}`;
+                    return `px-2 py-2 cursor-pointer transition-colors ${extra} ${needsFill ? 'bg-primary-bg hover:bg-[#ecd9f9]' : 'hover:bg-primary-bg/60'}`;
                   };
                   const fillPrompts: Record<number, string> = {
                     0: 'Kindly fill Drop No',
@@ -520,11 +520,11 @@ export default function EmbryoGradingDetailPage() {
                   const tdTitle = (col: number, log: IvfCycleLog) =>
                     col <= activeCol && !isFilled(col, log) ? fillPrompts[col] : undefined;
                   return (
-                    <div className="rounded-lg border border-[#E7E1E1] overflow-hidden">
+                    <div className="rounded-lg border border-line overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="min-w-[1320px] w-full text-sm">
                           <thead className="bg-[#E4C9F5] text-primary">
-                            <tr className="divide-x divide-[#E7E1E1]">
+                            <tr className="divide-x divide-line">
                               <th className={thCls()}>Oocyte</th>
                               <th className={thCls()}>Day 1 (PN)</th>
                               <th className={thCls()}>Day 3/4</th>
@@ -532,7 +532,7 @@ export default function EmbryoGradingDetailPage() {
                               <th className={thCls()}>Day 6</th>
                               <th className="px-2 py-2 text-left font-semibold">Fate</th>
                               <th className="px-2 py-2 text-left font-semibold">Notes</th>
-                              <th className="px-2 py-2 text-left font-semibold w-24 sticky right-0 z-10 bg-[#E4C9F5] border-l border-[#E7E1E1]">Actions</th>
+                              <th className="px-2 py-2 text-left font-semibold w-24 sticky right-0 z-10 bg-[#E4C9F5] border-l border-line">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -544,7 +544,7 @@ export default function EmbryoGradingDetailPage() {
                               </tr>
                             ) : (
                               logs.map((log) => (
-                                <tr key={log.log_id} className="border-t border-[#F1F1F1] divide-x divide-[#E7E1E1]">
+                                <tr key={log.log_id} className="border-t border-line divide-x divide-line">
                                   <td className={tdCls(0, log, 'whitespace-nowrap')} onClick={() => openEditLog(log, 0)}>
                                     <Tooltip text={tdTitle(0, log)}>
                                       <div>
@@ -559,7 +559,7 @@ export default function EmbryoGradingDetailPage() {
                                   <td className={`${tdCls(2, log)} text-center`} onClick={() => openEditLog(log, 2)}>
                                     <Tooltip text={tdTitle(2, log)}>
                                       {log.d3_grade
-                                        ? <span className="inline-block rounded px-1.5 py-0.5 text-xs font-bold bg-[#F7ECFF] text-primary">{log.d3_grade}</span>
+                                        ? <span className="inline-block rounded px-1.5 py-0.5 text-xs font-bold bg-primary-bg text-primary">{log.d3_grade}</span>
                                         : <span className="text-gray-400 text-xs">—</span>}
                                     </Tooltip>
                                   </td>
@@ -569,7 +569,7 @@ export default function EmbryoGradingDetailPage() {
                                   <td className={`${tdCls(4, log)} text-center`} onClick={() => openEditLog(log, 4)}>
                                     <Tooltip text={tdTitle(4, log)}><span>{renderBlastBadge(log.d6_grade || '—')}</span></Tooltip>
                                   </td>
-                                  <td className="px-2 py-2 cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 4)}>
+                                  <td className="px-2 py-2 cursor-pointer hover:bg-primary-bg/60 transition-colors" onClick={() => openEditLog(log, 4)}>
                                     <div className="flex items-center gap-1.5">
                                       {log.fate === 'Freeze' ? (
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 text-sm font-semibold border border-sky-200">
@@ -595,7 +595,7 @@ export default function EmbryoGradingDetailPage() {
                                     </div>
                                   </td>
                                   <td className="px-2 py-2 text-xs text-gray-500">{log.meta?.final_notes || '—'}</td>
-                                  <td className="px-2 py-2 flex gap-1 sticky right-0 z-10 bg-white border-l border-[#E7E1E1]">
+                                  <td className="px-2 py-2 flex gap-1 sticky right-0 z-10 bg-white border-l border-line">
                                     <button
                                       type="button"
                                       onClick={() => openEditLog(log, 0)}
@@ -633,14 +633,14 @@ export default function EmbryoGradingDetailPage() {
                   </button>
                 </div>
 
-                <div className="rounded-lg border border-[#E7E1E1] bg-white overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#F0EBF4] bg-gradient-to-r from-[#FDFAFF] to-white">
+                <div className="rounded-lg border border-line bg-white overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white">
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Audit Trail</p>
                       <p className="text-sm font-bold text-gray-900 leading-tight">Recent Activity</p>
                     </div>
                     {timelineEvents.length > 0 && (
-                      <span className="text-[10px] font-semibold bg-[#F7ECFF] text-primary px-2 py-0.5 rounded-full border border-[#e9d5ff]">
+                      <span className="text-[10px] font-semibold bg-primary-bg text-primary px-2 py-0.5 rounded-full border border-primary-ring">
                         {timelineEvents.length} events
                       </span>
                     )}
@@ -653,7 +653,7 @@ export default function EmbryoGradingDetailPage() {
                       <div className="flex items-center justify-center py-10 text-xs text-gray-400">No activity recorded yet.</div>
                     ) : (
                       <div className="relative px-4 py-3">
-                        <div className="absolute left-[23px] top-3 bottom-3 w-px bg-[#e9d5ff]" />
+                        <div className="absolute left-[23px] top-3 bottom-3 w-px bg-primary-ring" />
                         <div className="flex flex-col gap-0">
                           {timelineEvents.map((ev, idx) => {
                             const actorName = ev.actor_label
@@ -688,7 +688,7 @@ export default function EmbryoGradingDetailPage() {
                                 <div className="shrink-0 flex flex-col items-center z-10">
                                   <div className="w-3 h-3 rounded-full bg-primary border-2 border-white ring-1 ring-[#c084fc] mt-1" />
                                 </div>
-                                <div className="flex-1 min-w-0 bg-[#FDFAFF] border border-[#F0EBF4] rounded-lg px-3 py-2">
+                                <div className="flex-1 min-w-0 bg-surface border border-line-light rounded-lg px-3 py-2">
                                   <div className="flex items-start justify-between gap-2">
                                     <span className="text-xs font-semibold text-gray-900">{label}</span>
                                     <span className="text-[10px] text-gray-400 whitespace-nowrap shrink-0">
@@ -727,14 +727,14 @@ export default function EmbryoGradingDetailPage() {
         containerClassName="w-full max-w-[680px]"
       >
         {(() => {
-          const inp = "w-full h-9 rounded-lg border border-gray-200 px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6]/30 focus:border-[#9c3aa6] bg-white";
+          const inp = "w-full h-9 rounded-lg border border-gray-200 px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-muted/30 focus:border-primary-muted bg-white";
           const sel = inp;
           const lbl = "block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1";
           const day6Locked = logForm.day5Stage === 'Blastocyst';
           const blastGradeFields5 = logForm.day5ExpansionGrade && logForm.day5IcmGrade && logForm.day5TeGrade;
           const blastGradeFields6 = logForm.day6ExpansionGrade && logForm.day6IcmGrade && logForm.day6TeGrade;
 
-          const STEP_BASE = { activeBg: 'bg-primary', doneBg: 'bg-[#9c3aa6]', ring: 'ring-[#9c3aa6]', lineActive: 'bg-[#e9d5ff]', textActive: 'text-primary', border: 'border-[#E7E1E1]', headerBg: 'bg-gradient-to-r from-[#3b0764] to-primary', chipCls: 'bg-[#F7ECFF] border-[#c084fc]/40 text-primary' };
+          const STEP_BASE = { activeBg: 'bg-primary', doneBg: 'bg-primary-muted', ring: 'ring-primary-muted', lineActive: 'bg-primary-ring', textActive: 'text-primary', border: 'border-line', headerBg: 'bg-gradient-to-r from-[#3b0764] to-primary', chipCls: 'bg-primary-bg border-[#c084fc]/40 text-primary' };
           const STEPS = [
             { dayKey: 'D0', label: 'Day 0', sub: 'Fertilization',                   ...STEP_BASE },
             { dayKey: 'D1', label: 'Day 1', sub: 'PN Check',                        ...STEP_BASE },
@@ -757,15 +757,15 @@ export default function EmbryoGradingDetailPage() {
           return (
             <div className="flex flex-col gap-4">
               {/* Identity bar */}
-              <div className="rounded-2xl bg-gradient-to-br from-[#3b0764] via-primary to-[#4a044e] border border-[#9c3aa6]/40 shadow-lg px-5 py-3 flex items-center justify-between">
+              <div className="rounded-2xl bg-gradient-to-br from-[#3b0764] via-primary to-[#4a044e] border border-primary-muted/40 shadow-lg px-5 py-3 flex items-center justify-between">
                 <div>
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-[#e9d5ff]/60">HIS</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-primary-ring/60">HIS</span>
                   <p className="text-white font-bold text-sm leading-tight">{selectedCycle?.his_id || '—'}</p>
-                  <p className="text-[#e9d5ff]/70 text-xs mt-0.5">{selectedCycle?.patient_name || '—'}</p>
+                  <p className="text-primary-ring/70 text-xs mt-0.5">{selectedCycle?.patient_name || '—'}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col items-center">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-[#e9d5ff]/60 mb-1">Oocyte No</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-primary-ring/60 mb-1">Oocyte No</span>
                     <input
                       className="bg-transparent border border-white/30 rounded-lg text-white font-bold text-sm w-20 h-8 px-2 text-center focus:outline-none focus:border-white/70 placeholder:text-white/30"
                       placeholder="#"
@@ -913,8 +913,8 @@ export default function EmbryoGradingDetailPage() {
                       </div>
                       {logForm.day3CellCount && logForm.day3Fragmentation && (
                         <div className="flex items-end">
-                          <div className="w-full rounded-xl bg-[#F7ECFF] border border-[#c084fc]/40 px-3 py-2.5 text-center">
-                            <span className="text-[10px] text-[#9c3aa6] uppercase tracking-wide block mb-0.5">Auto Grade</span>
+                          <div className="w-full rounded-xl bg-primary-bg border border-[#c084fc]/40 px-3 py-2.5 text-center">
+                            <span className="text-[10px] text-primary-muted uppercase tracking-wide block mb-0.5">Auto Grade</span>
                             <span className="text-2xl font-black text-primary">{generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation)}</span>
                           </div>
                         </div>
@@ -939,8 +939,8 @@ export default function EmbryoGradingDetailPage() {
                       {logForm.day5Stage === 'Blastocyst' && (
                         <div className="col-span-2">
                           {blastGradeFields5 ? (
-                            <div className="w-full rounded-xl bg-[#F7ECFF] border border-[#c084fc]/40 px-3 py-2.5 text-center">
-                              <span className="text-[10px] text-[#9c3aa6] uppercase tracking-wide block mb-0.5">D5 Grade</span>
+                            <div className="w-full rounded-xl bg-primary-bg border border-[#c084fc]/40 px-3 py-2.5 text-center">
+                              <span className="text-[10px] text-primary-muted uppercase tracking-wide block mb-0.5">D5 Grade</span>
                               <span className={`text-2xl font-black ${getGradeColor(generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade))}`}>{generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade)}</span>
                             </div>
                           ) : (
@@ -1002,8 +1002,8 @@ export default function EmbryoGradingDetailPage() {
                           </div>
                           {blastGradeFields6 && (
                             <div className="flex items-end">
-                              <div className="w-full rounded-xl bg-[#F7ECFF] border border-[#c084fc]/40 px-3 py-2.5 text-center">
-                                <span className="text-[10px] text-[#9c3aa6] uppercase tracking-wide block mb-0.5">D6 Grade</span>
+                              <div className="w-full rounded-xl bg-primary-bg border border-[#c084fc]/40 px-3 py-2.5 text-center">
+                                <span className="text-[10px] text-primary-muted uppercase tracking-wide block mb-0.5">D6 Grade</span>
                                 <span className={`text-2xl font-black ${getGradeColor(generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade))}`}>{generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade)}</span>
                               </div>
                             </div>
@@ -1030,8 +1030,8 @@ export default function EmbryoGradingDetailPage() {
               </div>
 
               {/* Persistent Fate */}
-              <div className="rounded-xl border border-[#E7E1E1] bg-[#FDFAFF] overflow-hidden">
-                <div className="px-4 py-2.5 border-b border-[#E7E1E1] flex items-center justify-between">
+              <div className="rounded-xl border border-line bg-surface overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-line flex items-center justify-between">
                   <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Fate</p>
                   {logForm.fate && (
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${logForm.fate === 'Discard' ? 'bg-red-50 text-red-500 border border-red-200' : logForm.fate === 'Freeze' ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}`}>
@@ -1065,7 +1065,7 @@ export default function EmbryoGradingDetailPage() {
               {/* Actions */}
               <div className="flex items-center pt-1 border-t border-gray-100">
                 <button type="button" onClick={() => { setIsAddLogFormOpen(false); resetLogForm(); setEditingLogId(null); }}
-                  className="px-4 py-2.5 rounded-xl border border-[#9c3aa6]/40 text-primary text-sm font-semibold hover:bg-[#f8f0fb] transition-colors">
+                  className="px-4 py-2.5 rounded-xl border border-primary-muted/40 text-primary text-sm font-semibold hover:bg-[#f8f0fb] transition-colors">
                   Cancel
                 </button>
                 <div className="flex-1 flex items-center justify-center gap-2">
@@ -1085,7 +1085,7 @@ export default function EmbryoGradingDetailPage() {
                   )}
                 </div>
                 <button type="button" onClick={handleAddLogEntry} disabled={logSaving}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#3b0764] to-[#9c3aa6] text-white text-sm font-bold shadow-md hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2">
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#3b0764] to-primary-muted text-white text-sm font-bold shadow-md hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2">
                   {logSaving && <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
                   {editingLogId ? 'Update' : 'Save'}
                 </button>

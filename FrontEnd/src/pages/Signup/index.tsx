@@ -320,7 +320,7 @@ const Signup: React.FC = () => {
                                                 }
                                             }}
                                             placeholder="First Name"
-                                            className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${firstNameError ? "border-red-500" : "border-gray-300"
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-light ${firstNameError ? "border-red-500" : "border-gray-300"
                                                 }`}
                                         />
                                         {firstNameError && (
@@ -341,7 +341,7 @@ const Signup: React.FC = () => {
                                                 }
                                             }}
                                             placeholder="Last Name"
-                                            className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${lastNameError ? "border-red-500" : "border-gray-300"
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-light ${lastNameError ? "border-red-500" : "border-gray-300"
                                                 }`}
                                         />
                                         {lastNameError && (
@@ -366,7 +366,7 @@ const Signup: React.FC = () => {
                                             }
                                         }}
                                         placeholder="Email"
-                                        className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${emailError ? "border-red-500" : "border-gray-300"
+                                        className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-light ${emailError ? "border-red-500" : "border-gray-300"
                                             }`}
                                         aria-invalid={!!emailError}
                                     />
@@ -380,7 +380,7 @@ const Signup: React.FC = () => {
                                     {/* Role Dropdown */}
                                     <div className="relative w-full" ref={dropdownRef}>
                                         <div
-                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${roleError ? "border-red-500" : "border-gray-300"
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-light ${roleError ? "border-red-500" : "border-gray-300"
                                                 } ${!role ? "text-gray-400" : "text-black"}`}
                                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                         >
@@ -402,7 +402,7 @@ const Signup: React.FC = () => {
                                                 {roleOptions.map((option) => (
                                                     <div
                                                         key={option.value}
-                                                        className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${role === option.value ? "bg-[#8b2a96] text-white" : "text-black"
+                                                        className={`px-3 py-2 cursor-pointer hover:bg-primary-light hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${role === option.value ? "bg-primary-light text-white" : "text-black"
                                                             }`}
                                                         onClick={() => handleRoleSelect(option.value)}
                                                     >
@@ -428,7 +428,7 @@ const Signup: React.FC = () => {
                                             }}
                                             placeholder="Organization"
                                             disabled={isHospitalEmail}
-                                            className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${organizationError ? "border-red-500" : "border-gray-300"
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-light ${organizationError ? "border-red-500" : "border-gray-300"
                                                 } ${isHospitalEmail ? "bg-gray-100 cursor-not-allowed" : ""}`}
                                         />
                                         {organizationError && (
@@ -445,7 +445,7 @@ const Signup: React.FC = () => {
                                             value={department}
                                             placeholder="Department"
                                             disabled={true}
-                                            className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${departmentError ? "border-red-500" : "border-gray-300"
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-light ${departmentError ? "border-red-500" : "border-gray-300"
                                                 } bg-gray-100 cursor-not-allowed text-gray-600`}
                                         />
                                         {departmentError && (
@@ -458,7 +458,7 @@ const Signup: React.FC = () => {
                                     {/* Branch Dropdown - disabled for Manager (can view all branches) */}
                                     <div className="relative w-full" ref={branchDropdownRef}>
                                         <div
-                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${branchError ? "border-red-500" : "border-gray-300"
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-primary-light ${branchError ? "border-red-500" : "border-gray-300"
                                                 } ${!branch ? "text-gray-400" : "text-black"} ${!isHospitalEmail || role === "Manager" ? "bg-gray-100 cursor-not-allowed" : "cursor-pointer"}`}
                                             onClick={() => isHospitalEmail && role === "User" && setIsBranchDropdownOpen(!isBranchDropdownOpen)}
                                         >
@@ -482,7 +482,7 @@ const Signup: React.FC = () => {
                                                 {branchOptions.map((option) => (
                                                     <div
                                                         key={option.branch_id}
-                                                        className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${branch === option.branch_name ? "bg-[#8b2a96] text-white" : "text-black"
+                                                        className={`px-3 py-2 cursor-pointer hover:bg-primary-light hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${branch === option.branch_name ? "bg-primary-light text-white" : "text-black"
                                                             }`}
                                                         onClick={() => handleBranchSelect(option.branch_name)}
                                                     >
@@ -513,7 +513,7 @@ const Signup: React.FC = () => {
                                                 }
                                             }}
                                             placeholder="Password"
-                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${passwordError ? "border-red-500" : "border-gray-300"
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-primary-light ${passwordError ? "border-red-500" : "border-gray-300"
                                                 }`}
                                         />
                                         <button
@@ -544,7 +544,7 @@ const Signup: React.FC = () => {
                                                 if (confirmPasswordError) setConfirmPasswordError("");
                                             }}
                                             placeholder="Confirm Password"
-                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${confirmPasswordError || (passwordError && password === confirmPassword) || (confirmPassword && !validatePassword(confirmPassword)) ? "border-red-500" : "border-gray-300"
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-primary-light ${confirmPasswordError || (passwordError && password === confirmPassword) || (confirmPassword && !validatePassword(confirmPassword)) ? "border-red-500" : "border-gray-300"
                                                 }`}
                                         />
                                         <button
@@ -605,7 +605,7 @@ const Signup: React.FC = () => {
                     )}
 
                     {registrationSuccess && (
-                        <div className="border border-[white] rounded-lg p-6 bg-[#F2E4FF]">
+                        <div className="border border-[white] rounded-lg p-6 bg-primary-bg">
                             <h2 className="text-xl font-bold text-primary mb-2">
                                 Registration successful
                             </h2>
