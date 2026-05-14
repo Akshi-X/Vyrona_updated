@@ -205,12 +205,9 @@ const CANE_H = CAN_HEIGHT * 0.62; // matches STRAW_H inside makeCanister
 
 // Derived motion constants (shared across animation effects)
 const LIFT_Y = TANK_HEIGHT / 2 + CAN_HEIGHT / 2 + 0.5;
-const ROD_LENGTH_DYN = TANK_HEIGHT - CAN_HEIGHT - 0.06;
 const LID_OPEN_ROT = -2 * Math.PI / 3;
 const PARK_DIST = 4.75;
 const PARK_Y = 0.2;
-const PARK_Z_FORWARD = 4.35;
-const PARK_CANS_ROT_Y = 67 * Math.PI / 180;
 const ORBIT_R = CAN_RADIUS * 0.55;  // cane orbit radius inside canister ≈ 0.121
 const ORBIT_Y_LIFT = CAN_HEIGHT * 0.35;  // lifts cane orbit ring toward the canister opening
 
@@ -533,7 +530,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     internalTempAlert = false,
     onSensorSelect,
     onCanisterSelect,
-    onStrawSelect,
     tankCode,
     branchName,
   } = {},
@@ -2652,27 +2648,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     if (!can) return;
 
     const targetGroupRot = can.homeAngle;
-    const dirX = Math.cos(can.homeAngle);
-    const dirZ = Math.sin(can.homeAngle);
-    const liftLocalX = dirX * CAN_RING_R;
-    const liftLocalZ = dirZ * CAN_RING_R;
     // Inverse of parent Ry(h): local = R(-h) * world
     // wx = lx*cos(h) + lz*sin(h) = -PARK_DIST  →  lx = -cos(h)*PARK_DIST - sin(h)*PARK_Z_FORWARD
     // wz = -lx*sin(h) + lz*cos(h) = PARK_Z_FORWARD → lz = -sin(h)*PARK_DIST + cos(h)*PARK_Z_FORWARD
-    const getInspectWorldPos = (camPos: typeof STAGE2_CAM, targetPos: typeof STAGE2_TARGET) => {
-      const tempCam = new THREE.PerspectiveCamera(cam.fov, cam.aspect, cam.near, cam.far);
-      tempCam.position.set(camPos.x, camPos.y, camPos.z);
-      tempCam.lookAt(new THREE.Vector3(targetPos.x, targetPos.y, targetPos.z));
-      tempCam.updateMatrixWorld();
-
-      const depth = tempCam.position.distanceTo(
-        new THREE.Vector3(targetPos.x, targetPos.y, targetPos.z),
-      );
-      const ndc = new THREE.Vector3(-0.1, 0, 0.5);
-      ndc.unproject(tempCam);
-      const dir = ndc.sub(tempCam.position).normalize();
-      return tempCam.position.clone().add(dir.multiplyScalar(depth));
-    };
     const inspectOverride = inspectOverrideRef.current;
     const fixedInspectPos = { ...inspectOverride.pos };
     const fixedInspectRot = {
@@ -2680,8 +2658,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       y: inspectOverride.rotDeg.y * Math.PI / 180,
       z: inspectOverride.rotDeg.z * Math.PI / 180,
     };
-    const parkLocalX = -dirX * PARK_DIST - dirZ * PARK_Z_FORWARD;
-    const parkLocalZ = -dirZ * PARK_DIST + dirX * PARK_Z_FORWARD;
 
     // ---------- STAGE: extracted ----------
     if (viewStage === "extracted") {
