@@ -588,6 +588,14 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   const [debugPos, setDebugPos] = useState({ x: 0, y: 0, z: 0 });
   const [debugRotDeg, setDebugRotDeg] = useState({ x: 0, y: 0, z: 0 });
   const [debugScale, setDebugScale] = useState({ x: 1, y: 1, z: 1 });
+  const inspectOverrideRef = useRef({
+    enabled: true,
+    pos: { x: -3.45, y: 0.05, z: 4.55 },
+    rotDeg: { x: 4, y: 2, z: -4 },
+  });
+  const [inspectOverride, setInspectOverride] = useState(true);
+  const [inspectPos, setInspectPos] = useState({ x: -3.45, y: 0.05, z: 4.55 });
+  const [inspectRotDeg, setInspectRotDeg] = useState({ x: 4, y: 2, z: -4 });
   // HTML overlay positions — sliders in dev panel update these; prod uses initial values
   const [dbgLn2, setDbgLn2] = useState({ left: 74, top: 50 });
   const [dbgNameCard, setDbgNameCard] = useState({ left: 50, bottom: 52 });
@@ -645,6 +653,13 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   useEffect(() => {
     selectedCanisterRef.current = selectedCanister;
   }, [selectedCanister]);
+  useEffect(() => {
+    inspectOverrideRef.current = {
+      enabled: inspectOverride,
+      pos: inspectPos,
+      rotDeg: inspectRotDeg,
+    };
+  }, [inspectOverride, inspectPos, inspectRotDeg]);
   useEffect(() => {
     viewStageRef.current = viewStage;
     const isInspecting = viewStage === "inspecting";
@@ -748,10 +763,10 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     pmrem.dispose();
 
     // ----- Lighting rig -----
-    const ambient = new THREE.AmbientLight(0xffffff, 1.20);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.30);
     scene.add(ambient);
 
-    const key = new THREE.DirectionalLight(0xffffff, 0.45);
+    const key = new THREE.DirectionalLight(0xffffff, 1.35);
     key.position.set(5, 8, 6);
     scene.add(key);
 
@@ -836,11 +851,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     const shellGeo = new THREE.LatheGeometry(shellProfile, 72);
     const shellMat = new THREE.MeshPhysicalMaterial({
       color: 0x201e1e,
-      metalness: 0.64,
+      metalness: 1.00,
       roughness: 1.00,
       transmission: 0,
       transparent: true,
-      opacity: 0.24,
+      opacity: 0.33,
       thickness: 0.6,
       ior: 1.38,
       side: THREE.DoubleSide,
@@ -858,7 +873,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     const bottomCapMat = new THREE.MeshPhysicalMaterial({
       color: 0xe0dce8,
       metalness: 0.95,
-      roughness: 0.12,
+      roughness: 0.00,
       clearcoat: 1.0,
       clearcoatRoughness: 0.06,
     });
@@ -914,7 +929,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       roughness: 0.00,
       transmission: 0,
       transparent: true,
-      opacity: 0.11,
+      opacity: 0.09,
       thickness: 0.5,
       ior: 1.4,
       side: THREE.DoubleSide,
@@ -1365,11 +1380,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
     // ===== Canisters =====
     const canBodyMat = new THREE.MeshPhysicalMaterial({
-      color: 0xd8ceb8,
+      color: 0x000000,
       metalness: 1.00,
-      roughness: 0.58,
-      clearcoat: 0.4,
-      clearcoatRoughness: 0.2,
+      roughness: 1.00,
+      clearcoat: 0.0,
+      clearcoatRoughness: 0.0,
     });
     const rodMat = new THREE.MeshPhysicalMaterial({
       color: 0x401153,
@@ -1643,12 +1658,12 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     );
     ln2Geo.translate(0, MAX_LN2_HEIGHT / 2, 0);
     const ln2Mat = new THREE.MeshPhysicalMaterial({
-      color: 0x1888d8,
+      color: 0x0092fa,
       metalness: 0.0,
       roughness: 0.1,
       transmission: 0.18,
       transparent: true,
-      opacity: 0.43,
+      opacity: 0.62,
       thickness: 1.4,
       ior: 1.24,
       clearcoat: 0.6,
@@ -2181,6 +2196,24 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         }
       }
 
+      if (inspectOverrideRef.current.enabled) {
+        const stage = viewStageRef.current;
+        const selIdx = selectedCanisterRef.current;
+        if (stage === "inspecting" && inspectionReadyRef.current && selIdx !== null && canistersRef.current[selIdx]) {
+          const c = canistersRef.current[selIdx];
+          const { pos, rotDeg } = inspectOverrideRef.current;
+          if (c.group.parent !== scene) {
+            scene.attach(c.group);
+          }
+          c.group.position.set(pos.x, pos.y, pos.z);
+          c.group.rotation.set(
+            rotDeg.x * Math.PI / 180,
+            rotDeg.y * Math.PI / 180,
+            rotDeg.z * Math.PI / 180,
+          );
+        }
+      }
+
       renderer.render(scene, camera);
     };
     tick();
@@ -2457,7 +2490,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
     const anime = window.anime;
 
-    // Canister parks at local (-PARK_DIST, PARK_Y, PARK_Z_FORWARD) within tank group (shifted to (1.3, 0.75, 1.3) during inspection).
+    // Canister parks at local (-PARK_DIST, PARK_Y, PARK_Z_FORWARD) within tank group (shifted to (1.3, -0.3, 1.35) during inspection).
     // Camera centers between them; target z = midpoint of canister z and tank z.
     const STAGE1_TARGET = { x: -1.5, y: 0.0, z: 2.0 };
     const STAGE1_CAM    = { x: -1.5, y: 3.0, z: 13.0 };
@@ -2475,6 +2508,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       inspectionReadyRef.current = false;
       if (!animeReady || !anime) {
         cans.forEach((c) => {
+          if (c.group.parent !== grp) {
+            grp.add(c.group);
+          }
           c.group.position.copy(c.homePos);
           c.handleMat.opacity = 1;
           c.strawSubgroups.forEach((s) =>
@@ -2521,6 +2557,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       // 2) Return any displaced straws to their canister, then displaced canisters home
       let returningCan = null;
       cans.forEach((c) => {
+        if (c.group.parent !== grp) {
+          grp.attach(c.group);
+        }
         c.handleGroup.visible = true;
         // Stop orbit and reset strawGroup rotation + lift
         anime.remove(c.strawGroup.rotation);
@@ -2620,6 +2659,27 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     // Inverse of parent Ry(h): local = R(-h) * world
     // wx = lx*cos(h) + lz*sin(h) = -PARK_DIST  →  lx = -cos(h)*PARK_DIST - sin(h)*PARK_Z_FORWARD
     // wz = -lx*sin(h) + lz*cos(h) = PARK_Z_FORWARD → lz = -sin(h)*PARK_DIST + cos(h)*PARK_Z_FORWARD
+    const getInspectWorldPos = (camPos: typeof STAGE2_CAM, targetPos: typeof STAGE2_TARGET) => {
+      const tempCam = new THREE.PerspectiveCamera(cam.fov, cam.aspect, cam.near, cam.far);
+      tempCam.position.set(camPos.x, camPos.y, camPos.z);
+      tempCam.lookAt(new THREE.Vector3(targetPos.x, targetPos.y, targetPos.z));
+      tempCam.updateMatrixWorld();
+
+      const depth = tempCam.position.distanceTo(
+        new THREE.Vector3(targetPos.x, targetPos.y, targetPos.z),
+      );
+      const ndc = new THREE.Vector3(-0.1, 0, 0.5);
+      ndc.unproject(tempCam);
+      const dir = ndc.sub(tempCam.position).normalize();
+      return tempCam.position.clone().add(dir.multiplyScalar(depth));
+    };
+    const inspectOverride = inspectOverrideRef.current;
+    const fixedInspectPos = { ...inspectOverride.pos };
+    const fixedInspectRot = {
+      x: inspectOverride.rotDeg.x * Math.PI / 180,
+      y: inspectOverride.rotDeg.y * Math.PI / 180,
+      z: inspectOverride.rotDeg.z * Math.PI / 180,
+    };
     const parkLocalX = -dirX * PARK_DIST - dirZ * PARK_Z_FORWARD;
     const parkLocalZ = -dirZ * PARK_DIST + dirX * PARK_Z_FORWARD;
 
@@ -2628,7 +2688,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       if (!animeReady || !anime) {
         grp.rotation.y = targetGroupRot;
         lid.rotation.z = LID_OPEN_ROT;
-        can.group.position.set(parkLocalX, PARK_Y, parkLocalZ);
+        if (can.group.parent !== scene) {
+          scene.attach(can.group);
+        }
+        can.group.position.set(fixedInspectPos.x, fixedInspectPos.y, fixedInspectPos.z);
+        can.group.rotation.set(fixedInspectRot.x, fixedInspectRot.y, fixedInspectRot.z);
         can.handleMat.opacity = 1;
         // Make sure straws are home
         can.strawSubgroups.forEach((s) => {
@@ -2673,20 +2737,16 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           anime.remove(s.group.rotation);
           anime({ targets: s.group.rotation, x: 0, y: 0, z: 0, duration: 500, easing: "easeInOutCubic", delay: i * 30 });
         });
-        // Reset canister to correct world tilt (opening faces camera)
-        {
-          const h = targetGroupRot;
-          const TILT = Math.PI * 0.4;
-          const ct = Math.cos(TILT / 2), st = Math.sin(TILT / 2);
-          const ch = Math.cos(h / 2), sh = Math.sin(h / 2);
-          anime.remove(can.group.quaternion);
-          anime({
-            targets: can.group.quaternion,
-            x: ch * st, y: -sh * ct, z: sh * st, w: ch * ct,
-            duration: 700, easing: "easeInOutCubic",
-            update: () => can.group.quaternion.normalize(),
-          });
-        }
+        // Reset canister to fixed inspection tilt
+        anime.remove(can.group.rotation);
+        anime({
+          targets: can.group.rotation,
+          x: fixedInspectRot.x,
+          y: fixedInspectRot.y,
+          z: fixedInspectRot.z,
+          duration: 700,
+          easing: "easeInOutCubic",
+        });
         // Restore handle
         anime({ targets: can.handleMat, opacity: 1, duration: 500, easing: "easeOutQuad", delay: 600 });
         // Camera back to stage 1 framing
@@ -2714,33 +2774,34 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         delay: 600,
       });
 
-      // 3) Canister rises out, then arcs to park position
+      // 3) Canister rises out, then arcs to park position (world-space)
+      const startWorld = new THREE.Vector3();
+      can.group.getWorldPosition(startWorld);
+      if (can.group.parent !== scene) {
+        scene.attach(can.group);
+      }
       anime({
         targets: can.group.position,
         keyframes: [
-          { x: liftLocalX, y: LIFT_Y, z: liftLocalZ, duration: 1100 },
-          { x: parkLocalX, y: PARK_Y + 0.4, z: parkLocalZ, duration: 900 },
-          { x: parkLocalX, y: PARK_Y, z: parkLocalZ, duration: 500 },
+          { x: startWorld.x, y: LIFT_Y, z: startWorld.z, duration: 1100 },
+          { x: fixedInspectPos.x, y: fixedInspectPos.y + 0.4, z: fixedInspectPos.z, duration: 900 },
+          { x: fixedInspectPos.x, y: fixedInspectPos.y, z: fixedInspectPos.z, duration: 500 },
         ],
         easing: "easeInOutCubic",
         delay: 1500,
       });
 
-      // Tilt canister so opening faces camera.
-      // Group is frozen at targetGroupRot; correct world tilt = Ry(-h) * Rx(0.4π) as quaternion.
-      {
-        const h = targetGroupRot;
-        const TILT = Math.PI * 0.4;
-        const ct = Math.cos(TILT / 2), st = Math.sin(TILT / 2);
-        const ch = Math.cos(h / 2), sh = Math.sin(h / 2);
-        anime.remove(can.group.quaternion);
-        anime({
-          targets: can.group.quaternion,
-          x: ch * st, y: -sh * ct, z: sh * st, w: ch * ct,
-          duration: 900, easing: "easeOutBack", delay: 2800,
-          update: () => can.group.quaternion.normalize(),
-        });
-      }
+      // Tilt canister to a fixed inspection angle.
+      anime.remove(can.group.rotation);
+      anime({
+        targets: can.group.rotation,
+        x: fixedInspectRot.x,
+        y: fixedInspectRot.y,
+        z: fixedInspectRot.z,
+        duration: 900,
+        easing: "easeOutBack",
+        delay: 2800,
+      });
 
       // 4) Camera shifts to stage 1 framing — tank RIGHT, canister LEFT
       anime({
@@ -2775,9 +2836,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       // 5) Soft fill light positions near the parked canister (LEFT side)
       anime({
         targets: interior.position,
-        x: -PARK_DIST,
-        y: PARK_Y + 1.2,
-        z: PARK_Z_FORWARD,
+        x: fixedInspectPos.x,
+        y: fixedInspectPos.y + 1.2,
+        z: fixedInspectPos.z,
         duration: 1800,
         easing: "easeInOutCubic",
         delay: 2000,
@@ -2807,11 +2868,14 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
       if (!animeReady || !anime) {
         // Fallback: position canister at park, open lid, place canes in orbit
-        grp.rotation.y = can.homeAngle;
-        grp.position.set(1.3, -0.3, 1.35);
+        grp.rotation.set(6 * Math.PI / 180, 0, 0);
+        grp.position.set(1.75, -0.3, -0.1);
         lid.rotation.z = LID_OPEN_ROT;
-        can.group.position.set(parkLocalX, PARK_Y, parkLocalZ);
-        can.group.rotation.set(54 * Math.PI / 180, PARK_CANS_ROT_Y - targetGroupRot, -26 * Math.PI / 180);
+        if (can.group.parent !== scene) {
+          scene.attach(can.group);
+        }
+        can.group.position.set(fixedInspectPos.x, fixedInspectPos.y, fixedInspectPos.z);
+        can.group.rotation.set(fixedInspectRot.x, fixedInspectRot.y, fixedInspectRot.z);
         can.strawGroup.position.set(0, ORBIT_Y_LIFT, 0);
         visibleSubs.forEach((s, i) => {
           const angle = (i / N) * Math.PI * 2;
@@ -2835,26 +2899,38 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       const EXTRACT_DELAY = comingFromIdle ? 4300 : 0;
 
       // Shift tank group to inspection world position
-      anime({ targets: grp.position, x: 1.3, y: -0.3, z: 1.35, duration: 1200, easing: "easeInOutCubic", delay: EXTRACT_DELAY });
+      anime({ targets: grp.position, x: 1.75, y: -0.3, z: -0.1, duration: 1200, easing: "easeInOutCubic", delay: EXTRACT_DELAY });
+      anime.remove(grp.rotation);
+      anime({
+        targets: grp.rotation,
+        x: 6 * Math.PI / 180,
+        y: 0,
+        z: 0,
+        duration: 800,
+        easing: "easeInOutCubic",
+        delay: EXTRACT_DELAY,
+      });
 
       if (comingFromIdle) {
         anime.remove(grp.rotation);
         anime.remove(lid.rotation);
         anime.remove(can.group.position);
 
-        // 1) Align group so chosen canister faces outward
-        anime({ targets: grp.rotation, y: targetGroupRot, duration: 800, easing: "easeInOutCubic" });
-
-        // 2) Lid swings open 90°
+        // 1) Lid swings open 90°
         anime({ targets: lid.rotation, z: LID_OPEN_ROT, duration: 1100, easing: "easeOutQuart", delay: 600 });
 
-        // 3) Canister rises out, then arcs to LEFT park position
+        // 2) Canister rises out, then arcs to LEFT park position (world-space)
+        const startWorld = new THREE.Vector3();
+        can.group.getWorldPosition(startWorld);
+        if (can.group.parent !== scene) {
+          scene.attach(can.group);
+        }
         anime({
           targets: can.group.position,
           keyframes: [
-            { x: liftLocalX, y: LIFT_Y, z: liftLocalZ, duration: 1100 },
-            { x: parkLocalX, y: PARK_Y + 0.4, z: parkLocalZ, duration: 900 },
-            { x: parkLocalX, y: PARK_Y, z: parkLocalZ, duration: 500 },
+            { x: startWorld.x, y: LIFT_Y, z: startWorld.z, duration: 1100 },
+            { x: fixedInspectPos.x, y: fixedInspectPos.y + 0.4, z: fixedInspectPos.z, duration: 900 },
+            { x: fixedInspectPos.x, y: fixedInspectPos.y, z: fixedInspectPos.z, duration: 500 },
           ],
           easing: "easeInOutCubic",
           delay: 1500,
@@ -2880,16 +2956,40 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           delay: 1700,
         });
 
-        // Tilt so opening faces camera: Euler XYZ (Rx 54°, Ry cancels parent rotation, Rz −26° roll).
+        // Tilt so opening faces camera: Euler XYZ (Rx −4°, Ry 2°, Rz −4° roll).
         anime.remove(can.group.rotation);
         anime({
           targets: can.group.rotation,
-          x: 54 * Math.PI / 180,
-          y: PARK_CANS_ROT_Y - targetGroupRot,
-          z: -26 * Math.PI / 180,
+          x: fixedInspectRot.x,
+          y: fixedInspectRot.y,
+          z: fixedInspectRot.z,
           duration: 900,
           easing: "easeInOutCubic",
           delay: 2800,
+        });
+      }
+
+      if (!comingFromIdle) {
+        if (can.group.parent !== scene) {
+          scene.attach(can.group);
+        }
+        anime.remove(can.group.position);
+        anime({
+          targets: can.group.position,
+          x: -5.45,
+          y: 0.75,
+          z: 4.8,
+          duration: 700,
+          easing: "easeInOutCubic",
+        });
+        anime.remove(can.group.rotation);
+        anime({
+          targets: can.group.rotation,
+          x: fixedInspectRot.x,
+          y: fixedInspectRot.y,
+          z: fixedInspectRot.z,
+          duration: 700,
+          easing: "easeInOutCubic",
         });
       }
 
@@ -2918,7 +3018,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       anime({ targets: target, x: STAGE2_TARGET.x, y: STAGE2_TARGET.y, z: STAGE2_TARGET.z, duration: comingFromIdle ? 3000 : 1400, easing: "easeInOutCubic" });
 
       // 4) Light moves to illuminate canister area (LEFT side)
-      anime({ targets: interior.position, x: -PARK_DIST, y: PARK_Y + 1.0, z: PARK_Z_FORWARD, duration: 1400, easing: "easeInOutCubic", delay: EXTRACT_DELAY + 800 });
+      anime({ targets: interior.position, x: fixedInspectPos.x, y: fixedInspectPos.y + 1.0, z: fixedInspectPos.z, duration: 1400, easing: "easeInOutCubic", delay: EXTRACT_DELAY + 800 });
       anime({ targets: interior, intensity: 1.5, duration: 1200, easing: "easeOutQuad", delay: EXTRACT_DELAY + 800 });
 
       // 5) After orbit animation settles, enable inspection ready
@@ -4755,6 +4855,59 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 }}
                 style={{ width: "100%", padding: "5px 0", borderRadius: 6, border: "1px solid rgba(107,17,118,0.4)", background: "rgba(107,17,118,0.15)", color: "#c084fc", cursor: "pointer", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", marginBottom: 10 }}
               >COPY 3D VALUES</button>
+              <div style={{ borderTop: "1px solid rgba(107,17,118,0.25)", paddingTop: 10, marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ color: "#a78bfa", fontSize: 10, fontWeight: 600, letterSpacing: "0.1em" }}>INSPECT CANISTER</div>
+                  <button
+                    onClick={() => setInspectOverride(v => !v)}
+                    style={{ padding: "2px 8px", borderRadius: 6, border: "1px solid rgba(107,17,118,0.5)", background: inspectOverride ? "#6B1176" : "transparent", color: inspectOverride ? "#fff" : "#9ca3af", cursor: "pointer", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em" }}
+                  >{inspectOverride ? "OVERRIDE" : "OFF"}</button>
+                </div>
+                {(["POSITION", "ROTATION (deg)"] as const).map((section) => (
+                  <div key={section} style={{ marginBottom: 8 }}>
+                    <div style={{ color: "#a78bfa", fontSize: 10, fontWeight: 600, marginBottom: 4, letterSpacing: "0.1em" }}>{section}</div>
+                    {(["x", "y", "z"] as const).map((axis) => {
+                      const color = axis === "x" ? "#f87171" : axis === "y" ? "#4ade80" : "#60a5fa";
+                      const isPos = section === "POSITION";
+                      const val = isPos ? inspectPos[axis] : inspectRotDeg[axis];
+                      return (
+                        <div key={axis} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                          <span style={{ width: 10, color, fontWeight: 700 }}>{axis.toUpperCase()}</span>
+                          <input type="range"
+                            min={isPos ? -12 : -180}
+                            max={isPos ? 12 : 180}
+                            step={isPos ? 0.05 : 1}
+                            value={val}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              if (isPos) setInspectPos((p) => ({ ...p, [axis]: v }));
+                              else setInspectRotDeg((r) => ({ ...r, [axis]: v }));
+                            }}
+                            style={{ flex: 1, accentColor: color }}
+                          />
+                          <span style={{ width: 46, textAlign: "right", color: "#f3e8ff" }}>{val.toFixed(isPos ? 2 : 0)}{section.includes("deg") ? "°" : ""}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+                <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 6, padding: "6px 8px", fontSize: 10, color: "#c4b5d4", marginBottom: 8, lineHeight: 1.7 }}>
+                  <div>pos x={inspectPos.x.toFixed(3)} y={inspectPos.y.toFixed(3)} z={inspectPos.z.toFixed(3)}</div>
+                  <div>rot x={inspectRotDeg.x.toFixed(1)}° y={inspectRotDeg.y.toFixed(1)}° z={inspectRotDeg.z.toFixed(1)}°</div>
+                  <div style={{ color: "#7c6a8a", fontSize: 9, marginTop: 2 }}>rad {(inspectRotDeg.x*Math.PI/180).toFixed(4)} / {(inspectRotDeg.y*Math.PI/180).toFixed(4)} / {(inspectRotDeg.z*Math.PI/180).toFixed(4)}</div>
+                </div>
+                <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(
+                      `// canister-inspect\npos: x=${inspectPos.x.toFixed(3)}, y=${inspectPos.y.toFixed(3)}, z=${inspectPos.z.toFixed(3)}\n` +
+                      `rot: x=${inspectRotDeg.x.toFixed(1)}deg, y=${inspectRotDeg.y.toFixed(1)}deg, z=${inspectRotDeg.z.toFixed(1)}deg\n` +
+                      `scale: x=1.000, y=1.000, z=1.000\n` +
+                      `// radians: x=${(inspectRotDeg.x*Math.PI/180).toFixed(4)}, y=${(inspectRotDeg.y*Math.PI/180).toFixed(4)}, z=${(inspectRotDeg.z*Math.PI/180).toFixed(4)}`
+                    );
+                  }}
+                  style={{ width: "100%", padding: "5px 0", borderRadius: 6, border: "1px solid rgba(107,17,118,0.4)", background: "rgba(107,17,118,0.15)", color: "#c084fc", cursor: "pointer", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em" }}
+                >COPY INSPECT VALUES</button>
+              </div>
               <div style={{ borderTop: "1px solid rgba(107,17,118,0.25)", paddingTop: 10 }}>
                 <div style={{ color: "#a78bfa", fontSize: 10, fontWeight: 600, marginBottom: 8, letterSpacing: "0.1em" }}>HTML OVERLAYS</div>
                 <div style={{ marginBottom: 10 }}>
