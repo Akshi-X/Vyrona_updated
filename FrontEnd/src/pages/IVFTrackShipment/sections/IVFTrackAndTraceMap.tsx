@@ -440,14 +440,14 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
 
   if (!isLoaded) {
     return (
-      <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[460px] flex items-center justify-center">
+      <div className="bg-white border border-line rounded-lg p-4 h-[460px] flex items-center justify-center">
         <div className="text-gray-500">Loading map...</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[460px] flex flex-col">
+    <div className="bg-white border border-line rounded-lg p-4 h-[460px] flex flex-col">
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-semibold text-black text-[16px]">Track and Trace</h3>
         <div className="flex items-center gap-2">

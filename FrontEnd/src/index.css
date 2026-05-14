@@ -3,6 +3,23 @@
 @theme {
   --breakpoint-xl1: 1200px;
   --breakpoint-xl2: 1412px;
+
+  /* Brand purple scale */
+  --color-primary:        #6b1176;
+  --color-primary-light:  #8b2a96;
+  --color-primary-muted:  #9c3aa6;
+  --color-primary-bg:     #F7ECFF;
+  --color-primary-ring:   #E9D5FF;
+
+  /* Surface / background */
+  --color-surface:        #FDFAFF;
+
+  /* Borders / dividers */
+  --color-line:           #E7E1E1;
+  --color-line-light:     #F0EBF4;
+
+  /* Gradient */
+  --gradient-primary: linear-gradient(135deg, #4a0260 0%, var(--color-primary) 45%, var(--color-primary-light) 100%);
 }
 
 @keyframes page-enter {

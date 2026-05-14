@@ -310,14 +310,14 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
               
               {/* Patient Details */}
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[#6B1176] text-[14px] mb-1">
+                <div className="font-semibold text-primary text-[14px] mb-1">
                   {summary.hospital_name || 'Hospital Name'}
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-sm">
-                  <span className="text-[#6B1176] text-400">
+                  <span className="text-primary text-400">
                     <span className="font-medium text-sm">Patient ID :</span> {summary.patient_id}
                   </span>
-                  <span className="text-[#6B1176] text-400">
+                  <span className="text-primary text-400">
                     <span className="font-medium text-sm">Condition :</span> {summary.condition}
                   </span>
                 </div>

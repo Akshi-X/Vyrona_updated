@@ -13,7 +13,7 @@ export const FullPageLoader: React.FC = () => (
         aria-label="Loading"
     >
         <div
-            className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6b1176]"
+            className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"
             role="status"
             aria-hidden="true"
         />

@@ -13,7 +13,7 @@ export default function ConfirmDialog({
   confirmLabel,
   onConfirm,
   onCancel,
-  confirmClassName = 'px-4 py-2 text-sm rounded-lg bg-[#6b1176] text-white hover:bg-[#8a2a95] transition-colors',
+  confirmClassName = 'px-4 py-2 text-sm rounded-lg bg-primary text-white hover:bg-[#8a2a95] transition-colors',
 }: ConfirmDialogProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">

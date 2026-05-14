@@ -151,9 +151,9 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
 
   if (loading) {
     return (
-      <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+      <div className="w-full bg-white rounded-[10px] overflow-hidden border border-line">
         <div className="p-6 text-center">
-          <div className="text-[#6b1176] text-sm">Loading ongoing treatments...</div>
+          <div className="text-primary text-sm">Loading ongoing treatments...</div>
         </div>
       </div>
     );
@@ -161,7 +161,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
 
   if (error) {
     return (
-      <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+      <div className="w-full bg-white rounded-[10px] overflow-hidden border border-line">
         <div className="p-6 text-center">
           <div className="text-red-600 text-sm">{error}</div>
         </div>
@@ -170,7 +170,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   }
 
   return (
-    <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+    <div className="w-full bg-white rounded-[10px] overflow-hidden border border-line">
       <div 
         className="h-[415px] overflow-y-auto"
         style={{
@@ -178,12 +178,12 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
         }}
       >
         <table className="w-full">
-          <thead className="sticky top-0 bg-[#fdeeff] z-10">
+          <thead className="sticky top-0 bg-surface z-10">
             <tr className="border-b border-[#eeeeee]">
               {tableHeaders.map((header, index) => (
                 <th
                   key={index}
-                  className={`p-[15px] font-semibold text-[#6b1176] text-sm text-left ${
+                  className={`p-[15px] font-semibold text-primary text-sm text-left ${
                     header.hasSort ? 'cursor-pointer hover:bg-[#f0e6f0]' : ''
                   }`}
                   onClick={header.hasSort && header.field ? () => handleSort(header.field as SortField) : undefined}
@@ -231,7 +231,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                                     setIsDropdownOpen(false);
                                   }}
                                   className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                    stageFilter === value ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                                    stageFilter === value ? 'bg-primary text-white' : 'text-primary hover:bg-gray-100'
                                   }`}
                                 >
                                   {label}
@@ -249,11 +249,11 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                         <div className="flex flex-col">
                           {sortField === header.field ? (
                             sortDirection === 'asc' ? (
-                              <svg className="w-3 h-3 text-[#6b1176]" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
                               </svg>
                             ) : (
-                              <svg className="w-3 h-3 text-[#6b1176]" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                               </svg>
                             )

@@ -38,7 +38,7 @@ export default function EmbryoShell() {
     <button
       type="button"
       onClick={() => navigate('/embryo-grading')}
-      className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-[#E7E1E1] bg-white text-sm text-gray-700 hover:bg-gray-50 hover:text-[#6b1176] transition-colors"
+      className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-line bg-white text-sm text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
     >
       <Home size={15} />
       Embryo Dashboard
@@ -59,7 +59,7 @@ export default function EmbryoShell() {
       <button
         type="button"
         onClick={() => window.print()}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#6b1176] text-white text-sm font-semibold hover:bg-[#5a0f66] transition-colors print:hidden"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-white text-sm font-semibold hover:bg-[#5a0f66] transition-colors print:hidden"
       >
         <Printer size={15} />
         Print / Save as PDF

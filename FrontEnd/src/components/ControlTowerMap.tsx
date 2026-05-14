@@ -734,7 +734,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
 
     return (
-        <div className="bg-white border border-[#E7E1E1] rounded-lg relative overflow-hidden w-full h-full lg:min-h-[544px]">
+        <div className="bg-white border border-line rounded-lg relative overflow-hidden w-full h-full lg:min-h-[544px]">
             <div className="absolute inset-0 bg-[#272626]">
                 <div className="w-full h-full relative">
                     {/* Undo branch filter overlay (top-left) */}

@@ -45,7 +45,7 @@ const getInitials = (name: string): string => {
 };
 
 const avatarColors = [
-  'bg-[#6b1176]',
+  'bg-primary',
   'bg-[#0f766e]',
   'bg-[#1d4ed8]',
   'bg-[#b45309]',
@@ -88,7 +88,7 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
             key={chat.id}
             className={`rounded-xl border p-4 transition-colors ${
               !chat.isRead
-                ? 'border-[#6b1176] bg-purple-50'
+                ? 'border-primary bg-purple-50'
                 : 'border-gray-200 bg-white hover:border-purple-200'
             }`}
           >
@@ -102,7 +102,7 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-[#333]">{chat.sender}</span>
                     {!chat.isRead && (
-                      <span className="w-2 h-2 rounded-full bg-[#6b1176] shrink-0" title="Unread" />
+                      <span className="w-2 h-2 rounded-full bg-primary shrink-0" title="Unread" />
                     )}
                   </div>
                   <span className="text-xs text-gray-500 font-mono">{chat.patientId}</span>

@@ -1030,7 +1030,7 @@ export default function IVFQualityTrackingChart({
       type: 'line',
       label: showCandlestick ? `${datasetLabel} Avg` : datasetLabel,
       data: values,
-      borderColor: '#6B1176',
+      borderColor: '#6b1176',
       backgroundColor: (context: any) => {
         const chart = context.chart;
         const { ctx, chartArea } = chart;
@@ -1045,8 +1045,8 @@ export default function IVFQualityTrackingChart({
       borderWidth: 2,
       pointRadius: showCandlestick ? 0 : 2.5,
       pointHoverRadius: 4,
-      pointBackgroundColor: '#6B1176',
-      pointBorderColor: '#6B1176',
+      pointBackgroundColor: '#6b1176',
+      pointBorderColor: '#6b1176',
       pointBorderWidth: 0,
       tension: 0.3,
       fill: !showCandlestick,
@@ -1296,7 +1296,7 @@ export default function IVFQualityTrackingChart({
   const hasData = displayReadings.length > 0;
 
   return (
-    <div id="onboarding-ivf-quality-chart" className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-4">
+    <div id="onboarding-ivf-quality-chart" className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-line rounded-lg p-4">
       <div className="flex items-center justify-between mb-1 shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
@@ -1364,7 +1364,7 @@ export default function IVFQualityTrackingChart({
           isRangeLoading ? (
             <div className="flex items-center justify-center h-full">
               <svg
-                className="animate-spin h-8 w-8 text-[#6B1176]"
+                className="animate-spin h-8 w-8 text-primary"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -1416,7 +1416,7 @@ export default function IVFQualityTrackingChart({
                 aria-hidden="true"
               >
                 <svg
-                  className="animate-spin h-8 w-8 text-[#6B1176]"
+                  className="animate-spin h-8 w-8 text-primary"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -1458,7 +1458,7 @@ export default function IVFQualityTrackingChart({
               }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 timeRange === range.id
-                  ? 'bg-[#6B1176] text-white'
+                  ? 'bg-primary text-white'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
@@ -1474,7 +1474,7 @@ export default function IVFQualityTrackingChart({
             onClick={() => setShowCustomPicker((v) => !v)}
             className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
               timeRange === 'CUSTOM'
-                ? 'bg-[#6B1176] text-white border-[#6B1176]'
+                ? 'bg-primary text-white border-primary'
                 : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
             }`}
           >
@@ -1489,7 +1489,7 @@ export default function IVFQualityTrackingChart({
                   value={customFrom}
                   max={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setCustomFrom(e.target.value)}
-                  className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:border-[#6B1176]"
+                  className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:border-primary"
                 />
                 <button
                   type="button"
@@ -1500,7 +1500,7 @@ export default function IVFQualityTrackingChart({
                     setIsRangeLoading(true);
                     setShowCustomPicker(false);
                   }}
-                  className="w-full py-1.5 text-xs font-medium rounded bg-[#6B1176] text-white disabled:opacity-40 hover:bg-[#591063] transition-colors"
+                  className="w-full py-1.5 text-xs font-medium rounded bg-primary text-white disabled:opacity-40 hover:bg-[#591063] transition-colors"
                 >
                   Apply
                 </button>

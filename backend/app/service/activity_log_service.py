@@ -45,8 +45,8 @@ class ActivityLogService:
         metadata: Optional[Dict[str, Any]] = None,
         audit_log_disabled: bool = False,
     ) -> Optional[ActivityLog]:
-        # if settings.is_development or not settings.AUDIT_LOG_ENABLED or audit_log_disabled:
-        #     return None
+        if settings.is_development or not settings.AUDIT_LOG_ENABLED or audit_log_disabled:
+            return None
 
         hospital_id = actor.hospital_id
         if hospital_id is None and target is not None:
