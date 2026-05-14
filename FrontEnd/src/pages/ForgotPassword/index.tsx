@@ -81,11 +81,11 @@ const ForgotPassword: React.FC = () => {
                                 value={email}
                                 onChange={handleEmailChange}
                                 placeholder="Enter your email"
-                                className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${emailError ? "border-red-500" : "border-gray-300"}`}
+                                className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-light ${emailError ? "border-red-500" : "border-gray-300"}`}
                             />
                             <label
                                 className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
-                                ${emailError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
+                                ${emailError ? "text-red-500 opacity-100" : "text-primary-light opacity-0 peer-focus:opacity-100"}`}
                             >
                                 Email
                             </label>
@@ -96,7 +96,7 @@ const ForgotPassword: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 mb-1 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50 cursor-pointer"
+                            className="w-full py-3 mb-1 bg-primary text-white rounded-md font-medium hover:bg-primary-light transition disabled:opacity-50 cursor-pointer"
                         >
                             {loading ? "Sending..." : "Send"}
                         </button>
@@ -120,13 +120,13 @@ const ForgotPassword: React.FC = () => {
                     <div className="text-center text-sm text-gray-500 mt-2 space-y-2">
                         <p>
                             Remember your password?{" "}
-                            <Link to="/login" className="text-[#8b2a96] font-semibold underline">
+                            <Link to="/login" className="text-primary-light font-semibold underline">
                                 Sign in
                             </Link>
                         </p>
                         <p>
                             Don't have an account?{" "}
-                            <Link to="/signup" className="text-[#8b2a96] font-semibold underline">
+                            <Link to="/signup" className="text-primary-light font-semibold underline">
                                 Create one
                             </Link>
                         </p>

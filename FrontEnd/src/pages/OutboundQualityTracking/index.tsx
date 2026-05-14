@@ -136,7 +136,7 @@ export default function OutboundQualityTrackingPage() {
     }, [wsUnreadMessages, canisterId]);
 
     return (
-        <div className="bg-[#FDFAFF] flex w-full h-full">
+        <div className="bg-surface flex w-full h-full">
             <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
 
                 {/* Main Content */}
@@ -175,11 +175,11 @@ export default function OutboundQualityTrackingPage() {
                                     </div>
                                 )}
                                 {/* Tooltip */}
-                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                                     <div className="font-semibold text-black text-xs whitespace-nowrap">
                                         Critical Alerts
                                     </div>
-                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
                                 </div>
                             </div>
                             {/* Stakeholder Chats */}
@@ -196,11 +196,11 @@ export default function OutboundQualityTrackingPage() {
                                     </div>
                                 )}
                                 {/* Tooltip */}
-                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                                     <div className="font-semibold text-black text-xs whitespace-nowrap">
                                         Stakeholder Chats
                                     </div>
-                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
                                 </div>
                             </div>
                             {/* My Tasks */}
@@ -217,11 +217,11 @@ export default function OutboundQualityTrackingPage() {
                                     </div>
                                 )}
                                 {/* Tooltip */}
-                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                                     <div className="font-semibold text-black text-xs whitespace-nowrap">
                                         My Tasks
                                     </div>
-                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
                                 </div>
                             </div>
                         </div>

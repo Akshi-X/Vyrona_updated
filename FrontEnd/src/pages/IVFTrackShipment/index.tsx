@@ -384,7 +384,7 @@ export default function IVFTrackShipmentPage() {
                 >
                     {exporting ? (
                         <svg
-                            className="animate-spin h-[25px] w-[25px] text-[#6B1176]"
+                            className="animate-spin h-[25px] w-[25px] text-primary"
                             xmlns="http://www.w3.org/2000/svg"
                             fill="none"
                             viewBox="0 0 24 24"
@@ -393,12 +393,12 @@ export default function IVFTrackShipmentPage() {
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     ) : (
-                        <Download size={21} strokeWidth={2.25} className="text-[#6B1176]" aria-label="Export Excel" />
+                        <Download size={21} strokeWidth={2.25} className="text-primary" aria-label="Export Excel" />
                     )}
                 </button>
-                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                     <div className="font-semibold text-black text-xs whitespace-nowrap">Export Combined Report</div>
-                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
                 </div>
             </div>
             {/* Critical Alerts */}
@@ -451,8 +451,8 @@ export default function IVFTrackShipmentPage() {
                     </div>
                     <h2 className="text-lg font-semibold text-gray-800 mb-2">Access Denied</h2>
                     <p className="text-sm text-gray-500 mb-6">You don't have access to this page.</p>
-                    <div className="w-12 h-12 rounded-full border-4 border-[#6b1176] flex items-center justify-center mx-auto">
-                        <span className="text-xl font-bold text-[#6b1176]">{countdown}</span>
+                    <div className="w-12 h-12 rounded-full border-4 border-primary flex items-center justify-center mx-auto">
+                        <span className="text-xl font-bold text-primary">{countdown}</span>
                     </div>
                     <p className="text-xs text-gray-400 mt-3">Redirecting in {countdown} second{countdown !== 1 ? "s" : ""}…</p>
                 </div>
@@ -480,13 +480,13 @@ export default function IVFTrackShipmentPage() {
                                     <div className="text-sm font-semibold text-black">
                                         {headerTankCode} - {headerBranchName}
                                     </div>
-                                    <div className="inline-flex rounded-lg border border-[#E7E1E1] bg-white p-1">
+                                    <div className="inline-flex rounded-lg border border-line bg-white p-1">
                                         <button
                                             type="button"
                                             onClick={() => setUseNewCryocan(false)}
                                             className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                                                 !useNewCryocan
-                                                    ? 'bg-[#6B1176] text-white'
+                                                    ? 'bg-primary text-white'
                                                     : 'text-gray-600 hover:bg-gray-100'
                                             }`}
                                             aria-pressed={!useNewCryocan}
@@ -498,7 +498,7 @@ export default function IVFTrackShipmentPage() {
                                             onClick={() => setUseNewCryocan(true)}
                                             className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                                                 useNewCryocan
-                                                    ? 'bg-[#6B1176] text-white'
+                                                    ? 'bg-primary text-white'
                                                     : 'text-gray-600 hover:bg-gray-100'
                                             }`}
                                             aria-pressed={useNewCryocan}

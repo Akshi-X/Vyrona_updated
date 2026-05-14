@@ -3282,7 +3282,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   flexShrink: 0,
                 }}
               >
-                <span style={{ fontWeight: 600, fontSize: 14, color: "#6B1176" }}>
+                <span style={{ fontWeight: 600, fontSize: 14, color: "var(--color-primary)" }}>
                   Live Conditions
                 </span>
                 <svg
@@ -3290,7 +3290,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   height="16"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#6B1176"
+                  stroke="var(--color-primary)"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -3345,7 +3345,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                                 height: 20,
                                 borderRadius: 6,
                                 background: isActive ? "#FDF4FF" : "#f0eaf4",
-                                color: isActive ? "#6B1176" : "#9ca3af",
+                                color: isActive ? "var(--color-primary)" : "#9ca3af",
                                 flexShrink: 0,
                               }}
                             >
@@ -3379,7 +3379,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                           style={{
                             fontSize: 18,
                             fontWeight: 500,
-                            color: tile.isMissing ? "#9ca3af" : "#6B1176",
+                            color: tile.isMissing ? "#9ca3af" : "var(--color-primary)",
                           }}
                         >
                           {tile.value}
@@ -3393,7 +3393,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                           >
                             <polyline
                               fill="none"
-                              stroke={isActive ? "#6B1176" : "#b39cc2"}
+                              stroke={isActive ? "var(--color-primary)" : "#b39cc2"}
                               strokeWidth="1.5"
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -3903,9 +3903,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   }}
                 >
                   {/* Purple accent bar at top */}
-                  <div style={{ position: "absolute", top: 0, left: 12, right: 12, height: 3, borderRadius: "0 0 3px 3px", background: "linear-gradient(90deg, #6B1176, #9b4aaa)" }} />
+                  <div style={{ position: "absolute", top: 0, left: 12, right: 12, height: 3, borderRadius: "0 0 3px 3px", background: "linear-gradient(90deg, var(--color-primary), #9b4aaa)" }} />
                   {canvasTooltip.caneCode && (
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#6B1176", letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 5, marginTop: 2 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "var(--color-primary)", letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 5, marginTop: 2 }}>
                       Cane {canvasTooltip.caneCode}
                     </div>
                   )}
@@ -3921,7 +3921,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   )}
                   {canvasTooltip.item.grade && (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                      <span style={{ fontSize: 10, background: "#FDF4FF", color: "#6B1176", fontWeight: 600, borderRadius: 4, padding: "1px 6px" }}>
+                      <span style={{ fontSize: 10, background: "#FDF4FF", color: "var(--color-primary)", fontWeight: 600, borderRadius: 4, padding: "1px 6px" }}>
                         {canvasTooltip.item.grade}
                       </span>
                       {canvasTooltip.item.patient && (
@@ -3990,7 +3990,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                     boxShadow: "0 4px 18px #40115322",
                   }}
                 >
-                  <div style={{ fontSize: 9, fontWeight: 600, color: "#6B1176", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 4 }}>
+                  <div style={{ fontSize: 9, fontWeight: 600, color: "var(--color-primary)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 4 }}>
                     Selected Canister
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#1a0a1f" }}>
@@ -4012,11 +4012,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                     boxShadow: "0 4px 18px #40115322",
                   }}
                 >
-                  <div style={{ fontSize: 9, fontWeight: 600, color: "#6B1176", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8 }}>
+                  <div style={{ fontSize: 9, fontWeight: 600, color: "var(--color-primary)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8 }}>
                     Cane Slots
                   </div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 6 }}>
-                    <span style={{ fontSize: 22, fontWeight: 700, color: "#6B1176", lineHeight: 1 }}>{loadedCaneCount}</span>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: "var(--color-primary)", lineHeight: 1 }}>{loadedCaneCount}</span>
                     <span style={{ fontSize: 12, color: "#9ca3af" }}>/ 17 slots</span>
                   </div>
                   {/* Slot grid */}
@@ -4029,7 +4029,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                           height: 18,
                           borderRadius: 4,
                           background: i < loadedCaneCount
-                            ? "linear-gradient(135deg, #6B1176, #9b4aaa)"
+                            ? "linear-gradient(135deg, var(--color-primary), #9b4aaa)"
                             : "#f0e8f5",
                           border: `1px solid ${i < loadedCaneCount ? "#6B117640" : "#ddd"}`,
                         }}
@@ -4061,14 +4061,14 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 }}
               >
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                  <span style={{ fontSize: 9, fontWeight: 600, color: "#6B1176", letterSpacing: "0.1em" }}>LN2</span>
+                  <span style={{ fontSize: 9, fontWeight: 600, color: "var(--color-primary)", letterSpacing: "0.1em" }}>LN2</span>
                   <div style={{ position: "relative", width: 14, height: 140, background: "#e8ddf2", borderRadius: 8, overflow: "hidden", border: "1px solid #c8a8dc" }}>
                     <div style={{ position: "absolute", bottom: 0, width: "100%", height: `${displayPct}%`, background: "linear-gradient(to top, #1258b8, #2888f0)", transition: "height 1s ease", borderRadius: 8 }} />
                     {[25, 50, 75].map((pct) => (
                       <div key={pct} style={{ position: "absolute", left: 0, right: 0, bottom: `${pct}%`, height: 1, background: "rgba(107,17,118,0.25)" }} />
                     ))}
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#6B1176" }}>{Math.round(displayPct)}%</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-primary)" }}>{Math.round(displayPct)}%</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: 140, paddingTop: 2, paddingBottom: 2 }}>
                   {[100, 75, 50, 25, 0].map((tick) => (
@@ -4119,7 +4119,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   minWidth: 120,
                 }}
               >
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#6B1176", marginBottom: 3 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-primary)", marginBottom: 3 }}>
                   Cane {caneHoverCard.caneCode || `#${caneHoverCard.caneIdx + 1}`}
                 </div>
                 <div style={{ fontSize: 10, color: "#6b7280" }}>
@@ -4192,7 +4192,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                         <div style={{ fontSize: 9, fontWeight: 600, color: "#9ca3af", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 3 }}>
                           {selectedCanisterData?.label ?? "Canister"}
                         </div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#6B1176" }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>
                           Cryolock Details
                         </div>
                       </div>
@@ -4200,7 +4200,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                         style={{
                           fontSize: 11,
                           fontWeight: 700,
-                          color: "#6B1176",
+                          color: "var(--color-primary)",
                           background: "#f0e6f8",
                           borderRadius: 8,
                           padding: "3px 9px",
@@ -4348,7 +4348,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                               {item.grade && (
                                 <>
                                   <span style={{ color: "#9ca3af", fontWeight: 500 }}>Grade</span>
-                                  <span style={{ color: "#6B1176", fontWeight: 600 }}>{item.grade}</span>
+                                  <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>{item.grade}</span>
                                 </>
                               )}
                               {item.caneCode && (
@@ -4438,7 +4438,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 style={{
                   fontWeight: 600,
                   fontSize: 14,
-                  color: "#6B1176",
+                  color: "var(--color-primary)",
                   marginBottom: 12,
                   flexShrink: 0,
                 }}
@@ -4598,7 +4598,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                     style={{
                       fontWeight: 600,
                       fontSize: 14,
-                      color: "#6B1176",
+                      color: "var(--color-primary)",
                       marginBottom: 4,
                     }}
                   >
@@ -4629,7 +4629,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                       padding: "3px 9px",
                       borderRadius: 999,
                       background: "#FDF4FF",
-                      color: "#6B1176",
+                      color: "var(--color-primary)",
                     }}
                   >
                     samples per canister
@@ -4684,7 +4684,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                           height="20"
                           viewBox="0 0 14 20"
                           fill="none"
-                          stroke={isSelected ? "#6B1176" : "#6b7280"}
+                          stroke={isSelected ? "var(--color-primary)" : "#6b7280"}
                           strokeWidth="1.6"
                         >
                           <rect
@@ -4699,7 +4699,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                             cx="7"
                             cy="1"
                             r="0.8"
-                            fill={isSelected ? "#6B1176" : "#6b7280"}
+                            fill={isSelected ? "var(--color-primary)" : "#6b7280"}
                           />
                         </svg>
                       </div>
@@ -4766,7 +4766,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                       style={{
                         fontWeight: 600,
                         fontSize: 14,
-                        color: "#6B1176",
+                        color: "var(--color-primary)",
                         marginBottom: 4,
                       }}
                     >

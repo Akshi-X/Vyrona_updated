@@ -230,7 +230,7 @@ export default function QualityParametersTable() {
               aria-pressed={showAnomalies}
               onClick={() => setShowAnomalies((v) => !v)}
               className={`h-5 w-9 rounded-full transition-colors ${
-                showAnomalies ? 'bg-[#6B1176]' : 'bg-gray-300'
+                showAnomalies ? 'bg-primary' : 'bg-gray-300'
               } relative`}
             >
               <span
@@ -265,7 +265,7 @@ export default function QualityParametersTable() {
               aria-label="Download"
               onClick={handleExport}
               disabled={exporting || !patientId}
-              className="group flex h-8 w-8 items-center justify-center rounded-lg bg-[#6B1176] text-white shadow hover:bg-[#FDF4FF] hover:text-[#6B1176] hover:border-1 hover:border-[#6B1176] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white shadow hover:bg-surface hover:text-primary hover:border-1 hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {exporting ? (
                 <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -294,7 +294,7 @@ export default function QualityParametersTable() {
             <col className="w-1/6" />
             <col className="w-2/6" />
           </colgroup>
-          <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px] sticky top-0">
+          <thead className="bg-surface text-primary text-[12px] font-medium h-[56px] sticky top-0">
             <tr>
               <th className="px-3 py-2 text-left rounded-tl-[10px]">Parameter</th>
               <th className="px-3 py-2 text-left">Current Value</th>

@@ -37,7 +37,7 @@ function IncubatorIllustrationPanel({ metrics }: { metrics: IllustrationMetrics 
   return (
     <div className="flex items-center justify-center w-full">
       <div className="flex-1 max-w-[760px] w-full">
-        <div className="bg-white border border-[#E7E1E1] rounded-xl p-4">
+        <div className="bg-white border border-line rounded-xl p-4">
           <svg
         width="100%"
         viewBox="0 0 680 520"
@@ -266,21 +266,21 @@ function IncubatorIllustrationPanel({ metrics }: { metrics: IllustrationMetrics 
         <line x1="588" y1="370" x2="588" y2="410" stroke="#d8d5cf" strokeWidth="1" strokeLinecap="round" />
       </svg>
           <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-            <div className="rounded-lg border border-[#E7E1E1] bg-[#FAF7FC] px-3 py-2">
+            <div className="rounded-lg border border-line bg-surface px-3 py-2">
               <div className="text-[11px] text-gray-500">Temp</div>
-              <div className="text-sm font-semibold text-[#6B1176]">{metrics.temp}</div>
+              <div className="text-sm font-semibold text-primary">{metrics.temp}</div>
             </div>
-            <div className="rounded-lg border border-[#E7E1E1] bg-[#FAF7FC] px-3 py-2">
+            <div className="rounded-lg border border-line bg-surface px-3 py-2">
               <div className="text-[11px] text-gray-500">CO₂</div>
-              <div className="text-sm font-semibold text-[#6B1176]">{metrics.co2}</div>
+              <div className="text-sm font-semibold text-primary">{metrics.co2}</div>
             </div>
-            <div className="rounded-lg border border-[#E7E1E1] bg-[#FAF7FC] px-3 py-2">
+            <div className="rounded-lg border border-line bg-surface px-3 py-2">
               <div className="text-[11px] text-gray-500">pH</div>
-              <div className="text-sm font-semibold text-[#6B1176]">{metrics.ph}</div>
+              <div className="text-sm font-semibold text-primary">{metrics.ph}</div>
             </div>
-            <div className="rounded-lg border border-[#E7E1E1] bg-[#FAF7FC] px-3 py-2">
+            <div className="rounded-lg border border-line bg-surface px-3 py-2">
               <div className="text-[11px] text-gray-500">Humidity</div>
-              <div className="text-sm font-semibold text-[#6B1176]">{metrics.humidity}</div>
+              <div className="text-sm font-semibold text-primary">{metrics.humidity}</div>
             </div>
           </div>
         </div>
@@ -411,9 +411,9 @@ export default function IncubatorDetailPage() {
             <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
           </div>
         )}
-        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
           <div className="font-semibold text-black text-xs whitespace-nowrap">Critical Alerts</div>
-          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]" />
+          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border" />
         </div>
       </div>
       {/* Stakeholder Chats */}
@@ -429,9 +429,9 @@ export default function IncubatorDetailPage() {
             <span className="font-semibold text-white text-[10px]">{chatUnreadCount}</span>
           </div>
         )}
-        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
           <div className="font-semibold text-black text-xs whitespace-nowrap">Stakeholder Chats</div>
-          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]" />
+          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border" />
         </div>
       </div>
       {/* My Tasks */}
@@ -447,9 +447,9 @@ export default function IncubatorDetailPage() {
             <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
           </div>
         )}
-        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
           <div className="font-semibold text-black text-xs whitespace-nowrap">My Tasks</div>
-          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]" />
+          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border" />
         </div>
       </div>
     </div>
@@ -495,8 +495,8 @@ export default function IncubatorDetailPage() {
                 onClick={() => setChamberId(ch)}
                 className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
                   ch === chamberId
-                    ? 'bg-[#6B1176] text-white border-[#6B1176]'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-[#6B1176] hover:text-[#6B1176]'
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
                 }`}
               >
                 {ch}
@@ -523,7 +523,7 @@ export default function IncubatorDetailPage() {
           </div>
           <div className="min-h-80 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
             <h2 className="font-semibold text-black text-[16px] mb-3 w-full">Current Quality Status</h2>
-            <div className="w-full rounded-lg bg-linear-to-br from-[#FDFAFF] to-[#f3e8f7] p-3">
+            <div className="w-full rounded-lg bg-linear-to-br from-surface to-[#f3e8f7] p-3">
               <IncubatorIllustrationPanel metrics={illustrationMetrics} />
             </div>
           </div>

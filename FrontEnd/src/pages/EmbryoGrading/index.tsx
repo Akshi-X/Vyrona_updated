@@ -332,7 +332,7 @@ export default function EmbryoGradingPage() {
           <button
             type="button"
             onClick={() => setIsAddEmbryoFormOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
           >
             + Add Cycle
           </button>
@@ -342,7 +342,7 @@ export default function EmbryoGradingPage() {
       <div className="flex-1 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-h-0">
 
         {/* ── Hero Banner ────────────────────────────────────────────── */}
-        <div className="rounded-xl border border-[#E8E1F0] bg-gradient-to-br from-[#F7ECFF] to-white overflow-hidden shrink-0">
+        <div className="rounded-xl border border-[#E8E1F0] bg-gradient-to-br from-primary-bg to-white overflow-hidden shrink-0">
           <div className="px-6 py-5">
             <div className="flex items-center justify-between mb-5">
               <div>
@@ -368,7 +368,7 @@ export default function EmbryoGradingPage() {
 
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: 'Total Cycles', value: cycleStats.total,     sub: 'all time',    Icon: Layers,      valCls: 'text-[#6b1176]',    bg: 'bg-white border-[#E8E1F0]'    },
+                { label: 'Total Cycles', value: cycleStats.total,     sub: 'all time',    Icon: Layers,      valCls: 'text-primary',    bg: 'bg-white border-[#E8E1F0]'    },
                 { label: 'Active',       value: cycleStats.active,    sub: 'in progress', Icon: Activity,    valCls: 'text-emerald-700',  bg: 'bg-white border-[#E6F4EC]'    },
                 { label: 'Completed',    value: cycleStats.completed, sub: 'finished',    Icon: CheckCircle, valCls: 'text-sky-700',      bg: 'bg-white border-[#DDEFFA]'    },
               ].map(s => (
@@ -379,8 +379,8 @@ export default function EmbryoGradingPage() {
                       <p className={`text-4xl font-extrabold leading-none mt-2 ${s.valCls}`}>{s.value}</p>
                       <p className="text-[10px] text-gray-400 mt-1.5">{s.sub}</p>
                     </div>
-                    <div className="w-8 h-8 rounded-lg bg-[#F7ECFF] flex items-center justify-center shrink-0">
-                      <s.Icon size={15} className="text-[#6b1176]" />
+                    <div className="w-8 h-8 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
+                      <s.Icon size={15} className="text-primary" />
                     </div>
                   </div>
                 </div>
@@ -394,18 +394,13 @@ export default function EmbryoGradingPage() {
 
           {/* Left — Active Cycles */}
           <div className="flex flex-col gap-3">
-            <div className="hidden md:block bg-white border border-[#E7E1E1] rounded-xl px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892] mb-2">Filter</p>
-              <FilterSelect label="Status" value={selectedStatus} onChange={setSelectedStatus} options={statusOptions} allLabel="All Statuses" />
-            </div>
-
-            <div className="bg-white border border-[#E7E1E1] rounded-xl overflow-hidden flex flex-col">
-              <div className="px-4 py-3 flex items-center justify-between border-b border-[#F0EBF4] bg-gradient-to-r from-[#FDFAFF] to-white shrink-0">
+            <div className="bg-white border border-line rounded-xl overflow-hidden flex flex-col">
+              <div className="px-4 py-3 flex items-center justify-between border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Patients</p>
                   <p className="text-sm font-bold text-gray-900">Active Cycles</p>
                 </div>
-                <span className="text-xs font-bold bg-[#F7ECFF] text-[#6b1176] px-2.5 py-1 rounded-full border border-[#e9d5ff]">{filteredCycles.length}</span>
+                <span className="text-xs font-bold bg-primary-bg text-primary px-2.5 py-1 rounded-full border border-primary-ring">{filteredCycles.length}</span>
               </div>
 
               <div className="overflow-y-auto divide-y divide-[#F8F4FD]" style={{ maxHeight: '560px', scrollbarWidth: 'thin' }}>
@@ -415,8 +410,8 @@ export default function EmbryoGradingPage() {
                   <div className="px-4 py-4 text-xs text-red-500">{error}</div>
                 ) : filteredCycles.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-2 text-center px-4">
-                    <div className="w-10 h-10 rounded-full bg-[#F7ECFF] flex items-center justify-center">
-                      <Layers size={16} className="text-[#6b1176]" />
+                    <div className="w-10 h-10 rounded-full bg-primary-bg flex items-center justify-center">
+                      <Layers size={16} className="text-primary" />
                     </div>
                     <p className="text-xs font-medium text-gray-500">No cycles found</p>
                   </div>
@@ -429,7 +424,7 @@ export default function EmbryoGradingPage() {
                         key={cycle.cycle_id}
                         type="button"
                         onClick={() => navigate(`/embryo-grading/${cycle.his_id}`)}
-                        className="w-full flex items-center gap-0 hover:bg-[#FDFAFF] transition-colors text-left group"
+                        className="w-full flex items-center gap-0 hover:bg-surface transition-colors text-left group"
                       >
                         {/* urgency/active accent bar */}
                         <div className={`w-0.5 self-stretch shrink-0 ${
@@ -450,7 +445,7 @@ export default function EmbryoGradingPage() {
                           </div>
 
                           <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-[11px] text-[#6b1176] font-semibold">{cycle.his_id}</p>
+                            <p className="text-[11px] text-primary font-semibold">{cycle.his_id}</p>
                             {dayTask && (
                               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                                 dayTask.urgency === 'urgent' ? 'bg-red-50 text-red-600' :
@@ -464,7 +459,7 @@ export default function EmbryoGradingPage() {
                             <div className="flex items-center gap-1 mt-2">
                               <div className="flex items-center gap-0.5 flex-1">
                                 {[1, 2, 3, 4, 5, 6].map(d => (
-                                  <div key={d} className={`h-1 flex-1 rounded-full ${day >= d ? 'bg-[#6b1176]' : 'bg-gray-100'}`} />
+                                  <div key={d} className={`h-1 flex-1 rounded-full ${day >= d ? 'bg-primary' : 'bg-gray-100'}`} />
                                 ))}
                               </div>
                               <span className="text-[10px] text-gray-400 ml-2 shrink-0 font-medium">Day {day}</span>
@@ -472,7 +467,7 @@ export default function EmbryoGradingPage() {
                           )}
                         </div>
 
-                        <svg className="text-gray-200 group-hover:text-[#6b1176] transition-colors mr-3 shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+                        <svg className="text-gray-200 group-hover:text-primary transition-colors mr-3 shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
                       </button>
                     );
                   })
@@ -488,8 +483,8 @@ export default function EmbryoGradingPage() {
             <div className="grid grid-cols-2 gap-4">
 
               {/* Today's Queue */}
-              <div className="rounded-xl border border-[#E7E1E1] bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b border-[#F0EBF4] bg-gradient-to-r from-[#FDFAFF] to-white flex items-center justify-between">
+              <div className="rounded-xl border border-line bg-white overflow-hidden">
+                <div className="px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white flex items-center justify-between">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Today's Queue</p>
                     <p className="text-sm font-bold text-gray-900">Needs Attention</p>
@@ -515,7 +510,7 @@ export default function EmbryoGradingPage() {
                     todayQueue.map(item => (
                       <div
                         key={item.cycle.cycle_id}
-                        className="flex cursor-pointer hover:bg-[#FDFAFF] transition-colors group"
+                        className="flex cursor-pointer hover:bg-surface transition-colors group"
                         onClick={() => navigate(`/embryo-grading/${item.cycle.his_id}`)}
                       >
                         <div className={`w-1 shrink-0 rounded-l ${
@@ -526,7 +521,7 @@ export default function EmbryoGradingPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-gray-900 truncate">{item.cycle.patient_name || item.cycle.his_id}</p>
-                              <p className="text-[10px] text-[#6b1176] font-medium mt-0.5">{item.cycle.his_id} · {item.task}</p>
+                              <p className="text-[10px] text-primary font-medium mt-0.5">{item.cycle.his_id} · {item.task}</p>
                             </div>
                             <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                               item.urgency === 'urgent' ? 'bg-red-50 text-red-600 border-red-200' :
@@ -550,8 +545,8 @@ export default function EmbryoGradingPage() {
               </div>
 
               {/* Grade Distribution */}
-              <div className="rounded-xl border border-[#E7E1E1] bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b border-[#F0EBF4] bg-gradient-to-r from-[#FDFAFF] to-white">
+              <div className="rounded-xl border border-line bg-white overflow-hidden">
+                <div className="px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Grade Distribution</p>
                   <p className="text-sm font-bold text-gray-900">Current Cycle Grades</p>
                 </div>
@@ -580,7 +575,7 @@ export default function EmbryoGradingPage() {
                         <span className="text-xs font-bold text-gray-600 w-4 text-right shrink-0">{count}</span>
                       </div>
                     ))}
-                    <div className="flex items-center gap-4 pt-2.5 border-t border-[#F0EBF4]">
+                    <div className="flex items-center gap-4 pt-2.5 border-t border-line-light">
                       {([
                         { label: 'High Grade',  cls: 'bg-emerald-500' },
                         { label: 'Mid Grade',   cls: 'bg-amber-400'   },
@@ -598,18 +593,18 @@ export default function EmbryoGradingPage() {
             </div>
 
             {/* Past Cycles table */}
-            <div className="rounded-xl border border-[#E7E1E1] bg-white overflow-hidden">
-              <div className="px-5 py-3.5 flex items-center justify-between border-b border-[#F0EBF4] bg-gradient-to-r from-[#FDFAFF] to-white">
+            <div className="rounded-xl border border-line bg-white overflow-hidden">
+              <div className="px-5 py-3.5 flex items-center justify-between border-b border-line-light bg-gradient-to-r from-surface to-white">
                 <div>
                   <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">All Cycles</p>
                   <p className="text-sm font-bold text-black mt-0.5">Patient Cycle Register</p>
                 </div>
-                <span className="text-[10px] font-semibold text-[#6b1176] bg-[#F7ECFF] px-2.5 py-1 rounded-full border border-[#e9d5ff]">{pastCycles.length} records</span>
+                <span className="text-[10px] font-semibold text-primary bg-primary-bg px-2.5 py-1 rounded-full border border-primary-ring">{pastCycles.length} records</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-[#F0EBF4] bg-[#FDFAFF]">
+                    <tr className="border-b border-line-light bg-surface">
                       {['HIS No.', 'Patient', 'Method', 'Type', 'Status', 'OPU Date', ''].map((h, i) => (
                         <th key={i} className="text-left text-[10px] font-semibold text-[#8A7892] uppercase tracking-wide px-4 py-2.5">{h}</th>
                       ))}
@@ -620,8 +615,8 @@ export default function EmbryoGradingPage() {
                       <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-gray-400">No past cycles yet.</td></tr>
                     ) : (
                       pastCycles.map(c => (
-                        <tr key={c.cycle_id} className="hover:bg-[#FDFAFF] transition-colors cursor-pointer group" onClick={() => navigate(`/embryo-grading/${c.his_id}`)}>
-                          <td className="px-4 py-3 text-xs font-bold text-[#6b1176]">{c.his_id}</td>
+                        <tr key={c.cycle_id} className="hover:bg-surface transition-colors cursor-pointer group" onClick={() => navigate(`/embryo-grading/${c.his_id}`)}>
+                          <td className="px-4 py-3 text-xs font-bold text-primary">{c.his_id}</td>
                           <td className="px-4 py-3 text-xs font-medium text-gray-800 max-w-[140px] truncate">{c.patient_name || '—'}</td>
                           <td className="px-4 py-3 text-xs text-gray-500">{c.injection_method || '—'}</td>
                           <td className="px-4 py-3 text-xs text-gray-500">{c.cycle_type || '—'}</td>
@@ -635,7 +630,7 @@ export default function EmbryoGradingPage() {
                           <td className="px-4 py-3 text-xs text-gray-500">
                             {c.opu_date ? new Date(c.opu_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                           </td>
-                          <td className="px-4 py-3 text-[10px] text-gray-300 group-hover:text-[#6b1176] font-semibold transition-colors">View →</td>
+                          <td className="px-4 py-3 text-[10px] text-gray-300 group-hover:text-primary font-semibold transition-colors">View →</td>
                         </tr>
                       ))
                     )}
@@ -658,8 +653,8 @@ export default function EmbryoGradingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {(() => {
               const lbl = "text-xs text-gray-500 mb-1 ml-0.5";
-              const inp = "h-10 rounded-md border border-[#E7E1E1] px-3 text-sm w-full";
-              const sel = "h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white text-gray-700 w-full";
+              const inp = "h-10 rounded-md border border-line px-3 text-sm w-full";
+              const sel = "h-10 rounded-md border border-line px-3 text-sm bg-white text-gray-700 w-full";
               return (<>
                 <div className="flex flex-col">
                   <label className={lbl}>HIS Number <span className="text-red-500">*</span></label>
@@ -773,11 +768,11 @@ export default function EmbryoGradingPage() {
           </div>
 
           {selectedIncubator && selectedIncubator.chamber_r && selectedIncubator.chamber_c && (
-            <div className="rounded-lg border border-[#E7E1E1] p-3">
+            <div className="rounded-lg border border-line p-3">
               <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
                 Select Chamber Position
                 {newEmbryoForm.chamberPosition && (
-                  <span className="ml-2 text-[#6b1176]">— Slot {newEmbryoForm.chamberPosition} selected</span>
+                  <span className="ml-2 text-primary">— Slot {newEmbryoForm.chamberPosition} selected</span>
                 )}
               </p>
               <div
@@ -795,8 +790,8 @@ export default function EmbryoGradingPage() {
                         onClick={() => handleNewEmbryoFieldChange('chamberPosition', active ? '' : pos)}
                         className={`h-9 rounded-lg text-xs font-semibold transition-all duration-150 ${
                           active
-                            ? 'bg-[#6b1176] text-white scale-105'
-                            : 'bg-white text-gray-500 border border-gray-200 hover:border-[#6b1176] hover:text-[#6b1176] hover:scale-105'
+                            ? 'bg-primary text-white scale-105'
+                            : 'bg-white text-gray-500 border border-gray-200 hover:border-primary hover:text-primary hover:scale-105'
                         }`}
                       >
                         {pos}
@@ -808,10 +803,10 @@ export default function EmbryoGradingPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-md border border-[#E7E1E1]">
+          <div className="overflow-x-auto rounded-md border border-line">
             <table className="w-full text-xs text-center">
               <thead>
-                <tr className="bg-gray-50 border-b border-[#E7E1E1]">
+                <tr className="bg-gray-50 border-b border-line">
                   {(['M2', 'M1', 'GV', 'OTHERS', 'INJECTED', 'OOCYTES'] as const).map((col) => (
                     <React.Fragment key={col}>
                       {col === 'OOCYTES' && <th className="text-gray-300 font-light px-0">/</th>}
@@ -840,7 +835,7 @@ export default function EmbryoGradingPage() {
                             min={0}
                             max={isInjected ? undefined : 99}
                             disabled={isInjected}
-                            className={`w-full min-w-[48px] h-8 rounded border px-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-[#8b2a96] ${isInjected ? 'border-[#E7E1E1] bg-gray-50 text-gray-500 cursor-not-allowed font-semibold' : 'border-[#E7E1E1]'}`}
+                            className={`w-full min-w-[48px] h-8 rounded border px-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-primary-light ${isInjected ? 'border-line bg-gray-50 text-gray-500 cursor-not-allowed font-semibold' : 'border-line'}`}
                             value={newEmbryoForm[key] as string}
                             onChange={(e) => handleNewEmbryoFieldChange(key, e.target.value)}
                           />
@@ -857,7 +852,7 @@ export default function EmbryoGradingPage() {
             <button
               type="button"
               onClick={() => { setIsAddEmbryoFormOpen(false); resetNewEmbryoForm(); }}
-              className="px-3 py-2 rounded-md border border-[#E7E1E1] text-gray-700 text-sm font-medium hover:bg-gray-50"
+              className="px-3 py-2 rounded-md border border-line text-gray-700 text-sm font-medium hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -865,7 +860,7 @@ export default function EmbryoGradingPage() {
               type="button"
               onClick={handleAddEmbryo}
               disabled={!newEmbryoForm.hisNumber.trim() || cycleCreating}
-              className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-3 py-2 rounded-md bg-primary text-white text-sm font-medium hover:bg-[#5a0f62] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {cycleCreating && <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
               {cycleCreating ? 'Adding...' : 'Add Cycle'}

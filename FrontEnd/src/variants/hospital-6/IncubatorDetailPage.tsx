@@ -81,7 +81,7 @@ function IncubatorIllustrationPanel({ metrics }: { metrics: IllustrationMetrics 
           <rect x="88" y="486" width="184" height="6" rx="3" fill="#d0cce0" />
 
           <rect x="70" y="44" width="220" height="104" rx="12" fill="url(#inc-panel-grad)" stroke="#4a3870" strokeWidth="1.5" />
-          <rect x="82" y="56" width="196" height="78" rx="8" fill="url(#inc-display-grad)" stroke="#6B1176" strokeWidth="1" />
+          <rect x="82" y="56" width="196" height="78" rx="8" fill="url(#inc-display-grad)" stroke="var(--color-primary)" strokeWidth="1" />
 
           {[0, 1, 2, 3].map((index) => {
             const y = 62 + index * 18;
@@ -261,7 +261,7 @@ export default function IncubatorDetailPage() {
   }, [normalizedTankId]);
 
   return (
-    <div className="bg-[#FDFAFF] flex w-full h-full">
+    <div className="bg-surface flex w-full h-full">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
       <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
@@ -297,7 +297,7 @@ export default function IncubatorDetailPage() {
             </div>
             <div className="min-h-[320px] bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               <h2 className="font-semibold text-black text-[16px] mb-3 w-full">Current Quality Status</h2>
-              <div className="w-full rounded-lg bg-gradient-to-br from-[#FDFAFF] to-[#f3e8f7] p-3">
+              <div className="w-full rounded-lg bg-gradient-to-br from-surface to-[#f3e8f7] p-3">
                 <IncubatorIllustrationPanel metrics={illustrationMetrics} />
               </div>
             </div>

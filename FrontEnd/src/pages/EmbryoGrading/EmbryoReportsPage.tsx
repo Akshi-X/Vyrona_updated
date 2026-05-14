@@ -15,7 +15,7 @@ const gradeChip = (grade: string | null, day: 'd3' | 'd5' | 'd6') => {
   if (!grade || grade === '—') return <span className="text-gray-300 text-xs">—</span>;
   if (day === 'd3') {
     return (
-      <span className="inline-block rounded px-1.5 py-0.5 text-xs font-semibold bg-[#F7ECFF] text-[#6b1176]">
+      <span className="inline-block rounded px-1.5 py-0.5 text-xs font-semibold bg-primary-bg text-primary">
         {grade}
       </span>
     );
@@ -87,8 +87,8 @@ export default function EmbryoReportsPage() {
       <div id="embryo-report-print">
 
         {/* Header */}
-        <div className="flex items-stretch mb-6 rounded-xl overflow-hidden border border-[#E7E1E1]">
-          <div className="flex items-center justify-center bg-[#6b1176] px-6 py-4 shrink-0">
+        <div className="flex items-stretch mb-6 rounded-xl overflow-hidden border border-line">
+          <div className="flex items-center justify-center bg-primary px-6 py-4 shrink-0">
             <img src={mGScaleLogo} alt="mG-SCALE" className="h-10 w-auto" />
           </div>
           <div className="flex items-center justify-between flex-1 px-6 py-4 bg-white">
@@ -113,7 +113,7 @@ export default function EmbryoReportsPage() {
           <>
             {/* Patient & Cycle Info */}
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-[#FDFAFF] border border-[#F0EBF4] rounded-xl p-4">
+              <div className="bg-surface border border-line-light rounded-xl p-4">
                 <p className="text-[10px] font-semibold text-[#8A7892] uppercase tracking-widest mb-2">Patient Info</p>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
                   <Row label="Patient Name" value={fmt(cycle.patient_name)} />
@@ -122,7 +122,7 @@ export default function EmbryoReportsPage() {
                   <Row label="Status" value={fmt(cycle.status)} />
                 </div>
               </div>
-              <div className="bg-[#FDFAFF] border border-[#F0EBF4] rounded-xl p-4">
+              <div className="bg-surface border border-line-light rounded-xl p-4">
                 <p className="text-[10px] font-semibold text-[#8A7892] uppercase tracking-widest mb-2">Cycle Details</p>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
                   <Row label="Cycle Type" value={fmt(cycle.cycle_type)} />
@@ -134,7 +134,7 @@ export default function EmbryoReportsPage() {
             </div>
 
             {/* Oocyte Count */}
-            <div className="bg-[#FDFAFF] border border-[#F0EBF4] rounded-xl p-4 mb-6">
+            <div className="bg-surface border border-line-light rounded-xl p-4 mb-6">
               <p className="text-[10px] font-semibold text-[#8A7892] uppercase tracking-widest mb-3">Oocyte Count</p>
               <div className="grid grid-cols-4 gap-3">
                 {[
@@ -143,8 +143,8 @@ export default function EmbryoReportsPage() {
                   { label: 'GV', value: cycle.oocyte_gv },
                   { label: 'Others', value: cycle.oocyte_others },
                 ].map(s => (
-                  <div key={s.label} className="text-center bg-white rounded-lg border border-[#E7E1E1] py-3 px-2">
-                    <p className="text-xl font-bold text-[#6b1176]">{s.value ?? '—'}</p>
+                  <div key={s.label} className="text-center bg-white rounded-lg border border-line py-3 px-2">
+                    <p className="text-xl font-bold text-primary">{s.value ?? '—'}</p>
                     <p className="text-[10px] text-gray-500 mt-0.5">{s.label}</p>
                   </div>
                 ))}
@@ -161,8 +161,8 @@ export default function EmbryoReportsPage() {
                 { label: 'Day 6 Blast', value: stats.day6 },
                 { label: 'Frozen', value: stats.frozen },
               ].map(s => (
-                <div key={s.label} className="bg-white border border-[#E7E1E1] rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-[#6b1176]">{s.value}</p>
+                <div key={s.label} className="bg-white border border-line rounded-xl p-3 text-center">
+                  <p className="text-2xl font-bold text-primary">{s.value}</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">{s.label}</p>
                 </div>
               ))}
@@ -170,14 +170,14 @@ export default function EmbryoReportsPage() {
 
             {/* Embryo Log Table */}
             {logs.length > 0 && (
-              <div className="border border-[#E7E1E1] rounded-xl overflow-hidden">
-                <div className="px-4 py-3 bg-[#FDFAFF] border-b border-[#E7E1E1]">
+              <div className="border border-line rounded-xl overflow-hidden">
+                <div className="px-4 py-3 bg-surface border-b border-line">
                   <h2 className="text-sm font-semibold text-gray-800">Embryo Development Log</h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-[#E7E1E1]">
+                      <tr className="bg-gray-50 border-b border-line">
                         <Th>#</Th>
                         <Th>D0 Maturity</Th>
                         <Th>D0 Drop</Th>
@@ -197,7 +197,7 @@ export default function EmbryoReportsPage() {
                       {logs.map((log, idx) => {
                         const d3 = parseD3(log.d3_grade);
                         return (
-                          <tr key={log.log_id} className={`border-b border-[#F0EBF4] ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FDFAFF]'}`}>
+                          <tr key={log.log_id} className={`border-b border-line-light ${idx % 2 === 0 ? 'bg-white' : 'bg-surface'}`}>
                             <Td>{log.oocyte_no}</Td>
                             <Td>{fmt(log.d0_maturity)}</Td>
                             <Td>{fmt(log.d0_drop_no)}</Td>
@@ -221,7 +221,7 @@ export default function EmbryoReportsPage() {
             )}
 
             {logs.length === 0 && (
-              <div className="flex items-center justify-center py-10 text-sm text-gray-400 border border-dashed border-[#E7E1E1] rounded-xl">
+              <div className="flex items-center justify-center py-10 text-sm text-gray-400 border border-dashed border-line rounded-xl">
                 No embryo logs recorded for this cycle.
               </div>
             )}
