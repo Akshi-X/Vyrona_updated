@@ -206,7 +206,7 @@ const CANE_H = CAN_HEIGHT * 0.62; // matches STRAW_H inside makeCanister
 // Derived motion constants (shared across animation effects)
 const LIFT_Y = TANK_HEIGHT / 2 + CAN_HEIGHT / 2 + 0.5;
 const ROD_LENGTH_DYN = TANK_HEIGHT - CAN_HEIGHT - 0.06;
-const LID_OPEN_ROT = Math.PI / 2;
+const LID_OPEN_ROT = -2 * Math.PI / 3;
 const PARK_DIST = 4.75;
 const PARK_Y = 0.2;
 const PARK_Z_FORWARD = 4.35;
@@ -2869,7 +2869,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       if (!animeReady || !anime) {
         // Fallback: position canister at park, open lid, place canes in orbit
         grp.rotation.set(6 * Math.PI / 180, 0, 0);
-        grp.position.set(1.75, -0.3, -0.1);
+        grp.position.set(1.75, -0.65, -0.1);
         lid.rotation.z = LID_OPEN_ROT;
         if (can.group.parent !== scene) {
           scene.attach(can.group);
@@ -2899,7 +2899,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       const EXTRACT_DELAY = comingFromIdle ? 4300 : 0;
 
       // Shift tank group to inspection world position
-      anime({ targets: grp.position, x: 1.75, y: -0.3, z: -0.1, duration: 1200, easing: "easeInOutCubic", delay: EXTRACT_DELAY });
+      anime({ targets: grp.position, x: 1.75, y: -0.65, z: -0.1, duration: 1200, easing: "easeInOutCubic", delay: EXTRACT_DELAY });
       anime.remove(grp.rotation);
       anime({
         targets: grp.rotation,
