@@ -179,7 +179,7 @@ export default function IncubatorTrackingDashboardPage() {
             <div className="fixed top-3 left-4 z-30 md:hidden">
                 <HamburgerButton />
             </div>
-            <div className="w-full max-w-[560px] rounded-[14px] border border-[#E7E1E1] bg-white p-6 shadow-sm">
+            <div className="w-full max-w-[560px] rounded-[14px] border border-line bg-white p-6 shadow-sm">
                 <div className="mb-5 flex items-start gap-3">
                     <img src={IncubatorTrackingIcon} alt="Track Incubator" className="w-6 h-6 mt-0.5" />
                     <div>
@@ -263,7 +263,7 @@ export default function IncubatorTrackingDashboardPage() {
                                 style={{ top: branchMenuStyle.top, left: branchMenuStyle.left, width: branchMenuStyle.width, transform: branchMenuStyle.placement === 'top' ? 'translateY(-100%)' : undefined }}>
                                 {branches.map((b) => (
                                     <div key={b.branch_id}
-                                        className={`px-3 py-1.5 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${selectedBranchId === b.branch_id ? 'bg-[#8b2a96] text-white' : 'text-black'}`}
+                                        className={`px-3 py-1.5 cursor-pointer hover:bg-primary-light hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${selectedBranchId === b.branch_id ? 'bg-primary-light text-white' : 'text-black'}`}
                                         onClick={() => {
                                             setSelectedBranchName(b.branch_name);
                                             setSelectedBranchId(b.branch_id);
@@ -282,7 +282,7 @@ export default function IncubatorTrackingDashboardPage() {
                                 style={{ top: incubatorMenuStyle.top, left: incubatorMenuStyle.left, width: incubatorMenuStyle.width, transform: incubatorMenuStyle.placement === 'top' ? 'translateY(-100%)' : undefined }}>
                                 {incubators.map((inc) => (
                                     <div key={inc.incubator_id}
-                                        className={`px-3 py-1.5 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${selectedIncubatorId === inc.incubator_id ? 'bg-[#8b2a96] text-white' : 'text-black'}`}
+                                        className={`px-3 py-1.5 cursor-pointer hover:bg-primary-light hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${selectedIncubatorId === inc.incubator_id ? 'bg-primary-light text-white' : 'text-black'}`}
                                         onClick={() => {
                                             setSelectedIncubatorId(inc.incubator_id);
                                             setSelectedIncubatorLabel(inc.label);

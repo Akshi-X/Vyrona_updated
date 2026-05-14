@@ -551,7 +551,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                             e.stopPropagation();
                             handleAddClick();
                         }}
-                        className="px-4 py-2 bg-primary hover:bg-[#8b2a96] text-white text-sm font-medium rounded-md transition-colors flex items-center gap-1"
+                        className="px-4 py-2 bg-primary hover:bg-primary-light text-white text-sm font-medium rounded-md transition-colors flex items-center gap-1"
                     >
                         <svg
                             className="w-4 h-4"
@@ -806,7 +806,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                 id="onboarding-my-tasks-save-btn"
                                 onClick={handleSaveAdd}
                                 disabled={isSaving}
-                                className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${isSaving ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-primary text-white hover:bg-[#8b2a96]"}`}
+                                className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${isSaving ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-primary text-white hover:bg-primary-light"}`}
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

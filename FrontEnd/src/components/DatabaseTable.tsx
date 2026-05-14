@@ -123,7 +123,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
   // Loading state
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-[#E7E1E1] overflow-hidden">
+      <div className="bg-white rounded-lg border border-line overflow-hidden">
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <span className="ml-3 text-gray-600">Loading patients data...</span>
@@ -135,7 +135,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
   // Error state
   if (error) {
     return (
-      <div className="bg-white rounded-lg border border-[#E7E1E1] overflow-hidden">
+      <div className="bg-white rounded-lg border border-line overflow-hidden">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <div className="text-red-500 text-lg font-semibold mb-2">Error Loading Data</div>
@@ -155,7 +155,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
   // Empty state
   if (patients.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-[#E7E1E1] overflow-hidden">
+      <div className="bg-white rounded-lg border border-line overflow-hidden">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <div className="text-gray-500 text-lg font-semibold mb-2">No Patients Found</div>
@@ -167,10 +167,10 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-[#E7E1E1] overflow-hidden">
+    <div className="bg-white rounded-lg border border-line overflow-hidden">
       <div className="h-[70vh] overflow-y-auto overflow-x-auto [scrollbar-width:thin]">
         <table className="w-full">
-          <thead className="sticky top-0 bg-[#fdeeff] z-10">
+          <thead className="sticky top-0 bg-surface z-10">
             <tr>
               <th
                 className="px-6 py-4 text-left text-xs font-semibold text-primary uppercase tracking-wider cursor-pointer hover:bg-gray-100"

@@ -164,7 +164,7 @@ export default function AdvancedEmbryoGradingPage() {
           <aside className={`flex flex-col gap-3 overflow-y-auto pr-0.5 ${step === 2 ? 'hidden' : ''}`} style={{ maxHeight: 'calc(100vh - 14rem)' }}>
             <OocyteList logs={logs} loading={logsLoading} selectedOocyteNo={selectedOocyteNo} oocyteImages={oocyteImages} locked={step === 3 || step === 4} onSelect={handleOocyteSelect} />
 
-            <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
+            <div className="rounded-lg border border-line bg-white p-4">
               <p className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase mb-3">Embryo Details</p>
               <table className="w-full text-xs">
                 <tbody className="divide-y divide-[#F8F4FD]">
@@ -186,7 +186,7 @@ export default function AdvancedEmbryoGradingPage() {
             </div>
 
             {/* Horizontal Development Timeline */}
-            <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
+            <div className="rounded-lg border border-line bg-white p-4">
               <p className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase mb-4">Development Timeline</p>
               <div className="relative flex items-start justify-between">
                 {/* connecting line */}
@@ -208,14 +208,14 @@ export default function AdvancedEmbryoGradingPage() {
 
           {/* Step 1 — Upload */}
           {step === 1 && (
-            <section className="rounded-lg border border-[#E7E1E1] bg-white overflow-hidden flex flex-col min-h-0">
-              <div className="px-4 py-3 border-b border-[#F0EBF4] bg-gradient-to-r from-[#faf7fc] to-white shrink-0">
+            <section className="rounded-lg border border-line bg-white overflow-hidden flex flex-col min-h-0">
+              <div className="px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0">
                 <p className="text-sm font-bold text-gray-800">Upload Embryo Image</p>
                 <p className="text-[11px] text-gray-400 mt-0.5">Select an oocyte from the list, then upload its microscopy image</p>
               </div>
               <div className="flex-1 p-5 flex flex-col gap-4 min-h-0">
                 {currentSrc ? (
-                  <div className="relative flex-1 rounded-xl overflow-hidden border border-[#E7E1E1] bg-black">
+                  <div className="relative flex-1 rounded-xl overflow-hidden border border-line bg-black">
                     <img src={currentSrc} alt="Oocyte image" className="absolute inset-0 h-full w-full object-contain" />
                     <button
                       type="button"
@@ -224,19 +224,19 @@ export default function AdvancedEmbryoGradingPage() {
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
-                    <label className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg bg-white/90 border border-[#E7E1E1] text-primary text-xs font-semibold cursor-pointer hover:bg-white transition-colors">
+                    <label className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg bg-white/90 border border-line text-primary text-xs font-semibold cursor-pointer hover:bg-white transition-colors">
                       Replace
                       <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
                     </label>
                   </div>
                 ) : (
                   <label
-                    className={`flex-1 flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-all cursor-pointer ${isDragging ? 'border-primary bg-[#F7ECFF]' : 'border-[#E7E1E1] hover:border-[#c8b2d1] hover:bg-[#FDFAFF]'} ${selectedOocyteNo == null ? 'opacity-50 pointer-events-none' : ''}`}
+                    className={`flex-1 flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-all cursor-pointer ${isDragging ? 'border-primary bg-primary-bg' : 'border-line hover:border-[#c8b2d1] hover:bg-surface'} ${selectedOocyteNo == null ? 'opacity-50 pointer-events-none' : ''}`}
                     onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                     onDragLeave={() => setIsDragging(false)}
                     onDrop={handleDrop}
                   >
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${isDragging ? 'bg-primary text-white' : 'bg-[#F7ECFF] text-primary'}`}>
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${isDragging ? 'bg-primary text-white' : 'bg-primary-bg text-primary'}`}>
                       <Upload size={28} />
                     </div>
                     <div className="text-center">
@@ -247,7 +247,7 @@ export default function AdvancedEmbryoGradingPage() {
                       <p className="text-[11px] text-gray-300 mt-1.5">PNG, JPG, TIFF</p>
                     </div>
                     {selectedOocyteNo != null && (
-                      <span className="px-5 py-2 rounded-lg border border-[#D8C7E3] text-primary text-sm font-medium bg-white hover:bg-[#F7ECFF] transition-colors">
+                      <span className="px-5 py-2 rounded-lg border border-[#D8C7E3] text-primary text-sm font-medium bg-white hover:bg-primary-bg transition-colors">
                         Browse Files
                       </span>
                     )}
@@ -260,11 +260,11 @@ export default function AdvancedEmbryoGradingPage() {
 
           {/* Step 2 — AI processing (center + right span) */}
           {step === 2 && (
-            <div className="col-span-1 xl:col-span-3 flex flex-col items-center justify-center min-h-[420px] gap-6 rounded-lg border border-[#E7E1E1] bg-white">
+            <div className="col-span-1 xl:col-span-3 flex flex-col items-center justify-center min-h-[420px] gap-6 rounded-lg border border-line bg-white">
               <div className="relative">
                 <div className="w-24 h-24 rounded-full border-4 border-[#E8D5F5] border-t-primary animate-spin" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full bg-[#F7ECFF] flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-primary-bg flex items-center justify-center">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 2a10 10 0 0 1 0 20"/><circle cx="12" cy="12" r="3"/>
                     </svg>
@@ -289,7 +289,7 @@ export default function AdvancedEmbryoGradingPage() {
               </div>
               <div className="flex gap-2 flex-wrap justify-center">
                 {['Expansion grading', 'ICM classification', 'TE scoring', 'Quality assessment'].map((label, i) => (
-                  <span key={label} className="px-3 py-1 rounded-full bg-[#F7ECFF] text-primary text-[11px] font-medium"
+                  <span key={label} className="px-3 py-1 rounded-full bg-primary-bg text-primary text-[11px] font-medium"
                     style={{ opacity: 0, animation: `fade-in 0.3s ease forwards ${0.4 + i * 0.3}s` }}>
                     {label}
                   </span>
@@ -300,12 +300,12 @@ export default function AdvancedEmbryoGradingPage() {
 
           {/* Step 3 — Image viewer (result) */}
           {step === 3 && (
-            <section className="rounded-lg border border-[#E7E1E1] bg-white overflow-hidden flex flex-col min-h-0">
-              <div className="px-4 py-2 border-b border-[#E7E1E1] flex items-center justify-between bg-white shrink-0">
+            <section className="rounded-lg border border-line bg-white overflow-hidden flex flex-col min-h-0">
+              <div className="px-4 py-2 border-b border-line flex items-center justify-between bg-white shrink-0">
                 <span className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Image Viewer</span>
                 <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => setShowAnnotations(true)} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${showAnnotations ? 'bg-primary text-white' : 'border border-[#E7E1E1] text-gray-500 hover:bg-gray-50'}`}>Annotations</button>
-                  <button type="button" onClick={() => setShowAnnotations(false)} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${!showAnnotations ? 'bg-primary text-white' : 'border border-[#E7E1E1] text-gray-500 hover:bg-gray-50'}`}>Original</button>
+                  <button type="button" onClick={() => setShowAnnotations(true)} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${showAnnotations ? 'bg-primary text-white' : 'border border-line text-gray-500 hover:bg-gray-50'}`}>Annotations</button>
+                  <button type="button" onClick={() => setShowAnnotations(false)} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${!showAnnotations ? 'bg-primary text-white' : 'border border-line text-gray-500 hover:bg-gray-50'}`}>Original</button>
                 </div>
               </div>
               <div className="relative flex-1 bg-black min-h-0">
@@ -320,8 +320,8 @@ export default function AdvancedEmbryoGradingPage() {
 
           {/* Step 4 — Image viewer (center) */}
           {step === 4 && (
-            <section className="rounded-lg border border-[#E7E1E1] bg-white overflow-hidden flex flex-col min-h-0">
-              <div className="px-4 py-2 border-b border-[#E7E1E1] flex items-center justify-between bg-white shrink-0">
+            <section className="rounded-lg border border-line bg-white overflow-hidden flex flex-col min-h-0">
+              <div className="px-4 py-2 border-b border-line flex items-center justify-between bg-white shrink-0">
                 <span className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Image Viewer</span>
               </div>
               <div className="relative flex-1 bg-black min-h-0">
@@ -361,7 +361,7 @@ export default function AdvancedEmbryoGradingPage() {
                 </div>
 
                 {/* Component Grades — placeholder */}
-                <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
+                <div className="rounded-lg border border-line bg-white p-4">
                   <p className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase mb-3">Component Grades</p>
                   <div className="grid grid-cols-3 gap-2">
                     {[
@@ -369,7 +369,7 @@ export default function AdvancedEmbryoGradingPage() {
                       { label: 'ICM',       sub: '—', conf: '—' },
                       { label: 'TE',        sub: '—', conf: '—' },
                     ].map(c => (
-                      <div key={c.label} className="rounded-lg border border-[#E7E1E1] bg-[#FCF9FF] p-3">
+                      <div key={c.label} className="rounded-lg border border-line bg-[#FCF9FF] p-3">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-[10px] font-semibold text-primary">{c.label}</span>
                           <Info size={11} className="text-gray-300" />
@@ -383,7 +383,7 @@ export default function AdvancedEmbryoGradingPage() {
                 </div>
 
                 {/* Hint */}
-                <div className="rounded-lg border border-dashed border-[#D8C7E3] bg-[#F7ECFF] p-6 flex flex-col items-center justify-center gap-2 text-center">
+                <div className="rounded-lg border border-dashed border-[#D8C7E3] bg-primary-bg p-6 flex flex-col items-center justify-center gap-2 text-center">
                   <Info size={18} className="text-primary" />
                   <p className="text-xs font-semibold text-gray-800">Results will appear here after AI analysis.</p>
                   <p className="text-[10px] text-primary font-medium">Select an oocyte, upload its image, then click Start AI Analysis.</p>
@@ -420,7 +420,7 @@ export default function AdvancedEmbryoGradingPage() {
               </div>
 
               {/* Component Grades */}
-              <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
+              <div className="rounded-lg border border-line bg-white p-4">
                 <p className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase mb-3">Component Grades</p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
@@ -428,7 +428,7 @@ export default function AdvancedEmbryoGradingPage() {
                     { label: 'ICM',       value: mockAI.icm,       sub: mockAI.icmLabel,       conf: `${mockAI.icmConf}%` },
                     { label: 'TE',        value: mockAI.te,        sub: mockAI.teLabel,        conf: `${mockAI.teConf}%` },
                   ].map(c => (
-                    <div key={c.label} className="rounded-lg border border-[#E7E1E1] bg-[#FCF9FF] p-3">
+                    <div key={c.label} className="rounded-lg border border-line bg-[#FCF9FF] p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-semibold text-primary">{c.label}</span>
                         <Info size={11} className="text-gray-300" />
@@ -442,13 +442,13 @@ export default function AdvancedEmbryoGradingPage() {
               </div>
 
               {/* AI Justification */}
-              <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
+              <div className="rounded-lg border border-line bg-white p-4">
                 <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-2">AI Justification</p>
                 <p className="text-xs leading-relaxed text-gray-700">{mockAI.justification}</p>
               </div>
 
               {/* Key Observations */}
-              <div className="rounded-lg border border-[#E7E1E1] bg-white p-4">
+              <div className="rounded-lg border border-line bg-white p-4">
                 <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Key Observations</p>
                 <ul className="space-y-2">
                   {mockAI.observations.map(obs => (
@@ -460,14 +460,14 @@ export default function AdvancedEmbryoGradingPage() {
               </div>
 
               {/* Clinician Notes */}
-              <div className="rounded-lg border border-[#E7E1E1] bg-white p-4 flex flex-col">
+              <div className="rounded-lg border border-line bg-white p-4 flex flex-col">
                 <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Clinician Notes</p>
                 {notes.length > 0 && (
                   <ul className="space-y-1.5 mb-3">
-                    {notes.map((n, i) => <li key={i} className="text-xs text-gray-600 bg-[#FDFAFF] rounded px-2.5 py-1.5 border border-[#F0EAF4]">{n}</li>)}
+                    {notes.map((n, i) => <li key={i} className="text-xs text-gray-600 bg-surface rounded px-2.5 py-1.5 border border-[#F0EAF4]">{n}</li>)}
                   </ul>
                 )}
-                <textarea value={noteDraft} onChange={e => setNoteDraft(e.target.value)} placeholder="Add note..." rows={3} className="w-full rounded-lg border border-[#E7E1E1] bg-white px-3 py-2 text-xs text-gray-700 placeholder:text-gray-300 outline-none resize-none focus:border-primary transition-colors" />
+                <textarea value={noteDraft} onChange={e => setNoteDraft(e.target.value)} placeholder="Add note..." rows={3} className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs text-gray-700 placeholder:text-gray-300 outline-none resize-none focus:border-primary transition-colors" />
                 <div className="flex justify-end mt-2">
                   <button type="button" onClick={() => { if (noteDraft.trim()) { setNotes(n => [...n, noteDraft.trim()]); setNoteDraft(''); } }} className="px-4 py-2 rounded-lg bg-[#3b0764] text-white text-xs font-semibold hover:bg-primary transition-colors">Add Note</button>
                 </div>
@@ -499,7 +499,7 @@ export default function AdvancedEmbryoGradingPage() {
               </div>
 
               {/* Override form */}
-              <div className="rounded-lg border border-[#E7E1E1] bg-white p-4 flex flex-col gap-4">
+              <div className="rounded-lg border border-line bg-white p-4 flex flex-col gap-4">
                 {(['Expansion', 'ICM', 'TE'] as const).map((field) => {
                   const key = field.toLowerCase() as 'expansion' | 'icm' | 'te';
                   const setter = key === 'expansion' ? setOverrideExpansion : key === 'icm' ? setOverrideIcm : setOverrideTe;
@@ -515,7 +515,7 @@ export default function AdvancedEmbryoGradingPage() {
                       <div className="flex gap-2 flex-wrap">
                         {opts.map(o => (
                           <button key={o} type="button" onClick={() => setter(o)}
-                            className={`w-10 h-10 rounded-lg border-2 text-sm font-bold transition-all ${value === o ? 'border-primary bg-primary text-white scale-105' : 'border-[#E7E1E1] text-gray-500 hover:border-[#c084fc] hover:text-primary'}`}>
+                            className={`w-10 h-10 rounded-lg border-2 text-sm font-bold transition-all ${value === o ? 'border-primary bg-primary text-white scale-105' : 'border-line text-gray-500 hover:border-[#c084fc] hover:text-primary'}`}>
                             {o}
                           </button>
                         ))}
@@ -530,10 +530,10 @@ export default function AdvancedEmbryoGradingPage() {
                     onChange={e => setOverrideReason(e.target.value)}
                     placeholder="Explain why you are overriding the AI grade..."
                     rows={3}
-                    className="w-full rounded-lg border border-[#E7E1E1] px-3 py-2 text-xs text-gray-700 placeholder:text-gray-300 outline-none resize-none focus:border-primary transition-colors"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-xs text-gray-700 placeholder:text-gray-300 outline-none resize-none focus:border-primary transition-colors"
                   />
                 </div>
-                <div className="rounded-lg bg-[#FDFAFF] border border-[#F0EBF4] px-4 py-3 text-center">
+                <div className="rounded-lg bg-surface border border-line-light px-4 py-3 text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Override Grade</p>
                   <p className="text-4xl font-extrabold text-primary">{overrideExpansion || '—'}{overrideIcm}{overrideTe}</p>
                 </div>
@@ -543,7 +543,7 @@ export default function AdvancedEmbryoGradingPage() {
         </div>
 
       {/* Bottom action bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-t border-[#E7E1E1] bg-white mt-4 shrink-0 -mx-6 -mb-6">
+      <div className="flex items-center justify-between px-6 py-3 border-t border-line bg-white mt-4 shrink-0 -mx-6 -mb-6">
         {step === 1 && (
           <>
             <p className="text-sm text-gray-400">
@@ -569,7 +569,7 @@ export default function AdvancedEmbryoGradingPage() {
               <ArrowLeft size={14} /> Back to Upload
             </button>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={enterOverride} className="px-4 py-2 rounded-lg border border-primary text-primary text-sm font-semibold hover:bg-[#F7ECFF] transition-colors">
+              <button type="button" onClick={enterOverride} className="px-4 py-2 rounded-lg border border-primary text-primary text-sm font-semibold hover:bg-primary-bg transition-colors">
                 Override Grade
               </button>
               <button type="button" onClick={handleComplete} className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-primary transition-colors">
@@ -625,13 +625,13 @@ function OocyteList({ logs, loading, selectedOocyteNo, oocyteImages, locked, onS
       : icmTe === 'BB'
       ? 'bg-yellow-50 border-yellow-200 text-yellow-700'
       : grade.includes('C')
-      ? 'bg-[#F7ECFF] border-[#c084fc]/40 text-primary'
+      ? 'bg-primary-bg border-[#c084fc]/40 text-primary'
       : 'bg-amber-50 border-amber-200 text-amber-700';
   };
 
   return (
-    <div className={`rounded-xl border bg-white overflow-hidden flex flex-col min-h-0 ${locked ? 'border-[#E7E1E1] opacity-60 pointer-events-none' : 'border-[#E7E1E1]'}`}>
-      <div className="px-4 py-3 border-b border-[#F0EBF4] bg-gradient-to-r from-[#faf7fc] to-white shrink-0">
+    <div className={`rounded-xl border bg-white overflow-hidden flex flex-col min-h-0 ${locked ? 'border-line opacity-60 pointer-events-none' : 'border-line'}`}>
+      <div className="px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0">
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold text-gray-800">Select an oocyte to be graded</p>
           {locked && <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Locked</span>}
@@ -661,8 +661,8 @@ function OocyteList({ logs, loading, selectedOocyteNo, oocyteImages, locked, onS
                 onClick={() => onSelect(log.oocyte_no)}
                 className={`w-full flex items-center gap-3 py-2.5 transition-all text-left border-b border-[#F5F0F8] relative ${
                   active
-                    ? 'bg-[#F7ECFF] pl-3 pr-4'
-                    : 'hover:bg-[#faf7fc] pl-4 pr-4'
+                    ? 'bg-primary-bg pl-3 pr-4'
+                    : 'hover:bg-surface pl-4 pr-4'
                 }`}
               >
                 {/* Active indicator bar */}

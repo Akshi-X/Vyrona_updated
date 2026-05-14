@@ -24,16 +24,44 @@ const LEADERBOARD_EMBRYOS: LeaderboardEmbryo[] = [
 ];
 
 const SLOT_COLORS = [
-  { border: 'border-[#9b59b6]', badgeBg: 'bg-[#9b59b6]', textCol: 'text-[#9b59b6]', barCol: 'bg-[#9b59b6]' }, // muted purple
-  { border: 'border-[#5b8dd9]', badgeBg: 'bg-[#5b8dd9]', textCol: 'text-[#5b8dd9]', barCol: 'bg-[#5b8dd9]' }, // muted blue
-  { border: 'border-[#c0707a]', badgeBg: 'bg-[#c0707a]', textCol: 'text-[#c0707a]', barCol: 'bg-[#c0707a]' }, // muted rose
-  { border: 'border-[#c89840]', badgeBg: 'bg-[#c89840]', textCol: 'text-[#c89840]', barCol: 'bg-[#c89840]' }, // muted amber
+  { border: 'border-[#9b59b6]', badgeBg: 'bg-[#9b59b6]', textCol: 'text-[#9b59b6]', barCol: 'bg-[#9b59b6]' },
+  { border: 'border-[#5b8dd9]', badgeBg: 'bg-[#5b8dd9]', textCol: 'text-[#5b8dd9]', barCol: 'bg-[#5b8dd9]' },
+  { border: 'border-[#c0707a]', badgeBg: 'bg-[#c0707a]', textCol: 'text-[#c0707a]', barCol: 'bg-[#c0707a]' },
+  { border: 'border-[#c89840]', badgeBg: 'bg-[#c89840]', textCol: 'text-[#c89840]', barCol: 'bg-[#c89840]' },
 ];
 
 const eidToLabel = (id: string) => {
   const m = id.match(/\d+\.(\d+)$/);
   return m ? `Oocyte #${m[1]}` : id;
 };
+
+function RankBadge({ rank }: { rank: number }) {
+  const configs: Record<number, { outer: string; inner: string; ribbon: string }> = {
+    1: { outer: '#F59E0B', inner: '#FDE68A', ribbon: '#D97706' },
+    2: { outer: '#9CA3AF', inner: '#E5E7EB', ribbon: '#6B7280' },
+    3: { outer: '#CD7C2F', inner: '#FCD9A0', ribbon: '#92400E' },
+  };
+  const c = configs[rank];
+  if (!c) return null;
+  return (
+    <svg width="20" height="26" viewBox="0 0 20 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Ribbon bar */}
+      <rect x="6" y="0" width="8" height="9" rx="1.5" fill={c.ribbon} />
+      {/* V-notch connecting ribbon to medal */}
+      <path d="M6 8 L10 11 L14 8Z" fill={c.outer} />
+      {/* Drop shadow */}
+      <circle cx="10" cy="20" r="7.5" fill="rgba(0,0,0,0.12)" />
+      {/* Medal body */}
+      <circle cx="10" cy="19" r="7.5" fill={c.outer} />
+      {/* Inner highlight */}
+      <circle cx="10" cy="17.5" r="5" fill={c.inner} opacity="0.4" />
+      {/* Inner ring */}
+      <circle cx="10" cy="19" r="6" fill="none" stroke="white" strokeWidth="0.8" strokeOpacity="0.55" />
+      {/* Rank number */}
+      <text x="10" y="22.5" textAnchor="middle" fontSize="8.5" fontWeight="900" fill="white" fontFamily="system-ui,sans-serif">{rank}</text>
+    </svg>
+  );
+}
 
 export default function EmbryoComparePage() {
   const [selectedEmbryoIds, setSelectedEmbryoIds] = useState<string[]>(['EID 1.2']);
@@ -67,13 +95,6 @@ export default function EmbryoComparePage() {
               const isSelected = selectedEmbryoIds.includes(emb.id);
               const slotIdx = selectedEmbryoIds.indexOf(emb.id);
               const color = slotIdx >= 0 ? SLOT_COLORS[slotIdx] : null;
-              const rankMedal = emb.rank === 1
-                ? { bg: '#F59E0B', shadow: 'rgba(245,158,11,0.35)' }
-                : emb.rank === 2
-                ? { bg: '#9CA3AF', shadow: 'rgba(156,163,175,0.35)' }
-                : emb.rank === 3
-                ? { bg: '#F97316', shadow: 'rgba(249,115,22,0.35)' }
-                : null;
 
               return (
                 <div
@@ -94,14 +115,9 @@ export default function EmbryoComparePage() {
                   )}
 
                   {/* Rank + Checkbox stacked */}
-                  <div className="flex flex-col items-center gap-1.5 shrink-0 w-6 pl-1">
-                    {rankMedal ? (
-                      <div
-                        className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-white"
-                        style={{ background: rankMedal.bg, boxShadow: `0 2px 6px ${rankMedal.shadow}` }}
-                      >
-                        {emb.rank}
-                      </div>
+                  <div className="flex flex-col items-center gap-1.5 shrink-0 w-7 pl-1">
+                    {emb.rank <= 3 ? (
+                      <RankBadge rank={emb.rank} />
                     ) : (
                       <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-gray-400 border border-gray-200 bg-gray-50">
                         {emb.rank}
@@ -185,7 +201,7 @@ export default function EmbryoComparePage() {
                   className="grid gap-2.5 mb-2.5"
                   style={{ gridTemplateColumns: `130px repeat(${selectedEmbryoIds.length}, minmax(155px, 220px))` }}
                 >
-                  <div /> {/* spacer matching metrics label column */}
+                  <div />
                   {selectedEmbryoIds.map((eid, idx) => {
                     const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
                     const color = SLOT_COLORS[idx];
@@ -241,7 +257,7 @@ export default function EmbryoComparePage() {
                   })}
                 </div>
 
-                {/* Key Metrics — same column template, label fills the first 130px slot */}
+                {/* Key Metrics */}
                 <div className="rounded-xl border border-[#E7E1E1] overflow-hidden">
                   <div className="px-3 py-2 border-b border-[#E7E1E1] bg-[#FDFAFF]">
                     <h4 className="text-xs font-bold text-gray-900">Key Metrics</h4>

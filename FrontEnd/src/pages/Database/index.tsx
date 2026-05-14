@@ -36,7 +36,7 @@ export default function Database() {
   }
 
   return (
-    <div className="bg-[#FDFAFF] flex w-full" style={{ height: '100vh' }}>
+    <div className="bg-surface flex w-full" style={{ height: '100vh' }}>
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header
@@ -45,7 +45,7 @@ export default function Database() {
           className=""
           rightContent={(
             <div 
-              className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
+              className="w-[30px] h-[30px] bg-primary-muted rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
               onClick={() => navigate('/user-profile')}
               title="Go to User Profile"
             >

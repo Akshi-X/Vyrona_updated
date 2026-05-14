@@ -130,7 +130,7 @@ const InviteSignup: React.FC = () => {
                             <p className="text-xs text-amber-600 mb-6">Invite expires on {expiresLabel}.</p>
 
                             {/* Fixed fields */}
-                            <div className="mb-4 p-3 bg-[#F2E4FF] rounded-lg flex flex-col gap-2">
+                            <div className="mb-4 p-3 bg-primary-bg rounded-lg flex flex-col gap-2">
                                 <div>
                                     <p className="text-xs text-gray-500">Email</p>
                                     <p className="text-sm font-medium text-gray-800">{inviteData?.email}</p>

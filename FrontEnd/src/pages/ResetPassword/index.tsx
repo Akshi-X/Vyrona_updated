@@ -110,11 +110,11 @@ const ResetPassword: React.FC = () => {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="Enter new password"
-                                    className={`peer w-full border rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${passwordError ? "border-red-500" : "border-gray-300"}`}
+                                    className={`peer w-full border rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-primary-light ${passwordError ? "border-red-500" : "border-gray-300"}`}
                                 />
                                 <label
                                     className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
-                                    ${passwordError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
+                                    ${passwordError ? "text-red-500 opacity-100" : "text-primary-light opacity-0 peer-focus:opacity-100"}`}
                                 >
                                     New Password
                                 </label>
@@ -140,11 +140,11 @@ const ResetPassword: React.FC = () => {
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     placeholder="Confirm new password"
-                                    className={`peer w-full border rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${confirmError ? "border-red-500" : "border-gray-300"}`}
+                                    className={`peer w-full border rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-primary-light ${confirmError ? "border-red-500" : "border-gray-300"}`}
                                 />
                                 <label
                                     className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
-                                    ${confirmError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
+                                    ${confirmError ? "text-red-500 opacity-100" : "text-primary-light opacity-0 peer-focus:opacity-100"}`}
                                 >
                                     Confirm Password
                                 </label>
@@ -166,7 +166,7 @@ const ResetPassword: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 mb-1 bg-primary text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50"
+                            className="w-full py-3 mb-1 bg-primary text-white rounded-md font-medium hover:bg-primary-light transition disabled:opacity-50"
                         >
                             {loading ? "Resetting..." : "Reset Password"}
                         </button>
@@ -200,7 +200,7 @@ const ResetPassword: React.FC = () => {
                     <div className="text-center text-sm text-gray-500 mt-3 space-y-2">
                         <p>
                             Need help?{" "}
-                            <Link to="/forgot-password" className="text-[#8b2a96] font-semibold underline">
+                            <Link to="/forgot-password" className="text-primary-light font-semibold underline">
                                 Forgot Password
                             </Link>
                         </p>

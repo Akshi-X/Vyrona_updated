@@ -59,7 +59,7 @@ export const FilterSelect = ({
                         e.stopPropagation();
                         setIsOpen((v) => !v);
                     }}
-                    className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                    className="w-full px-3 h-12 border border-line rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary-muted focus:border-transparent bg-white"
                 >
                     <span className={value !== "All" ? "text-primary" : "text-gray-700"}>
                         {selectedLabel}
@@ -140,7 +140,7 @@ export const FilterToggle = ({
                     className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
                         value === opt.value
                             ? "bg-primary text-white border-primary"
-                            : "bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50"
+                            : "bg-white text-gray-700 border-line hover:bg-gray-50"
                     } ${opt.disabled ? "opacity-50 cursor-not-allowed hover:bg-white" : ""}`}
                 >
                     {opt.label}
@@ -178,7 +178,7 @@ const FilterPanel = ({ children, activeCount = 0 }: FilterPanelProps) => {
                 className={`relative flex items-center justify-center w-9 h-9 border rounded-lg transition-colors ${
                     activeCount > 0 || isOpen
                         ? "bg-primary text-white border-primary"
-                        : "bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50"
+                        : "bg-white text-gray-700 border-line hover:bg-gray-50"
                 }`}
             >
                 <SlidersHorizontal className="w-4 h-4" />
@@ -189,7 +189,7 @@ const FilterPanel = ({ children, activeCount = 0 }: FilterPanelProps) => {
                 )}
             </button>
             {isOpen && (
-                <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-[#E7E1E1] rounded-lg shadow-lg p-4 w-72 flex flex-col gap-3">
+                <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-line rounded-lg shadow-lg p-4 w-72 flex flex-col gap-3">
                     {children}
                 </div>
             )}

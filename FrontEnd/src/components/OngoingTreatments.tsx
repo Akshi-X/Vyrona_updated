@@ -151,7 +151,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
 
   if (loading) {
     return (
-      <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+      <div className="w-full bg-white rounded-[10px] overflow-hidden border border-line">
         <div className="p-6 text-center">
           <div className="text-primary text-sm">Loading ongoing treatments...</div>
         </div>
@@ -161,7 +161,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
 
   if (error) {
     return (
-      <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+      <div className="w-full bg-white rounded-[10px] overflow-hidden border border-line">
         <div className="p-6 text-center">
           <div className="text-red-600 text-sm">{error}</div>
         </div>
@@ -170,7 +170,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   }
 
   return (
-    <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+    <div className="w-full bg-white rounded-[10px] overflow-hidden border border-line">
       <div 
         className="h-[415px] overflow-y-auto"
         style={{
@@ -178,7 +178,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
         }}
       >
         <table className="w-full">
-          <thead className="sticky top-0 bg-[#fdeeff] z-10">
+          <thead className="sticky top-0 bg-surface z-10">
             <tr className="border-b border-[#eeeeee]">
               {tableHeaders.map((header, index) => (
                 <th

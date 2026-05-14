@@ -98,7 +98,7 @@ export default function ThreePLTable() {
         ) : (
           <div className="inline-block min-w-[760px] bg-white rounded-[5px]">
             <table className="table-fixed text-xs w-full">
-              <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px] sticky top-0">
+              <thead className="bg-surface text-primary text-[12px] font-medium h-[56px] sticky top-0">
                 <tr>
                   <th className="px-3 py-2 text-left whitespace-nowrap w-[140px] rounded-tl-[10px]">3PL Player Name</th>
                   <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Mode of Transport</th>

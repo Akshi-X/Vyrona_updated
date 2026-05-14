@@ -41,7 +41,7 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
         if (quizResult !== "pass" && !isCompleted) return;
 
         const isLastLevel = levelId === "level-8";
-        const colors = ["#6b1176", "#a855f7", "#ffffff", "#f9a8d4", "#fbbf24", "#34d399"];
+        const colors = ["var(--color-primary)", "#a855f7", "#ffffff", "#f9a8d4", "#fbbf24", "#34d399"];
 
         if (isLastLevel) {
             // Grand finale — centre burst + sustained side cannons for 5 s

@@ -230,11 +230,11 @@ const Login: React.FC = () => {
                                 value={email}
                                 onChange={handleEmailChange}
                                 placeholder="Enter your email"
-                                className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${emailError ? "border-red-500" : "border-gray-300"}`}
+                                className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-light ${emailError ? "border-red-500" : "border-gray-300"}`}
                             />
                             <label
                                 className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
-                                ${emailError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
+                                ${emailError ? "text-red-500 opacity-100" : "text-primary-light opacity-0 peer-focus:opacity-100"}`}
                             >
                                 Email
                             </label>
@@ -251,12 +251,12 @@ const Login: React.FC = () => {
                                     value={password}
                                     onChange={handlePasswordChange}
                                     placeholder="Password"
-                                    className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${passwordError ? "border-red-500" : "border-gray-300"
+                                    className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-light ${passwordError ? "border-red-500" : "border-gray-300"
                                         }`}
                                 />
                                 <label
                                     className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
-                                ${passwordError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
+                                ${passwordError ? "text-red-500 opacity-100" : "text-primary-light opacity-0 peer-focus:opacity-100"}`}
                                 >
                                     Password
                                 </label>
@@ -284,11 +284,11 @@ const Login: React.FC = () => {
                                     type="checkbox"
                                     checked={rememberMe}
                                     onChange={(e) => setRememberMe(e.target.checked)}
-                                    className="w-4 h-4 border-gray-300 accent-[#8b2a96]"
+                                    className="w-4 h-4 border-gray-300 accent-primary-light"
                                 />
                                 <span className="text-gray-700 font-medium">Remember me</span>
                             </label>
-                            <Link to="/forgot-password" className="text-[#8b2a96] font-semibold underline">
+                            <Link to="/forgot-password" className="text-primary-light font-semibold underline">
                                 Forgot Password?
                             </Link>
                         </div>
@@ -297,7 +297,7 @@ const Login: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-3 mb-1 text-white rounded-md font-medium transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-primary hover:bg-[#8b2a96] cursor-pointer"
+                            className={`w-full py-3 mb-1 text-white rounded-md font-medium transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-primary hover:bg-primary-light cursor-pointer"
                                 }`}
                         >
                             {loading ? "Signing in..." : "Sign in"}
@@ -310,7 +310,7 @@ const Login: React.FC = () => {
                     {/* Footer */}
                     {/* <p className="text-center text-sm text-gray-500 mt-2">
                         New to myGrape?{" "}
-                        <Link to="/signup" className="text-[#8b2a96] font-semibold underline">
+                        <Link to="/signup" className="text-primary-light font-semibold underline">
                             Create an account
                         </Link>
                     </p> */}

@@ -342,7 +342,7 @@ export default function EmbryoGradingPage() {
       <div className="flex-1 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-h-0">
 
         {/* ── Hero Banner ────────────────────────────────────────────── */}
-        <div className="rounded-xl border border-[#E8E1F0] bg-gradient-to-br from-[#F7ECFF] to-white overflow-hidden shrink-0">
+        <div className="rounded-xl border border-[#E8E1F0] bg-gradient-to-br from-primary-bg to-white overflow-hidden shrink-0">
           <div className="px-6 py-5">
             <div className="flex items-center justify-between mb-5">
               <div>
@@ -379,7 +379,7 @@ export default function EmbryoGradingPage() {
                       <p className={`text-4xl font-extrabold leading-none mt-2 ${s.valCls}`}>{s.value}</p>
                       <p className="text-[10px] text-gray-400 mt-1.5">{s.sub}</p>
                     </div>
-                    <div className="w-8 h-8 rounded-lg bg-[#F7ECFF] flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
                       <s.Icon size={15} className="text-primary" />
                     </div>
                   </div>
@@ -394,13 +394,13 @@ export default function EmbryoGradingPage() {
 
           {/* Left — Active Cycles */}
           <div className="flex flex-col gap-3">
-            <div className="bg-white border border-[#E7E1E1] rounded-xl overflow-hidden flex flex-col">
-              <div className="px-4 py-3 flex items-center justify-between border-b border-[#F0EBF4] bg-gradient-to-r from-[#FDFAFF] to-white shrink-0">
+            <div className="bg-white border border-line rounded-xl overflow-hidden flex flex-col">
+              <div className="px-4 py-3 flex items-center justify-between border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Patients</p>
                   <p className="text-sm font-bold text-gray-900">Active Cycles</p>
                 </div>
-                <span className="text-xs font-bold bg-[#F7ECFF] text-primary px-2.5 py-1 rounded-full border border-[#e9d5ff]">{filteredCycles.length}</span>
+                <span className="text-xs font-bold bg-primary-bg text-primary px-2.5 py-1 rounded-full border border-primary-ring">{filteredCycles.length}</span>
               </div>
 
               <div className="overflow-y-auto divide-y divide-[#F8F4FD]" style={{ maxHeight: '560px', scrollbarWidth: 'thin' }}>
@@ -410,7 +410,7 @@ export default function EmbryoGradingPage() {
                   <div className="px-4 py-4 text-xs text-red-500">{error}</div>
                 ) : filteredCycles.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-2 text-center px-4">
-                    <div className="w-10 h-10 rounded-full bg-[#F7ECFF] flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-primary-bg flex items-center justify-center">
                       <Layers size={16} className="text-primary" />
                     </div>
                     <p className="text-xs font-medium text-gray-500">No cycles found</p>
@@ -424,7 +424,7 @@ export default function EmbryoGradingPage() {
                         key={cycle.cycle_id}
                         type="button"
                         onClick={() => navigate(`/embryo-grading/${cycle.his_id}`)}
-                        className="w-full flex items-center gap-0 hover:bg-[#FDFAFF] transition-colors text-left group"
+                        className="w-full flex items-center gap-0 hover:bg-surface transition-colors text-left group"
                       >
                         {/* urgency/active accent bar */}
                         <div className={`w-0.5 self-stretch shrink-0 ${
@@ -483,8 +483,8 @@ export default function EmbryoGradingPage() {
             <div className="grid grid-cols-2 gap-4">
 
               {/* Today's Queue */}
-              <div className="rounded-xl border border-[#E7E1E1] bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b border-[#F0EBF4] bg-gradient-to-r from-[#FDFAFF] to-white flex items-center justify-between">
+              <div className="rounded-xl border border-line bg-white overflow-hidden">
+                <div className="px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white flex items-center justify-between">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Today's Queue</p>
                     <p className="text-sm font-bold text-gray-900">Needs Attention</p>
@@ -510,7 +510,7 @@ export default function EmbryoGradingPage() {
                     todayQueue.map(item => (
                       <div
                         key={item.cycle.cycle_id}
-                        className="flex cursor-pointer hover:bg-[#FDFAFF] transition-colors group"
+                        className="flex cursor-pointer hover:bg-surface transition-colors group"
                         onClick={() => navigate(`/embryo-grading/${item.cycle.his_id}`)}
                       >
                         <div className={`w-1 shrink-0 rounded-l ${
@@ -545,8 +545,8 @@ export default function EmbryoGradingPage() {
               </div>
 
               {/* Grade Distribution */}
-              <div className="rounded-xl border border-[#E7E1E1] bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b border-[#F0EBF4] bg-gradient-to-r from-[#FDFAFF] to-white">
+              <div className="rounded-xl border border-line bg-white overflow-hidden">
+                <div className="px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Grade Distribution</p>
                   <p className="text-sm font-bold text-gray-900">Current Cycle Grades</p>
                 </div>
@@ -575,7 +575,7 @@ export default function EmbryoGradingPage() {
                         <span className="text-xs font-bold text-gray-600 w-4 text-right shrink-0">{count}</span>
                       </div>
                     ))}
-                    <div className="flex items-center gap-4 pt-2.5 border-t border-[#F0EBF4]">
+                    <div className="flex items-center gap-4 pt-2.5 border-t border-line-light">
                       {([
                         { label: 'High Grade',  cls: 'bg-emerald-500' },
                         { label: 'Mid Grade',   cls: 'bg-amber-400'   },
@@ -593,18 +593,18 @@ export default function EmbryoGradingPage() {
             </div>
 
             {/* Past Cycles table */}
-            <div className="rounded-xl border border-[#E7E1E1] bg-white overflow-hidden">
-              <div className="px-5 py-3.5 flex items-center justify-between border-b border-[#F0EBF4] bg-gradient-to-r from-[#FDFAFF] to-white">
+            <div className="rounded-xl border border-line bg-white overflow-hidden">
+              <div className="px-5 py-3.5 flex items-center justify-between border-b border-line-light bg-gradient-to-r from-surface to-white">
                 <div>
                   <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">All Cycles</p>
                   <p className="text-sm font-bold text-black mt-0.5">Patient Cycle Register</p>
                 </div>
-                <span className="text-[10px] font-semibold text-primary bg-[#F7ECFF] px-2.5 py-1 rounded-full border border-[#e9d5ff]">{pastCycles.length} records</span>
+                <span className="text-[10px] font-semibold text-primary bg-primary-bg px-2.5 py-1 rounded-full border border-primary-ring">{pastCycles.length} records</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-[#F0EBF4] bg-[#FDFAFF]">
+                    <tr className="border-b border-line-light bg-surface">
                       {['HIS No.', 'Patient', 'Method', 'Type', 'Status', 'OPU Date', ''].map((h, i) => (
                         <th key={i} className="text-left text-[10px] font-semibold text-[#8A7892] uppercase tracking-wide px-4 py-2.5">{h}</th>
                       ))}
@@ -615,7 +615,7 @@ export default function EmbryoGradingPage() {
                       <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-gray-400">No past cycles yet.</td></tr>
                     ) : (
                       pastCycles.map(c => (
-                        <tr key={c.cycle_id} className="hover:bg-[#FDFAFF] transition-colors cursor-pointer group" onClick={() => navigate(`/embryo-grading/${c.his_id}`)}>
+                        <tr key={c.cycle_id} className="hover:bg-surface transition-colors cursor-pointer group" onClick={() => navigate(`/embryo-grading/${c.his_id}`)}>
                           <td className="px-4 py-3 text-xs font-bold text-primary">{c.his_id}</td>
                           <td className="px-4 py-3 text-xs font-medium text-gray-800 max-w-[140px] truncate">{c.patient_name || '—'}</td>
                           <td className="px-4 py-3 text-xs text-gray-500">{c.injection_method || '—'}</td>
@@ -653,8 +653,8 @@ export default function EmbryoGradingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {(() => {
               const lbl = "text-xs text-gray-500 mb-1 ml-0.5";
-              const inp = "h-10 rounded-md border border-[#E7E1E1] px-3 text-sm w-full";
-              const sel = "h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white text-gray-700 w-full";
+              const inp = "h-10 rounded-md border border-line px-3 text-sm w-full";
+              const sel = "h-10 rounded-md border border-line px-3 text-sm bg-white text-gray-700 w-full";
               return (<>
                 <div className="flex flex-col">
                   <label className={lbl}>HIS Number <span className="text-red-500">*</span></label>
@@ -768,7 +768,7 @@ export default function EmbryoGradingPage() {
           </div>
 
           {selectedIncubator && selectedIncubator.chamber_r && selectedIncubator.chamber_c && (
-            <div className="rounded-lg border border-[#E7E1E1] p-3">
+            <div className="rounded-lg border border-line p-3">
               <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
                 Select Chamber Position
                 {newEmbryoForm.chamberPosition && (
@@ -803,10 +803,10 @@ export default function EmbryoGradingPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-md border border-[#E7E1E1]">
+          <div className="overflow-x-auto rounded-md border border-line">
             <table className="w-full text-xs text-center">
               <thead>
-                <tr className="bg-gray-50 border-b border-[#E7E1E1]">
+                <tr className="bg-gray-50 border-b border-line">
                   {(['M2', 'M1', 'GV', 'OTHERS', 'INJECTED', 'OOCYTES'] as const).map((col) => (
                     <React.Fragment key={col}>
                       {col === 'OOCYTES' && <th className="text-gray-300 font-light px-0">/</th>}
@@ -835,7 +835,7 @@ export default function EmbryoGradingPage() {
                             min={0}
                             max={isInjected ? undefined : 99}
                             disabled={isInjected}
-                            className={`w-full min-w-[48px] h-8 rounded border px-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-[#8b2a96] ${isInjected ? 'border-[#E7E1E1] bg-gray-50 text-gray-500 cursor-not-allowed font-semibold' : 'border-[#E7E1E1]'}`}
+                            className={`w-full min-w-[48px] h-8 rounded border px-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-primary-light ${isInjected ? 'border-line bg-gray-50 text-gray-500 cursor-not-allowed font-semibold' : 'border-line'}`}
                             value={newEmbryoForm[key] as string}
                             onChange={(e) => handleNewEmbryoFieldChange(key, e.target.value)}
                           />
@@ -852,7 +852,7 @@ export default function EmbryoGradingPage() {
             <button
               type="button"
               onClick={() => { setIsAddEmbryoFormOpen(false); resetNewEmbryoForm(); }}
-              className="px-3 py-2 rounded-md border border-[#E7E1E1] text-gray-700 text-sm font-medium hover:bg-gray-50"
+              className="px-3 py-2 rounded-md border border-line text-gray-700 text-sm font-medium hover:bg-gray-50"
             >
               Cancel
             </button>

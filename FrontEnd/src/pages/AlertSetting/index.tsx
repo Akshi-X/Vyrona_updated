@@ -544,7 +544,7 @@ const AlertStatusBadge = ({
             </div>
         )}
         {isAlertEnabled ? (
-            <div className={`w-auto pl-1.5 pr-1.5 h-6 rounded-lg flex items-center justify-center ${isCritical ? "bg-red-100" : "bg-[#F2E4FF]"}`}>
+            <div className={`w-auto pl-1.5 pr-1.5 h-6 rounded-lg flex items-center justify-center ${isCritical ? "bg-red-100" : "bg-primary-bg"}`}>
                 {isCritical ? (
                     <Mail size={16} className="text-red-500" />
                 ) : (
@@ -1666,7 +1666,7 @@ export default function AlertSetting() {
                     <div className="relative w-64">
                         <button
                             type="button"
-                            className="dropdown-button w-full px-3 h-10 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
+                            className="dropdown-button w-full px-3 h-10 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary-muted focus:border-transparent bg-white text-gray-900"
                             onClick={() => setOpenDropdowns((prev) => ({ ...prev, [dropdownKey]: !prev[dropdownKey] }))}
                         >
                             <span>{cfg.custom_dropdown.find((o) => o.value === lidStateVal)?.label || "Select"}</span>
@@ -1771,7 +1771,7 @@ export default function AlertSetting() {
                                 id="onboarding-alert-settings-btn"
                                 type="button"
                                 onClick={openNotifySettings}
-                                className="w-9 h-9 rounded-lg border border-[#E7E1E1] bg-white flex items-center justify-center text-primary hover:bg-[#F7ECFF] transition-colors"
+                                className="w-9 h-9 rounded-lg border border-line bg-white flex items-center justify-center text-primary hover:bg-primary-bg transition-colors"
                                 aria-label="Notification settings"
                                 title="Notification settings"
                             >
@@ -1784,21 +1784,21 @@ export default function AlertSetting() {
                         {/* Left: filters + containers (Control Tower UI) */}
                         <div className="w-full xl1:w-[380px] xl1:shrink-0 flex flex-col gap-6">
                             {/* Filters card - hidden on mobile (shown via header filter icon) */}
-                            <div id="onboarding-alert-filters" className="hidden md:flex bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 flex-col gap-3">
+                            <div id="onboarding-alert-filters" className="hidden md:flex bg-white border border-line rounded-lg px-3 py-3 flex-col gap-3">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Direction</label>
                                     <div className="flex gap-2">
                                         <button
                                             type="button"
                                             onClick={() => setDirectionFilter("cryotanks")}
-                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "cryotanks" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50"}`}
+                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "cryotanks" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
                                         >
                                             Cryotanks
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setDirectionFilter("incubators")}
-                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "incubators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50"}`}
+                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "incubators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
                                         >
                                             Incubators
                                         </button>
@@ -1820,7 +1820,7 @@ export default function AlertSetting() {
                                                     !isBranchDropdownOpen,
                                                 );
                                             }}
-                                            className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                                            className="w-full px-3 h-12 border border-line rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary-muted focus:border-transparent bg-white"
                                         >
                                             <span
                                                 className={
@@ -1883,13 +1883,13 @@ export default function AlertSetting() {
                             </div>
 
                             {/* Active Containers card */}
-                            <div id="onboarding-alert-containers" className="bg-white border border-[#E7E1E1] rounded-lg p-3 flex flex-col overflow-hidden flex-1 min-h-[340px]">
+                            <div id="onboarding-alert-containers" className="bg-white border border-line rounded-lg p-3 flex flex-col overflow-hidden flex-1 min-h-[340px]">
                                 <div className="flex items-center justify-between mb-2">
                                     <h2 className="font-bold text-black text-base">
                                         {directionFilter === "incubators" ? "Active Incubators" : "Active Containers"}
                                     </h2>
                                 </div>
-                                <div className="pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-primary">
+                                <div className="pl-2 pr-2 py-2 rounded-t-lg bg-primary-bg text-xs font-semibold text-primary">
                                     {directionFilter === "incubators" ? "Incubators #" : "Containers #"}
                                 </div>
                                 <div
@@ -1966,7 +1966,7 @@ export default function AlertSetting() {
                                                     }
                                                     className={`pl-2 pr-2 py-2 hover:bg-gray-50 overflow-hidden cursor-pointer ${
                                                         isSelected
-                                                            ? "bg-[#F7ECFF]"
+                                                            ? "bg-primary-bg"
                                                             : ""
                                                     } ${lockContainerSelection ? "opacity-70 cursor-not-allowed" : ""}`}
                                                 >
@@ -2000,7 +2000,7 @@ export default function AlertSetting() {
                                 onClick={() => { setShowKpiPanel(false); setSelectedContainers([]); }}
                             />
                         )}
-                        <section id="onboarding-alert-kpi-panel" className={`bg-white rounded-lg border border-[#E7E1E1] p-4 min-w-0 overflow-y-auto xl1:flex xl1:flex-1 xl1:flex-col xl1:overflow-hidden xl1:relative xl1:inset-auto xl1:z-auto ${showKpiPanel ? "fixed inset-x-3 top-14 bottom-3 z-50 flex flex-col" : "hidden"}`}>
+                        <section id="onboarding-alert-kpi-panel" className={`bg-white rounded-lg border border-line p-4 min-w-0 overflow-y-auto xl1:flex xl1:flex-1 xl1:flex-col xl1:overflow-hidden xl1:relative xl1:inset-auto xl1:z-auto ${showKpiPanel ? "fixed inset-x-3 top-14 bottom-3 z-50 flex flex-col" : "hidden"}`}>
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="font-bold text-black text-base">
                                     Alert Configuration{" "}
@@ -2210,7 +2210,7 @@ export default function AlertSetting() {
                                                                         isAlertEnabled
                                                                             ? isCritical
                                                                                 ? "border-red-200 bg-gradient-to-r from-red-50/50 to-white"
-                                                                                : "border-[#E7D4F0] bg-gradient-to-r from-[#F7ECFF]/50 to-white"
+                                                                                : "border-[#E7D4F0] bg-gradient-to-r from-primary-bg/50 to-white"
                                                                             : "border-gray-200 bg-gray-50/30"
                                                                     }`}
                                                                 >
@@ -2221,8 +2221,8 @@ export default function AlertSetting() {
                                                                                     isAlertEnabled
                                                                                         ? isCritical
                                                                                             ? "bg-red-100 text-red-500"
-                                                                                            : "bg-[#F2E4FF] text-primary"
-                                                                                        : "bg-[#F2E4FF] text-primary"
+                                                                                            : "bg-primary-bg text-primary"
+                                                                                        : "bg-primary-bg text-primary"
                                                                                 }`}
                                                                             >
                                                                                 {metadata.icon}
@@ -2287,13 +2287,13 @@ export default function AlertSetting() {
                                                                                 <div className="relative w-44 min-w-[140px]">
                                                                                     <button
                                                                                         type="button"
-                                                                                        className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white ${
+                                                                                        className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary-muted focus:border-transparent bg-white ${
                                                                                             !canEnableAlert
                                                                                                 ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
                                                                                                 : isAlertEnabled
                                                                                                   ? isCritical
                                                                                                       ? "border-red-200 bg-red-50 text-red-700"
-                                                                                                      : "border-[#E7D4F0] bg-[#F7ECFF] text-primary"
+                                                                                                      : "border-[#E7D4F0] bg-primary-bg text-primary"
                                                                                                   : "border-gray-200 bg-white text-gray-500"
                                                                                         }`}
                                                                                         disabled={
@@ -2552,7 +2552,7 @@ export default function AlertSetting() {
                                                                         isAlertEnabled
                                                                             ? isCritical
                                                                                 ? "border-red-200 bg-gradient-to-r from-red-50/50 to-white"
-                                                                                : "border-[#E7D4F0] bg-gradient-to-r from-[#F7ECFF]/50 to-white"
+                                                                                : "border-[#E7D4F0] bg-gradient-to-r from-primary-bg/50 to-white"
                                                                             : "border-gray-200 bg-gray-50/30"
                                                                     }`}
                                                                 >
@@ -2564,8 +2564,8 @@ export default function AlertSetting() {
                                                                                     isAlertEnabled
                                                                                         ? isCritical
                                                                                             ? "bg-red-100 text-red-500"
-                                                                                            : "bg-[#F2E4FF] text-primary"
-                                                                                        : "bg-[#F2E4FF] text-primary"
+                                                                                            : "bg-primary-bg text-primary"
+                                                                                        : "bg-primary-bg text-primary"
                                                                                 }`}
                                                                             >
                                                                                 {metadata.icon}
@@ -2634,13 +2634,13 @@ export default function AlertSetting() {
                                                                                 <div className="relative w-44 min-w-[140px]">
                                                                                     <button
                                                                                         type="button"
-                                                                                        className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white ${
+                                                                                        className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary-muted focus:border-transparent bg-white ${
                                                                                             !canEnableAlert
                                                                                                 ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
                                                                                                 : isAlertEnabled
                                                                                                   ? isCritical
                                                                                                       ? "border-red-200 bg-red-50 text-red-700"
-                                                                                                      : "border-[#E7D4F0] bg-[#F7ECFF] text-primary"
+                                                                                                      : "border-[#E7D4F0] bg-primary-bg text-primary"
                                                                                                   : "border-gray-200 bg-white text-gray-500"
                                                                                         }`}
                                                                                         disabled={
@@ -2865,7 +2865,7 @@ export default function AlertSetting() {
                                                                         <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4">
                                                                             {/* Icon + mobile badge row */}
                                                                             <div className="flex items-center justify-between md:block">
-                                                                                <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 bg-[#F2E4FF] text-primary">
+                                                                                <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 bg-primary-bg text-primary">
                                                                                     {metadata.icon}
                                                                                 </div>
                                                                                 <AlertStatusBadge
@@ -2917,7 +2917,7 @@ export default function AlertSetting() {
                                                                             <div className="relative w-44 min-w-[140px]">
                                                                                 <button
                                                                                     type="button"
-                                                                                    className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white ${
+                                                                                    className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary-muted focus:border-transparent bg-white ${
                                                                                         !canEnableAlert
                                                                                             ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
                                                                                             : "border-gray-200 bg-white text-gray-700"
@@ -3107,7 +3107,7 @@ export default function AlertSetting() {
                                                                 type="button"
                                                                 disabled={!primaryContainer || configList.length === 0}
                                                                 onClick={() => setShowChamberCopyDropdown((v) => !v)}
-                                                                className="w-full md:w-auto px-4 py-2.5 border border-primary text-primary rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                                className="w-full md:w-auto px-4 py-2.5 border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary-bg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                                             >
                                                                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                                                 Apply to Other Chambers
@@ -3119,7 +3119,7 @@ export default function AlertSetting() {
                                                                 return (
                                                                     <>
                                                                         <div className="fixed inset-0 z-40" onClick={() => { setShowChamberCopyDropdown(false); }} />
-                                                                        <div className="absolute bottom-full right-0 mb-2 w-64 bg-white border border-[#E7E1E1] rounded-xl shadow-xl z-50 overflow-hidden">
+                                                                        <div className="absolute bottom-full right-0 mb-2 w-64 bg-white border border-line rounded-xl shadow-xl z-50 overflow-hidden">
                                                                             <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
                                                                                 <span className="text-xs text-gray-500">{otherChambers.length} chamber{otherChambers.length !== 1 ? "s" : ""}</span>
                                                                                 <button
@@ -3141,7 +3141,7 @@ export default function AlertSetting() {
                                                                                     <div className="px-4 py-3 text-xs text-gray-400">No other chambers available.</div>
                                                                                 )}
                                                                                 {otherChambers.map((cid) => (
-                                                                                    <label key={cid} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7ECFF] cursor-pointer">
+                                                                                    <label key={cid} className="flex items-center gap-3 px-4 py-2.5 hover:bg-primary-bg cursor-pointer">
                                                                                         <input
                                                                                             type="checkbox"
                                                                                             checked={selectedChamberIds.includes(cid)}
@@ -3215,7 +3215,7 @@ export default function AlertSetting() {
                                                                 type="button"
                                                                 disabled={!primaryContainer || configList.length === 0}
                                                                 onClick={() => setShowBranchDropdown((v) => !v)}
-                                                                className="w-full md:w-auto px-4 py-2.5 border border-primary text-primary rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                                className="w-full md:w-auto px-4 py-2.5 border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary-bg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                                             >
                                                                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
@@ -3231,7 +3231,7 @@ export default function AlertSetting() {
                                                                 return (
                                                                     <>
                                                                         <div className="fixed inset-0 z-40" onClick={() => { setShowBranchDropdown(false); setSelectedTankIds([]); }} />
-                                                                        <div className="absolute bottom-full right-0 mb-2 w-72 bg-white border border-[#E7E1E1] rounded-xl shadow-xl z-50 overflow-hidden">
+                                                                        <div className="absolute bottom-full right-0 mb-2 w-72 bg-white border border-line rounded-xl shadow-xl z-50 overflow-hidden">
                                                                             <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
                                                                                 <span className="text-xs text-gray-500">{filteredTanks.length} tank{filteredTanks.length !== 1 ? "s" : ""}</span>
                                                                                 <button
@@ -3253,7 +3253,7 @@ export default function AlertSetting() {
                                                                                     <div className="px-4 py-3 text-xs text-gray-400">No tanks available.</div>
                                                                                 )}
                                                                                 {filteredTanks.map((c) => (
-                                                                                    <label key={c.tank_id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7ECFF] cursor-pointer">
+                                                                                    <label key={c.tank_id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-primary-bg cursor-pointer">
                                                                                         <input
                                                                                             type="checkbox"
                                                                                             checked={selectedTankIds.includes(c.tank_id)}
@@ -3563,7 +3563,7 @@ export default function AlertSetting() {
                                         : handleCreate
                                 }
                                 disabled={submitLoading}
-                                className="px-4 py-2 bg-[#9C3AA6] text-white rounded hover:opacity-90 text-sm disabled:opacity-50"
+                                className="px-4 py-2 bg-primary-muted text-white rounded hover:opacity-90 text-sm disabled:opacity-50"
                             >
                                 {submitLoading
                                     ? "Saving..."
@@ -3686,7 +3686,7 @@ export default function AlertSetting() {
                                             }
                                         }}
                                         disabled={notifySettingsSaving}
-                                        className="px-4 py-2 border border-[#E7E1E1] rounded text-sm"
+                                        className="px-4 py-2 border border-line rounded text-sm"
                                     >
                                         Cancel
                                     </button>
@@ -3726,7 +3726,7 @@ export default function AlertSetting() {
                         <div className="flex gap-4 justify-end">
                             <button
                                 type="button"
-                                className="px-6 py-2 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium transition hover:bg-[#E8D4F0] disabled:opacity-50"
+                                className="px-6 py-2 bg-primary-bg text-primary-light rounded-md font-medium transition hover:bg-[#E8D4F0] disabled:opacity-50"
                                 onClick={closeDeleteConfirm}
                                 disabled={deleteLoading}
                             >
@@ -3761,7 +3761,7 @@ export default function AlertSetting() {
                         <div className="flex gap-4 justify-end">
                             <button
                                 type="button"
-                                className="px-6 py-2 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium transition hover:bg-[#E8D4F0]"
+                                className="px-6 py-2 bg-primary-bg text-primary-light rounded-md font-medium transition hover:bg-[#E8D4F0]"
                                 onClick={handleContinueWithOldSetting}
                             >
                                 Keep Existing Settings

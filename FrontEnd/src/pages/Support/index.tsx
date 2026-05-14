@@ -622,7 +622,7 @@ const Support: React.FC = () => {
                                                 ? "border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed"
                                                 : fullNameError
                                                   ? "border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500"
-                                                  : "border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]"
+                                                  : "border-gray-300 bg-white text-gray-900 focus:ring-primary-light"
                                         }`}
                                         placeholder="Enter your full name"
                                     />
@@ -648,7 +648,7 @@ const Support: React.FC = () => {
                                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                                             identityDisabled
                                                 ? "border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed"
-                                                : "border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]"
+                                                : "border-gray-300 bg-white text-gray-900 focus:ring-primary-light"
                                         }`}
                                         placeholder="Enter your work email"
                                     />
@@ -669,7 +669,7 @@ const Support: React.FC = () => {
                                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                                             readonly
                                                 ? "cursor-not-allowed bg-gray-100 text-gray-600 border-gray-200"
-                                                : "border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]"
+                                                : "border-gray-300 bg-white text-gray-900 focus:ring-primary-light"
                                         }`}
                                     >
                                         <option value="">Select</option>
@@ -711,7 +711,7 @@ const Support: React.FC = () => {
                                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                                             readonly
                                                 ? "border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed"
-                                                : "border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]"
+                                                : "border-gray-300 bg-white text-gray-900 focus:ring-primary-light"
                                         }`}
                                         placeholder="e.g., 'No alert on excursion during shipment #5238'"
                                     />
@@ -734,7 +734,7 @@ const Support: React.FC = () => {
                                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                                         readonly
                                             ? "border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed"
-                                            : "border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]"
+                                            : "border-gray-300 bg-white text-gray-900 focus:ring-primary-light"
                                     }`}
                                     placeholder="Explain what happened, what you expected, and any relevant shipment/device ID."
                                 />
@@ -889,7 +889,7 @@ const Support: React.FC = () => {
                                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                                             readonly
                                                 ? "cursor-not-allowed bg-gray-100 text-gray-600 border-gray-200"
-                                                : "border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]"
+                                                : "border-gray-300 bg-white text-gray-900 focus:ring-primary-light"
                                         }`}
                                     >
                                         <option value="">
@@ -930,7 +930,7 @@ const Support: React.FC = () => {
                                                                     .checked,
                                                             )
                                                         }
-                                                        className="h-4 w-4 rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#8b2a96]"
+                                                        className="h-4 w-4 rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-light"
                                                         style={{
                                                             accentColor:
                                                                 COLORS.primary
@@ -1096,7 +1096,7 @@ const Support: React.FC = () => {
                                                             e.target.value,
                                                         )
                                                     }
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8b2a96]"
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-light"
                                                     placeholder={
                                                         "Add a comment..."
                                                     }
@@ -1170,7 +1170,7 @@ const Support: React.FC = () => {
                                             href="https://mygrape.org/contact/"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-primary underline hover:text-[#8b2a96] font-semibold"
+                                            className="text-primary underline hover:text-primary-light font-semibold"
                                         >
                                             https://mygrape.org/contact/
                                         </a>
@@ -1185,7 +1185,7 @@ const Support: React.FC = () => {
                                                 )
                                             }
                                             disabled={readonly}
-                                            className="h-4 w-4 rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#8b2a96]"
+                                            className="h-4 w-4 rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-light"
                                             style={{
                                                 accentColor:
                                                     COLORS.primary.purple,
