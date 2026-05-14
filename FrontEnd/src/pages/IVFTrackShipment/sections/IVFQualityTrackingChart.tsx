@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, Fragment } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ivfService } from '../../../services/ivfService';
 import {
@@ -1329,25 +1329,29 @@ export default function IVFQualityTrackingChart({
 
       {/* KPI Tabs (from DB kpi_config when available) */}
       {!hideTabs && (
-        <div id="onboarding-chart-kpi-tabs" className="flex gap-1 mb-3 flex-wrap">
+        <div id="onboarding-chart-kpi-tabs" className="flex items-center gap-0 mb-3 flex-wrap">
           {!hasLoadedKpiConfig ? (
             <span className="text-xs text-[#7C7C7C]">Loading...</span>
           ) : (
-            kpiTabs.map((tab) => (
-              <button
-                key={tab.id}
-                id={tab.id === 'ln2_level' ? 'onboarding-chart-tab-ln2' : undefined}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
-                  activeTab === tab.id
-                    ? 'bg-purple-100 border-purple-300 text-purple-900'
-                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <KpiTabIcon id={tab.id} />
-                {tab.label}
-              </button>
+            kpiTabs.map((tab, index) => (
+              <Fragment key={tab.id}>
+                <button
+                  id={tab.id === 'ln2_level' ? 'onboarding-chart-tab-ln2' : undefined}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+                    activeTab === tab.id
+                      ? 'bg-[#6B1176] text-white border-[#6B1176]'
+                      : 'bg-transparent border-transparent text-gray-600 hover:border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <KpiTabIcon id={tab.id} />
+                  {tab.label}
+                </button>
+                {index < kpiTabs.length - 1 && (
+                  <div className="w-px h-4 bg-gray-200 mx-1 flex-shrink-0" />
+                )}
+              </Fragment>
             ))
           )}
         </div>
