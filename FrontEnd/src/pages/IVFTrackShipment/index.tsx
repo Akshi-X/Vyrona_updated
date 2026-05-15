@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTrackingDark.svg';
@@ -37,6 +37,7 @@ export default function IVFTrackShipmentPage() {
     const [headerBranchName, setHeaderBranchName] = useState<string>("-");
     const [tankMaxCapacity, setTankMaxCapacity] = useState<number | null>(null);
     const [tankMinCapacity, setTankMinCapacity] = useState<number | null>(null);
+    const [ln2L2Threshold, setLn2L2Threshold] = useState<number | null>(null);
     const [accessDenied, setAccessDenied] = useState(false);
     const [countdown, setCountdown] = useState(3);
 
@@ -65,6 +66,8 @@ export default function IVFTrackShipmentPage() {
     const [exporting, setExporting] = useState(false);
     const [useNewCryocan, setUseNewCryocan] = useState(false);
     const [systemActivity, setSystemActivity] = useState<ActivityLogRecord[]>([]);
+    const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
+    const qualityChartRef = useRef<HTMLDivElement>(null);
     const [cryocanCanisters, setCryocanCanisters] = useState<
         Array<{ id: string; label: string; sampleCount?: number; status?: string }>
     >([]);
@@ -121,6 +124,49 @@ export default function IVFTrackShipmentPage() {
 
     const { sensorTiles, ln2Level, internalTemp, externalTemp, lidStatus } =
         useIvfKpiSnapshot({ tankId, enabled: useNewCryocan });
+
+    const toFiniteNumber = (value: unknown): number | null => {
+        if (typeof value === "number") return Number.isFinite(value) ? value : null;
+        if (typeof value === "string") {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+    };
+
+    const clampPercent = (value: number | null): number | null =>
+        value == null ? null : Math.min(100, Math.max(0, value));
+
+    const extractLn2Thresholds = (kpiLimits: unknown): { l1: number | null; l2: number | null } => {
+        const ln2Level =
+            kpiLimits && typeof kpiLimits === "object"
+                ? (kpiLimits as Record<string, unknown>).ln2_level
+                : null;
+
+        if (!ln2Level || typeof ln2Level !== "object") {
+            return { l1: null, l2: null };
+        }
+
+        const entries = Object.entries(ln2Level as Record<string, Record<string, unknown>>);
+        const l1Entry = entries.find(([name]) => name.toLowerCase().includes("l1"))?.[1];
+        const l2Entry = entries.find(([name]) => name.toLowerCase().includes("l2"))?.[1];
+
+        const nextL1 = toFiniteNumber(l1Entry?.max) ?? toFiniteNumber(l2Entry?.min);
+        const nextL2 = toFiniteNumber(l1Entry?.min) ?? toFiniteNumber(l2Entry?.max);
+
+        if (nextL1 == null && nextL2 == null && entries.length > 0) {
+            const legacy = entries[0][1] as Record<string, unknown>;
+            return {
+                l1: clampPercent(toFiniteNumber(legacy?.max)),
+                l2: clampPercent(toFiniteNumber(legacy?.min)),
+            };
+        }
+
+        return {
+            l1: clampPercent(nextL1),
+            l2: clampPercent(nextL2),
+        };
+    };
     const fetchCriticalAlerts = async () => {
         setLoadingAlerts(true);
         try {
@@ -194,16 +240,19 @@ export default function IVFTrackShipmentPage() {
             setHeaderBranchName("-");
             setTankMaxCapacity(null);
             setTankMinCapacity(null);
+            setLn2L2Threshold(null);
             return;
         }
 
         try {
             const kpiConfigResponse = await ivfService.getTankKpiConfig(tankId);
+            const thresholds = extractLn2Thresholds(kpiConfigResponse?.kpi_limits);
 
             setHeaderTankCode(kpiConfigResponse?.tank_code || "-");
             setHeaderBranchName(kpiConfigResponse?.branch_name || "-");
             setTankMaxCapacity(kpiConfigResponse?.tank_max_capacity_reading ?? null);
             setTankMinCapacity(kpiConfigResponse?.tank_min_capacity_reading ?? null);
+            setLn2L2Threshold(thresholds.l2);
         } catch (e: unknown) {
             const msg = (e as Error)?.message || "";
             if (msg.includes("403") || msg.toLowerCase().includes("access denied") || msg.toLowerCase().includes("does not belong")) {
@@ -214,6 +263,7 @@ export default function IVFTrackShipmentPage() {
                 setHeaderBranchName("-");
                 setTankMaxCapacity(null);
                 setTankMinCapacity(null);
+                setLn2L2Threshold(null);
             }
         }
     };
@@ -543,6 +593,7 @@ export default function IVFTrackShipmentPage() {
                                         lidStatus={lidStatus ?? undefined}
                                         tankMaxCapacity={tankMaxCapacity}
                                         tankMinCapacity={tankMinCapacity}
+                                        ln2L2Threshold={ln2L2Threshold}
                                         sensorTiles={sensorTiles}
                                         canisters={cryocanCanisters}
                                         canisterContents={cryocanContents}
@@ -551,9 +602,14 @@ export default function IVFTrackShipmentPage() {
                                         internalTempAlert={internalTempAlert}
                                         tankCode={headerTankCode !== "-" ? headerTankCode : undefined}
                                         branchName={headerBranchName !== "-" ? headerBranchName : undefined}
+                                        selectedSensorId={selectedSensorId}
+                                        onSensorSelect={(id) => {
+                                            setSelectedSensorId(id);
+                                            setTimeout(() => qualityChartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+                                        }}
                                     />
-                                    <div style={{ marginBottom: 16 }}>
-                                        <IVFQualityTrackingChart canisterNumber={tankId} />
+                                    <div ref={qualityChartRef} style={{ marginBottom: 16 }}>
+                                        <IVFQualityTrackingChart canisterNumber={tankId} selectedKpiKey={selectedSensorId} />
                                     </div>
                                 </>
                             )}
