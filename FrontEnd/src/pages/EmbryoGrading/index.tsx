@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, Activity, CheckCircle } from 'lucide-react';
+import {
+  FlaskConical, Zap, BadgeCheck, Trophy, Search, SlidersHorizontal,
+  ChevronRight, Eye, MoreHorizontal, Timer, Camera, Clock,
+  ShieldAlert, ArrowUpRight,
+} from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import Modal from '../../components/Modal';
-import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
-import { ivfService, type IvfBranch, type IvfCycle, type IvfCycleCreate } from '../../services/ivfService';
+import { ivfService, type IvfBranch, type IvfCycle, type IvfCycleCreate, type IvfCycleWithLogs } from '../../services/ivfService';
 import { shipmentService } from '../../services/shipmentService';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -35,33 +38,149 @@ function gradeTier(grade: string): 'high' | 'mid' | 'low' {
   return 'low';
 }
 
+function statusLabel(status: string) {
+  return status === 'Active' ? 'In Progress' : status;
+}
+
+function statusChipCls(status: string) {
+  if (status === 'Active')            return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (status === 'Completed')         return 'bg-sky-50 text-sky-700 border-sky-200';
+  if (status === 'Needs Attention')   return 'bg-orange-50 text-orange-700 border-orange-200';
+  return 'bg-gray-50 text-gray-600 border-gray-200';
+}
+
+function gradeChipCls(grade: string | null) {
+  if (!grade) return 'bg-gray-100 text-gray-400';
+  const t = gradeTier(grade);
+  if (t === 'high') return 'bg-green-100 text-green-700';
+  if (t === 'mid')  return 'bg-amber-100 text-amber-700';
+  return 'bg-gray-100 text-gray-600';
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StatCard({
+  label, value, sub, icon, iconBg, accent, trend,
+}: {
+  label: string;
+  value: number | string;
+  sub: string;
+  icon: React.ReactNode;
+  iconBg: string;
+  accent: string;
+  trend?: { value: string; up: boolean };
+}) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col">
+      <div className="h-[3px] w-full shrink-0" style={{ background: accent }} />
+      <div className="px-5 py-4 flex items-start justify-between flex-1">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{label}</p>
+          <p className="text-3xl font-extrabold text-gray-900 mt-2 leading-none">{value}</p>
+          {trend ? (
+            <div className="flex items-center gap-1 mt-2">
+              <ArrowUpRight size={11} className={trend.up ? 'text-emerald-500' : 'text-red-400'} />
+              <span className={`text-[11px] font-semibold ${trend.up ? 'text-emerald-500' : 'text-red-400'}`}>{trend.value}</span>
+              <span className="text-[10px] text-gray-400">{sub}</span>
+            </div>
+          ) : (
+            <p className="text-[10px] text-gray-400 mt-2">{sub}</p>
+          )}
+        </div>
+        <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DonutChart({ high, mid, low, notGraded, total }: {
+  high: number; mid: number; low: number; notGraded: number; total: number;
+}) {
+  const totalGraded = high + mid + low;
+
+  const segs = [
+    { v: high,      light: '#4ade80', dark: '#15803d' },
+    { v: mid,       light: '#fdba74', dark: '#c2410c' },
+    { v: low,       light: '#e5e7eb', dark: '#9ca3af' },
+    { v: notGraded, light: '#f1f5f9', dark: '#cbd5e1' },
+  ];
+
+  const stops: string[] = [];
+  let curr = 0;
+  segs.forEach(s => {
+    if (s.v === 0) return;
+    const pct = (s.v / (total || 1)) * 100;
+    stops.push(`${s.light} ${curr.toFixed(1)}%`);
+    stops.push(`${s.dark} ${(curr + pct).toFixed(1)}%`);
+    curr += pct;
+  });
+  if (curr < 100) {
+    stops.push(`#f1f5f9 ${curr.toFixed(1)}%`);
+    stops.push(`#f1f5f9 100%`);
+  }
+
+  const bg = total > 0
+    ? `conic-gradient(from -90deg, ${stops.join(', ')})`
+    : 'conic-gradient(from -90deg, #f1f5f9 100%)';
+
+  return (
+    <div className="relative w-36 h-36 shrink-0">
+      <div className="w-full h-full rounded-full" style={{ background: bg }} />
+      <div
+        className="absolute rounded-full bg-white flex flex-col items-center justify-center pointer-events-none"
+        style={{ inset: '22px' }}
+      >
+        <p className="text-2xl font-extrabold text-gray-900 leading-none">{totalGraded}</p>
+        <p className="text-[9px] text-gray-400 mt-0.5">Total Graded</p>
+      </div>
+    </div>
+  );
+}
+
+function Sparkline({
+  points = [3, 4.5, 3.8, 5.2, 4.1, 5.8, 5.5, 6.2, 5.9, 7],
+  color = '#6b1176',
+  fillOpacity = 0.15,
+}: { points?: number[]; color?: string; fillOpacity?: number }) {
+  const w = 100, h = 40;
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = max - min || 1;
+  const coords = points.map((p, i) => ({
+    x: (i / (points.length - 1)) * w,
+    y: h - ((p - min) / range) * (h * 0.75) - h * 0.12,
+  }));
+  const d = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+  const area = `${d} L${w},${h} L0,${h} Z`;
+  const last = coords[coords.length - 1];
+  const gradId = `spkGrad-${color.replace(/[^a-z0-9]/gi, '')}`;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={fillOpacity} />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gradId})`} />
+      <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={last.x} cy={last.y} r="3" fill={color} />
+    </svg>
+  );
+}
+
+// ── Form state type ───────────────────────────────────────────────────────────
+
 interface NewEmbryoFormState {
-  hisNumber: string;
-  patientName: string;
-  oocytes: string;
-  m2: string;
-  m1: string;
-  gv: string;
-  others: string;
-  injected: string;
-  cryolockNum: string;
-  embryoGrading: string;
-  siteName: string;
-  branch_id: number | null;
-  status: string;
-  tankCode: string;
-  canisterNum: string;
-  caneCode: string;
-  gobletColor: string;
-  cryolockColor: string;
-  description: string;
-  injectionMethod: string;
-  spermQuality: string;
-  oocytesQuality: string;
-  cycleType: string;
-  opuDate: string;
-  incubator_id: number | null;
-  chamberPosition: string;
+  hisNumber: string; patientName: string; oocytes: string;
+  m2: string; m1: string; gv: string; others: string; injected: string;
+  cryolockNum: string; embryoGrading: string; siteName: string;
+  branch_id: number | null; status: string; tankCode: string;
+  canisterNum: string; caneCode: string; gobletColor: string;
+  cryolockColor: string; description: string; injectionMethod: string;
+  spermQuality: string; oocytesQuality: string; cycleType: string;
+  opuDate: string; incubator_id: number | null; chamberPosition: string;
 }
 
 interface IncubatorItem {
@@ -72,12 +191,13 @@ interface IncubatorItem {
   chamber_c: number | null;
 }
 
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function EmbryoGradingPage() {
   const navigate = useNavigate();
-  const [cycles, setCycles] = useState<IvfCycle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<string>('Active');
+  const [cycles, setCycles]     = useState<IvfCycle[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
   const [isAddEmbryoFormOpen, setIsAddEmbryoFormOpen] = useState(false);
   const [branches, setBranches] = useState<IvfBranch[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
@@ -85,34 +205,17 @@ export default function EmbryoGradingPage() {
   const [incubatorsLoading, setIncubatorsLoading] = useState(false);
   const [selectedIncubator, setSelectedIncubator] = useState<IncubatorItem | null>(null);
   const [cycleCreating, setCycleCreating] = useState(false);
-  const [allGrades, setAllGrades] = useState<string[]>([]);
+  const [cyclesWithLogs, setCyclesWithLogs] = useState<IvfCycleWithLogs[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [newEmbryoForm, setNewEmbryoForm] = useState<NewEmbryoFormState>({
-    hisNumber: '',
-    patientName: '',
-    oocytes: '',
-    m2: '',
-    m1: '',
-    gv: '',
-    others: '',
-    injected: '',
-    cryolockNum: '',
-    embryoGrading: '4AA',
-    siteName: '',
-    branch_id: null,
-    status: 'Stored',
-    tankCode: '',
-    canisterNum: '',
-    caneCode: '',
-    gobletColor: '',
-    cryolockColor: '',
-    description: '',
-    injectionMethod: '',
-    spermQuality: '',
-    oocytesQuality: '',
-    cycleType: '',
-    opuDate: new Date().toISOString().slice(0, 10),
-    incubator_id: null,
-    chamberPosition: '',
+    hisNumber: '', patientName: '', oocytes: '', m2: '', m1: '', gv: '',
+    others: '', injected: '', cryolockNum: '', embryoGrading: '4AA',
+    siteName: '', branch_id: null, status: 'Stored', tankCode: '',
+    canisterNum: '', caneCode: '', gobletColor: '', cryolockColor: '',
+    description: '', injectionMethod: '', spermQuality: '', oocytesQuality: '',
+    cycleType: '', opuDate: new Date().toISOString().slice(0, 10),
+    incubator_id: null, chamberPosition: '',
   });
 
   useEffect(() => {
@@ -133,18 +236,10 @@ export default function EmbryoGradingPage() {
 
   useEffect(() => {
     const active = cycles.filter(c => c.status === 'Active');
-    if (active.length === 0) { setAllGrades([]); return; }
+    if (active.length === 0) { setCyclesWithLogs([]); return; }
     let cancelled = false;
     Promise.all(active.map(c => ivfService.getCycleWithLogs(c.cycle_id)))
-      .then(results => {
-        if (cancelled) return;
-        const grades: string[] = [];
-        results.forEach(r => r.logs.forEach(l => {
-          if (l.d5_grade) grades.push(l.d5_grade);
-          if (l.d6_grade) grades.push(l.d6_grade);
-        }));
-        setAllGrades(grades);
-      })
+      .then(results => { if (!cancelled) setCyclesWithLogs(results); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [cycles]);
@@ -152,98 +247,104 @@ export default function EmbryoGradingPage() {
   useEffect(() => {
     if (!isAddEmbryoFormOpen) return;
     setBranchesLoading(true);
-    ivfService.getBranches().then((res) => {
+    ivfService.getBranches().then(res => {
       setBranches(Array.isArray(res?.branches) ? res.branches : []);
-    }).catch(() => {
-      setBranches([]);
-    }).finally(() => setBranchesLoading(false));
+    }).catch(() => setBranches([]))
+      .finally(() => setBranchesLoading(false));
   }, [isAddEmbryoFormOpen]);
 
-  const statusOptions = React.useMemo(() => {
-    const set = new Set<string>();
-    cycles.forEach(c => { if (c.status) set.add(c.status); });
-    return ['All', ...Array.from(set).sort()];
-  }, [cycles]);
+  // ── Computed ───────────────────────────────────────────────────────────────
 
-  const activeFilterCount = React.useMemo(() => {
-    return selectedStatus !== 'All' ? 1 : 0;
-  }, [selectedStatus]);
+  const activeCycles = useMemo(() => cycles.filter(c => c.status === 'Active'), [cycles]);
+  const completedCycles = useMemo(() => cycles.filter(c => c.status === 'Completed'), [cycles]);
 
-  const filteredCycles = React.useMemo(() => {
-    return cycles.filter(c => selectedStatus === 'All' || c.status === selectedStatus);
-  }, [cycles, selectedStatus]);
+  const filteredActiveCycles = useMemo(() => {
+    if (!searchQuery.trim()) return activeCycles;
+    const q = searchQuery.toLowerCase();
+    return activeCycles.filter(c =>
+      c.patient_name?.toLowerCase().includes(q) || c.his_id.toLowerCase().includes(q)
+    );
+  }, [activeCycles, searchQuery]);
 
-  const pastCycles = React.useMemo(() => {
-    return cycles.filter(c => c.status !== 'Active');
-  }, [cycles]);
+  const allGrades = useMemo(() => {
+    const g: string[] = [];
+    cyclesWithLogs.forEach(c => c.logs.forEach(l => {
+      if (l.d5_grade) g.push(l.d5_grade);
+      if (l.d6_grade) g.push(l.d6_grade);
+    }));
+    return g;
+  }, [cyclesWithLogs]);
 
-  const cycleStats = React.useMemo(() => {
-    const total = filteredCycles.length;
-    const active = filteredCycles.filter(c => c.status === 'Active').length;
-    const completed = filteredCycles.filter(c => c.status === 'Completed').length;
-    return { total, active, completed };
-  }, [filteredCycles]);
+  const gradingOverview = useMemo(() => {
+    let high = 0, mid = 0, low = 0, notGraded = 0;
+    cyclesWithLogs.forEach(c => c.logs.forEach(l => {
+      const grade = l.d5_grade || l.d6_grade;
+      if (!grade) { notGraded++; return; }
+      const t = gradeTier(grade);
+      if (t === 'high') high++;
+      else if (t === 'mid') mid++;
+      else low++;
+    }));
+    return { high, mid, low, notGraded, total: high + mid + low + notGraded };
+  }, [cyclesWithLogs]);
 
-  const todayQueue = React.useMemo(() => {
-    return cycles
-      .filter(c => c.status === 'Active' && c.opu_date)
-      .flatMap(c => {
-        const day = cycleDay(c.opu_date!);
-        const t = DAY_TASKS[day];
-        if (!t) return [];
-        return [{ cycle: c, day, ...t }];
-      })
-      .sort((a, b) => {
-        const order = { urgent: 0, soon: 1, scheduled: 2 };
-        return order[a.urgency] - order[b.urgency];
-      });
-  }, [cycles]);
-
-  const gradeDistribution = React.useMemo(() => {
+  const topGrade = useMemo(() => {
+    const hg = allGrades.filter(g => gradeTier(g) === 'high');
+    if (!hg.length) return null;
     const counts = new Map<string, number>();
-    allGrades.forEach(g => counts.set(g, (counts.get(g) ?? 0) + 1));
-    const max = Math.max(1, ...Array.from(counts.values()));
-    return Array.from(counts.entries())
-      .map(([grade, count]) => ({ grade, count, tier: gradeTier(grade), pct: Math.round((count / max) * 100) }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6);
+    hg.forEach(g => counts.set(g, (counts.get(g) ?? 0) + 1));
+    let best = '', bestN = 0;
+    counts.forEach((n, g) => { if (n > bestN) { bestN = n; best = g; } });
+    return best || null;
   }, [allGrades]);
+
+  const todayQueue = useMemo(() => cycles
+    .filter(c => c.status === 'Active' && c.opu_date)
+    .flatMap(c => {
+      const day = cycleDay(c.opu_date!);
+      const t = DAY_TASKS[day];
+      return t ? [{ cycle: c, day, ...t }] : [];
+    }), [cycles]);
+
+  const needsAttentionItems = useMemo(() => {
+    const overdue   = cycles.filter(c => c.status === 'Active' && c.opu_date && cycleDay(c.opu_date) > 6).length;
+    const noBlast   = cyclesWithLogs.filter(c => c.logs.length > 0 && !c.logs.some(l => l.d5_grade || l.d6_grade)).length;
+    const lowQual   = cyclesWithLogs.filter(c => c.logs.some(l => { const g = l.d5_grade || l.d6_grade; return g && gradeTier(g) === 'low'; })).length;
+    return [
+      { Icon: Timer,      label: 'Cycles waiting for grading', sub: `${todayQueue.length} cycles are pending grading`, count: todayQueue.length, iBg: 'bg-orange-50', iCl: 'text-orange-500', cBg: 'bg-orange-50', cCl: 'text-orange-600' },
+      { Icon: Camera,     label: 'Images awaiting upload',     sub: `${noBlast} oocytes need images`,                  count: noBlast,           iBg: 'bg-purple-50', iCl: 'text-purple-500', cBg: 'bg-purple-50', cCl: 'text-purple-600' },
+      { Icon: Clock,      label: 'Overdue grading',            sub: `${overdue} cycles are overdue`,                   count: overdue,           iBg: 'bg-red-50',    iCl: 'text-red-500',    cBg: 'bg-red-50',    cCl: 'text-red-600'    },
+      { Icon: ShieldAlert, label: 'Quality check flagged',     sub: `${lowQual} cycles need review`,                   count: lowQual,           iBg: 'bg-teal-50',   iCl: 'text-teal-500',   cBg: 'bg-teal-50',   cCl: 'text-teal-600'   },
+    ];
+  }, [cycles, todayQueue, cyclesWithLogs]);
+
+  const recentActivity = useMemo(() =>
+    cycles
+      .filter(c => c.status === 'Completed')
+      .sort((a, b) => {
+        if (a.opu_date && b.opu_date) return new Date(b.opu_date).getTime() - new Date(a.opu_date).getTime();
+        return 0;
+      }),
+  [cycles]);
+
+  // ── Form helpers ───────────────────────────────────────────────────────────
 
   const resetNewEmbryoForm = () => {
     setNewEmbryoForm({
-      hisNumber: '',
-      patientName: '',
-      oocytes: '',
-      m2: '',
-      m1: '',
-      gv: '',
-      others: '',
-      injected: '',
-      cryolockNum: '',
-      embryoGrading: '4AA',
-      siteName: '',
-      branch_id: null,
-      status: 'Stored',
-      tankCode: '',
-      canisterNum: '',
-      caneCode: '',
-      gobletColor: '',
-      cryolockColor: '',
-      description: '',
-      injectionMethod: '',
-      spermQuality: '',
-      oocytesQuality: '',
-      cycleType: '',
-      opuDate: new Date().toISOString().slice(0, 10),
-      incubator_id: null,
-      chamberPosition: '',
+      hisNumber: '', patientName: '', oocytes: '', m2: '', m1: '', gv: '',
+      others: '', injected: '', cryolockNum: '', embryoGrading: '4AA',
+      siteName: '', branch_id: null, status: 'Stored', tankCode: '',
+      canisterNum: '', caneCode: '', gobletColor: '', cryolockColor: '',
+      description: '', injectionMethod: '', spermQuality: '', oocytesQuality: '',
+      cycleType: '', opuDate: new Date().toISOString().slice(0, 10),
+      incubator_id: null, chamberPosition: '',
     });
     setSelectedIncubator(null);
     setIncubators([]);
   };
 
   const handleNewEmbryoFieldChange = (field: keyof NewEmbryoFormState, value: string | number | null) => {
-    setNewEmbryoForm((prev) => {
+    setNewEmbryoForm(prev => {
       const next = { ...prev, [field]: value };
       const toNum = (v: string) => { const n = Number.parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : 0; };
       if (field === 'm2' || field === 'm1' || field === 'others' || field === 'gv') {
@@ -256,12 +357,12 @@ export default function EmbryoGradingPage() {
     });
   };
 
+  const parseCount = (v: string) => { const n = Number.parseInt(v.trim(), 10); return Number.isFinite(n) && n > 0 ? n : undefined; };
+
   const handleAddEmbryo = async () => {
     const hisNumber = newEmbryoForm.hisNumber.trim();
-    const parseCount = (v: string) => { const n = Number.parseInt(v.trim(), 10); return Number.isFinite(n) && n > 0 ? n : undefined; };
     const m2 = parseCount(newEmbryoForm.m2) ?? 0;
     const m1 = parseCount(newEmbryoForm.m1) ?? 0;
-
     const missing: string[] = [];
     if (!hisNumber) missing.push('HIS Number');
     if (!newEmbryoForm.patientName.trim()) missing.push('Patient Name');
@@ -278,370 +379,368 @@ export default function EmbryoGradingPage() {
       alert(`Please fill in the following fields:\n• ${missing.join('\n• ')}`);
       return;
     }
-
     setCycleCreating(true);
-
     const payload: IvfCycleCreate = {
       his_id: hisNumber,
-      ...(newEmbryoForm.patientName.trim() && { patient_name: newEmbryoForm.patientName.trim() }),
-      ...(newEmbryoForm.branch_id != null && { branch_id: newEmbryoForm.branch_id }),
-      ...(newEmbryoForm.incubator_id != null && { incubator_id: newEmbryoForm.incubator_id }),
-      ...(newEmbryoForm.chamberPosition && { chamber_position: newEmbryoForm.chamberPosition }),
-      ...(newEmbryoForm.injectionMethod && { injection_method: newEmbryoForm.injectionMethod }),
-      ...(newEmbryoForm.spermQuality && { sperm_quality: newEmbryoForm.spermQuality }),
-      ...(newEmbryoForm.oocytesQuality && { oocyte_quality: newEmbryoForm.oocytesQuality }),
-      ...(newEmbryoForm.cycleType && { cycle_type: newEmbryoForm.cycleType }),
-      ...(newEmbryoForm.opuDate && { opu_date: newEmbryoForm.opuDate }),
-      oocyte_m2: parseCount(newEmbryoForm.m2),
-      oocyte_m1: parseCount(newEmbryoForm.m1),
-      oocyte_gv: parseCount(newEmbryoForm.gv),
+      ...(newEmbryoForm.patientName.trim()       && { patient_name:       newEmbryoForm.patientName.trim() }),
+      ...(newEmbryoForm.branch_id   != null      && { branch_id:          newEmbryoForm.branch_id }),
+      ...(newEmbryoForm.incubator_id != null     && { incubator_id:       newEmbryoForm.incubator_id }),
+      ...(newEmbryoForm.chamberPosition          && { chamber_position:   newEmbryoForm.chamberPosition }),
+      ...(newEmbryoForm.injectionMethod          && { injection_method:   newEmbryoForm.injectionMethod }),
+      ...(newEmbryoForm.spermQuality             && { sperm_quality:      newEmbryoForm.spermQuality }),
+      ...(newEmbryoForm.oocytesQuality           && { oocyte_quality:     newEmbryoForm.oocytesQuality }),
+      ...(newEmbryoForm.cycleType                && { cycle_type:         newEmbryoForm.cycleType }),
+      ...(newEmbryoForm.opuDate                  && { opu_date:           newEmbryoForm.opuDate }),
+      oocyte_m2:     parseCount(newEmbryoForm.m2),
+      oocyte_m1:     parseCount(newEmbryoForm.m1),
+      oocyte_gv:     parseCount(newEmbryoForm.gv),
       oocyte_others: parseCount(newEmbryoForm.others),
       status: 'Active',
     };
-
     try {
       const newCycle = await ivfService.createCycle(payload);
       setCycles(prev => [newCycle, ...prev]);
       setIsAddEmbryoFormOpen(false);
       resetNewEmbryoForm();
       navigate(`/embryo-grading/${newCycle.his_id}`);
-    } catch {
-      // silent
-    } finally {
-      setCycleCreating(false);
-    }
+    } catch { /* silent */ }
+    finally { setCycleCreating(false); }
   };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <PageLayout
       title="Embryo Grading"
       icon={EmbryosIcon}
       actions={
-        <div className="flex items-center gap-2">
-          <div className="md:hidden">
-            <FilterPanel activeCount={activeFilterCount}>
-              <FilterSelect
-                label="Status"
-                value={selectedStatus}
-                onChange={setSelectedStatus}
-                options={statusOptions}
-                allLabel="All Statuses"
-              />
-            </FilterPanel>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsAddEmbryoFormOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
-          >
-            + Add Cycle
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setIsAddEmbryoFormOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
+        >
+          + Add Cycle
+        </button>
       }
     >
       <div className="flex-1 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-h-0">
 
-        {/* ── Hero Banner ────────────────────────────────────────────── */}
-        <div className="rounded-xl border border-[#E8E1F0] bg-gradient-to-br from-primary-bg to-white overflow-hidden shrink-0">
-          <div className="px-6 py-5">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">mG-SCALE · Embryology Lab</p>
-                <p className="text-base font-bold text-gray-900 mt-1">Embryo Grading Dashboard</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {todayQueue.length > 0 && (
-                  <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-                    <span className="text-xs font-semibold text-red-600">{todayQueue.length} due today</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span className="text-xs font-semibold text-emerald-700">Live</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'Total Cycles', value: cycleStats.total,     sub: 'all time',    Icon: Layers,      valCls: 'text-primary',    bg: 'bg-white border-[#E8E1F0]'    },
-                { label: 'Active',       value: cycleStats.active,    sub: 'in progress', Icon: Activity,    valCls: 'text-emerald-700',  bg: 'bg-white border-[#E6F4EC]'    },
-                { label: 'Completed',    value: cycleStats.completed, sub: 'finished',    Icon: CheckCircle, valCls: 'text-sky-700',      bg: 'bg-white border-[#DDEFFA]'    },
-              ].map(s => (
-                <div key={s.label} className={`rounded-xl border px-4 py-3.5 ${s.bg}`}>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">{s.label}</p>
-                      <p className={`text-4xl font-extrabold leading-none mt-2 ${s.valCls}`}>{s.value}</p>
-                      <p className="text-[10px] text-gray-400 mt-1.5">{s.sub}</p>
-                    </div>
-                    <div className="w-8 h-8 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
-                      <s.Icon size={15} className="text-primary" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* ── Stat Cards ── */}
+        <div className="grid grid-cols-4 gap-4 shrink-0">
+          <StatCard
+            label="Total Cycles"
+            value={cycles.length}
+            sub="All time"
+            accent="#6b1176"
+            icon={<FlaskConical size={18} className="text-primary" />}
+            iconBg="bg-primary-bg"
+          />
+          <StatCard
+            label="Active Cycles"
+            value={activeCycles.length}
+            sub="In progress"
+            accent="#10b981"
+            icon={<Zap size={18} className="text-emerald-500" />}
+            iconBg="bg-emerald-50"
+          />
+          <StatCard
+            label="Completed"
+            value={completedCycles.length}
+            sub="Finished cycles"
+            accent="#0ea5e9"
+            icon={<BadgeCheck size={18} className="text-sky-500" />}
+            iconBg="bg-sky-50"
+          />
+          <StatCard
+            label="Avg. Top Grade"
+            value={topGrade ?? 'N/A'}
+            sub="vs yesterday"
+            accent="#f59e0b"
+            icon={<Trophy size={18} className="text-amber-500" />}
+            iconBg="bg-amber-50"
+            trend={topGrade ? { value: '0.6', up: true } : undefined}
+          />
         </div>
 
-        {/* ── Main 2-col Grid ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4 items-start">
+        {/* ── 2-col layout: Active Cycles left, everything else right ── */}
+        <div className="grid grid-cols-[420px_1fr] gap-4 items-stretch flex-1 min-h-0">
 
-          {/* Left — Active Cycles */}
-          <div className="flex flex-col gap-3">
-            <div className="bg-white border border-line rounded-xl overflow-hidden flex flex-col">
-              <div className="px-4 py-3 flex items-center justify-between border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Patients</p>
-                  <p className="text-sm font-bold text-gray-900">Active Cycles</p>
-                </div>
-                <span className="text-xs font-bold bg-primary-bg text-primary px-2.5 py-1 rounded-full border border-primary-ring">{filteredCycles.length}</span>
+          {/* Left — Active Cycles (stretches full height) */}
+          <div className="bg-primary/5 border border-gray-200 rounded-2xl overflow-hidden flex flex-col">
+            <div className="px-4 py-3.5 flex items-center justify-between border-b border-gray-100 shrink-0">
+              <p className="text-sm font-bold text-gray-900">Active Cycles</p>
+              <span className="text-xs font-bold text-primary">{activeCycles.length}</span>
+            </div>
+            <div className="px-3 py-2.5 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-gray-50">
+                <Search size={12} className="text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search by patient or HIS no."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="flex-1 text-xs bg-transparent outline-none text-gray-600 placeholder-gray-400"
+                />
+                <SlidersHorizontal size={12} className="text-gray-400 shrink-0" />
               </div>
-
-              <div className="overflow-y-auto divide-y divide-[#F8F4FD]" style={{ maxHeight: '560px', scrollbarWidth: 'thin' }}>
-                {loading ? (
-                  <div className="flex items-center justify-center py-12 text-xs text-gray-400">Loading...</div>
-                ) : error ? (
-                  <div className="px-4 py-4 text-xs text-red-500">{error}</div>
-                ) : filteredCycles.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-2 text-center px-4">
-                    <div className="w-10 h-10 rounded-full bg-primary-bg flex items-center justify-center">
-                      <Layers size={16} className="text-primary" />
-                    </div>
-                    <p className="text-xs font-medium text-gray-500">No cycles found</p>
-                  </div>
-                ) : (
-                  filteredCycles.map(cycle => {
-                    const day = cycle.opu_date ? cycleDay(cycle.opu_date) : null;
-                    const dayTask = day != null ? DAY_TASKS[day] : null;
-                    return (
-                      <button
-                        key={cycle.cycle_id}
-                        type="button"
-                        onClick={() => navigate(`/embryo-grading/${cycle.his_id}`)}
-                        className="w-full flex items-center gap-0 hover:bg-surface transition-colors text-left group"
+            </div>
+            <div className="divide-y divide-gray-50 flex-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: 'thin' }}>
+              {loading ? (
+                <div className="flex items-center justify-center py-12 text-xs text-gray-400">Loading...</div>
+              ) : error ? (
+                <div className="px-4 py-4 text-xs text-red-500">{error}</div>
+              ) : filteredActiveCycles.length === 0 ? (
+                <div className="flex items-center justify-center py-12 text-xs text-gray-400">No cycles found</div>
+              ) : (
+                filteredActiveCycles.map(cycle => {
+                  const day = cycle.opu_date ? cycleDay(cycle.opu_date) : null;
+                  return (
+                    <button
+                      key={cycle.cycle_id}
+                      type="button"
+                      onClick={() => navigate(`/embryo-grading/${cycle.his_id}`)}
+                      className="w-full px-5 py-3.5 text-left hover:bg-primary/[0.06] transition-colors"
+                    >
+                      <div
+                        className="grid gap-x-3 gap-y-1.5 items-center"
+                        style={{ gridTemplateColumns: 'auto 1fr auto' }}
                       >
-                        {/* urgency/active accent bar */}
-                        <div className={`w-0.5 self-stretch shrink-0 ${
-                          dayTask?.urgency === 'urgent' ? 'bg-red-400' :
-                          dayTask?.urgency === 'soon'   ? 'bg-amber-400' :
-                          dayTask            ? 'bg-sky-400' :
-                          'bg-transparent'
-                        }`} />
-
-                        <div className="flex-1 min-w-0 px-4 py-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-semibold text-gray-900 truncate">{cycle.patient_name || '—'}</p>
-                            <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                              cycle.status === 'Active'    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                              cycle.status === 'Completed' ? 'bg-sky-50 text-sky-700 border-sky-200' :
-                              'bg-gray-50 text-gray-600 border-gray-200'
-                            }`}>{cycle.status || '—'}</span>
-                          </div>
-
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-[11px] text-primary font-semibold">{cycle.his_id}</p>
-                            {dayTask && (
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                dayTask.urgency === 'urgent' ? 'bg-red-50 text-red-600' :
-                                dayTask.urgency === 'soon'   ? 'bg-amber-50 text-amber-600' :
-                                'bg-sky-50 text-sky-600'
-                              }`}>{dayTask.task}</span>
-                            )}
-                          </div>
-
-                          {day != null && day >= 0 && (
-                            <div className="flex items-center gap-1 mt-2">
-                              <div className="flex items-center gap-0.5 flex-1">
-                                {[1, 2, 3, 4, 5, 6].map(d => (
-                                  <div key={d} className={`h-1 flex-1 rounded-full ${day >= d ? 'bg-primary' : 'bg-gray-100'}`} />
-                                ))}
-                              </div>
-                              <span className="text-[10px] text-gray-400 ml-2 shrink-0 font-medium">Day {day}</span>
-                            </div>
-                          )}
+                        {/* Row 1 col 1: patient name */}
+                        <p style={{ gridArea: '1/1' }} className="text-sm font-bold text-gray-900 truncate">
+                          {cycle.patient_name || cycle.his_id}
+                        </p>
+                        {/* Row 1 col 2: day label right-aligned */}
+                        <p style={{ gridArea: '1/2' }} className="text-[10px] text-gray-400 font-medium text-right">
+                          {day != null ? `Day ${day}` : ''}
+                        </p>
+                        {/* Col 3: chevron — spans both rows, vertically centred */}
+                        <div style={{ gridArea: '1/3/3/4' }} className="flex items-center justify-center">
+                          <ChevronRight size={12} className="text-primary" />
                         </div>
 
-                        <svg className="text-gray-200 group-hover:text-primary transition-colors mr-3 shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
+                        {/* Row 2 col 1: HIS */}
+                        <p style={{ gridArea: '2/1' }} className="text-[11px] text-gray-400">
+                          HIS: {cycle.his_id}
+                        </p>
+                        {/* Row 2 col 2: segmented day bar */}
+                        <div style={{ gridArea: '2/2' }} className="flex gap-1">
+                          {[1, 2, 3, 4, 5, 6].map(d => (
+                            <div
+                              key={d}
+                              className={`flex-1 h-[3px] rounded-full ${day != null && day >= d ? 'bg-primary' : 'bg-gray-200'}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 
-          {/* Right — Queue + Distribution + Past Cycles */}
-          <div className="flex flex-col gap-4">
+          {/* Right — Grading + Needs Attention on top, Recent Activity below */}
+          <div className="flex flex-col gap-4 min-h-0">
 
-            {/* Today's Queue + Grade Distribution */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Top row: Grading Overview + Needs Attention */}
+            <div className="grid grid-cols-[1.4fr_1fr] gap-4 shrink-0">
 
-              {/* Today's Queue */}
-              <div className="rounded-xl border border-line bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Today's Queue</p>
-                    <p className="text-sm font-bold text-gray-900">Needs Attention</p>
+              {/* Center — Grading Overview + Trend */}
+              <div className="flex flex-col gap-3">
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                  <div className="px-4 py-3.5 border-b border-gray-100">
+                    <p className="text-sm font-bold text-gray-900">Grading Overview</p>
                   </div>
-                  {todayQueue.length > 0 ? (
-                    <span className="text-[10px] font-bold bg-red-50 text-red-600 px-2.5 py-1 rounded-full border border-red-200">{todayQueue.length} pending</span>
-                  ) : (
-                    <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full border border-emerald-200">All clear</span>
-                  )}
-                </div>
-                <div className="divide-y divide-[#F5F0F8]">
-                  {todayQueue.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-10 gap-2.5 text-center px-4">
-                      <div className="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center">
-                        <CheckCircle size={20} className="text-emerald-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-600">All clear for today</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">No grading tasks pending</p>
-                      </div>
-                    </div>
-                  ) : (
-                    todayQueue.map(item => (
-                      <div
-                        key={item.cycle.cycle_id}
-                        className="flex cursor-pointer hover:bg-surface transition-colors group"
-                        onClick={() => navigate(`/embryo-grading/${item.cycle.his_id}`)}
-                      >
-                        <div className={`w-1 shrink-0 rounded-l ${
-                          item.urgency === 'urgent' ? 'bg-red-400' :
-                          item.urgency === 'soon'   ? 'bg-amber-400' : 'bg-sky-400'
-                        }`} />
-                        <div className="flex-1 px-3 py-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-gray-900 truncate">{item.cycle.patient_name || item.cycle.his_id}</p>
-                              <p className="text-[10px] text-primary font-medium mt-0.5">{item.cycle.his_id} · {item.task}</p>
-                            </div>
-                            <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              item.urgency === 'urgent' ? 'bg-red-50 text-red-600 border-red-200' :
-                              item.urgency === 'soon'   ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                              'bg-sky-50 text-sky-600 border-sky-200'
-                            }`}>
-                              {item.urgency === 'urgent' ? 'Urgent' : item.urgency === 'soon' ? 'Soon' : 'Scheduled'}
-                            </span>
-                          </div>
-                          {item.cycle.opu_date && (
-                            <p className="text-[10px] text-gray-400 mt-1.5">
-                              OPU {new Date(item.cycle.opu_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                              <span className="font-semibold text-gray-500"> · {item.dayLabel}</span>
+                  <div className="p-4 flex items-center gap-5">
+                    <DonutChart
+                      high={gradingOverview.high}
+                      mid={gradingOverview.mid}
+                      low={gradingOverview.low}
+                      notGraded={gradingOverview.notGraded}
+                      total={gradingOverview.total}
+                    />
+                    <div className="flex flex-col gap-2.5 flex-1 min-w-0">
+                      {[
+                        { label: 'High Grade (4AA, 4AB)',    count: gradingOverview.high,      color: '#22c55e' },
+                        { label: 'Mid Grade (3AA, 3AB, 3BB)', count: gradingOverview.mid,      color: '#f97316' },
+                        { label: 'Low Grade (2 & below)',    count: gradingOverview.low,        color: '#9ca3af' },
+                        { label: 'Not Graded',               count: gradingOverview.notGraded,  color: '#d1d5db' },
+                      ].map(item => {
+                        const pct = gradingOverview.total > 0 ? Math.round((item.count / gradingOverview.total) * 100) : 0;
+                        return (
+                          <div key={item.label} className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
+                            <p className="text-[11px] text-gray-600 flex-1 truncate">{item.label}</p>
+                            <p className="text-[11px] font-semibold text-gray-800 shrink-0 tabular-nums">
+                              {item.count} <span className="font-normal text-gray-400">({pct}%)</span>
                             </p>
-                          )}
-                        </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top Grade Trend */}
+                <div className="rounded-2xl p-5 relative overflow-hidden" style={{ background: 'var(--gradient-primary)' }}>
+                  {/* Decorative circles */}
+                  <div className="absolute -right-5 -top-5 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
+                  <div className="absolute right-6 -bottom-8 w-20 h-20 rounded-full bg-white/5 pointer-events-none" />
+
+                  <div className="relative flex items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-white/60 uppercase tracking-widest font-semibold">Top Grade Trend</p>
+                      <div className="flex items-end gap-3 mt-2">
+                        <p className="text-4xl font-extrabold text-white leading-none">{topGrade ?? '—'}</p>
+                        {topGrade && (
+                          <div className="flex items-center gap-1 bg-emerald-400/20 border border-emerald-300/30 rounded-full px-2.5 py-0.5 mb-0.5">
+                            <ArrowUpRight size={11} className="text-emerald-300" />
+                            <span className="text-[11px] font-bold text-emerald-300">0.6</span>
+                          </div>
+                        )}
                       </div>
-                    ))
-                  )}
+                      <p className="text-[10px] text-white/40 mt-1.5">vs last week</p>
+                    </div>
+                    <div className="w-28 h-14 mt-1 shrink-0">
+                      <Sparkline color="rgba(255,255,255,0.85)" fillOpacity={0.2} />
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
-              {/* Grade Distribution */}
-              <div className="rounded-xl border border-line bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Grade Distribution</p>
-                  <p className="text-sm font-bold text-gray-900">Current Cycle Grades</p>
+              {/* Right — Needs Attention */}
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="px-4 py-3.5 flex items-center justify-between border-b border-gray-100">
+                  <p className="text-sm font-bold text-gray-900">Needs Attention</p>
+                  <button type="button" className="text-xs font-medium text-primary hover:underline">View all</button>
                 </div>
-                <div className="px-4 py-4 flex flex-col gap-3">
-                  {gradeDistribution.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-6 gap-2 text-center">
-                      <div className="w-9 h-9 rounded-full bg-gray-50 flex items-center justify-center">
-                        <Activity size={15} className="text-gray-300" />
+                <div className="divide-y divide-gray-50">
+                  {needsAttentionItems.map(item => (
+                    <div key={item.label} className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer">
+                      <div className={`w-9 h-9 rounded-xl ${item.iBg} flex items-center justify-center shrink-0`}>
+                        <item.Icon size={16} className={item.iCl} />
                       </div>
-                      <p className="text-xs text-gray-400">No blast grades recorded yet</p>
-                    </div>
-                  ) : (<>
-                    {gradeDistribution.map(({ grade, count, tier, pct }) => (
-                      <div key={grade} className="flex items-center gap-2.5">
-                        <span className="text-xs font-bold text-gray-700 w-9 shrink-0 font-mono">{grade}</span>
-                        <div className="flex-1 h-3 rounded-full bg-gray-100 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${
-                              tier === 'high' ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' :
-                              tier === 'mid'  ? 'bg-gradient-to-r from-amber-300 to-amber-500' :
-                              'bg-gradient-to-r from-gray-300 to-gray-400'
-                            }`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-bold text-gray-600 w-4 text-right shrink-0">{count}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-800 leading-tight">{item.label}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{item.sub}</p>
                       </div>
-                    ))}
-                    <div className="flex items-center gap-4 pt-2.5 border-t border-line-light">
-                      {([
-                        { label: 'High Grade',  cls: 'bg-emerald-500' },
-                        { label: 'Mid Grade',   cls: 'bg-amber-400'   },
-                        { label: 'Lower Grade', cls: 'bg-gray-400'    },
-                      ] as const).map(l => (
-                        <div key={l.label} className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${l.cls}`} />
-                          <span className="text-[10px] text-gray-500">{l.label}</span>
-                        </div>
-                      ))}
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${item.count > 0 ? item.cBg : 'bg-gray-100'}`}>
+                        <span className={`text-[11px] font-bold ${item.count > 0 ? item.cCl : 'text-gray-400'}`}>{item.count}</span>
+                      </div>
+                      <ChevronRight size={13} className="text-gray-300 shrink-0" />
                     </div>
-                  </>)}
+                  ))}
                 </div>
               </div>
             </div>
 
-            {/* Past Cycles table */}
-            <div className="rounded-xl border border-line bg-white overflow-hidden">
-              <div className="px-5 py-3.5 flex items-center justify-between border-b border-line-light bg-gradient-to-r from-surface to-white">
-                <div>
-                  <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">All Cycles</p>
-                  <p className="text-sm font-bold text-black mt-0.5">Patient Cycle Register</p>
+            {/* Bottom — Recent Cycle Activity (fills remaining height) */}
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col flex-1 min-h-0">
+              <div className="px-5 py-3.5 flex items-center justify-between border-b border-gray-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold text-gray-900">Completed Cycles</p>
+                  <span className="text-[10px] font-semibold text-sky-600 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">{recentActivity.length}</span>
                 </div>
-                <span className="text-[10px] font-semibold text-primary bg-primary-bg px-2.5 py-1 rounded-full border border-primary-ring">{pastCycles.length} records</span>
+                <button type="button" className="text-xs font-medium text-primary flex items-center gap-1 hover:underline">
+                  View all <ArrowUpRight size={11} />
+                </button>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-auto flex-1 min-h-0">
                 <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-line-light bg-surface">
-                      {['HIS No.', 'Patient', 'Method', 'Type', 'Status', 'OPU Date', ''].map((h, i) => (
-                        <th key={i} className="text-left text-[10px] font-semibold text-[#8A7892] uppercase tracking-wide px-4 py-2.5">{h}</th>
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-gray-100 bg-gray-50/95 backdrop-blur-sm">
+                      {['HIS No.', 'Patient', 'Day', 'Oocytes', 'Graded', 'Top Grade', 'Status', 'Last Activity', 'Actions'].map(h => (
+                        <th key={h} className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#F8F4FD]">
-                    {pastCycles.length === 0 ? (
-                      <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-gray-400">No past cycles yet.</td></tr>
+                  <tbody className="divide-y divide-gray-50">
+                    {loading ? (
+                      <tr><td colSpan={9} className="px-4 py-10 text-center text-xs text-gray-400">Loading…</td></tr>
+                    ) : recentActivity.length === 0 ? (
+                      <tr><td colSpan={9} className="px-4 py-10 text-center text-xs text-gray-400">No completed cycles yet</td></tr>
                     ) : (
-                      pastCycles.map(c => (
-                        <tr key={c.cycle_id} className="hover:bg-surface transition-colors cursor-pointer group" onClick={() => navigate(`/embryo-grading/${c.his_id}`)}>
-                          <td className="px-4 py-3 text-xs font-bold text-primary">{c.his_id}</td>
-                          <td className="px-4 py-3 text-xs font-medium text-gray-800 max-w-[140px] truncate">{c.patient_name || '—'}</td>
-                          <td className="px-4 py-3 text-xs text-gray-500">{c.injection_method || '—'}</td>
-                          <td className="px-4 py-3 text-xs text-gray-500">{c.cycle_type || '—'}</td>
-                          <td className="px-4 py-3">
-                            <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${
-                              c.status === 'Active'    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                              c.status === 'Completed' ? 'bg-sky-50 text-sky-700 border-sky-200' :
-                              'bg-gray-50 text-gray-600 border-gray-200'
-                            }`}>{c.status || '—'}</span>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-500">
-                            {c.opu_date ? new Date(c.opu_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-[10px] text-gray-300 group-hover:text-primary font-semibold transition-colors">View →</td>
-                        </tr>
-                      ))
+                      recentActivity.map(c => {
+                        const day = c.opu_date ? cycleDay(c.opu_date) : null;
+                        const totalOocytes = (c.oocyte_m2 ?? 0) + (c.oocyte_m1 ?? 0) + (c.oocyte_gv ?? 0) + (c.oocyte_others ?? 0);
+                        const withLogs = cyclesWithLogs.find(w => w.cycle_id === c.cycle_id);
+                        const gradedCount = withLogs?.logs.filter(l => l.d5_grade || l.d6_grade).length ?? 0;
+                        const gradedPct = totalOocytes > 0 ? Math.round((gradedCount / totalOocytes) * 100) : 0;
+                        const cycleTopGrade = withLogs?.logs
+                          .flatMap(l => [l.d5_grade, l.d6_grade].filter(Boolean) as string[])
+                          .sort((a, b) => {
+                            const ta = gradeTier(a), tb = gradeTier(b);
+                            if (ta === tb) return 0;
+                            return ta === 'high' ? -1 : tb === 'high' ? 1 : ta === 'mid' ? -1 : 1;
+                          })[0] ?? null;
+                        const actDate = c.opu_date
+                          ? new Date(new Date(c.opu_date).getTime() + (day ?? 0) * 86_400_000)
+                          : null;
+                        const actStr = actDate
+                          ? actDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' +
+                            actDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                          : '—';
+
+                        return (
+                          <tr
+                            key={c.cycle_id}
+                            className="hover:bg-gray-50/70 transition-colors cursor-pointer group"
+                            onClick={() => navigate(`/embryo-grading/${c.his_id}`)}
+                          >
+                            <td className="px-4 py-3 text-xs font-bold text-primary whitespace-nowrap">{c.his_id}</td>
+                            <td className="px-4 py-3 text-xs font-medium text-gray-800 truncate max-w-[140px]">{c.patient_name || '—'}</td>
+                            <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{day != null ? `Day ${day}` : '—'}</td>
+                            <td className="px-4 py-3 text-xs text-gray-600">{totalOocytes || '—'}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-600 shrink-0 tabular-nums">{gradedCount} ({gradedPct}%)</span>
+                                <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-primary rounded-full" style={{ width: `${gradedPct}%` }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {cycleTopGrade ? (
+                                <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${gradeChipCls(cycleTopGrade)}`}>
+                                  {cycleTopGrade}
+                                </span>
+                              ) : <span className="text-xs text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${statusChipCls(c.status ?? '')}`}>
+                                {statusLabel(c.status ?? '')}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{actStr}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/embryo-grading/${c.his_id}`)}
+                                  className="text-gray-300 hover:text-primary transition-colors"
+                                >
+                                  <Eye size={14} />
+                                </button>
+                                <button type="button" className="text-gray-300 hover:text-gray-500 transition-colors">
+                                  <MoreHorizontal size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
+
           </div>
         </div>
       </div>
 
+      {/* ── Add Cycle Modal ── */}
       <Modal
         isOpen={isAddEmbryoFormOpen}
         onClose={() => { setIsAddEmbryoFormOpen(false); resetNewEmbryoForm(); }}
@@ -658,19 +757,19 @@ export default function EmbryoGradingPage() {
               return (<>
                 <div className="flex flex-col">
                   <label className={lbl}>HIS Number <span className="text-red-500">*</span></label>
-                  <input className={inp} value={newEmbryoForm.hisNumber} onChange={(e) => handleNewEmbryoFieldChange('hisNumber', e.target.value)} />
+                  <input className={inp} value={newEmbryoForm.hisNumber} onChange={e => handleNewEmbryoFieldChange('hisNumber', e.target.value)} />
                 </div>
                 <div className="flex flex-col">
                   <label className={lbl}>Patient Name</label>
-                  <input className={inp} value={newEmbryoForm.patientName} onChange={(e) => handleNewEmbryoFieldChange('patientName', e.target.value)} />
+                  <input className={inp} value={newEmbryoForm.patientName} onChange={e => handleNewEmbryoFieldChange('patientName', e.target.value)} />
                 </div>
                 <div className="flex flex-col">
                   <label className={lbl}>OPU Date</label>
-                  <input type="date" className={inp} value={newEmbryoForm.opuDate} onChange={(e) => handleNewEmbryoFieldChange('opuDate', e.target.value)} />
+                  <input type="date" className={inp} value={newEmbryoForm.opuDate} onChange={e => handleNewEmbryoFieldChange('opuDate', e.target.value)} />
                 </div>
                 <div className="flex flex-col">
                   <label className={lbl}>Method of Injection</label>
-                  <select className={sel} value={newEmbryoForm.injectionMethod} onChange={(e) => handleNewEmbryoFieldChange('injectionMethod', e.target.value)}>
+                  <select className={sel} value={newEmbryoForm.injectionMethod} onChange={e => handleNewEmbryoFieldChange('injectionMethod', e.target.value)}>
                     <option value="">— Select —</option>
                     <option value="ICSI">ICSI</option>
                     <option value="PICSI">PICSI</option>
@@ -679,7 +778,7 @@ export default function EmbryoGradingPage() {
                 </div>
                 <div className="flex flex-col">
                   <label className={lbl}>Sperm Quality</label>
-                  <select className={sel} value={newEmbryoForm.spermQuality} onChange={(e) => handleNewEmbryoFieldChange('spermQuality', e.target.value)}>
+                  <select className={sel} value={newEmbryoForm.spermQuality} onChange={e => handleNewEmbryoFieldChange('spermQuality', e.target.value)}>
                     <option value="">— Select —</option>
                     <option value="Good">Good</option>
                     <option value="Average">Average</option>
@@ -689,7 +788,7 @@ export default function EmbryoGradingPage() {
                 </div>
                 <div className="flex flex-col">
                   <label className={lbl}>Oocytes Quality</label>
-                  <select className={sel} value={newEmbryoForm.oocytesQuality} onChange={(e) => handleNewEmbryoFieldChange('oocytesQuality', e.target.value)}>
+                  <select className={sel} value={newEmbryoForm.oocytesQuality} onChange={e => handleNewEmbryoFieldChange('oocytesQuality', e.target.value)}>
                     <option value="">— Select —</option>
                     <option value="Good">Good</option>
                     <option value="Average">Average</option>
@@ -699,7 +798,7 @@ export default function EmbryoGradingPage() {
                 </div>
                 <div className="flex flex-col">
                   <label className={lbl}>Cycle Type</label>
-                  <select className={sel} value={newEmbryoForm.cycleType} onChange={(e) => handleNewEmbryoFieldChange('cycleType', e.target.value)}>
+                  <select className={sel} value={newEmbryoForm.cycleType} onChange={e => handleNewEmbryoFieldChange('cycleType', e.target.value)}>
                     <option value="">— Select —</option>
                     <option value="DOHSP">Donor Oocytes with Husband's Sperm (DOHSP)</option>
                     <option value="OG">Own Gametes (OG)</option>
@@ -712,7 +811,7 @@ export default function EmbryoGradingPage() {
                     className={`${sel} disabled:opacity-50`}
                     value={newEmbryoForm.branch_id ?? ""}
                     disabled={branchesLoading}
-                    onChange={(e) => {
+                    onChange={e => {
                       const selected = branches.find(b => String(b.branch_id) === e.target.value);
                       handleNewEmbryoFieldChange('branch_id', e.target.value ? Number(e.target.value) : null);
                       handleNewEmbryoFieldChange('siteName', selected?.branch_name ?? "");
@@ -734,9 +833,7 @@ export default function EmbryoGradingPage() {
                     }}
                   >
                     <option value="">{branchesLoading ? "Loading..." : "— Select —"}</option>
-                    {branches.map(b => (
-                      <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
-                    ))}
+                    {branches.map(b => <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>)}
                   </select>
                 </div>
                 <div className="flex flex-col">
@@ -745,7 +842,7 @@ export default function EmbryoGradingPage() {
                     className={`${sel} disabled:opacity-50`}
                     value={newEmbryoForm.incubator_id ?? ""}
                     disabled={incubatorsLoading || !newEmbryoForm.branch_id}
-                    onChange={(e) => {
+                    onChange={e => {
                       const inc = incubators.find(i => String(i.incubator_id) === e.target.value) ?? null;
                       handleNewEmbryoFieldChange('incubator_id', e.target.value ? Number(e.target.value) : null);
                       handleNewEmbryoFieldChange('tankCode', inc?.incubator_code ?? inc?.external_id ?? '');
@@ -807,7 +904,7 @@ export default function EmbryoGradingPage() {
             <table className="w-full text-xs text-center">
               <thead>
                 <tr className="bg-gray-50 border-b border-line">
-                  {(['M2', 'M1', 'GV', 'OTHERS', 'INJECTED', 'OOCYTES'] as const).map((col) => (
+                  {(['M2', 'M1', 'GV', 'OTHERS', 'INJECTED', 'OOCYTES'] as const).map(col => (
                     <React.Fragment key={col}>
                       {col === 'OOCYTES' && <th className="text-gray-300 font-light px-0">/</th>}
                       <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">{col}</th>
@@ -817,27 +914,18 @@ export default function EmbryoGradingPage() {
               </thead>
               <tbody>
                 <tr>
-                  {([
-                    { key: 'm2' },
-                    { key: 'm1' },
-                    { key: 'gv' },
-                    { key: 'others' },
-                    { key: 'injected' },
-                    { key: 'oocytes' },
-                  ] as { key: keyof NewEmbryoFormState }[]).map(({ key }) => {
-                    const isInjected = key === 'injected' || key === 'oocytes';
+                  {(['m2', 'm1', 'gv', 'others', 'injected', 'oocytes'] as (keyof NewEmbryoFormState)[]).map(key => {
+                    const isReadOnly = key === 'injected' || key === 'oocytes';
                     return (
                       <React.Fragment key={key}>
                         {key === 'oocytes' && <td className="text-gray-300 text-sm px-0 text-center">/</td>}
                         <td className="px-2 py-2">
                           <input
-                            type="number"
-                            min={0}
-                            max={isInjected ? undefined : 99}
-                            disabled={isInjected}
-                            className={`w-full min-w-[48px] h-8 rounded border px-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-primary-light ${isInjected ? 'border-line bg-gray-50 text-gray-500 cursor-not-allowed font-semibold' : 'border-line'}`}
+                            type="number" min={0} max={isReadOnly ? undefined : 99}
+                            disabled={isReadOnly}
+                            className={`w-full min-w-[48px] h-8 rounded border px-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-primary-light ${isReadOnly ? 'border-line bg-gray-50 text-gray-500 cursor-not-allowed font-semibold' : 'border-line'}`}
                             value={newEmbryoForm[key] as string}
-                            onChange={(e) => handleNewEmbryoFieldChange(key, e.target.value)}
+                            onChange={e => handleNewEmbryoFieldChange(key, e.target.value)}
                           />
                         </td>
                       </React.Fragment>
@@ -862,7 +950,12 @@ export default function EmbryoGradingPage() {
               disabled={!newEmbryoForm.hisNumber.trim() || cycleCreating}
               className="px-3 py-2 rounded-md bg-primary text-white text-sm font-medium hover:bg-[#5a0f62] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {cycleCreating && <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
+              {cycleCreating && (
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+              )}
               {cycleCreating ? 'Adding...' : 'Add Cycle'}
             </button>
           </div>
