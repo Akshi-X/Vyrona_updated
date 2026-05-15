@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { History, FlaskConical, Activity, Sun, Tag, Server, Thermometer, Star } from 'lucide-react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { ivfService, type IvfCycle, type IvfCycleLog, type IvfCycleWithLogs, type IvfLogUpsert, type ChamberLatestItem } from '../../services/ivfService';
@@ -384,29 +385,12 @@ export default function EmbryoGradingDetailPage() {
 
   return (
     <>
-      <div className="flex flex-col min-w-0 w-full flex-1 min-h-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {/* Chamber Health strip */}
-          <div className="px-6 py-3 border-b border-gray-100 bg-surface flex items-center gap-6">
-            <p className="text-[10px] font-semibold text-[#8A7892] uppercase tracking-widest shrink-0">Chamber Health</p>
-            {[
-              { kpi_name: 'incubator_temp', label: 'Temperature' },
-              { kpi_name: 'incubator_o2',   label: 'O₂ Level' },
-              { kpi_name: 'incubator_co2',  label: 'CO₂ Level' },
-            ].map(def => {
-              const match = chamberHealth.find(h => h.kpi_name === def.kpi_name);
-              const display = chamberHealthLoading ? '...' : match?.value != null ? `${match.value}${match.unit}` : '—';
-              return (
-                <div key={def.kpi_name} className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-gray-400">{def.label}</span>
-                  <span className="text-[11px] font-bold text-primary">{display}</span>
-                </div>
-              );
-            })}
-          </div>
+      <div className="flex flex-col min-w-0 w-full flex-1 min-h-0 overflow-hidden">
 
-          <div className="flex-1 overflow-y-auto p-6">
             {selectedCycle ? (
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4 p-4">
+                <div className="flex gap-4 items-start">
+                <div className="flex-1 min-w-0">
                 {/* Cycle Journey */}
                 {(() => {
                   const totalOocytes = (selectedCycle.oocyte_m2 ?? 0) + (selectedCycle.oocyte_m1 ?? 0) + (selectedCycle.oocyte_gv ?? 0) + (selectedCycle.oocyte_others ?? 0);
@@ -426,71 +410,279 @@ export default function EmbryoGradingDetailPage() {
                     { label: 'GV',     value: selectedCycle.oocyte_gv ?? 0,     color: 'text-white/80' },
                     { label: 'Others', value: selectedCycle.oocyte_others ?? 0, color: 'text-white/80' },
                   ];
+                  const rawDay = calculateDayInCycle();
+                  const dayNum2 = parseInt(rawDay.replace('Day ', ''), 10);
+                  const qualityColor = (v: string) => {
+                    const l = v.toLowerCase();
+                    return l.includes('good') || l.includes('excellent')
+                      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                      : l.includes('average') || l.includes('moderate')
+                      ? 'text-amber-700 bg-amber-50 border-amber-200'
+                      : l.includes('poor') || l.includes('bad')
+                      ? 'text-rose-700 bg-rose-50 border-rose-200'
+                      : 'text-gray-700 bg-gray-50 border-gray-200';
+                  };
+                  const grade = primaryGradeDetails?.grade;
+                  const gradeCls = grade
+                    ? grade.slice(1) === 'AA' ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                    : grade.slice(1) === 'BB' ? 'text-amber-700 bg-amber-50 border-amber-200'
+                    : 'text-primary bg-primary-bg border-primary/20'
+                    : '';
                   return (
-                    <div className="rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-[#3b0764] via-primary to-[#4a044e] border border-primary-muted/40">
-                      <div className="flex divide-x divide-white/10">
-                        {stages.map((s, i) => (
-                          <div key={s.label} className="flex-1 flex flex-col items-center px-3 py-4 relative">
-                            <div className="absolute bottom-0 left-0 right-0 h-[6px] bg-white/10">
-                              <div className={`h-full bg-gradient-to-r ${s.bar} transition-all duration-700`} style={{ width: `${pct(s.value, s.base)}%` }} />
-                            </div>
-                            <span className="text-xs font-extrabold uppercase tracking-widest mb-2 text-primary-ring">{s.label}</span>
-                            <span className="text-3xl font-black text-white leading-none tabular-nums">{s.value}</span>
-                            {i > 0 ? (
-                              <span className="mt-1.5 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/10 text-primary-ring">
-                                {pct(s.value, s.base)}%
-                              </span>
-                            ) : (
-                              <div className="flex items-center gap-1.5 mt-2 flex-wrap justify-center">
-                                {breakdown.map((b) => (
-                                  <span key={b.label} className={`text-[10px] font-bold ${b.color}`}>
-                                    {b.value} <span className="font-bold text-white/80">{b.label}</span>
-                                  </span>
-                                ))}
+                    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+
+                      {/* ── Row 1: Oocyte breakdown header ── */}
+                      <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b border-primary/10">
+                        <span className="text-[10px] font-bold text-primary uppercase tracking-widest shrink-0">Oocytes</span>
+                        <span className="text-xl font-black text-primary">{totalOocytes}</span>
+                        <div className="flex items-center gap-2 ml-1">
+                          {breakdown.map(b => (
+                            <span key={b.label} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-primary/20 text-[10px] font-semibold text-gray-700">
+                              <span className="font-black text-primary">{b.value}</span>
+                              <span className="text-gray-400">{b.label}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* ── Row 2: Funnel stages ── */}
+                      <div className="flex items-stretch divide-x divide-gray-100 border-b border-gray-100">
+                        {stages.slice(1).map(s => {
+                          const percent = pct(s.value, s.base);
+                          const pctCls = percent >= 60 ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                                       : percent >= 30 ? 'text-amber-600 bg-amber-50 border-amber-200'
+                                       :                 'text-rose-500 bg-rose-50 border-rose-200';
+                          return (
+                            <div key={s.label} className="flex-1 flex flex-col items-center gap-1 px-3 py-3">
+                              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{s.label}</span>
+                              <span className="text-2xl font-black text-gray-900 leading-none tabular-nums">{s.value}</span>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${pctCls}`}>{percent}%</span>
+                              <div className="w-full h-1 rounded-full bg-gray-100 mt-1">
+                                <div className={`h-full rounded-full bg-gradient-to-r ${s.bar} transition-all duration-700`} style={{ width: `${percent}%` }} />
                               </div>
+                            </div>
+                          );
+                        })}
+                        <div className="flex-1 flex flex-col items-center justify-center gap-1 px-3 py-3 bg-primary/[0.03]">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Good Grade</span>
+                          {logSummary.blastGoodGrades ? (
+                            <div className="flex flex-wrap gap-1 justify-center mt-0.5">
+                              {logSummary.blastGoodGrades.split(', ').map(g => (
+                                <span key={g} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-bg text-primary border border-primary/20">{g}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-lg font-black text-gray-300">—</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ── Row 3: Cycle info cards ── */}
+                      <div className="grid grid-cols-4 gap-2 p-3 border-t border-gray-100 bg-gray-50/40">
+
+                        {/* Current Day */}
+                        <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shadow-sm shrink-0">
+                            <span className="text-sm font-black text-white leading-none">{dayNum2 >= 0 ? dayNum2 : '—'}</span>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9px] font-bold text-primary/50 uppercase tracking-widest whitespace-nowrap">Current Day</span>
+                            <div className="flex items-center gap-0.5">
+                              {[0,1,2,3,4,5,6].map(d => (
+                                <div key={d} className={`rounded-full transition-all ${d === dayNum2 ? 'w-3 h-1.5 bg-primary' : d < dayNum2 ? 'w-1.5 h-1.5 bg-primary/50' : 'w-1.5 h-1.5 bg-primary/15'}`} />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Injection Method */}
+                        <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                            <FlaskConical size={13} />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Injection Method</span>
+                            <span className="text-sm font-bold text-gray-800">{selectedCycle.injection_method || '—'}</span>
+                          </div>
+                        </div>
+
+                        {/* Sperm Quality */}
+                        <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                            <Activity size={13} />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Sperm Quality</span>
+                            {selectedCycle.sperm_quality ? (
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded border w-fit ${qualityColor(selectedCycle.sperm_quality)}`}>{selectedCycle.sperm_quality}</span>
+                            ) : (
+                              <span className="text-sm font-bold text-gray-800">—</span>
                             )}
                           </div>
-                        ))}
-                        <div className="flex-1 flex flex-col items-center px-3 py-4">
-                          <span className="text-xs font-extrabold uppercase tracking-widest mb-2 text-primary-ring">Good Grade</span>
-                          <span className="text-sm font-black text-white leading-snug text-center">{logSummary.blastGoodGrades || '—'}</span>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })()}
 
-                {(() => {
-                  const rawDay = calculateDayInCycle();
-                  const dayNum = parseInt(rawDay.replace('Day ', ''), 10);
-                  const dayDisplay = dayNum > 6 ? '6+' : rawDay;
-                  return (
-                    <div className="rounded-lg border border-line bg-white overflow-hidden">
-                      <div className="flex divide-x divide-line-light overflow-x-auto">
-                        <div className="px-4 py-3 bg-primary-bg min-w-[110px]">
-                          <p className="text-xs font-extrabold text-primary-muted uppercase tracking-wide mb-1 whitespace-nowrap">Current Day</p>
-                          <p className="text-sm font-black text-primary">{dayDisplay}</p>
-                        </div>
-                        {([
-                          { label: 'Injection Method', value: selectedCycle.injection_method || '—' },
-                          { label: 'Sperm Quality',    value: selectedCycle.sperm_quality || '—' },
-                          { label: 'Oocyte Quality',   value: selectedCycle.oocyte_quality || '—' },
-                          { label: 'Type',             value: selectedCycle.cycle_type || '—' },
-                          { label: 'Chamber',          value: selectedCycle.chamber_position || '—' },
-                        ] as { label: string; value: string }[]).map((item) => (
-                          <div key={item.label} className="flex-1 min-w-[110px] px-4 py-3">
-                            <p className="text-xs font-extrabold uppercase tracking-wide mb-1 whitespace-nowrap text-primary-muted">{item.label}</p>
-                            <p className="text-sm font-semibold text-gray-900">{item.value}</p>
+                        {/* Oocyte Quality */}
+                        <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                            <Sun size={13} />
                           </div>
-                        ))}
-                        <div className="px-4 py-3 min-w-[110px]">
-                          <p className="text-xs font-extrabold uppercase tracking-wide mb-1 whitespace-nowrap text-primary-muted">Best Grade</p>
-                          <p className="text-sm font-semibold text-gray-900">{primaryGradeDetails?.grade || '—'}</p>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Oocyte Quality</span>
+                            {selectedCycle.oocyte_quality ? (
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded border w-fit ${qualityColor(selectedCycle.oocyte_quality)}`}>{selectedCycle.oocyte_quality}</span>
+                            ) : (
+                              <span className="text-sm font-bold text-gray-800">—</span>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Type */}
+                        <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                            <Tag size={13} />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Type</span>
+                            <span className="text-sm font-bold text-gray-800">{selectedCycle.cycle_type || '—'}</span>
+                          </div>
+                        </div>
+
+                        {/* Chamber */}
+                        <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                            <Server size={13} />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Chamber</span>
+                            <span className="text-sm font-bold text-gray-800">{String(selectedCycle.chamber_position ?? '—')}</span>
+                          </div>
+                        </div>
+
+                        {/* Chamber Health */}
+                        <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                            <Thermometer size={13} />
+                          </div>
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Chamber Health</span>
+                            <div className="flex items-center gap-1">
+                              {[
+                                { kpi_name: 'incubator_temp', label: 'T' },
+                                { kpi_name: 'incubator_o2',   label: 'O₂' },
+                                { kpi_name: 'incubator_co2',  label: 'CO₂' },
+                              ].map(def => {
+                                const match = chamberHealth.find(h => h.kpi_name === def.kpi_name);
+                                const val = chamberHealthLoading ? '…' : match?.value != null ? `${match.value}${match.unit}` : '—';
+                                return (
+                                  <span key={def.kpi_name} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/5 border border-primary/10 text-[10px]">
+                                    <span className="font-semibold text-gray-400">{def.label}</span>
+                                    <span className="font-black text-primary">{val}</span>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Best Grade */}
+                        <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                            <Star size={13} />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Best Grade</span>
+                            {grade ? (
+                              <span className={`text-sm font-black px-2 py-0.5 rounded-lg border w-fit ${gradeCls}`}>{grade}</span>
+                            ) : (
+                              <span className="text-sm font-black text-gray-300">—</span>
+                            )}
+                          </div>
+                        </div>
+
                       </div>
                     </div>
                   );
                 })()}
+                </div>
+
+                <div className="w-72 shrink-0 self-stretch flex flex-col rounded-lg border border-line bg-white overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white">
+                    <div className="flex items-center gap-2">
+                      <History size={14} className="text-[#8A7892]" />
+                      <p className="text-sm font-bold text-gray-900 leading-tight">Recent Activity</p>
+                    </div>
+                    {timelineEvents.length > 0 && (
+                      <span className="text-[10px] font-semibold bg-primary-bg text-primary px-2 py-0.5 rounded-full border border-primary-ring">
+                        {timelineEvents.length} events
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto">
+                    {timelineLoading ? (
+                      <div className="flex items-center justify-center py-10 text-xs text-gray-400">Loading activity…</div>
+                    ) : timelineEvents.length === 0 ? (
+                      <div className="flex items-center justify-center py-10 text-xs text-gray-400">No activity recorded yet.</div>
+                    ) : (
+                      <div className="relative px-4 py-3">
+                        <div className="absolute left-[23px] top-3 bottom-3 w-px bg-primary-ring" />
+                        <div className="flex flex-col gap-0">
+                          {timelineEvents.map((ev, idx) => {
+                            const actorName = ev.actor_label
+                              || (`${ev.actor_details?.first_name || ''} ${ev.actor_details?.last_name || ''}`.trim())
+                              || ev.actor_id
+                              || 'System';
+                            const branch = ev.actor_details?.branch_name || '';
+                            const dt = new Date(ev.created_at);
+                            const meta = ev.metadata || {};
+                            const chips: string[] = [];
+                            if (meta.oocyte_no != null) chips.push(`Oocyte #${meta.oocyte_no}`);
+                            if (meta.d1_pn) chips.push(`PN: ${meta.d1_pn}`);
+                            if (meta.d3_grade) chips.push(`Grade: ${meta.d3_grade}`);
+                            if (meta.d5_grade) chips.push(`Grade: ${meta.d5_grade}`);
+                            if (meta.d6_grade) chips.push(`Grade: ${meta.d6_grade}`);
+                            if (meta.fate) chips.push(`Fate: ${meta.fate}`);
+                            if (meta.injection_method) chips.push(`Method: ${meta.injection_method}`);
+                            const LABELS: Record<string, string> = {
+                              'ivf_cycle.created': 'Cycle Created',
+                              'ivf_cycle.updated': 'Cycle Updated',
+                              'ivf_cycle.oocyte_log.d0_saved': 'Day 0 Saved',
+                              'ivf_cycle.oocyte_log.d1_updated': 'Day 1 Updated',
+                              'ivf_cycle.oocyte_log.d3_updated': 'Day 3 Updated',
+                              'ivf_cycle.oocyte_log.d5_updated': 'Day 5 Updated',
+                              'ivf_cycle.oocyte_log.d6_updated': 'Day 6 Updated',
+                              'ivf_cycle.oocyte_log.fate_set': 'Fate Set',
+                            };
+                            const label = LABELS[ev.action] || ev.action;
+                            const isLast = idx === timelineEvents.length - 1;
+                            return (
+                              <div key={ev.id} className={`flex gap-3 ${isLast ? 'pb-0' : 'pb-4'}`}>
+                                <div className="shrink-0 flex flex-col items-center z-10">
+                                  <div className="w-3 h-3 rounded-full bg-primary border-2 border-white ring-1 ring-[#c084fc] mt-1" />
+                                </div>
+                                <div className="flex-1 min-w-0 bg-surface border border-line-light rounded-lg px-3 py-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <span className="text-xs font-semibold text-gray-900">{label}</span>
+                                    <span className="text-[10px] text-gray-400 whitespace-nowrap shrink-0">
+                                      {dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  {chips.length > 0 && (
+                                    <p className="text-[11px] text-primary mt-0.5 font-medium">{chips.join(' · ')}</p>
+                                  )}
+                                  <p className="text-[10px] text-gray-500 mt-1">
+                                    {actorName}{branch ? <span className="text-gray-400"> · {branch}</span> : ''}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                </div>
 
                 {(() => {
                   const dayNum = parseInt(calculateDayInCycle().replace('Day ', ''), 10);
@@ -632,91 +824,12 @@ export default function EmbryoGradingDetailPage() {
                     {selectedCycle?.status === 'Completed' ? 'Completed' : 'Review & Complete'}
                   </button>
                 </div>
-
-                <div className="rounded-lg border border-line bg-white overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8A7892]">Audit Trail</p>
-                      <p className="text-sm font-bold text-gray-900 leading-tight">Recent Activity</p>
-                    </div>
-                    {timelineEvents.length > 0 && (
-                      <span className="text-[10px] font-semibold bg-primary-bg text-primary px-2 py-0.5 rounded-full border border-primary-ring">
-                        {timelineEvents.length} events
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
-                    {timelineLoading ? (
-                      <div className="flex items-center justify-center py-10 text-xs text-gray-400">Loading activity…</div>
-                    ) : timelineEvents.length === 0 ? (
-                      <div className="flex items-center justify-center py-10 text-xs text-gray-400">No activity recorded yet.</div>
-                    ) : (
-                      <div className="relative px-4 py-3">
-                        <div className="absolute left-[23px] top-3 bottom-3 w-px bg-primary-ring" />
-                        <div className="flex flex-col gap-0">
-                          {timelineEvents.map((ev, idx) => {
-                            const actorName = ev.actor_label
-                              || (`${ev.actor_details?.first_name || ''} ${ev.actor_details?.last_name || ''}`.trim())
-                              || ev.actor_id
-                              || 'System';
-                            const branch = ev.actor_details?.branch_name || '';
-                            const dt = new Date(ev.created_at);
-                            const meta = ev.metadata || {};
-                            const chips: string[] = [];
-                            if (meta.oocyte_no != null) chips.push(`Oocyte #${meta.oocyte_no}`);
-                            if (meta.d1_pn) chips.push(`PN: ${meta.d1_pn}`);
-                            if (meta.d3_grade) chips.push(`Grade: ${meta.d3_grade}`);
-                            if (meta.d5_grade) chips.push(`Grade: ${meta.d5_grade}`);
-                            if (meta.d6_grade) chips.push(`Grade: ${meta.d6_grade}`);
-                            if (meta.fate) chips.push(`Fate: ${meta.fate}`);
-                            if (meta.injection_method) chips.push(`Method: ${meta.injection_method}`);
-                            const LABELS: Record<string, string> = {
-                              'ivf_cycle.created': 'Cycle Created',
-                              'ivf_cycle.updated': 'Cycle Updated',
-                              'ivf_cycle.oocyte_log.d0_saved': 'Day 0 Saved',
-                              'ivf_cycle.oocyte_log.d1_updated': 'Day 1 Updated',
-                              'ivf_cycle.oocyte_log.d3_updated': 'Day 3 Updated',
-                              'ivf_cycle.oocyte_log.d5_updated': 'Day 5 Updated',
-                              'ivf_cycle.oocyte_log.d6_updated': 'Day 6 Updated',
-                              'ivf_cycle.oocyte_log.fate_set': 'Fate Set',
-                            };
-                            const label = LABELS[ev.action] || ev.action;
-                            const isLast = idx === timelineEvents.length - 1;
-                            return (
-                              <div key={ev.id} className={`flex gap-3 ${isLast ? 'pb-0' : 'pb-4'}`}>
-                                <div className="shrink-0 flex flex-col items-center z-10">
-                                  <div className="w-3 h-3 rounded-full bg-primary border-2 border-white ring-1 ring-[#c084fc] mt-1" />
-                                </div>
-                                <div className="flex-1 min-w-0 bg-surface border border-line-light rounded-lg px-3 py-2">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <span className="text-xs font-semibold text-gray-900">{label}</span>
-                                    <span className="text-[10px] text-gray-400 whitespace-nowrap shrink-0">
-                                      {dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  </div>
-                                  {chips.length > 0 && (
-                                    <p className="text-[11px] text-primary mt-0.5 font-medium">{chips.join(' · ')}</p>
-                                  )}
-                                  <p className="text-[10px] text-gray-500 mt-1">
-                                    {actorName}{branch ? <span className="text-gray-400"> · {branch}</span> : ''}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="text-center text-gray-500 py-8">
                 <p>Loading cycle…</p>
               </div>
             )}
-          </div>
       </div>
 
       <Modal
