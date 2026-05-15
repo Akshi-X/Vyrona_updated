@@ -1,12 +1,16 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FlaskConical, Zap, BadgeCheck, Trophy, Search, SlidersHorizontal,
+  CalendarRange, Microscope, ClipboardCheck, Gem, Search, SlidersHorizontal,
   ChevronRight, Eye, MoreHorizontal, Timer, Camera, Clock,
   ShieldAlert, ArrowUpRight,
 } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
+import WavePurple from '../../assets/bottom-right1.svg';
+import WaveGreen  from '../../assets/bottom-right2.svg';
+import WaveBlue   from '../../assets/bottom-right3.svg';
+import WaveAmber  from '../../assets/bottom-right4.svg';
 import Modal from '../../components/Modal';
 import { ivfService, type IvfBranch, type IvfCycle, type IvfCycleCreate, type IvfCycleWithLogs } from '../../services/ivfService';
 import { shipmentService } from '../../services/shipmentService';
@@ -60,36 +64,51 @@ function gradeChipCls(grade: string | null) {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatCard({
-  label, value, sub, icon, iconBg, accent, trend,
+  label, value, sub, icon, accent, wave, trend, waveDown,
 }: {
   label: string;
   value: number | string;
   sub: string;
   icon: React.ReactNode;
-  iconBg: string;
   accent: string;
+  wave: string;
   trend?: { value: string; up: boolean };
+  waveDown?: boolean;
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col">
-      <div className="h-[3px] w-full shrink-0" style={{ background: accent }} />
-      <div className="px-5 py-4 flex items-start justify-between flex-1">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{label}</p>
-          <p className="text-3xl font-extrabold text-gray-900 mt-2 leading-none">{value}</p>
-          {trend ? (
-            <div className="flex items-center gap-1 mt-2">
-              <ArrowUpRight size={11} className={trend.up ? 'text-emerald-500' : 'text-red-400'} />
-              <span className={`text-[11px] font-semibold ${trend.up ? 'text-emerald-500' : 'text-red-400'}`}>{trend.value}</span>
-              <span className="text-[10px] text-gray-400">{sub}</span>
-            </div>
-          ) : (
-            <p className="text-[10px] text-gray-400 mt-2">{sub}</p>
-          )}
-        </div>
-        <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
-          {icon}
-        </div>
+    <div
+      className="border border-gray-100 rounded-2xl px-5 py-4 flex items-center justify-between relative overflow-hidden shadow-sm"
+      style={{ background: `radial-gradient(ellipse at bottom right, ${accent}18 0%, #ffffff 70%)` }}
+    >
+      <img
+        src={wave}
+        aria-hidden="true"
+        alt=""
+        className="absolute right-0 w-full pointer-events-none select-none"
+        style={{ opacity: 0.9, bottom: waveDown ? '-14px' : '0px' }}
+      />
+
+      {/* Text */}
+      <div className="relative z-10">
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: accent }}>{label}</p>
+        <p className="text-3xl font-extrabold text-gray-900 mt-2 leading-none">{value}</p>
+        {trend ? (
+          <div className="flex items-center gap-1 mt-2">
+            <ArrowUpRight size={11} className="text-emerald-500" />
+            <span className="text-[11px] font-semibold text-emerald-500">{trend.value}</span>
+            <span className="text-[10px] text-gray-400">{sub}</span>
+          </div>
+        ) : (
+          <p className="text-[10px] text-gray-400 mt-2">{sub}</p>
+        )}
+      </div>
+
+      {/* Icon with soft circular backdrop */}
+      <div
+        className="relative z-10 shrink-0 w-14 h-14 rounded-full flex items-center justify-center"
+        style={{ background: `${accent}1a` }}
+      >
+        {icon}
       </div>
     </div>
   );
@@ -432,32 +451,33 @@ export default function EmbryoGradingPage() {
             value={cycles.length}
             sub="All time"
             accent="#6b1176"
-            icon={<FlaskConical size={18} className="text-primary" />}
-            iconBg="bg-primary-bg"
+            wave={WavePurple}
+            waveDown
+            icon={<CalendarRange size={32} color="#6b1176" strokeWidth={1.5} />}
           />
           <StatCard
             label="Active Cycles"
             value={activeCycles.length}
             sub="In progress"
             accent="#10b981"
-            icon={<Zap size={18} className="text-emerald-500" />}
-            iconBg="bg-emerald-50"
+            wave={WaveGreen}
+            icon={<Microscope size={32} color="#10b981" strokeWidth={1.5} />}
           />
           <StatCard
-            label="Completed"
+            label="Completed Cycles"
             value={completedCycles.length}
             sub="Finished cycles"
             accent="#0ea5e9"
-            icon={<BadgeCheck size={18} className="text-sky-500" />}
-            iconBg="bg-sky-50"
+            wave={WaveBlue}
+            icon={<ClipboardCheck size={32} color="#0ea5e9" strokeWidth={1.5} />}
           />
           <StatCard
             label="Avg. Top Grade"
             value={topGrade ?? 'N/A'}
             sub="vs yesterday"
             accent="#f59e0b"
-            icon={<Trophy size={18} className="text-amber-500" />}
-            iconBg="bg-amber-50"
+            wave={WaveAmber}
+            icon={<Gem size={32} color="#f59e0b" strokeWidth={1.5} />}
             trend={topGrade ? { value: '0.6', up: true } : undefined}
           />
         </div>
