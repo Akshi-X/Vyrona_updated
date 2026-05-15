@@ -100,10 +100,13 @@ export default function EmbryoComparePage() {
               return (
                 <div
                   key={emb.id}
-                  className="relative flex items-center gap-2 px-2.5 py-2 pr-8 rounded-xl cursor-pointer transition-all bg-white"
+                  className="relative flex items-center gap-2 px-2.5 py-2 pr-8 rounded-xl cursor-pointer transition-all"
                   style={{
                     border: isSelected && color ? `1px solid ${color.border.replace('border-[','').replace(']','')}` : '1px solid #EEE8F8',
                     boxShadow: isSelected ? '0 4px 16px rgba(107,17,118,0.08)' : '0 1px 3px rgba(0,0,0,0.04)',
+                    background: isSelected && color
+                      ? `${color.badgeBg.replace('bg-[','').replace(']','')}18`
+                      : 'white',
                   }}
                   onClick={() => toggleEmbryo(emb.id)}
                 >
@@ -250,9 +253,6 @@ export default function EmbryoComparePage() {
                           <div className="aspect-square bg-gray-50">
                             <img src={emb.src} alt="" className="w-full h-full object-cover" />
                           </div>
-                          <div className="absolute top-2 right-2 w-4 h-4 rounded-md flex items-center justify-center shadow-sm" style={{ background: color.badgeBg.replace('bg-[','').replace(']','') }}>
-                            <svg width="7" height="7" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                          </div>
                         </div>
 
                         {/* AI Score box */}
@@ -281,11 +281,11 @@ export default function EmbryoComparePage() {
                 </div>
 
                 {/* Key Metrics */}
-                <div className="rounded-xl border border-[#E7E1E1] overflow-hidden">
-                  <div className="px-3 py-2 rounded-xl border-primary  bg-[#FDFAFF]">
-                    <h4 className="text-xs font-bold text-gray-900">Key Metrics</h4>
+                <div className="rounded-xl border border-line overflow-hidden bg-white">
+                  <div className="px-3 py-2.5" style={{ background: 'linear-gradient(135deg, #6b2177 0%, #8a3095 45%, #a44db5 100%)' }}>
+                    <h4 className="text-xs font-bold text-white">Key Metrics</h4>
                   </div>
-                  <div className="divide-y divide-[#F0EBF4]">
+                  <div className="divide-y divide-line">
                     {([
                       { metric: 'Blastocyst Stage',    icon: Layers,      getValue: (e: LeaderboardEmbryo) => e.blastocystStage },
                       { metric: 'Hatching Status',     icon: Egg,         getValue: (e: LeaderboardEmbryo) => e.hatchText       },
@@ -300,11 +300,11 @@ export default function EmbryoComparePage() {
                     ] as { metric: string; icon: LucideIcon; getValue: (e: LeaderboardEmbryo) => string; bars?: (e: LeaderboardEmbryo) => number }[]).map(row => (
                       <div
                         key={row.metric}
-                        className="grid"
+                        className="grid bg-white"
                         style={{ gridTemplateColumns: `160px repeat(${selectedEmbryoIds.length}, minmax(155px, 220px))` }}
                       >
-                        <div className="px-3 py-2 text-[10px] font-semibold text-primary flex items-center gap-1.5 border-r border-[#F0EBF4]">
-                          <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center shrink-0">
+                        <div className="px-3 py-2 text-[10px] font-semibold text-primary flex items-center gap-1.5 border-r border-line">
+                          <div className="w-7 h-7 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
                             <row.icon size={14} className="text-primary" />
                           </div>
                           {row.metric}
@@ -313,7 +313,7 @@ export default function EmbryoComparePage() {
                           const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
                           const color = SLOT_COLORS[idx];
                           return (
-                            <div key={eid} className="px-2.5 py-2 flex items-center gap-1.5 border-r border-[#F0EBF4] last:border-r-0">
+                            <div key={eid} className="px-2.5 py-2 flex items-center gap-1.5 border-r border-line last:border-r-0">
                               {row.bars && (
                                 <div className="flex gap-0.5 shrink-0">
                                   {[0, 1, 2, 3].map(i => (
