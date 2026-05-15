@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { type LucideIcon, X, Info, Layers, Trophy, GitCompare, Scissors, AlignCenter, Shield, Droplet, Link, CircleDot, Atom, Grid3x3, Egg } from 'lucide-react';
+import { X, Info, Trophy, GitCompare } from 'lucide-react';
 
 
 interface LeaderboardEmbryo {
@@ -75,7 +75,7 @@ export default function EmbryoComparePage() {
       <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
 
         {/* ── Left: Leaderboard ── */}
-        <div className="w-[270px] shrink-0 flex flex-col gap-3 overflow-y-auto bg-white border border-primary rounded-2xl p-3">
+        <div className="w-[270px] shrink-0 flex flex-col gap-3 overflow-y-auto bg-white border border-primary/20 rounded-2xl p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
@@ -102,7 +102,7 @@ export default function EmbryoComparePage() {
                   key={emb.id}
                   className="relative flex items-center gap-2 px-2.5 py-2 pr-8 rounded-xl cursor-pointer transition-all"
                   style={{
-                    border: isSelected && color ? `1px solid ${color.border.replace('border-[','').replace(']','')}` : '1px solid #EEE8F8',
+                    border: isSelected && color ? `1px solid ${color.border.replace('border-[','').replace(']','')}50` : '1px solid #EEE8F8',
                     boxShadow: isSelected ? '0 4px 16px rgba(107,17,118,0.08)' : '0 1px 3px rgba(0,0,0,0.04)',
                     background: isSelected && color
                       ? `${color.badgeBg.replace('bg-[','').replace(']','')}18`
@@ -170,7 +170,7 @@ export default function EmbryoComparePage() {
         </div>
 
         {/* ── Right: Compare panel ── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-auto rounded-2xl p-4 border border-primary" style={{ background: 'rgba(141, 84, 149, 0.1)' }}>
+        <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-auto rounded-2xl p-4 border border-primary/20" style={{ background: 'rgba(141, 84, 149, 0.1)' }}>
           <div className="flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center shrink-0">
@@ -207,31 +207,25 @@ export default function EmbryoComparePage() {
               <p className="text-xs text-gray-400 mt-1">Select embryos from the leaderboard to compare</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <div style={{ minWidth: `${130 + selectedEmbryoIds.length * 170}px` }}>
-
-                {/* Embryo columns — offset by 130px to align with metrics label */}
+            <div className="overflow-x-auto flex justify-center">
+              <div>
                 <div
-                  className="grid gap-2.5 mb-2.5"
-                  style={{ gridTemplateColumns: `160px repeat(${selectedEmbryoIds.length}, minmax(155px, 220px))` }}
+                  className="grid gap-3 items-start"
+                  style={{ gridTemplateColumns: `repeat(${selectedEmbryoIds.length}, minmax(165px, 240px))` }}
                 >
-                  <div />
                   {selectedEmbryoIds.map((eid, idx) => {
                     const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
                     const color = SLOT_COLORS[idx];
+                    const hex = color.barCol.replace('bg-[', '').replace(']', '');
                     return (
                       <div key={eid} className="flex flex-col gap-2">
 
-                        {/* Header box */}
+                        {/* Header */}
                         <div
                           className="rounded-xl flex items-center gap-1.5 px-2.5 py-2 border"
-                          style={{
-                            borderColor: color.border.replace('border-[','').replace(']','') + '50',
-                            background: color.badgeBg.replace('bg-[','').replace(']','') + '12',
-                            boxShadow: 'none',
-                          }}
+                          style={{ borderColor: hex + '50', background: hex + '12' }}
                         >
-                          <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0" style={{ background: color.badgeBg.replace('bg-[','').replace(']','') }}>{idx + 1}</span>
+                          <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0" style={{ background: hex }}>{idx + 1}</span>
                           <span className="text-xs font-bold text-gray-800 flex-1 truncate">{eidToLabel(emb.id)}</span>
                           <button
                             type="button"
@@ -242,31 +236,25 @@ export default function EmbryoComparePage() {
                           </button>
                         </div>
 
-                        {/* Image box */}
-                        <div
-                          className="relative rounded-xl overflow-hidden"
-                          style={{
-                            border: `1px solid ${color.border.replace('border-[','').replace(']','')}50`,
-                            boxShadow: 'none',
-                          }}
-                        >
+                        {/* Image */}
+                        <div className="relative rounded-xl overflow-hidden" style={{ border: `1px solid ${hex}50` }}>
                           <div className="aspect-square bg-gray-50">
                             <img src={emb.src} alt="" className="w-full h-full object-cover" />
                           </div>
                         </div>
 
-                        {/* AI Score box */}
+                        {/* AI Score */}
                         <div className="rounded-xl border border-gray-200 bg-white px-2.5 py-2.5">
                           <div className="flex items-center justify-between mb-1.5">
                             <span className="text-[9px] font-semibold text-gray-600 uppercase tracking-wide">AI Score</span>
                             <span className="text-sm font-black text-gray-900">{emb.aiScore} <span className="text-[10px] font-medium text-gray-500">/ 10</span></span>
                           </div>
                           <div className="h-1 rounded-full bg-gray-100 overflow-hidden">
-                            <div className="h-full rounded-full transition-all" style={{ width: `${emb.aiScore * 10}%`, background: color.barCol.replace('bg-[','').replace(']','') }} />
+                            <div className="h-full rounded-full transition-all" style={{ width: `${emb.aiScore * 10}%`, background: hex }} />
                           </div>
                         </div>
 
-                        {/* Exp / ICM / TE — each its own box */}
+                        {/* Exp / ICM / TE */}
                         <div className="flex gap-1.5">
                           {[{ label: 'Exp', value: emb.expansion }, { label: 'ICM', value: emb.icm }, { label: 'TE', value: emb.te }].map(chip => (
                             <div key={chip.label} className="flex-1 rounded-xl bg-white border border-gray-200 px-1 py-2 text-center">
@@ -275,61 +263,48 @@ export default function EmbryoComparePage() {
                             </div>
                           ))}
                         </div>
+
+                        {/* Bar metrics */}
+                        {([
+                          { label: 'Fragmentation',  value: emb.fragPct,    bars: emb.fragBars    },
+                          { label: 'Symmetry',       value: emb.symText,    bars: emb.symBars     },
+                          { label: 'Zona Pellucida', value: emb.zonaText,   bars: emb.zonaBars    },
+                          { label: 'Blastocoel',     value: emb.blastoText, bars: emb.blastoBars  },
+                          { label: 'Vacuolization',  value: emb.vacuoleText,bars: emb.vacuoleBars },
+                        ]).map(m => (
+                          <div key={m.label} className="rounded-xl border border-gray-200 bg-white px-2.5 py-2">
+                            <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">{m.label}</div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-gray-900">{m.value}</span>
+                              <div className="flex gap-0.5">
+                                {[0, 1, 2, 3].map(i => (
+                                  <div key={i} className={`w-2.5 h-1.5 rounded-sm ${i < m.bars ? color.barCol : 'bg-gray-100'}`} />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Text-only metrics — 2 per row */}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {([
+                            { label: 'Blast. Stage', value: emb.blastocystStage },
+                            { label: 'Hatching',     value: emb.hatchText       },
+                            { label: 'Bridge',       value: emb.bridgeText      },
+                            { label: 'Multinuc.',    value: emb.multinucText    },
+                            { label: 'Cyto. Gran.',  value: emb.cytogranText    },
+                          ]).map(m => (
+                            <div key={m.label} className="rounded-xl bg-white border border-gray-200 px-2 py-2">
+                              <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wide leading-none mb-1">{m.label}</div>
+                              <div className="text-[10px] font-bold text-gray-800 leading-tight">{m.value}</div>
+                            </div>
+                          ))}
+                        </div>
+
                       </div>
                     );
                   })}
                 </div>
-
-                {/* Key Metrics */}
-                <div className="rounded-xl border border-line overflow-hidden bg-white">
-                  <div className="px-3 py-2.5" style={{ background: 'linear-gradient(135deg, #6b2177 0%, #8a3095 45%, #a44db5 100%)' }}>
-                    <h4 className="text-xs font-bold text-white">Key Metrics</h4>
-                  </div>
-                  <div className="divide-y divide-line">
-                    {([
-                      { metric: 'Blastocyst Stage',    icon: Layers,      getValue: (e: LeaderboardEmbryo) => e.blastocystStage },
-                      { metric: 'Hatching Status',     icon: Egg,         getValue: (e: LeaderboardEmbryo) => e.hatchText       },
-                      { metric: 'Fragmentation',       icon: Scissors,    getValue: (e: LeaderboardEmbryo) => e.fragPct,       bars: (e: LeaderboardEmbryo) => e.fragBars    },
-                      { metric: 'Symmetry',            icon: AlignCenter, getValue: (e: LeaderboardEmbryo) => e.symText,       bars: (e: LeaderboardEmbryo) => e.symBars     },
-                      { metric: 'Zona Pellucida',      icon: Shield,      getValue: (e: LeaderboardEmbryo) => e.zonaText,      bars: (e: LeaderboardEmbryo) => e.zonaBars    },
-                      { metric: 'Blastocoel',          icon: Droplet,     getValue: (e: LeaderboardEmbryo) => e.blastoText,    bars: (e: LeaderboardEmbryo) => e.blastoBars  },
-                      { metric: 'Bridge Formation',    icon: Link,        getValue: (e: LeaderboardEmbryo) => e.bridgeText     },
-                      { metric: 'Vacuolization',       icon: CircleDot,   getValue: (e: LeaderboardEmbryo) => e.vacuoleText,   bars: (e: LeaderboardEmbryo) => e.vacuoleBars },
-                      { metric: 'Multinucleation',     icon: Atom,        getValue: (e: LeaderboardEmbryo) => e.multinucText   },
-                      { metric: 'Cyto. Granularity',   icon: Grid3x3,     getValue: (e: LeaderboardEmbryo) => e.cytogranText   },
-                    ] as { metric: string; icon: LucideIcon; getValue: (e: LeaderboardEmbryo) => string; bars?: (e: LeaderboardEmbryo) => number }[]).map(row => (
-                      <div
-                        key={row.metric}
-                        className="grid bg-white"
-                        style={{ gridTemplateColumns: `160px repeat(${selectedEmbryoIds.length}, minmax(155px, 220px))` }}
-                      >
-                        <div className="px-3 py-2 text-[10px] font-semibold text-primary flex items-center gap-1.5 border-r border-line">
-                          <div className="w-7 h-7 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
-                            <row.icon size={14} className="text-primary" />
-                          </div>
-                          {row.metric}
-                        </div>
-                        {selectedEmbryoIds.map((eid, idx) => {
-                          const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
-                          const color = SLOT_COLORS[idx];
-                          return (
-                            <div key={eid} className="px-2.5 py-2 flex items-center gap-1.5 border-r border-line last:border-r-0">
-                              {row.bars && (
-                                <div className="flex gap-0.5 shrink-0">
-                                  {[0, 1, 2, 3].map(i => (
-                                    <div key={i} className={`w-2.5 h-1.5 rounded-sm ${i < row.bars!(emb) ? color.barCol : 'bg-gray-100'}`} />
-                                  ))}
-                                </div>
-                              )}
-                              <span className="text-[10px] text-gray-700">{row.getValue(emb)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
               </div>
             </div>
           )}

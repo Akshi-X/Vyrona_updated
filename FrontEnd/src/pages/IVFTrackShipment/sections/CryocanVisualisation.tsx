@@ -113,6 +113,8 @@ type CryocanVisualizerProps = {
   systemActivity?: ActivityLogRecord[];
   externalTempAlert?: boolean;
   internalTempAlert?: boolean;
+  tankMaxCapacity?: number | null;
+  tankMinCapacity?: number | null;
   onSensorSelect?: (sensorId: string) => void;
   onCanisterSelect?: (canisterId: string) => void;
   onStrawSelect?: (canisterId: string, strawId: string) => void;
@@ -456,20 +458,20 @@ function groupByCane(contents: StrawInfo[]): Map<string, StrawInfo[]> {
 
 // ─── End cane helpers ─────────────────────────────────────────────────────────
 
-function sparklinePoints(history: number[], w: number, h: number): string {
-  if (history.length < 2) return "";
-  const min = Math.min(...history);
-  const max = Math.max(...history);
-  const range = max - min || 1;
-  const pad = 2;
-  return history
-    .map((v, i) => {
-      const x = ((i / (history.length - 1)) * (w - pad * 2) + pad).toFixed(1);
-      const y = (h - pad - ((v - min) / range) * (h - pad * 2)).toFixed(1);
-      return `${x},${y}`;
-    })
-    .join(" ");
-}
+// function sparklinePoints(history: number[], w: number, h: number): string {
+//   if (history.length < 2) return "";
+//   const min = Math.min(...history);
+//   const max = Math.max(...history);
+//   const range = max - min || 1;
+//   const pad = 2;
+//   return history
+//     .map((v, i) => {
+//       const x = ((i / (history.length - 1)) * (w - pad * 2) + pad).toFixed(1);
+//       const y = (h - pad - ((v - min) / range) * (h - pad * 2)).toFixed(1);
+//       return `${x},${y}`;
+//     })
+//     .join(" ");
+// }
 
 const SENSOR_ICONS: Record<string, ReactElement> = {
   temp_external: (
@@ -512,6 +514,16 @@ const SENSOR_ICONS: Record<string, ReactElement> = {
   ),
 };
 
+const KPI_CARD_STYLES: Record<string, { accent: string; ring: string }> = {
+  temp_external: { accent: "#c02640", ring: "rgba(192,38,64,0.12)" },
+  temp_internal: { accent: "#b45309", ring: "rgba(180,83,9,0.12)" },
+  ln2_level: { accent: "#6B1176", ring: "rgba(107,17,118,0.12)" },
+  ln2_evaporation_rate: { accent: "#0f766e", ring: "rgba(15,118,110,0.12)" },
+  tive_battery_percentage: { accent: "#2563eb", ring: "rgba(37,99,235,0.12)" },
+  ln2_lid_state: { accent: "#7c3aed", ring: "rgba(124,58,237,0.12)" },
+  shock: { accent: "#dc2626", ring: "rgba(220,38,38,0.12)" },
+};
+
 const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerProps>(function CryocanVisualizer(
   {
     ln2Level = 78,
@@ -528,6 +540,8 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     systemActivity = [],
     externalTempAlert = false,
     internalTempAlert = false,
+    tankMaxCapacity = null,
+    tankMinCapacity = null,
     onSensorSelect,
     onCanisterSelect,
     tankCode,
@@ -606,9 +620,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     innerVessel: { color: "#2320fe", metalness: 0.00, roughness: 0.00, opacity: 0.09 },
     bottomCap:   { color: "#e0dce8", metalness: 0.95, roughness: 0.00 },
     neck:        { color: "#401153", metalness: 0.75, roughness: 0.22 },
-    lidTop:      { color: "#401153", metalness: 0.60, roughness: 0.22 },
-    lidBottom:   { color: "#7a1a88", metalness: 0.50, roughness: 0.28 },
-    lidWall:     { color: "#7a1a88", metalness: 0.55, roughness: 0.25 },
+    lidTop:      { color: "#351048", metalness: 0.60, roughness: 0.22 },
+    lidBottom:   { color: "#65166f", metalness: 0.50, roughness: 0.28 },
+    lidWall:     { color: "#65166f", metalness: 0.55, roughness: 0.25 },
     canBody:     { color: "#000000", metalness: 1.00, roughness: 1.00 },
     rod:         { color: "#401153", metalness: 1.00, roughness: 0.47 },
     innerWall:   { color: "#b8b8c2", metalness: 1.00, roughness: 0.73 },
@@ -2651,6 +2665,20 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     // Inverse of parent Ry(h): local = R(-h) * world
     // wx = lx*cos(h) + lz*sin(h) = -PARK_DIST  →  lx = -cos(h)*PARK_DIST - sin(h)*PARK_Z_FORWARD
     // wz = -lx*sin(h) + lz*cos(h) = PARK_Z_FORWARD → lz = -sin(h)*PARK_DIST + cos(h)*PARK_Z_FORWARD
+    const getInspectWorldPos = (ndcX: number) => {
+      const tempCam = new THREE.PerspectiveCamera(cam.fov, cam.aspect, cam.near, cam.far);
+      tempCam.position.set(STAGE2_CAM.x, STAGE2_CAM.y, STAGE2_CAM.z);
+      tempCam.lookAt(new THREE.Vector3(STAGE2_TARGET.x, STAGE2_TARGET.y, STAGE2_TARGET.z));
+      tempCam.updateMatrixWorld();
+
+      const depth = tempCam.position.distanceTo(
+        new THREE.Vector3(STAGE2_TARGET.x, STAGE2_TARGET.y, STAGE2_TARGET.z),
+      );
+      const ndc = new THREE.Vector3(ndcX, 0, 0.5);
+      ndc.unproject(tempCam);
+      const dir = ndc.sub(tempCam.position).normalize();
+      return tempCam.position.clone().add(dir.multiplyScalar(depth));
+    };
     const inspectOverride = inspectOverrideRef.current;
     const fixedInspectPos = { ...inspectOverride.pos };
     const fixedInspectRot = {
@@ -2658,6 +2686,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       y: inspectOverride.rotDeg.y * Math.PI / 180,
       z: inspectOverride.rotDeg.z * Math.PI / 180,
     };
+    const tankInspectPos = getInspectWorldPos(0.5).add(new THREE.Vector3(0, -1.5, -3.5));
 
     // ---------- STAGE: extracted ----------
     if (viewStage === "extracted") {
@@ -2845,7 +2874,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       if (!animeReady || !anime) {
         // Fallback: position canister at park, open lid, place canes in orbit
         grp.rotation.set(6 * Math.PI / 180, 0, 0);
-        grp.position.set(1.75, -0.65, -0.1);
+        grp.position.set(tankInspectPos.x, tankInspectPos.y, tankInspectPos.z);
         lid.rotation.z = LID_OPEN_ROT;
         if (can.group.parent !== scene) {
           scene.attach(can.group);
@@ -2875,7 +2904,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       const EXTRACT_DELAY = comingFromIdle ? 4300 : 0;
 
       // Shift tank group to inspection world position
-      anime({ targets: grp.position, x: 1.75, y: -0.65, z: -0.1, duration: 1200, easing: "easeInOutCubic", delay: EXTRACT_DELAY });
+      anime({ targets: grp.position, x: tankInspectPos.x, y: tankInspectPos.y, z: tankInspectPos.z, duration: 1200, easing: "easeInOutCubic", delay: EXTRACT_DELAY });
       anime.remove(grp.rotation);
       anime({
         targets: grp.rotation,
@@ -3490,27 +3519,41 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                     : "minmax(0, 1fr)",
             gap: isEmbedded ? 16 : 18,
             alignItems: "stretch",
+            transition: "grid-template-columns 0.35s ease",
           }}
         >
           {/* Left column — Live Conditions when idle, Cryolock Details when inspecting */}
           {showSensorTiles && (
             <div style={{ overflow: "hidden" }}>
-            {/* Inspection panel: canister details + cryolock cards */}
-            {isInspecting && selectedCanisterData && (
+            <div style={{ position: "relative", width: 280, height: isEmbedded ? 520 : 620 }}>
+              {/* Inspection panel: canister details + cryolock cards */}
               <div
                 className="cryo-fade-in bg-white flex flex-col"
-                style={{ width: 280, height: isEmbedded ? 520 : 620, border: "1px solid #E7E1E1", borderRadius: 18, boxShadow: "0 6px 16px #40115308", overflow: "hidden" }}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: 280,
+                  height: isEmbedded ? 520 : 620,
+                  border: "1px solid #e6d6ee",
+                  borderRadius: 18,
+                  boxShadow: "0 6px 16px #40115308",
+                  overflow: "hidden",
+                  opacity: isInspecting ? 1 : 0,
+                  transform: isInspecting ? "translateY(0)" : "translateY(10px)",
+                  pointerEvents: isInspecting ? "auto" : "none",
+                  transition: "opacity 0.35s ease, transform 0.35s ease",
+                }}
               >
                 {/* Header with Return button */}
-                <div style={{ padding: "12px 14px 10px", background: "var(--color-primary)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ padding: "12px 14px 10px", background: "#f7f2fa", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #efe5f4" }}>
                   <div>
-                    <div style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.65)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Selected</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#ffffff" }}>{selectedCanisterData.label}</div>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: "#8b6c97", letterSpacing: "0.1em", textTransform: "uppercase" }}>Selected</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#5f3b73" }}>{selectedCanisterData?.label ?? "Selected"}</div>
                   </div>
                   <button
                     onClick={() => { setSelectedCanister(null); setViewStage("idle"); }}
                     title="Return canister"
-                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.15)", color: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: 5 }}
+                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #d9c9e6", background: "#ffffff", color: "#6b4a78", cursor: "pointer", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: 5 }}
                   >
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
                     Return
@@ -3525,7 +3568,16 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 3 }}>
                     {Array.from({ length: 17 }).map((_, si) => (
-                      <div key={si} style={{ width: 16, height: 16, borderRadius: 3, background: si < loadedCaneCount ? "linear-gradient(135deg, var(--color-primary), #9b4aaa)" : "#f0e8f5", border: `1px solid ${si < loadedCaneCount ? "#6B117640" : "#ddd"}` }} />
+                      <div
+                        key={si}
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: 3,
+                          background: si < loadedCaneCount ? "#dcfce7" : "#fee2e2",
+                          border: `1px solid ${si < loadedCaneCount ? "#86efac" : "#fca5a5"}`,
+                        }}
+                      />
                     ))}
                   </div>
                   <div style={{ fontSize: 10, color: "#6b7280", marginTop: 5 }}>{17 - loadedCaneCount} slots available</div>
@@ -3600,29 +3652,33 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                               </div>
                             )}
                           </div>
-                          <div style={{ padding: "6px 9px 8px", display: "grid", gridTemplateColumns: "auto 1fr", gap: "3px 7px", fontSize: 10 }}>
-                            {caneId && <><span style={{ color: "#9ca3af" }}>Cane</span><span style={{ color: "#1a0a1f", fontWeight: 600 }}>{caneId}</span></>}
-                            {lockId && <><span style={{ color: "#9ca3af" }}>Lock #</span><span style={{ color: "#1a0a1f", fontWeight: 600 }}>{lockId}</span></>}
-                            {item.hisNumber && <><span style={{ color: "#9ca3af" }}>HIS</span><span style={{ color: "#1a0a1f" }}>{item.hisNumber}</span></>}
-                            <span style={{ color: "#9ca3af" }}>Goblet</span>
-                            {isEditing ? (
-                              <input value={editColorValues.gobletColor} onChange={(e) => setEditColorValues((v) => ({ ...v, gobletColor: e.target.value }))} style={{ fontSize: 10, border: "1px solid #c8a8dc", borderRadius: 4, padding: "1px 5px", outline: "none", color: "#1a0a1f" }} placeholder="e.g. Red" />
-                            ) : (
-                              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                {gobletHex && <span style={{ width: 8, height: 8, borderRadius: 2, background: gobletHex, display: "inline-block", flexShrink: 0 }} />}
-                                <span style={{ color: "#1a0a1f", textTransform: "capitalize" }}>{item.gobletColor || "—"}</span>
-                              </span>
-                            )}
-                            <span style={{ color: "#9ca3af" }}>Lock</span>
-                            {isEditing ? (
-                              <input value={editColorValues.cryolockColor} onChange={(e) => setEditColorValues((v) => ({ ...v, cryolockColor: e.target.value }))} style={{ fontSize: 10, border: "1px solid #c8a8dc", borderRadius: 4, padding: "1px 5px", outline: "none", color: "#1a0a1f" }} placeholder="e.g. Blue" />
-                            ) : (
-                              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                {lockHex && <span style={{ width: 8, height: 8, borderRadius: 2, background: lockHex, display: "inline-block", flexShrink: 0 }} />}
-                                <span style={{ color: "#1a0a1f", textTransform: "capitalize" }}>{item.cryolockColor || "—"}</span>
-                              </span>
-                            )}
-                            {item.vitrificationDate && <><span style={{ color: "#9ca3af" }}>Vitrified</span><span style={{ color: "#1a0a1f" }}>{item.vitrificationDate}</span></>}
+                          <div style={{ padding: "6px 9px 8px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", fontSize: 10 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "3px 7px", alignContent: "start" }}>
+                              {caneId && <><span style={{ color: "#9ca3af" }}>Cane</span><span style={{ color: "#1a0a1f", fontWeight: 600 }}>{caneId}</span></>}
+                              {lockId && <><span style={{ color: "#9ca3af" }}>Lock #</span><span style={{ color: "#1a0a1f", fontWeight: 600 }}>{lockId}</span></>}
+                              {item.hisNumber && <><span style={{ color: "#9ca3af" }}>HIS</span><span style={{ color: "#1a0a1f" }}>{item.hisNumber}</span></>}
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "3px 7px", alignContent: "start" }}>
+                              <span style={{ color: "#9ca3af" }}>Goblet</span>
+                              {isEditing ? (
+                                <input value={editColorValues.gobletColor} onChange={(e) => setEditColorValues((v) => ({ ...v, gobletColor: e.target.value }))} style={{ fontSize: 10, border: "1px solid #c8a8dc", borderRadius: 4, padding: "1px 5px", outline: "none", color: "#1a0a1f" }} placeholder="e.g. Red" />
+                              ) : (
+                                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  {gobletHex && <span style={{ width: 8, height: 8, borderRadius: 2, background: gobletHex, display: "inline-block", flexShrink: 0 }} />}
+                                  <span style={{ color: "#1a0a1f", textTransform: "capitalize" }}>{item.gobletColor || "—"}</span>
+                                </span>
+                              )}
+                              <span style={{ color: "#9ca3af" }}>Lock</span>
+                              {isEditing ? (
+                                <input value={editColorValues.cryolockColor} onChange={(e) => setEditColorValues((v) => ({ ...v, cryolockColor: e.target.value }))} style={{ fontSize: 10, border: "1px solid #c8a8dc", borderRadius: 4, padding: "1px 5px", outline: "none", color: "#1a0a1f" }} placeholder="e.g. Blue" />
+                              ) : (
+                                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  {lockHex && <span style={{ width: 8, height: 8, borderRadius: 2, background: lockHex, display: "inline-block", flexShrink: 0 }} />}
+                                  <span style={{ color: "#1a0a1f", textTransform: "capitalize" }}>{item.cryolockColor || "—"}</span>
+                                </span>
+                              )}
+                              {item.vitrificationDate && <><span style={{ color: "#9ca3af" }}>Vitrified</span><span style={{ color: "#1a0a1f" }}>{item.vitrificationDate}</span></>}
+                            </div>
                             {item.description && (
                               <span style={{ gridColumn: "1 / -1", marginTop: 3, color: "#6b5a70", fontStyle: "italic", fontSize: 10, lineHeight: 1.4, borderTop: "1px solid #f0e8f4", paddingTop: 3 }}>
                                 {item.description}
@@ -3635,30 +3691,35 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   )}
                 </div>
               </div>
-            )}
-            {/* Live Conditions card — shown when not inspecting */}
-            {!isInspecting && (
-            <div
-              className="cryo-fade-in bg-white flex flex-col"
-              style={{
-                width: 280,
-                height: isEmbedded ? 520 : 620,
-                border: "1px solid #E7E1E1",
-                borderRadius: 18,
-                boxShadow: "0 6px 16px #40115308",
-                overflow: "hidden",
-              }}
-            >
+              {/* Live Conditions card — shown when not inspecting */}
+              <div
+                className="cryo-fade-in bg-white flex flex-col"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: 280,
+                  height: isEmbedded ? 520 : 620,
+                  border: "1px solid #e6d6ee",
+                  borderRadius: 18,
+                  boxShadow: "0 6px 16px #40115308",
+                  overflow: "hidden",
+                  opacity: isInspecting ? 0 : 1,
+                  transform: isInspecting ? "translateY(-10px)" : "translateY(0)",
+                  pointerEvents: isInspecting ? "none" : "auto",
+                  transition: "opacity 0.35s ease, transform 0.35s ease",
+                }}
+              >
               {/* Card header */}
               <div
                 className="flex items-center justify-between"
                 style={{
                   padding: "14px 16px 10px",
-                  background: "var(--color-primary)",
+                  background: "#f7f2fa",
                   flexShrink: 0,
+                  borderBottom: "1px solid #efe5f4",
                 }}
               >
-                <span style={{ fontWeight: 600, fontSize: 14, color: "#ffffff" }}>
+                <span style={{ fontWeight: 600, fontSize: 14, color: "#5f3b73" }}>
                   Live Conditions
                 </span>
                 <svg
@@ -3666,7 +3727,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   height="16"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="rgba(255,255,255,0.8)"
+                  stroke="#6b4a78"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -3688,50 +3749,144 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               >
                 {sensorTiles.map((tile) => {
                   const isActive = selectedSensorId === tile.id;
+                  const isMuted = tile.isMissing || tile.isMuted;
                   const icon = SENSOR_ICONS[tile.id];
+                  const palette = KPI_CARD_STYLES[tile.id];
+                  const accent = isMuted
+                    ? "#c9b8d2"
+                    : palette?.accent ?? (isActive ? "var(--color-primary)" : "#7b5c8b");
+                  const ring = palette?.ring ?? "rgba(123,92,139,0.08)";
+                  const border = "#e6d6ee";
+                  const ln2Clamped = typeof ln2Level === "number" ? Math.max(0, Math.min(100, ln2Level)) : null;
+                  const ln2CapacitySpan =
+                    tankMaxCapacity != null && tankMinCapacity != null
+                      ? tankMaxCapacity - tankMinCapacity
+                      : null;
+                  const ln2Percent =
+                    ln2Clamped != null && ln2CapacitySpan != null && ln2CapacitySpan > 0
+                      ? Math.floor((ln2Clamped / ln2CapacitySpan) * 100)
+                      : null;
+                  const valueText =
+                    tile.id === "ln2_level"
+                      ? (ln2Percent != null ? `${Math.min(100, Math.max(0, ln2Percent))}%` : tile.value)
+                      : tile.value;
                   return (
                     <button
                       key={tile.id}
                       type="button"
                       onClick={() => onSensorSelect && onSensorSelect(tile.id)}
-                      className="text-left"
+                      className="text-left kpi-card"
                       style={{
                         cursor: "pointer",
-                        borderRadius: 12,
-                        padding: "10px 12px",
-                        border: isActive ? "1px solid #6B117650" : "1px solid #E7E1E1",
-                        background: isActive
-                          ? "linear-gradient(135deg, #6B117610 0%, #6B117605 100%)"
-                          : "#f9f5fc",
-                        boxShadow: isActive ? "0 4px 14px #6B117620" : "none",
-                        opacity: tile.isMuted ? 0.6 : 1,
+                        borderRadius: 16,
+                        padding: "12px 14px",
+                        border: `1px solid ${border}`,
+                        background: "#fdfbfe",
+                        boxShadow: isActive ? "0 6px 16px #6B117620" : "0 4px 12px #40115310",
+                        opacity: isMuted ? 0.7 : 1,
                         flexShrink: 0,
+                        position: "relative",
+                        overflow: "hidden",
                       }}
                       title={tile.tooltip}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        {icon && (
-                          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: isActive ? "#FDF4FF" : "#f0eaf4", color: isActive ? "var(--color-primary)" : "#9ca3af" }}>
-                            {icon}
-                          </span>
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
-                            <span style={{ fontSize: 11, fontWeight: 500, color: "#6b7280" }}>{tile.label}</span>
-                            <span style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: tile.isMissing || tile.isMuted ? "#d1d5db" : "#22c55e", boxShadow: tile.isMissing || tile.isMuted ? "none" : "0 0 0 3px #22c55e22" }} />
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, position: "relative", zIndex: 1 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: "#8b6c97", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                            {tile.label}
                           </div>
-                          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 6 }}>
-                            <div className="cryo-display" style={{ fontSize: 18, fontWeight: 500, color: tile.isMissing ? "#9ca3af" : "var(--color-primary)" }}>
-                              {tile.value}
-                            </div>
-                            {tile.history && tile.history.length > 2 && (
-                              <svg width="56" height="24" viewBox="0 0 56 24" style={{ flexShrink: 0, marginBottom: 2 }}>
-                                <polyline fill="none" stroke={isActive ? "var(--color-primary)" : "#b39cc2"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity={tile.isMissing ? 0.3 : 0.75} points={sparklinePoints(tile.history, 56, 24)} />
-                              </svg>
-                            )}
+                          <div className="cryo-display" style={{ fontSize: 24, fontWeight: 700, color: isMuted ? "#b4a9be" : "var(--color-primary)", marginTop: 4 }}>
+                            {valueText}
+                          </div>
+                          <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>
+                            {tile.timestamp ?? "All time"}
                           </div>
                         </div>
+                        <div
+                          style={{
+                            width: 46,
+                            height: 46,
+                            borderRadius: "50%",
+                            background: "rgba(255,255,255,0.8)",
+                            border: `1px solid ${border}`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: `inset 0 0 0 6px ${ring}`,
+                            color: accent,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span style={{ display: "inline-flex", transform: "translateY(1px)" }}>{icon}</span>
+                        </div>
                       </div>
+                      <div
+                        className="kpi-orb"
+                        style={{
+                          position: "absolute",
+                          right: -20,
+                          bottom: -18,
+                          width: 140,
+                          height: 70,
+                          borderRadius: "50%",
+                          border: "1px solid rgba(170,140,190,0.35)",
+                          opacity: 0.7,
+                        }}
+                      />
+                      <div
+                        className="kpi-glow"
+                        style={{
+                          position: "absolute",
+                          left: -30,
+                          top: -24,
+                          width: 110,
+                          height: 110,
+                          borderRadius: "50%",
+                          background: "radial-gradient(circle, rgba(123,92,139,0.12) 0%, rgba(123,92,139,0) 70%)",
+                          opacity: 0.6,
+                        }}
+                      />
+                      <div
+                        className="kpi-sheen"
+                        style={{
+                          position: "absolute",
+                          inset: "12px 12px auto auto",
+                          width: 46,
+                          height: 46,
+                          borderRadius: 10,
+                          border: "1px solid rgba(230,214,238,0.9)",
+                          opacity: 0.45,
+                          transform: "rotate(12deg)",
+                        }}
+                      />
+                      <div
+                        className="kpi-curve"
+                        style={{
+                          position: "absolute",
+                          left: -18,
+                          bottom: -22,
+                          width: 160,
+                          height: 90,
+                          borderRadius: "100%",
+                          border: "1px solid rgba(214,198,228,0.5)",
+                          transform: "rotate(-8deg)",
+                          opacity: 0.55,
+                        }}
+                      />
+                      <div
+                        className="kpi-wave"
+                        style={{
+                          position: "absolute",
+                          right: -40,
+                          top: 28,
+                          width: 180,
+                          height: 80,
+                          borderRadius: "100%",
+                          border: "1px dashed rgba(214,198,228,0.45)",
+                          transform: "rotate(10deg)",
+                          opacity: 0.5,
+                        }}
+                      />
                     </button>
                   );
                 })}
@@ -3758,7 +3913,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 </span>
               </div>
             </div>
-            )}
+            </div>
             </div>
           )}
 
@@ -3776,7 +3931,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 ? "0 8px 20px -12px #4011531f, 0 2px 6px #4011530a"
                 : "0 20px 50px -20px #40115325, 0 2px 6px #4011530a",
               opacity: isEmbedded ? 1 : 0,
-              transition: "background 0.6s ease, border-color 0.6s ease",
+                transition: "background 0.6s ease, border-color 0.6s ease, width 0.35s ease",
             }}
           >
             {/* Grid pattern */}
@@ -4373,7 +4528,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               className="cryo-fade-in bg-white"
               style={{
                 flexShrink: 0,
-                border: "1px solid #E7E1E1",
+                border: "1px solid #e6d6ee",
                 borderRadius: 18,
                 overflow: "hidden",
                 boxShadow: "0 6px 16px #40115308",
@@ -4387,10 +4542,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 style={{
                   fontWeight: 600,
                   fontSize: 14,
-                  color: "#ffffff",
+                  color: "#5f3b73",
                   padding: "12px 16px 10px",
-                  background: "var(--color-primary)",
+                  background: "#f7f2fa",
                   flexShrink: 0,
+                  borderBottom: "1px solid #efe5f4",
                 }}
               >
                 System Activity
@@ -4544,7 +4700,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               className="cryo-fade-in bg-white"
               style={{
                 flexShrink: 0,
-                border: "1px solid #E7E1E1",
+                border: "1px solid #e6d6ee",
                 borderRadius: 18,
                 overflow: "hidden",
                 boxShadow: "0 6px 16px #40115308",
@@ -4553,14 +4709,14 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             >
               <div
                 className="flex justify-between items-start"
-                style={{ gap: 10, padding: "12px 16px 10px", background: "var(--color-primary)" }}
+                style={{ gap: 10, padding: "12px 16px 10px", background: "#f7f2fa", borderBottom: "1px solid #efe5f4" }}
               >
                 <div>
                   <div
                     style={{
                       fontWeight: 600,
                       fontSize: 14,
-                      color: "#ffffff",
+                      color: "#5f3b73",
                     }}
                   >
                     Container Data
@@ -4570,7 +4726,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                     style={{
                       fontSize: 14,
                       fontWeight: 500,
-                      color: "rgba(255,255,255,0.8)",
+                      color: "#8b6c97",
                       letterSpacing: "-0.015em",
                       marginTop: 2,
                     }}
@@ -4589,8 +4745,8 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                       fontWeight: 500,
                       padding: "3px 9px",
                       borderRadius: 999,
-                      background: "rgba(255,255,255,0.2)",
-                      color: "#ffffff",
+                      background: "#efe7f3",
+                      color: "#6b4a78",
                     }}
                   >
                     Total {sceneCanisterCount}
@@ -5146,6 +5302,23 @@ const customCss = `
   to   { opacity: 1; transform: translateY(0); }
 }
 .cryo-panel-in { animation: cryoPanelIn 600ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+@keyframes kpiFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes kpiSheen {
+  0% { transform: translateX(0) rotate(12deg); opacity: 0.3; }
+  50% { transform: translateX(8px) rotate(12deg); opacity: 0.6; }
+  100% { transform: translateX(0) rotate(12deg); opacity: 0.3; }
+}
+
+.kpi-card .kpi-glow { animation: kpiFloat 4.8s ease-in-out infinite; }
+.kpi-card .kpi-orb { animation: kpiFloat 5.6s ease-in-out infinite reverse; }
+.kpi-card .kpi-sheen { animation: kpiSheen 6.2s ease-in-out infinite; }
+.kpi-card .kpi-curve { animation: kpiFloat 7.4s ease-in-out infinite; }
+.kpi-card .kpi-wave { animation: kpiFloat 8.2s ease-in-out infinite reverse; }
 
 .cryo-side-scroll::-webkit-scrollbar { width: 6px; }
 .cryo-side-scroll::-webkit-scrollbar-track { background: transparent; }
