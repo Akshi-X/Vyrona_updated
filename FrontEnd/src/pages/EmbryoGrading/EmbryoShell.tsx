@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Printer, Home } from 'lucide-react';
+import { Home } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 import EmbryoTabBar from './EmbryoTabBar';
 import { ivfService } from '../../services/ivfService';
@@ -56,14 +56,6 @@ export default function EmbryoShell() {
   ) : isReports ? (
     <div className="flex items-center gap-2">
       {homeBtn}
-      <button
-        type="button"
-        onClick={() => window.print()}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-white text-sm font-semibold hover:bg-[#5a0f66] transition-colors print:hidden"
-      >
-        <Printer size={15} />
-        Print / Save as PDF
-      </button>
     </div>
   ) : (
     <div className="flex items-center gap-2">
