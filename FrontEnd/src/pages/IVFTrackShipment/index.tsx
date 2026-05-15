@@ -35,6 +35,8 @@ export default function IVFTrackShipmentPage() {
     const navigate = useNavigate();
     const [headerTankCode, setHeaderTankCode] = useState<string>("-");
     const [headerBranchName, setHeaderBranchName] = useState<string>("-");
+    const [tankMaxCapacity, setTankMaxCapacity] = useState<number | null>(null);
+    const [tankMinCapacity, setTankMinCapacity] = useState<number | null>(null);
     const [accessDenied, setAccessDenied] = useState(false);
     const [countdown, setCountdown] = useState(3);
 
@@ -190,6 +192,8 @@ export default function IVFTrackShipmentPage() {
         if (!tankId) {
             setHeaderTankCode("-");
             setHeaderBranchName("-");
+            setTankMaxCapacity(null);
+            setTankMinCapacity(null);
             return;
         }
 
@@ -198,6 +202,8 @@ export default function IVFTrackShipmentPage() {
 
             setHeaderTankCode(kpiConfigResponse?.tank_code || "-");
             setHeaderBranchName(kpiConfigResponse?.branch_name || "-");
+            setTankMaxCapacity(kpiConfigResponse?.tank_max_capacity_reading ?? null);
+            setTankMinCapacity(kpiConfigResponse?.tank_min_capacity_reading ?? null);
         } catch (e: unknown) {
             const msg = (e as Error)?.message || "";
             if (msg.includes("403") || msg.toLowerCase().includes("access denied") || msg.toLowerCase().includes("does not belong")) {
@@ -206,6 +212,8 @@ export default function IVFTrackShipmentPage() {
             } else {
                 setHeaderTankCode("-");
                 setHeaderBranchName("-");
+                setTankMaxCapacity(null);
+                setTankMinCapacity(null);
             }
         }
     };
@@ -533,6 +541,8 @@ export default function IVFTrackShipmentPage() {
                                         internalTemp={internalTemp ?? undefined}
                                         externalTemp={externalTemp ?? undefined}
                                         lidStatus={lidStatus ?? undefined}
+                                        tankMaxCapacity={tankMaxCapacity}
+                                        tankMinCapacity={tankMinCapacity}
                                         sensorTiles={sensorTiles}
                                         canisters={cryocanCanisters}
                                         canisterContents={cryocanContents}
