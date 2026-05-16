@@ -1297,7 +1297,7 @@ export default function IVFQualityTrackingChart({
 
   return (
     <div id="onboarding-ivf-quality-chart" className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-line rounded-lg p-4">
-      <div className="flex items-center justify-between mb-1 shrink-0">
+      <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
           {hideTabs && activeTabLabel && (
@@ -1329,7 +1329,7 @@ export default function IVFQualityTrackingChart({
 
       {/* KPI Tabs (from DB kpi_config when available) */}
       {!hideTabs && (
-        <div id="onboarding-chart-kpi-tabs" className="flex items-center gap-0 mb-3 flex-wrap">
+        <div id="onboarding-chart-kpi-tabs" className="flex items-center gap-0 mb-3 flex-wrap mt-2">
           {!hasLoadedKpiConfig ? (
             <span className="text-xs text-[#7C7C7C]">Loading...</span>
           ) : (
@@ -1341,7 +1341,7 @@ export default function IVFQualityTrackingChart({
                   onClick={() => setActiveTab(tab.id)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
                     activeTab === tab.id
-                      ? 'bg-[#6B1176] text-white border-[#6B1176]'
+                      ? 'bg-[#f3e8ff] text-[#6B1176] border-[#6B1176]'
                       : 'bg-transparent border-transparent text-gray-600 hover:border-gray-200 hover:bg-gray-50'
                   }`}
                 >

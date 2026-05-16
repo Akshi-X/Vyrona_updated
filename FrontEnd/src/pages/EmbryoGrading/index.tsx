@@ -77,15 +77,14 @@ function StatCard({
 }) {
   return (
     <div
-      className="border border-gray-100 rounded-2xl px-5 py-4 flex items-center justify-between relative overflow-hidden shadow-sm"
-      style={{ background: `radial-gradient(ellipse at bottom right, ${accent}18 0%, #ffffff 70%)` }}
+      className="border border-gray-100 rounded-2xl px-5 py-4 flex items-center justify-between relative overflow-hidden shadow-sm bg-white"
     >
       <img
         src={wave}
         aria-hidden="true"
         alt=""
         className="absolute right-0 w-full pointer-events-none select-none"
-        style={{ opacity: 0.9, bottom: waveDown ? '-14px' : '0px' }}
+        style={{ bottom: waveDown ? '-14px' : '0px' }}
       />
 
       {/* Text */}
@@ -120,10 +119,10 @@ function DonutChart({ high, mid, low, notGraded, total }: {
   const totalGraded = high + mid + low;
 
   const segs = [
-    { v: high,      light: '#4ade80', dark: '#15803d' },
-    { v: mid,       light: '#fdba74', dark: '#c2410c' },
-    { v: low,       light: '#e5e7eb', dark: '#9ca3af' },
-    { v: notGraded, light: '#f1f5f9', dark: '#cbd5e1' },
+    { v: high,      light: '#7c1e87', dark: '#6b1176' },
+    { v: mid,       light: '#a855c2', dark: '#8b3aa3' },
+    { v: low,       light: '#c8a8d8', dark: '#b08cc0' },
+    { v: notGraded, light: '#e8d5f0', dark: '#dac4e6' },
   ];
 
   const stops: string[] = [];
@@ -136,23 +135,23 @@ function DonutChart({ high, mid, low, notGraded, total }: {
     curr += pct;
   });
   if (curr < 100) {
-    stops.push(`#f1f5f9 ${curr.toFixed(1)}%`);
-    stops.push(`#f1f5f9 100%`);
+    stops.push(`#e8d5f0 ${curr.toFixed(1)}%`);
+    stops.push(`#e8d5f0 100%`);
   }
 
   const bg = total > 0
     ? `conic-gradient(from -90deg, ${stops.join(', ')})`
-    : 'conic-gradient(from -90deg, #f1f5f9 100%)';
+    : 'conic-gradient(from -90deg, #e8d5f0 100%)';
 
   return (
-    <div className="relative w-36 h-36 shrink-0">
+    <div className="relative w-28 h-28 shrink-0">
       <div className="w-full h-full rounded-full" style={{ background: bg }} />
       <div
         className="absolute rounded-full bg-white flex flex-col items-center justify-center pointer-events-none"
-        style={{ inset: '22px' }}
+        style={{ inset: '20px' }}
       >
-        <p className="text-2xl font-extrabold text-gray-900 leading-none">{totalGraded}</p>
-        <p className="text-[9px] text-gray-400 mt-0.5">Total Graded</p>
+        <p className="text-xl font-extrabold text-gray-900 leading-none">{totalGraded}</p>
+        <p className="text-[8px] text-gray-400 mt-0.5">Total Graded</p>
       </div>
     </div>
   );
@@ -172,7 +171,6 @@ function Sparkline({
   }));
   const d = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
   const area = `${d} L${w},${h} L0,${h} Z`;
-  const last = coords[coords.length - 1];
   const gradId = `spkGrad-${color.replace(/[^a-z0-9]/gi, '')}`;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
@@ -184,7 +182,9 @@ function Sparkline({
       </defs>
       <path d={area} fill={`url(#${gradId})`} />
       <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={last.x} cy={last.y} r="3" fill={color} />
+      {coords.map((c, i) => (
+        <circle key={i} cx={c.x.toFixed(1)} cy={c.y.toFixed(1)} r={i === coords.length - 1 ? 3 : 2} fill={color} />
+      ))}
     </svg>
   );
 }
@@ -445,7 +445,7 @@ export default function EmbryoGradingPage() {
       <div className="flex-1 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-h-0">
 
         {/* ── Stat Cards ── */}
-        <div className="grid grid-cols-4 gap-4 shrink-0">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 shrink-0">
           <StatCard
             label="Total Cycles"
             value={cycles.length}
@@ -483,17 +483,20 @@ export default function EmbryoGradingPage() {
         </div>
 
         {/* ── 2-col layout: Active Cycles left, everything else right ── */}
-        <div className="grid grid-cols-[420px_1fr] gap-4 items-stretch flex-1 min-h-0">
+        <div className="grid grid-cols-1 xl:grid-cols-[min(340px,26%)_1fr] gap-4 xl:items-stretch xl:flex-1 min-h-0">
 
-          {/* Left — Active Cycles (stretches full height) */}
-          <div className="bg-primary/5 border border-gray-200 rounded-2xl overflow-hidden flex flex-col">
-            <div className="px-4 py-3.5 flex items-center justify-between border-b border-gray-100 shrink-0">
+          {/* Left — Active Cycles */}
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col max-h-80 xl:max-h-none xl:flex-1">
+            {/* Header */}
+            <div className="px-4 py-3.5 flex items-center gap-2 border-b border-gray-100 shrink-0">
               <p className="text-sm font-bold text-gray-900">Active Cycles</p>
-              <span className="text-xs font-bold text-primary">{activeCycles.length}</span>
+              <span className="text-[11px] font-bold text-primary bg-primary/10 rounded-full px-2 py-0.5">{activeCycles.length}</span>
             </div>
+
+            {/* Search */}
             <div className="px-3 py-2.5 border-b border-gray-100 shrink-0">
-              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-gray-50">
-                <Search size={12} className="text-gray-400 shrink-0" />
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white">
+                <Search size={13} className="text-gray-400 shrink-0" />
                 <input
                   type="text"
                   placeholder="Search by patient or HIS no."
@@ -501,16 +504,18 @@ export default function EmbryoGradingPage() {
                   onChange={e => setSearchQuery(e.target.value)}
                   className="flex-1 text-xs bg-transparent outline-none text-gray-600 placeholder-gray-400"
                 />
-                <SlidersHorizontal size={12} className="text-gray-400 shrink-0" />
+                <SlidersHorizontal size={13} className="text-gray-400 shrink-0" />
               </div>
             </div>
-            <div className="divide-y divide-gray-50 flex-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: 'thin' }}>
+
+            {/* Cycle cards */}
+            <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-2" style={{ scrollbarWidth: 'thin' }}>
               {loading ? (
-                <div className="flex items-center justify-center py-12 text-xs text-gray-400">Loading...</div>
+                <div className="flex items-center justify-center py-10 text-xs text-gray-400">Loading...</div>
               ) : error ? (
-                <div className="px-4 py-4 text-xs text-red-500">{error}</div>
+                <div className="px-2 py-3 text-xs text-red-500">{error}</div>
               ) : filteredActiveCycles.length === 0 ? (
-                <div className="flex items-center justify-center py-12 text-xs text-gray-400">No cycles found</div>
+                <div className="flex items-center justify-center py-10 text-xs text-gray-400">No cycles found</div>
               ) : (
                 filteredActiveCycles.map(cycle => {
                   const day = cycle.opu_date ? cycleDay(cycle.opu_date) : null;
@@ -519,51 +524,50 @@ export default function EmbryoGradingPage() {
                       key={cycle.cycle_id}
                       type="button"
                       onClick={() => navigate(`/embryo-grading/${cycle.his_id}`)}
-                      className="w-full px-5 py-3.5 text-left hover:bg-primary/[0.06] transition-colors"
+                      className="w-full bg-primary/[0.03] border border-primary/10 rounded-xl px-4 py-3 text-left hover:bg-primary/[0.06] hover:border-primary/20 transition-colors"
                     >
-                      <div
-                        className="grid gap-x-3 gap-y-1.5 items-center"
-                        style={{ gridTemplateColumns: 'auto 1fr auto' }}
-                      >
-                        {/* Row 1 col 1: patient name */}
-                        <p style={{ gridArea: '1/1' }} className="text-sm font-bold text-gray-900 truncate">
-                          {cycle.patient_name || cycle.his_id}
-                        </p>
-                        {/* Row 1 col 2: day label right-aligned */}
-                        <p style={{ gridArea: '1/2' }} className="text-[10px] text-gray-400 font-medium text-right">
-                          {day != null ? `Day ${day}` : ''}
-                        </p>
-                        {/* Col 3: chevron — spans both rows, vertically centred */}
-                        <div style={{ gridArea: '1/3/3/4' }} className="flex items-center justify-center">
-                          <ChevronRight size={12} className="text-primary" />
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-bold text-gray-900 truncate">{cycle.patient_name || cycle.his_id}</p>
+                            <p className="text-[11px] text-gray-400 shrink-0">{day != null ? `Day ${day}` : ''}</p>
+                          </div>
+                          <div className="flex items-center gap-3 mt-2">
+                            <p className="text-[11px] text-gray-400 shrink-0">HIS: {cycle.his_id}</p>
+                            <div className="flex gap-1 flex-1">
+                              {[1, 2, 3, 4, 5, 6].map(d => (
+                                <div
+                                  key={d}
+                                  className={`flex-1 h-[3px] rounded-full ${day != null && day >= d ? 'bg-primary' : 'bg-gray-200'}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
                         </div>
-
-                        {/* Row 2 col 1: HIS */}
-                        <p style={{ gridArea: '2/1' }} className="text-[11px] text-gray-400">
-                          HIS: {cycle.his_id}
-                        </p>
-                        {/* Row 2 col 2: segmented day bar */}
-                        <div style={{ gridArea: '2/2' }} className="flex gap-1">
-                          {[1, 2, 3, 4, 5, 6].map(d => (
-                            <div
-                              key={d}
-                              className={`flex-1 h-[3px] rounded-full ${day != null && day >= d ? 'bg-primary' : 'bg-gray-200'}`}
-                            />
-                          ))}
-                        </div>
+                        <ChevronRight size={14} className="text-primary shrink-0 mt-0.5" />
                       </div>
                     </button>
                   );
                 })
               )}
             </div>
+
+            {/* Footer */}
+            <div className="px-4 py-3 border-t border-gray-100 shrink-0">
+              <button
+                type="button"
+                className="w-full text-sm font-semibold text-primary flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
+              >
+                View all active cycles <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
 
           {/* Right — Grading + Needs Attention on top, Recent Activity below */}
-          <div className="flex flex-col gap-4 min-h-0">
+          <div className="flex flex-col gap-4 min-h-0 overflow-hidden">
 
             {/* Top row: Grading Overview + Needs Attention */}
-            <div className="grid grid-cols-[1.4fr_1fr] gap-4 shrink-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
 
               {/* Center — Grading Overview + Trend */}
               <div className="flex flex-col gap-3">

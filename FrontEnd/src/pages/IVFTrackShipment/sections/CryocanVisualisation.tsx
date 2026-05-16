@@ -115,6 +115,7 @@ type CryocanVisualizerProps = {
   internalTempAlert?: boolean;
   tankMaxCapacity?: number | null;
   tankMinCapacity?: number | null;
+  ln2L2Threshold?: number | null;
   onSensorSelect?: (sensorId: string) => void;
   onCanisterSelect?: (canisterId: string) => void;
   onStrawSelect?: (canisterId: string, strawId: string) => void;
@@ -422,15 +423,63 @@ function getActivityIconType(action: string): ActivityIconType {
 }
 
 const ACTIVITY_BADGE_STYLE: Record<ActivityIconType, { bg: string; color: string; label: string }> = {
-  refill:  { bg: "#e8f4fd", color: "#1a6fa8", label: "Refill"  },
-  alert:   { bg: "#fef3c7", color: "#92400e", label: "Alert"   },
-  config:  { bg: "#f1e7f4", color: "#401153", label: "Config"  },
-  task:    { bg: "#ecfdf5", color: "#065f46", label: "Task"    },
-  email:   { bg: "#eff6ff", color: "#1e40af", label: "Email"   },
-  user:    { bg: "#f9fafb", color: "#374151", label: "User"    },
-  report:  { bg: "#e8f4fd", color: "#1a6fa8", label: "Export"  },
-  ivf:     { bg: "#f5f3ff", color: "#4c1d95", label: "IVF"    },
-  default: { bg: "#f1e7f4", color: "#401153", label: "System"  },
+  refill:  { bg: "#dbeafe", color: "#1d4ed8", label: "Refill"  },
+  alert:   { bg: "#fee2e2", color: "#dc2626", label: "Alert"   },
+  config:  { bg: "#f3f4f6", color: "#374151", label: "Config"  },
+  task:    { bg: "#dcfce7", color: "#16a34a", label: "Task"    },
+  email:   { bg: "#e0f2fe", color: "#0369a1", label: "Email"   },
+  user:    { bg: "#ede9fe", color: "#6d28d9", label: "User"    },
+  report:  { bg: "#fef9c3", color: "#a16207", label: "Export"  },
+  ivf:     { bg: "#fce7f3", color: "#be185d", label: "IVF"    },
+  default: { bg: "#ccfbf1", color: "#0f766e", label: "System"  },
+};
+
+const ACTIVITY_ICON_INNER: Record<ActivityIconType, React.ReactNode> = {
+  refill: <path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" />,
+  alert: (
+    <>
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </>
+  ),
+  config: (
+    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+  ),
+  task: (
+    <>
+      <polyline points="9 11 12 14 22 4" />
+      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+    </>
+  ),
+  email: (
+    <>
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+      <polyline points="22,6 12,13 2,6" />
+    </>
+  ),
+  user: (
+    <>
+      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </>
+  ),
+  report: (
+    <>
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </>
+  ),
+  ivf: (
+    <>
+      <path d="M14.5 2v17.5c0 1.4-1.1 2.5-2.5 2.5s-2.5-1.1-2.5-2.5V2" />
+      <path d="M8.5 2h7" />
+      <path d="M14.5 16h-5" />
+    </>
+  ),
+  default: <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
 };
 
 // ─── End activity log helpers ─────────────────────────────────────────────────
@@ -542,6 +591,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     internalTempAlert = false,
     tankMaxCapacity = null,
     tankMinCapacity = null,
+    ln2L2Threshold = null,
     onSensorSelect,
     onCanisterSelect,
     tankCode,
@@ -569,6 +619,15 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   const sceneCanisterCountRef = useRef<number>(CAN_COUNT);
   const canisterGlowRef = useRef<THREE.Group | null>(null);
   const glowRingMatsRef = useRef<THREE.MeshBasicMaterial[]>([]);
+  const ln2RimMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
+  const ln2ThresholdRingRef = useRef<THREE.Mesh | null>(null);
+  const l2LabelRef = useRef<HTMLDivElement | null>(null);
+  const vapSpriteDataRef = useRef<Array<{
+    sprite: THREE.Sprite;
+    mat: THREE.SpriteMaterial;
+    vy: number; vx: number; vz: number;
+    baseScale: number; baseOpacity: number; phase: number;
+  }>>([]);
 
   // Material handles for live tweaking from a dev panel
   const materialsRef = useRef<MaterialMap>({});
@@ -578,9 +637,12 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   const fill = Math.max(0, Math.min(100, ln2Level));
   const [displayPct, setDisplayPct] = useState<number>(fill);
   const [animeReady, setAnimeReady] = useState<boolean>(false);
+  const [sceneReady, setSceneReady] = useState<boolean>(false);
+  const sceneReadyRef = useRef<boolean>(false);
   const [selectedCanister, setSelectedCanister] = useState<number | null>(null); // null | index into canisters[]
   // Stage progresses idle → inspecting on canister click; back to idle on dismiss
   const [viewStage, setViewStage] = useState<"idle" | "extracted" | "inspecting">("idle"); // 'idle' | 'extracted' | 'inspecting'
+  const [inspectionReady, setInspectionReady] = useState<boolean>(false);
   const [selectedStraw, setSelectedStraw] = useState<number | null>(null); // null | 0..8
   const [loadedCaneCount, setLoadedCaneCount] = useState<number>(0);
   const autoRotateRef = useRef<boolean>(true);
@@ -600,11 +662,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   const [debugScale, setDebugScale] = useState({ x: 1, y: 1, z: 1 });
   const inspectOverrideRef = useRef({
     enabled: true,
-    pos: { x: -3.45, y: 0.05, z: 4.55 },
+    pos: { x: -3.75, y: 0.05, z: 4.55 },
     rotDeg: { x: 4, y: 2, z: -4 },
   });
   const [inspectOverride, setInspectOverride] = useState(true);
-  const [inspectPos, setInspectPos] = useState({ x: -3.45, y: 0.05, z: 4.55 });
+  const [inspectPos, setInspectPos] = useState({ x: -3.75, y: 0.05, z: 4.55 });
   const [inspectRotDeg, setInspectRotDeg] = useState({ x: 4, y: 2, z: -4 });
   // HTML overlay positions — sliders in dev panel update these; prod uses initial values
   const [dbgLn2, setDbgLn2] = useState({ left: 74, top: 50 });
@@ -642,6 +704,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   ]);
   const viewStageRef = useRef<"idle" | "extracted" | "inspecting">("idle");
   const selectedStrawRef = useRef<number | null>(null);
+  const canisterHasContentsRef = useRef<boolean[]>([]);
   // flat index → {caneIdx, cryolockIdx} per canister
   const cryolockFlatMapRef = useRef<{ caneIdx: number; cryolockIdx: number }[][]>([]);
 
@@ -661,6 +724,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   const [localContents, setLocalContents] = useState<StrawInfo[]>([]);
 
   useEffect(() => {
+    sceneReadyRef.current = sceneReady;
+  }, [sceneReady]);
+  useEffect(() => {
     selectedCanisterRef.current = selectedCanister;
   }, [selectedCanister]);
   useEffect(() => {
@@ -676,6 +742,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     setDbgLn2(isInspecting ? { left: 87.5, top: 50 } : { left: 74, top: 50 });
     setDbgNameCard(isInspecting ? { left: 72.5, bottom: 34 } : { left: 50, bottom: 52 });
   }, [viewStage]);
+  useEffect(() => {
+    setInspectionReady(false);
+  }, [viewStage, selectedCanister]);
   useEffect(() => {
     selectedStrawRef.current = selectedStraw;
   }, [selectedStraw]);
@@ -723,6 +792,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     // ----- Scene / camera / renderer -----
     const scene = new THREE.Scene();
     scene.background = null;
+    scene.fog = new THREE.Fog(0xe8d4f4, 22, 60);
 
     const camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
     camera.position.set(-1.4, 0.5, 11.0);
@@ -1017,6 +1087,25 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     );
     neckInnerWall.position.y = NECK_BOTTOM_Y + NECK_HEIGHT / 2;
     group.add(neckInnerWall);
+
+    // ===== L2 threshold ring (horizontal marker inside tank body at threshold height) =====
+    const THRESHOLD_RING_R = INNER_R - 0.04;
+    const ln2RimMat = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    ln2RimMatRef.current = ln2RimMat;
+    const ln2Rim = new THREE.Mesh(
+      new THREE.TorusGeometry(THRESHOLD_RING_R, 0.025, 10, 64),
+      ln2RimMat,
+    );
+    ln2Rim.rotation.x = Math.PI / 2;
+    ln2Rim.position.y = -TANK_HEIGHT / 2 + LN2_BOTTOM_MARGIN;
+    group.add(ln2Rim);
+    ln2ThresholdRingRef.current = ln2Rim;
 
     // ===== Tank Lid (disc lid that swings open 90° on a rim hinge) =====
     const lidPivot = new THREE.Group();
@@ -1753,58 +1842,69 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     waveRef.current = waveMesh;
     waveOrigPosRef.current = new Float32Array(positions);
 
-    // ===== Vapour particles above the lid =====
-    const P_COUNT = 42;
-    const pGeo = new THREE.BufferGeometry();
-    const pPos = new Float32Array(P_COUNT * 3);
-    const pVel: Array<{ x: number; y: number; z: number }> = [];
-    for (let i = 0; i < P_COUNT; i++) {
-      const r = Math.random() * TANK_RADIUS * 0.35;
+    // ===== Vapour cloud above the lid (sprite-based soft puffs) =====
+    const vapCanvas = document.createElement("canvas");
+    vapCanvas.width = vapCanvas.height = 128;
+    const vCtx = vapCanvas.getContext("2d")!;
+    const vGrad = vCtx.createRadialGradient(64, 64, 4, 64, 64, 64);
+    vGrad.addColorStop(0,    "rgba(255,255,255,1)");
+    vGrad.addColorStop(0.25, "rgba(242,242,246,0.85)");
+    vGrad.addColorStop(0.55, "rgba(220,220,228,0.45)");
+    vGrad.addColorStop(0.8,  "rgba(200,200,212,0.15)");
+    vGrad.addColorStop(1,    "rgba(190,190,205,0)");
+    vCtx.fillStyle = vGrad;
+    vCtx.fillRect(0, 0, 128, 128);
+    const vapTex = new THREE.CanvasTexture(vapCanvas);
+
+    vapSpriteDataRef.current = [];
+    const VAP_COUNT = 58;
+    for (let i = 0; i < VAP_COUNT; i++) {
+      const baseOpacity = 0.22 + Math.random() * 0.32;
+      const baseScale   = 0.45 + Math.random() * 1.1;
+      const mat = new THREE.SpriteMaterial({
+        map: vapTex,
+        transparent: true,
+        opacity: baseOpacity,
+        depthWrite: false,
+        blending: THREE.NormalBlending,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(baseScale, baseScale, 1);
+      const r = Math.random() * TANK_RADIUS * 0.55;
       const a = Math.random() * Math.PI * 2;
-      pPos[i * 3] = Math.cos(a) * r;
-      pPos[i * 3 + 1] = TANK_HEIGHT / 2 + 0.6 + Math.random() * 2.8;
-      pPos[i * 3 + 2] = Math.sin(a) * r;
-      pVel.push({
-        y: 0.008 + Math.random() * 0.014,
-        x: (Math.random() - 0.5) * 0.003,
-        z: (Math.random() - 0.5) * 0.003,
+      sprite.position.set(
+        Math.cos(a) * r,
+        TANK_HEIGHT / 2 + 0.25 + Math.random() * 2.8,
+        Math.sin(a) * r,
+      );
+      group.add(sprite);
+      vapSpriteDataRef.current.push({
+        sprite, mat,
+        vy: 0.004 + Math.random() * 0.008,
+        vx: (Math.random() - 0.5) * 0.0022,
+        vz: (Math.random() - 0.5) * 0.0022,
+        baseScale,
+        baseOpacity,
+        phase: Math.random() * Math.PI * 2,
       });
     }
-    pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
-    const pMat = new THREE.PointsMaterial({
-      color: 0xf3eaf6,
-      size: 0.14,
-      transparent: true,
-      opacity: 0.42,
-      sizeAttenuation: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const particles = new THREE.Points(pGeo, pMat);
-    scene.add(particles);
 
-    // ===== Soft shadow ellipse under tank =====
-    const shadowTexCanvas = document.createElement("canvas");
-    shadowTexCanvas.width = shadowTexCanvas.height = 256;
-    const stx = shadowTexCanvas.getContext("2d")!;
-    const rg = stx.createRadialGradient(128, 128, 10, 128, 128, 128);
-    rg.addColorStop(0, "rgba(64, 17, 83, 0.55)");
-    rg.addColorStop(0.6, "rgba(64, 17, 83, 0.15)");
-    rg.addColorStop(1, "rgba(64, 17, 83, 0)");
-    stx.fillStyle = rg;
-    stx.fillRect(0, 0, 256, 256);
-    const shadowTex = new THREE.CanvasTexture(shadowTexCanvas);
-    const shadow = new THREE.Mesh(
-      new THREE.PlaneGeometry(TANK_RADIUS * 3.4, TANK_RADIUS * 3.4),
-      new THREE.MeshBasicMaterial({
-        map: shadowTex,
-        transparent: true,
-        depthWrite: false,
-      }),
-    );
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.position.y = -TANK_HEIGHT / 2 - 0.25;
-    scene.add(shadow);
+
+    // ===== 3D perspective floor grid (extends to fog horizon) =====
+    const GRID_SIZE = 110;
+    const GRID_DIVS = 88;
+    const floorGrid = new THREE.GridHelper(GRID_SIZE, GRID_DIVS, 0xc4a8dc, 0xc4a8dc);
+    floorGrid.position.y = -TANK_HEIGHT / 2 - 0.26;
+    const setGridOpacity = (m: THREE.Material | THREE.Material[]) => {
+      const mats = Array.isArray(m) ? m : [m];
+      mats.forEach((mat) => {
+        mat.transparent = true;
+        (mat as THREE.LineBasicMaterial).opacity = 0.52;
+        (mat as THREE.LineBasicMaterial).depthWrite = false;
+      });
+    };
+    setGridOpacity(floorGrid.material);
+    scene.add(floorGrid);
 
     // ===== Canister portal ring glow (neon halo shown when canister is parked) =====
     const RING_R = 0.68;           // ring radius — a bit wider than canister
@@ -2004,6 +2104,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
         const idx = pickCanister(upX, upY);
         if (idx === null) return;
+        if (!canisterHasContentsRef.current[idx]) return;
 
         if (stage === "idle") {
           setSelectedCanister(idx);
@@ -2088,7 +2189,8 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             setCaneHoverCard(null);
           }
           if (stage === "idle") {
-            actionable = pickCanister(x, y) !== null;
+            const idx = pickCanister(x, y);
+            actionable = idx !== null && !!canisterHasContentsRef.current[idx];
           }
         }
         renderer.domElement.style.cursor = actionable
@@ -2174,21 +2276,40 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         waveRef.current.geometry.computeVertexNormals();
       }
 
-      // Vapour
-      const pa = particles.geometry.attributes.position.array;
-      for (let i = 0; i < P_COUNT; i++) {
-        pa[i * 3] += pVel[i].x + Math.sin(t * 0.6 + i) * 0.0008;
-        pa[i * 3 + 1] += pVel[i].y;
-        pa[i * 3 + 2] += pVel[i].z + Math.cos(t * 0.6 + i) * 0.0008;
-        if (pa[i * 3 + 1] > TANK_HEIGHT / 2 + 3.4) {
-          const r = Math.random() * TANK_RADIUS * 0.35;
-          const a = Math.random() * Math.PI * 2;
-          pa[i * 3] = Math.cos(a) * r;
-          pa[i * 3 + 1] = TANK_HEIGHT / 2 + 0.55;
-          pa[i * 3 + 2] = Math.sin(a) * r;
+      // Vapour cloud — animate each sprite puff
+      const inspecting = viewStageRef.current === "inspecting";
+      for (const v of vapSpriteDataRef.current) {
+        const sp = v.sprite;
+        sp.position.y += v.vy;
+        sp.position.x += v.vx + Math.sin(t * 0.32 + v.phase) * 0.0014;
+        sp.position.z += v.vz + Math.cos(t * 0.32 + v.phase) * 0.0014;
+
+        // Expand and fade as the puff rises
+        const rise = (sp.position.y - (TANK_HEIGHT / 2 + 0.25)) / 3.0;
+        const sc   = v.baseScale * (1 + rise * 0.9);
+        const peak = inspecting ? Math.min(v.baseOpacity * 1.8, 0.88) : v.baseOpacity;
+        const op   = peak * Math.max(0, 1 - rise * 0.85);
+        sp.scale.set(sc, sc, 1);
+        v.mat.opacity = Math.max(0, op);
+
+        // Respawn at tank opening when fully risen or invisible
+        if (sp.position.y > TANK_HEIGHT / 2 + 3.8 || v.mat.opacity < 0.01) {
+          const spawnR = Math.random() * TANK_RADIUS * (inspecting ? 0.65 : 0.52);
+          const spawnA = Math.random() * Math.PI * 2;
+          sp.position.set(
+            Math.cos(spawnA) * spawnR,
+            TANK_HEIGHT / 2 + 0.15 + Math.random() * 0.55,
+            Math.sin(spawnA) * spawnR,
+          );
+          v.baseScale   = inspecting ? (0.65 + Math.random() * 1.5) : (0.45 + Math.random() * 1.1);
+          v.baseOpacity = inspecting ? (0.42 + Math.random() * 0.42) : (0.22 + Math.random() * 0.32);
+          sp.scale.set(v.baseScale, v.baseScale, 1);
+          v.mat.opacity = v.baseOpacity;
+          v.vy = 0.004 + Math.random() * 0.008;
+          v.vx = (Math.random() - 0.5) * 0.0022;
+          v.vz = (Math.random() - 0.5) * 0.0022;
         }
       }
-      particles.geometry.attributes.position.needsUpdate = true;
 
       // Breathing rim light
       rim1.intensity = 1.4 + Math.sin(t * 0.45) * 0.25;
@@ -2225,6 +2346,27 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       }
 
       renderer.render(scene, camera);
+
+      // ===== L2 label overlay — visibility + colour only (position set by useEffect) =====
+      const labelEl = l2LabelRef.current;
+      const rimMat = ln2RimMatRef.current;
+      if (labelEl) {
+        const showLabel =
+          sceneReadyRef.current &&
+          viewStageRef.current !== "inspecting" &&
+          rimMat != null &&
+          rimMat.opacity > 0;
+        labelEl.style.display = showLabel ? "flex" : "none";
+        if (showLabel && rimMat) {
+          const hex = `#${rimMat.color.getHexString()}`;
+          const inner = labelEl.querySelector<HTMLElement>("[data-l2-badge]");
+          const line = labelEl.querySelector<HTMLElement>("[data-l2-line]");
+          const arrow = labelEl.querySelector<HTMLElement>("[data-l2-arrow]");
+          if (inner) { inner.style.borderColor = hex; inner.style.color = hex; }
+          if (line) line.style.background = hex;
+          if (arrow) arrow.style.borderRightColor = hex;
+        }
+      }
     };
     tick();
 
@@ -2535,9 +2677,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         cam.position.set(IDLE_CAM.x, IDLE_CAM.y, IDLE_CAM.z);
         target.set(IDLE_TARGET.x, IDLE_TARGET.y, IDLE_TARGET.z);
         interior.intensity = 0;
+        setSceneReady(true);
         return;
       }
 
+      setSceneReady(false);
       anime.remove(cam.position);
       anime.remove(target);
       anime.remove(lid.rotation);
@@ -2553,6 +2697,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           { x: IDLE_CAM.x, y: IDLE_CAM.y, z: IDLE_CAM.z, duration: 1000 },
         ],
         easing: "easeInOutCubic",
+        complete: () => setSceneReady(true),
       });
       anime({ targets: grp.position, x: 0, y: 0, z: 0, duration: 1400, easing: "easeInOutCubic", delay: 300 });
       anime({
@@ -2890,6 +3035,8 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         cam.position.set(STAGE2_CAM.x, STAGE2_CAM.y, STAGE2_CAM.z);
         target.set(STAGE2_TARGET.x, STAGE2_TARGET.y, STAGE2_TARGET.z);
         interior.intensity = 1.5;
+        inspectionReadyRef.current = true;
+        setInspectionReady(true);
         return;
       }
 
@@ -3032,6 +3179,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       setTimeout(() => {
         if (viewStageRef.current === "inspecting" && selectedCanisterRef.current === selCanSnap) {
           inspectionReadyRef.current = true;
+          setInspectionReady(true);
           // Fan canes outward using the same orbit angles assigned in step 2
           const POP_R = ORBIT_R * 3.5;
           visibleSubs.forEach((s, i) => {
@@ -3180,6 +3328,56 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     });
   }, [animeReady]);
 
+  useEffect(() => {
+    const rimMat = ln2RimMatRef.current;
+    const thresholdRing = ln2ThresholdRingRef.current;
+    if (!rimMat) return;
+
+    const ln2CapacitySpan =
+      tankMaxCapacity != null && tankMinCapacity != null
+        ? tankMaxCapacity - tankMinCapacity
+        : null;
+
+    // No threshold configured — hide the ring.
+    if (ln2L2Threshold == null || ln2CapacitySpan == null || ln2CapacitySpan <= 0) {
+      rimMat.opacity = 0;
+      rimMat.needsUpdate = true;
+      return;
+    }
+
+    // Convert raw threshold to percentage of the LN2-fillable range and clamp.
+    const thresholdPercent = Math.max(0, Math.min(100, (ln2L2Threshold / ln2CapacitySpan) * 100));
+
+    // Position the ring at the threshold height within MAX_LN2_HEIGHT.
+    if (thresholdRing) {
+      thresholdRing.position.y = -TANK_HEIGHT / 2 + LN2_BOTTOM_MARGIN + MAX_LN2_HEIGHT * (thresholdPercent / 100);
+    }
+
+    // Colour: green when current fill is at or above threshold, amber when below.
+    const ln2Clamped = typeof ln2Level === "number" ? Math.max(0, Math.min(100, ln2Level)) : null;
+    const isOk = ln2Clamped == null ? true : ln2Clamped >= thresholdPercent;
+    rimMat.color.set(isOk ? "#22c55e" : "#f59e0b");
+    rimMat.opacity = 0.7;
+    rimMat.needsUpdate = true;
+
+    // Position the label once — deferred until the intro camera animation finishes
+    // so the camera is at its final idle position when we project.
+    if (sceneReady) {
+      const labelEl = l2LabelRef.current;
+      const cam = cameraRef.current;
+      const mount = mountRef.current;
+      if (labelEl && cam && mount) {
+        const thresholdY = -TANK_HEIGHT / 2 + LN2_BOTTOM_MARGIN + MAX_LN2_HEIGHT * (thresholdPercent / 100);
+        const pt = new THREE.Vector3(TANK_RADIUS * 1.12, thresholdY, 0);
+        cam.updateMatrixWorld();
+        pt.project(cam);
+        const rect = mount.getBoundingClientRect();
+        labelEl.style.left = `${((pt.x + 1) / 2) * rect.width}px`;
+        labelEl.style.top = `${((-pt.y + 1) / 2) * rect.height}px`;
+      }
+    }
+  }, [ln2Level, tankMaxCapacity, tankMinCapacity, ln2L2Threshold, sceneReady]);
+
   // ---------- Derived state for status ----------
   const status =
     fill >= 60
@@ -3190,13 +3388,10 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
   const isEmbedded = variant === "embedded";
   const effectiveCanisters =
-    canisters ?? (isEmbedded ? [] : DEFAULT_CANISTERS);
+    canisters ?? DEFAULT_CANISTERS;
   const effectiveContents =
     canisterContents ?? (isEmbedded ? {} : DEFAULT_CONTENTS);
-  const sceneCanisterCount = Math.min(
-    CAN_COUNT,
-    effectiveCanisters.length || (isEmbedded ? 0 : CAN_COUNT),
-  );
+  const sceneCanisterCount = CAN_COUNT;
   const visibleCanisters: CanisterInfo[] = Array.from(
     { length: sceneCanisterCount },
     (_, i) =>
@@ -3213,6 +3408,56 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       ? effectiveContents[selectedCanisterData.id] ?? []
       : [];
   const samplesPerCanister = selectedContents.length;
+  const canisterHasContents = visibleCanisters.map(
+    (c) => (effectiveContents[c.id]?.length ?? c.sampleCount ?? 0) > 0,
+  );
+
+  const clamp = (value: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, value));
+  const canvasRect = mountRef.current?.getBoundingClientRect();
+  const tooltipPad = 8;
+  const canvasTooltipDims = { width: 220, height: 140, arrow: 12 };
+  const canvasTooltipOffset = 14;
+  const canvasTooltipSide = canvasTooltip && canvasRect
+    ? ((canvasTooltip.x + canvasTooltipDims.width + canvasTooltipOffset + tooltipPad) <= canvasRect.width
+        ? "right"
+        : (canvasTooltip.x - canvasTooltipDims.width - canvasTooltipOffset - tooltipPad >= 0
+            ? "left"
+            : "right"))
+    : "right";
+  const canvasTooltipPos = canvasTooltip && canvasRect
+    ? {
+        left: clamp(
+          canvasTooltipSide === "right"
+            ? canvasTooltip.x + canvasTooltipOffset
+            : canvasTooltip.x - canvasTooltipDims.width - canvasTooltipOffset,
+          tooltipPad,
+          canvasRect.width - canvasTooltipDims.width - tooltipPad,
+        ),
+        top: canvasTooltip.y - canvasTooltipDims.height / 2,
+      }
+    : null;
+  const canvasTooltipTransform = canvasTooltipPos
+    ? "translate(0, 0)"
+    : "translate(-50%, -50%)";
+  const caneTooltipPos = caneHoverCard && canvasRect
+    ? {
+        left: clamp(
+          caneHoverCard.x + 12,
+          tooltipPad,
+          canvasRect.width - 160 - tooltipPad,
+        ),
+        top: clamp(
+          caneHoverCard.y - 58,
+          tooltipPad,
+          canvasRect.height - 64 - tooltipPad,
+        ),
+      }
+    : null;
+  const tankLabelText = `${tankCode || "—"} · ${branchName || "—"} · LN2 ${Math.round(displayPct)}%`;
+  const inspectLabelText = selectedCanisterData
+    ? `${selectedCanisterData.label} · ${samplesPerCanister} samples`
+    : null;
 
   useEffect(() => {
     setLocalContents(selectedContents);
@@ -3250,6 +3495,10 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       can.group.visible = idx < sceneCanisterCount;
     });
   }, [sceneCanisterCount]);
+
+  useEffect(() => {
+    canisterHasContentsRef.current = canisterHasContents;
+  }, [canisterHasContents]);
 
   useEffect(() => {
     if (selectedCanister == null) return;
@@ -3538,9 +3787,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   borderRadius: 18,
                   boxShadow: "0 6px 16px #40115308",
                   overflow: "hidden",
-                  opacity: isInspecting ? 1 : 0,
-                  transform: isInspecting ? "translateY(0)" : "translateY(10px)",
-                  pointerEvents: isInspecting ? "auto" : "none",
+                  opacity: isInspecting && inspectionReady ? 1 : 0,
+                  transform: isInspecting && inspectionReady ? "translateY(0)" : "translateY(10px)",
+                  pointerEvents: isInspecting && inspectionReady ? "auto" : "none",
                   transition: "opacity 0.35s ease, transform 0.35s ease",
                 }}
               >
@@ -3934,19 +4183,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 transition: "background 0.6s ease, border-color 0.6s ease, width 0.35s ease",
             }}
           >
-            {/* Grid pattern */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                zIndex: 0,
-                pointerEvents: "none",
-                backgroundImage:
-                  "linear-gradient(rgba(100,40,140,0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(100,40,140,0.09) 1px, transparent 1px)",
-                backgroundSize: "48px 48px",
-                backgroundPosition: "center center",
-              }}
-            />
             {/* Radial depth vignette — brighter center, darker corners */}
             <div
               style={{
@@ -4319,19 +4555,75 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             )}
 
 
+            {/* L2 threshold label — tracks the 3D ring, hidden in inspecting mode */}
+            <div
+              ref={l2LabelRef}
+              style={{
+                position: "absolute",
+                left: 0,
+                display: "none",
+                alignItems: "center",
+                transform: "translateY(-50%)",
+                pointerEvents: "none",
+                zIndex: 4,
+                gap: 0,
+              }}
+            >
+              <div
+                data-l2-line
+                style={{
+                  width: 22,
+                  height: 1.5,
+                  background: "#f59e0b",
+                  flexShrink: 0,
+                }}
+              />
+              <div
+                data-l2-arrow
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderTop: "5px solid transparent",
+                  borderBottom: "5px solid transparent",
+                  borderRight: "6px solid #f59e0b",
+                  flexShrink: 0,
+                }}
+              />
+              <div
+                data-l2-badge
+                style={{
+                  background: "rgba(255,255,255,0.92)",
+                  backdropFilter: "blur(8px)",
+                  border: "1.5px solid #f59e0b",
+                  borderRadius: 6,
+                  padding: "2px 8px",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#f59e0b",
+                  letterSpacing: "0.1em",
+                  lineHeight: 1.5,
+                  whiteSpace: "nowrap",
+                  fontFamily: "Inter, system-ui, sans-serif",
+                }}
+              >
+                L2
+              </div>
+            </div>
+
             {/* Cryolock 3D tooltip — appears above the selected cap */}
             {canvasTooltip && (
               <div
                 className="absolute pointer-events-none"
                 style={{
-                  left: canvasTooltip.x,
-                  top: canvasTooltip.y - 12,
-                  transform: "translate(-50%, -100%)",
+                  left: canvasTooltipPos?.left ?? canvasTooltip.x,
+                  top: canvasTooltipPos?.top ?? canvasTooltip.y,
+                  transform: canvasTooltipTransform,
                   zIndex: 10,
                 }}
               >
                 <div
                   style={{
+                    position: "relative",
                     background: "rgba(255,255,255,0.97)",
                     backdropFilter: "blur(16px)",
                     border: "1.5px solid #c8a8dc",
@@ -4344,6 +4636,34 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 >
                   {/* Purple accent bar at top */}
                   <div style={{ position: "absolute", top: 0, left: 12, right: 12, height: 3, borderRadius: "0 0 3px 3px", background: "linear-gradient(90deg, var(--color-primary), #9b4aaa)" }} />
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      width: 0,
+                      height: 0,
+                      borderTop: "8px solid transparent",
+                      borderBottom: "8px solid transparent",
+                      ...(canvasTooltipSide === "right"
+                        ? { left: -10, borderRight: "10px solid #c8a8dc" }
+                        : { right: -10, borderLeft: "10px solid #c8a8dc" }),
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      width: 0,
+                      height: 0,
+                      borderTop: "7px solid transparent",
+                      borderBottom: "7px solid transparent",
+                      ...(canvasTooltipSide === "right"
+                        ? { left: -8, borderRight: "8px solid rgba(255,255,255,0.97)" }
+                        : { right: -8, borderLeft: "8px solid rgba(255,255,255,0.97)" }),
+                    }}
+                  />
                   {canvasTooltip.caneCode && (
                     <div style={{ fontSize: 9, fontWeight: 700, color: "var(--color-primary)", letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 5, marginTop: 2 }}>
                       Cane {canvasTooltip.caneCode}
@@ -4372,35 +4692,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   {canvasTooltip.item.type && !canvasTooltip.item.stage && (
                     <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>{canvasTooltip.item.type}</div>
                   )}
-                </div>
-                {/* Downward-pointing arrow matching card border */}
-                <div style={{ position: "relative", height: 10, margin: "0 auto", width: 20 }}>
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      width: 0,
-                      height: 0,
-                      borderLeft: "9px solid transparent",
-                      borderRight: "9px solid transparent",
-                      borderTop: "9px solid #c8a8dc",
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      width: 0,
-                      height: 0,
-                      borderLeft: "7px solid transparent",
-                      borderRight: "7px solid transparent",
-                      borderTop: "8px solid rgba(255,255,255,0.97)",
-                    }}
-                  />
                 </div>
               </div>
             )}
@@ -4441,7 +4732,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             )}
 
             {/* Tank code / branch name — bottom center */}
-            {isInspecting && (tankCode || branchName) && (
+            {isInspecting && inspectionReady && (tankCode || branchName) && (
               <div
                 style={{
                   position: "absolute",
@@ -4459,8 +4750,29 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   whiteSpace: "nowrap",
                 }}
               >
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#1a0a1f" }}>{tankCode || "—"}</div>
-                <div style={{ fontSize: 10, color: "#6b7280" }}>{branchName || "—"}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#1a0a1f" }}>{tankLabelText}</div>
+              </div>
+            )}
+
+            {isInspecting && inspectionReady && inspectLabelText && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: dbgNameCard.bottom,
+                  left: "26%",
+                  transform: "translateX(-50%)",
+                  background: "rgba(255,255,255,0.88)",
+                  backdropFilter: "blur(14px)",
+                  border: "1px solid #d8c6e8",
+                  borderRadius: 10,
+                  padding: "6px 12px",
+                  zIndex: 8,
+                  textAlign: "center",
+                  pointerEvents: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#1a0a1f" }}>{inspectLabelText}</div>
               </div>
             )}
 
@@ -4469,8 +4781,8 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               <div
                 style={{
                   position: "absolute",
-                  left: Math.min(caneHoverCard.x + 12, (mountRef.current?.offsetWidth ?? 600) - 160),
-                  top: Math.max(caneHoverCard.y - 48, 8),
+                  left: caneTooltipPos?.left ?? caneHoverCard.x + 12,
+                  top: caneTooltipPos?.top ?? caneHoverCard.y - 48,
                   background: "rgba(255,255,255,0.97)",
                   border: "1px solid #c8a8dc",
                   borderRadius: 10,
@@ -4577,7 +4889,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                       animationPlayState: activityScrollPaused ? "paused" : "running",
                     }}
                   >
-                  {[...systemActivity, ...systemActivity].map((log, _idx) => {
+                  {[...systemActivity, ...systemActivity].flatMap((log, _idx) => {
                     const _key = `${log.id}-${_idx}`;
                     const action = log.action ?? "";
                     const iconType = getActivityIconType(action);
@@ -4590,7 +4902,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                     const actorName = log.actor_label || (log.actor_details
                       ? `${(log.actor_details as any).first_name || ""} ${(log.actor_details as any).last_name || ""}`.trim()
                       : "");
-                    return (
+                    const card = (
                       <div
                         key={_key}
                         style={{
@@ -4609,49 +4921,16 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                             height: 32,
                             borderRadius: 8,
                             background: badge.bg,
+                            color: badge.color,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             flexShrink: 0,
                           }}
                         >
-                          {iconType === "refill" ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M12 2L8 6h3v8a4 4 0 008 0V6h3L12 2z"/>
-                            </svg>
-                          ) : iconType === "alert" ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                            </svg>
-                          ) : iconType === "config" ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/>
-                            </svg>
-                          ) : iconType === "task" ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-                            </svg>
-                          ) : iconType === "email" ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
-                            </svg>
-                          ) : iconType === "user" ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                            </svg>
-                          ) : iconType === "report" ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                            </svg>
-                          ) : iconType === "ivf" ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
-                            </svg>
-                          ) : (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={badge.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                            </svg>
-                          )}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            {ACTIVITY_ICON_INNER[iconType]}
+                          </svg>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
@@ -4689,6 +4968,10 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                         </div>
                       </div>
                     );
+                    const isCopyEnd = _idx === systemActivity.length - 1 || _idx === systemActivity.length * 2 - 1;
+                    return isCopyEnd
+                      ? [card, <div key={`gap-${_idx}`} style={{ height: 52, flexShrink: 0 }} />]
+                      : [card];
                   })}
                   </div>
                 )}
@@ -4724,7 +5007,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   <div
                     className="cryo-display"
                     style={{
-                      fontSize: 14,
+                      fontSize: 11,
                       fontWeight: 500,
                       color: "#8b6c97",
                       letterSpacing: "-0.015em",
@@ -4735,7 +5018,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                       ? "Selected"
                       : selectedCanister !== null
                         ? "Extracted"
-                        : `Click to any canister to inspect`}
+                        : "Click a loaded canister to inspect"}
                   </div>
                 </div>
                 {viewStage !== "inspecting" && (
@@ -4760,15 +5043,15 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               >
                 {visibleCanisters.map((c, i) => {
                   const isSelected = selectedCanister === i;
-                  if (viewStage === "inspecting" && !isSelected) return null;
                   const canSampleCount =
                     c.sampleCount ?? effectiveContents[c.id]?.length ?? 0;
-                  const cursor = viewStage === "idle" ? "pointer" : "default";
+                  const hasContents = canSampleCount > 0;
+                  const cursor = viewStage === "idle" && hasContents ? "pointer" : "default";
                   return (
                     <div
                       key={c.id}
                       onClick={() => {
-                        if (viewStage === "idle") {
+                        if (viewStage === "idle" && hasContents) {
                           setSelectedCanister(i);
                           setViewStage("inspecting");
                           onCanisterSelect && onCanisterSelect(c.id);
@@ -4779,11 +5062,20 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                         gap: 10,
                         padding: "8px 10px",
                         borderRadius: 12,
-                        background: isSelected ? "var(--color-primary)" : "#ffffff",
-                        border: isSelected ? "1px solid var(--color-primary)" : "1px solid #E7E1E1",
-                        boxShadow: isSelected ? "0 4px 14px #6B117640" : "none",
+                        background: isSelected
+                          ? "#f3e8ff"
+                          : hasContents
+                            ? "#ffffff"
+                            : "#f8f5fa",
+                        border: isSelected
+                          ? "1px solid #6B1176"
+                          : hasContents
+                            ? "1px solid #E7E1E1"
+                            : "1px solid #eee7f3",
+                        boxShadow: isSelected ? "0 4px 14px #6B117620" : "none",
                         transition: "all 0.2s ease",
                         cursor,
+                        opacity: hasContents || isSelected ? 1 : 0.7,
                       }}
                     >
                       <div
@@ -4795,7 +5087,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                           height="20"
                           viewBox="0 0 14 20"
                           fill="none"
-                          stroke={isSelected ? "#ffffff" : "#6b7280"}
+                          stroke={isSelected ? "#6B1176" : "#6b7280"}
                           strokeWidth="1.6"
                         >
                           <rect
@@ -4810,7 +5102,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                             cx="7"
                             cy="1"
                             r="0.8"
-                            fill={isSelected ? "#ffffff" : "#6b7280"}
+                            fill={isSelected ? "#6B1176" : "#6b7280"}
                           />
                         </svg>
                       </div>
@@ -4819,7 +5111,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                           style={{
                             fontSize: 13,
                             fontWeight: 600,
-                            color: isSelected ? "#ffffff" : "#1a0a1f",
+                            color: isSelected ? "#401153" : "#1a0a1f",
                           }}
                         >
                           {c.label}
@@ -4827,7 +5119,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                         <div
                           style={{
                             fontSize: 10,
-                            color: isSelected ? "rgba(255,255,255,0.75)" : "#6b7280",
+                            color: isSelected ? "#6b4a78" : "#6b7280",
                             marginTop: 2,
                           }}
                         >
@@ -4842,7 +5134,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                             width: 8,
                             height: 8,
                             borderRadius: "50%",
-                            background: "rgba(255,255,255,0.7)",
+                            background: "#6B1176",
                           }}
                         />
                       )}

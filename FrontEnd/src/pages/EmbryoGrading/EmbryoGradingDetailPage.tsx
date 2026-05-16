@@ -385,7 +385,7 @@ export default function EmbryoGradingDetailPage() {
 
   return (
     <>
-      <div className="flex flex-col min-w-0 w-full flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col min-w-0 w-full flex-1 min-h-0 overflow-y-auto">
 
             {selectedCycle ? (
               <div className="flex flex-col gap-4 p-4">
@@ -618,7 +618,7 @@ export default function EmbryoGradingDetailPage() {
                     )}
                   </div>
 
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="h-[260.5px] overflow-y-auto">
                     {timelineLoading ? (
                       <div className="flex items-center justify-center py-10 text-xs text-gray-400">Loading activity…</div>
                     ) : timelineEvents.length === 0 ? (
