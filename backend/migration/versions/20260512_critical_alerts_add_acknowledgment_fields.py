@@ -7,6 +7,11 @@ Create Date: 2026-05-12
 from alembic import op
 import sqlalchemy as sa
 
+revision = '20260512_critical_alerts_ack_fields'
+down_revision = '20260508_critical_alerts_add_incubator'
+branch_labels = None
+depends_on = None
+
 
 def upgrade():
     op.add_column(
