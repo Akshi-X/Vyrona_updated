@@ -12,6 +12,7 @@ interface CriticalAlert {
     message: string;
     timestamp: string;
     status: "Active" | "Acknowledged" | "Resolved" | "Escalated";
+    acknowledgementReason?: string;
 }
 
 interface CriticalAlertsModalProps {
@@ -720,6 +721,14 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                                 )}
                                                             </div>
                                                         )}
+                                                        {activeGroupAlertIds.length === 0 &&
+                                                            isLidStateAlert(latestAlert) &&
+                                                            latestAlert.acknowledgementReason && (
+                                                                <div className="mt-2 flex flex-wrap items-start gap-x-1 text-xs text-gray-500">
+                                                                    <span className="font-semibold text-gray-600">Reason:</span>
+                                                                    <span>{latestAlert.acknowledgementReason}</span>
+                                                                </div>
+                                                            )}
                                                     </div>
                                                 </div>
 

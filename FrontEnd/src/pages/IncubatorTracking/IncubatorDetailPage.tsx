@@ -552,6 +552,7 @@ export default function IncubatorDetailPage() {
           message: a.message,
           timestamp: new Date(a.occurred_at + 'Z').toLocaleString(),
           status: a.status === 'Active' ? 'Active' : 'Acknowledged',
+          acknowledgementReason: a.acknowledgment_reason,
         }))}
         loading={loadingAlerts}
         patientIdLabel=""
