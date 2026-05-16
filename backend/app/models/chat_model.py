@@ -20,7 +20,11 @@ class ChatMessage(Base):
     
     # Tank Reference (for IVF flow)
     tank_id = Column(Integer, ForeignKey("tanks.tank_id"), nullable=True, index=True)
-    
+
+    # Incubator Reference (for incubator tracking)
+    incubator_id = Column(Integer, ForeignKey("incubators.incubator_id"), nullable=True, index=True)
+    chamber_id = Column(String(255), nullable=True)
+
     # Sender Information
     sender_id = Column(String, ForeignKey("users.user_id"), nullable=False, index=True)
     # Note: sender_role removed - use sender_id relationship to User table to get role
@@ -37,6 +41,7 @@ class ChatMessage(Base):
     # Relationships
     patient = relationship("Patient", backref="chat_messages")
     tank = relationship("Tank", backref="chat_messages")
+    incubator = relationship("Incubator", backref="chat_messages")
     sender = relationship("User", foreign_keys=[sender_id], backref="sent_messages")
     # Note: read_statuses relationship removed - ChatReadStatus now uses composite PK (user_id, patient_id)
     # and tracks last_read_message_id instead of per-message read status
@@ -45,4 +50,5 @@ class ChatMessage(Base):
     __table_args__ = (
         Index('idx_chat_messages_patient_created', 'patient_id', 'created_at'),
         Index('idx_chat_messages_tank_created', 'tank_id', 'created_at'),
+        Index('idx_chat_messages_incubator_created', 'incubator_id', 'created_at'),
     )

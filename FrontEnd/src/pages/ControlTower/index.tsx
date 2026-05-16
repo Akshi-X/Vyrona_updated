@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 import ControlTowerMap from '../../components/ControlTowerMap';
 import { Link } from 'react-router-dom';
-import { userService } from '../../services/userService';
 import ControlTowerIconDark from '../../assets/DashBoardIcons/ControlTowerDark.svg';
 import PageLayout from '../../components/PageLayout';
 import FilterPanel, { FilterSelect, FilterToggle } from '../../components/FilterPanel';
@@ -54,7 +53,6 @@ const ControlTower = () => {
         "inbound",
     );
     const [department, setDepartment] = useState<string | null>(null);
-    const [_userInitials, setUserInitials] = useState<string>("");
 
     // Sync branch + status filters to URL query params
     useEffect(() => {
@@ -90,11 +88,25 @@ const ControlTower = () => {
             status: string;
             deviations?: number;
             date: string;
-            isIncubator: boolean;
         }>
     >([]);
     const [loadingCanisters, setLoadingCanisters] = useState(false);
     const [canistersError, setCanistersError] = useState<string | null>(null);
+
+    const [incubators, setIncubators] = useState<
+        Array<{
+            id: string;
+            canisterId: string;
+            tankId: string;
+            branchName: string;
+            branchId: string;
+            status: string;
+            deviations?: number;
+            date: string;
+        }>
+    >([]);
+    const [loadingIncubators, setLoadingIncubators] = useState(false);
+    const [incubatorsError, setIncubatorsError] = useState<string | null>(null);
     const [zoomToLocation, setZoomToLocation] = useState<{
         lat: number;
         lng: number;
@@ -237,7 +249,6 @@ const ControlTower = () => {
                     status: string;
                     deviations?: number;
                     date: string;
-                    isIncubator: boolean;
                 }> = [];
 
                 // Handle flat format (canisters array) - legacy format
@@ -277,7 +288,6 @@ const ControlTower = () => {
                             status: statusText,
                             deviations: deviationCount,
                             date: date,
-                            isIncubator: canister.is_incubator ?? false,
                         };
                         },
                     );
@@ -324,7 +334,6 @@ const ControlTower = () => {
                                         status: statusText,
                                         deviations: deviationCount,
                                         date: date,
-                                        isIncubator: tank.is_incubator ?? false,
                                     };
                                 });
                             }
@@ -372,8 +381,7 @@ const ControlTower = () => {
                                         status: statusText,
                                         deviations: deviationCount,
                                         date: date,
-                                        isIncubator: canister.is_incubator ?? false,
-                                    };
+                                                };
                                 });
                             }
                             return [];
@@ -394,43 +402,51 @@ const ControlTower = () => {
         fetchCanisters();
     }, [isAuthenticated, isIvfUser]);
 
-    // Fetch user profile to compute initials
     useEffect(() => {
-        const fetchUserProfile = async () => {
-            try {
-                const profile = await userService.getProfile();
-                const first = profile.first_name?.trim?.() || "";
-                const last = profile.last_name?.trim?.() || "";
-                const initials =
-                    `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || "U";
-                setUserInitials(initials);
-            } catch {
-                setUserInitials("U");
-            }
-        };
-        if (isAuthenticated) {
-            fetchUserProfile();
+        if (!isIvfUser || !isAuthenticated) {
+            setIncubators([]);
+            setIncubatorsError(null);
+            setLoadingIncubators(false);
+            return;
         }
-    }, [isAuthenticated]);
 
-    // Fetch user profile to compute initials
-    useEffect(() => {
-        const fetchUserProfile = async () => {
+        const fetchIncubators = async () => {
+            setLoadingIncubators(true);
+            setIncubatorsError(null);
             try {
-                const profile = await userService.getProfile();
-                const first = profile.first_name?.trim?.() || "";
-                const last = profile.last_name?.trim?.() || "";
-                const initials =
-                    `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || "U";
-                setUserInitials(initials);
-            } catch {
-                setUserInitials("U");
+                const data = await shipmentService.getActiveIncubators();
+                const flattened = (data.branches || []).flatMap((branch) =>
+                    (branch.incubators || []).map((inc) => {
+                        let date = "NA";
+                        if (inc.updated_at) {
+                            const d = new Date(inc.updated_at);
+                            if (!isNaN(d.getTime())) {
+                                date = d.toLocaleDateString("en-GB");
+                            }
+                        }
+                        return {
+                            id: `incubator-${branch.branch_id}-${inc.incubator_id}`,
+                            canisterId: inc.incubator_code || String(inc.incubator_id),
+                            tankId: String(inc.incubator_id),
+                            branchId: String(branch.branch_id),
+                            branchName: branch.branch_name || "N/A",
+                            status: "Active",
+                            deviations: undefined,
+                            date,
+                        };
+                    }),
+                );
+                setIncubators(flattened);
+            } catch (e: any) {
+                setIncubatorsError(e?.message || "Failed to load active incubators");
+                setIncubators([]);
+            } finally {
+                setLoadingIncubators(false);
             }
         };
-        if (isAuthenticated) {
-            fetchUserProfile();
-        }
-    }, [isAuthenticated]);
+        fetchIncubators();
+    }, [isAuthenticated, isIvfUser]);
+
 
     // Build filter option lists from routes data
     const regionOptions = useMemo(() => {
@@ -444,14 +460,17 @@ const ControlTower = () => {
         return ["All", ...Array.from(set).sort()];
     }, [routes]);
 
-    // Status options for inbound (from canisters)
+    // Active list switches between cryotanks and incubators based on device type toggle
+    const activeList = deviceType === "incubators" ? incubators : canisters;
+
+    // Status options for inbound (from active list)
     const statusOptionsInbound = useMemo(() => {
         const set = new Set<string>();
-        canisters.forEach((c) => {
+        activeList.forEach((c) => {
             if (c?.status && String(c.status).trim()) set.add(String(c.status));
         });
         return ["All", ...Array.from(set).sort()];
-    }, [canisters]);
+    }, [activeList]);
 
     // Status options for outbound (from routes)
     const statusOptionsOutbound = useMemo(() => {
@@ -481,7 +500,7 @@ const ControlTower = () => {
     // Build branch options from canisters data (for inbound) — value = branchId, label = branchName
     const branchOptions = useMemo(() => {
         const map = new Map<string, string>(); // branchId -> branchName
-        canisters.forEach((c) => {
+        activeList.forEach((c) => {
             if (c?.branchId && c.branchId !== "N/A" && c?.branchName && c.branchName !== "N/A") {
                 map.set(c.branchId, c.branchName.trim());
             }
@@ -490,7 +509,7 @@ const ControlTower = () => {
             .sort((a, b) => a[1].localeCompare(b[1]))
             .map(([id, name]) => ({ label: name, value: id }));
         return ["All" as const, ...sorted];
-    }, [canisters]);
+    }, [activeList]);
 
     // Resolve branch name from selected branch ID — map always filters/zooms by name
     const selectedBranchName = useMemo(() => {
@@ -530,11 +549,7 @@ const ControlTower = () => {
 
     // Canisters are now filtered client-side to preserve all options for dropdowns
     const filteredCanisters = useMemo(() => {
-        let result = canisters || [];
-
-        result = result.filter((c) =>
-            deviceType === "incubators" ? c.isIncubator : !c.isIncubator,
-        );
+        let result = activeList;
 
         if (selectedBranch && selectedBranch !== "All") {
             result = result.filter((c) => c.branchId === selectedBranch);
@@ -545,7 +560,7 @@ const ControlTower = () => {
         }
 
         return result;
-    }, [canisters, deviceType, selectedBranch, selectedStatusInbound]);
+    }, [activeList, selectedBranch, selectedStatusInbound]);
 
     // Reset zoomToLocation after it's been used
     useEffect(() => {
@@ -582,7 +597,7 @@ const ControlTower = () => {
                             onChange={(v) => setDeviceType(v as "cryotanks" | "incubators")}
                             options={[
                                 { label: "Cryotanks", value: "cryotanks" },
-                                { label: "Incubators", value: "incubators" },
+                                { label: "Incubators", value: "incubators", disabled: true },
                             ]}
                         />
                     )}
@@ -648,7 +663,7 @@ const ControlTower = () => {
                         <div className="order-2 lg:order-1 flex flex-col gap-6 min-w-0 lg:h-full lg:min-h-0 lg:row-span-2">
 
                             {/* Inline Filter Panel — desktop only */}
-                            <div id="onboarding-control-filter-panel" className="hidden lg:flex flex-col gap-3 bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 shrink-0">
+                            <div id="onboarding-control-filter-panel" className="hidden lg:flex flex-col gap-3 bg-white border border-line rounded-lg px-3 py-3 shrink-0">
                                 {isIvfUser && (
                                     <div id="onboarding-control-filter-direction">
                                         <FilterToggle
@@ -657,7 +672,7 @@ const ControlTower = () => {
                                             onChange={(v) => setDeviceType(v as "cryotanks" | "incubators")}
                                             options={[
                                                 { label: "Cryotanks", value: "cryotanks" },
-                                                { label: "Incubators", value: "incubators" },
+                                                { label: "Incubators", value: "incubators", disabled: true },
                                             ]}
                                         />
                                     </div>
@@ -727,22 +742,22 @@ const ControlTower = () => {
                             </div>
 
                             {/* Active Routes/Canisters List */}
-                            <div id="onboarding-control-active-containers" className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
+                            <div id="onboarding-control-active-containers" className="bg-white border border-line rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
                                 <h2 className="font-bold text-black text-base mb-2">
                                     {isIvfUser
-                                        ? "Active Containers"
+                                        ? deviceType === "incubators" ? "Active Incubators" : "Active Containers"
                                         : "Active Routes"}
                                 </h2>
-                                <div className="grid grid-cols-3 pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
+                                <div className="grid grid-cols-3 pl-2 pr-2 py-2 rounded-t-lg bg-primary-bg text-xs font-semibold text-primary gap-3">
                                     <div className="text-left">
                                         {isIvfUser
-                                            ? "Containers #"
+                                            ? deviceType === "incubators" ? "Incubators #" : "Containers #"
                                             : "Routes ID"}
                                     </div>
                                     <div className="text-center">Deviation</div>
                                     <div className="text-center">
                                         {isIvfUser
-                                            ? "Last Refill Date"
+                                            ? deviceType === "incubators" ? "Last Updated" : "Last Refill Date"
                                             : "Date"}
                                     </div>
                                 </div>
@@ -753,7 +768,7 @@ const ControlTower = () => {
                                         scrollbarWidth: "thin",
                                     }}
                                 >
-                                    {(loadingRoutes || loadingCanisters) && (
+                                    {(loadingRoutes || loadingCanisters || loadingIncubators) && (
                                         <div className="flex flex-col divide-y divide-gray-100">
                                             {Array.from(
                                                 { length: 10 },
@@ -811,18 +826,20 @@ const ControlTower = () => {
                                     )}
                                     {!loadingRoutes &&
                                         !loadingCanisters &&
+                                        !loadingIncubators &&
                                         ((isCgtUser && routesError) ||
-                                            (isIvfUser && canistersError)) && (
+                                            (isIvfUser && (deviceType === "incubators" ? incubatorsError : canistersError))) && (
                                             <div className="p-4 text-xs text-red-600">
                                                 {isIvfUser
-                                                    ? canistersError
+                                                    ? (deviceType === "incubators" ? incubatorsError : canistersError)
                                                     : routesError}
                                             </div>
                                         )}
                                     {!loadingRoutes &&
                                         !loadingCanisters &&
+                                        !loadingIncubators &&
                                         ((isCgtUser && !routesError) ||
-                                            (isIvfUser && !canistersError)) && (
+                                            (isIvfUser && !(deviceType === "incubators" ? incubatorsError : canistersError))) && (
                                             <>
                                                 {/* Display Routes (CGT users only) */}
                                                 {isCgtUser &&
@@ -896,7 +913,7 @@ const ControlTower = () => {
                                                                         {route?.patientId ? (
                                                                             <Link
                                                                                 to={`${isOnboarding ? "/onboarding" : ""}/track/${route.patientId}`}
-                                                                                className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
+                                                                                className="text-primary text-xs font-bold hover:underline cursor-pointer truncate block"
                                                                                 onClick={(
                                                                                     e,
                                                                                 ) =>
@@ -908,7 +925,7 @@ const ControlTower = () => {
                                                                                 }
                                                                             </Link>
                                                                         ) : (
-                                                                            <span className="text-[#6b1176] text-xs font-bold">
+                                                                            <span className="text-primary text-xs font-bold">
                                                                                 N/A
                                                                             </span>
                                                                         )}
@@ -992,40 +1009,40 @@ const ControlTower = () => {
                                                                     className="grid grid-cols-3 pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
                                                                     onClick={() => {
                                                                         try {
-                                                                            if (
-                                                                                canister.branchId &&
-                                                                                canister.branchId !==
-                                                                                    "N/A"
-                                                                            ) {
-                                                                                sessionStorage.setItem(
-                                                                                    "ivf_selected_branch_id",
-                                                                                    String(
-                                                                                        canister.branchId,
-                                                                                    ),
-                                                                                );
-                                                                            }
-                                                                            const tankParam = encodeURIComponent(
-                                                                                canister.tankId &&
-                                                                                    canister.tankId !== "N/A"
-                                                                                    ? canister.tankId
-                                                                                    : canister.canisterId,
-                                                                            );
                                                                             const prefix = isOnboarding ? "/onboarding" : "";
-                                                                            navigate(`${prefix}/ivf-track-shipment/${tankParam}`);
+                                                                            if (deviceType === "incubators") {
+                                                                                navigate(`${prefix}/incubator-tracking/${canister.tankId}`);
+                                                                            } else {
+                                                                                if (
+                                                                                    canister.branchId &&
+                                                                                    canister.branchId !== "N/A"
+                                                                                ) {
+                                                                                    sessionStorage.setItem(
+                                                                                        "ivf_selected_branch_id",
+                                                                                        String(canister.branchId),
+                                                                                    );
+                                                                                }
+                                                                                const tankParam = encodeURIComponent(
+                                                                                    canister.tankId && canister.tankId !== "N/A"
+                                                                                        ? canister.tankId
+                                                                                        : canister.canisterId,
+                                                                                );
+                                                                                navigate(`${prefix}/ivf-track-shipment/${tankParam}`);
+                                                                            }
                                                                         } catch {}
                                                                     }}
                                                                 >
                                                                     <div className="min-w-0 text-left overflow-hidden">
                                                                         {canister.canisterId ? (
-                                                                            <span className="text-[#6b1176] text-xs font-bold hover:underline truncate block">
-                                                                                Container{" "}
+                                                                            <span className="text-primary text-xs font-bold hover:underline truncate block">
+                                                                                {deviceType === "incubators" ? "Incubator" : "Container"}{" "}
                                                                                 {
                                                                                     canister.canisterId
                                                                                 }
                                                                             </span>
                                                                         ) : (
-                                                                            <span className="text-[#6b1176] text-xs font-bold">
-                                                                                Container{" "}
+                                                                            <span className="text-primary text-xs font-bold">
+                                                                                {deviceType === "incubators" ? "Incubator" : "Container"}{" "}
                                                                                 {
                                                                                     canister.canisterId
                                                                                 }
@@ -1066,8 +1083,7 @@ const ControlTower = () => {
                                                             0) &&
                                                     !loadingCanisters && (
                                                         <div className="p-4 text-xs text-gray-500">
-                                                            No active containers
-                                                            found.
+                                                            {deviceType === "incubators" ? "No active incubators found." : "No active containers found."}
                                                         </div>
                                                     )}
                                                 {isCgtUser &&

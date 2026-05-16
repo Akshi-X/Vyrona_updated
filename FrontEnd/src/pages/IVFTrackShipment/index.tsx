@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTrackingDark.svg';
@@ -8,6 +8,8 @@ import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
 import IVFQualityTrackingChart from './sections/IVFQualityTrackingChart';
 import { IVFQualityParametersTable } from './sections/IVFQualityParametersTable';
+import CryocanVisualizer from './sections/CryocanVisualisation';
+import { useIvfKpiSnapshot } from './sections/useIvfKpiSnapshot';
 import { userService, type UserProfileDto } from '../../services/userService';
 // Header icons & modals
 import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
@@ -22,6 +24,8 @@ import {
 } from "../../services/ivfAlertsService";
 import { tasksService, type Task } from "../../services/tasksService";
 import { ivfService } from "../../services/ivfService";
+import { activityLogService } from "../../services/activityLogService";
+import type { ActivityLogRecord } from "../../services/activityLogService";
 import StakeholderChatBox from "../../components/StakeholderChatBox";
 import { useDashboardChatWebSocket } from "../../hooks/useChatWebSocket";
 
@@ -31,6 +35,9 @@ export default function IVFTrackShipmentPage() {
     const navigate = useNavigate();
     const [headerTankCode, setHeaderTankCode] = useState<string>("-");
     const [headerBranchName, setHeaderBranchName] = useState<string>("-");
+    const [tankMaxCapacity, setTankMaxCapacity] = useState<number | null>(null);
+    const [tankMinCapacity, setTankMinCapacity] = useState<number | null>(null);
+    const [ln2L2Threshold, setLn2L2Threshold] = useState<number | null>(null);
     const [accessDenied, setAccessDenied] = useState(false);
     const [countdown, setCountdown] = useState(3);
 
@@ -57,6 +64,29 @@ export default function IVFTrackShipmentPage() {
         }>
     >([]);
     const [exporting, setExporting] = useState(false);
+    const [useNewCryocan, setUseNewCryocan] = useState(false);
+    const [systemActivity, setSystemActivity] = useState<ActivityLogRecord[]>([]);
+    const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
+    const qualityChartRef = useRef<HTMLDivElement>(null);
+    const [cryocanCanisters, setCryocanCanisters] = useState<
+        Array<{ id: string; label: string; sampleCount?: number; status?: string }>
+    >([]);
+    const [cryocanContents, setCryocanContents] = useState<
+        Record<
+            string,
+            Array<{
+                id?: string;
+                type?: string;
+                hisNumber?: string;
+                cryolockNumber?: string;
+                caneCode?: string;
+                gobletColor?: string;
+                cryolockColor?: string;
+                vitrificationDate?: string;
+                description?: string | null;
+            }>
+        >
+    >({});
 
     // WebSocket for unread count
     const { unreadMessages: wsUnreadMessages } = useDashboardChatWebSocket();
@@ -74,6 +104,12 @@ export default function IVFTrackShipmentPage() {
     const criticalAlertsCount = criticalAlerts.filter(
         (alert) => alert.acknowledged_at == null,
     ).length;
+    const externalTempAlert = criticalAlerts.some(
+        (a) => a.acknowledged_at == null && /temp.?external|external.?temp/i.test(a.alert_type),
+    );
+    const internalTempAlert = criticalAlerts.some(
+        (a) => a.acknowledged_at == null && /temp.?internal|internal.?temp/i.test(a.alert_type),
+    );
     const myTasksCount = myTasks.filter(
         (task) =>
             task.status === "Not started" || task.status === "In progress",
@@ -85,6 +121,52 @@ export default function IVFTrackShipmentPage() {
         headerTankCode && headerTankCode !== "-"
             ? headerTankCode
             : routeTankCode;
+
+    const { sensorTiles, ln2Level, internalTemp, externalTemp, lidStatus } =
+        useIvfKpiSnapshot({ tankId, enabled: useNewCryocan });
+
+    const toFiniteNumber = (value: unknown): number | null => {
+        if (typeof value === "number") return Number.isFinite(value) ? value : null;
+        if (typeof value === "string") {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+    };
+
+    const clampPercent = (value: number | null): number | null =>
+        value == null ? null : Math.min(100, Math.max(0, value));
+
+    const extractLn2Thresholds = (kpiLimits: unknown): { l1: number | null; l2: number | null } => {
+        const ln2Level =
+            kpiLimits && typeof kpiLimits === "object"
+                ? (kpiLimits as Record<string, unknown>).ln2_level
+                : null;
+
+        if (!ln2Level || typeof ln2Level !== "object") {
+            return { l1: null, l2: null };
+        }
+
+        const entries = Object.entries(ln2Level as Record<string, Record<string, unknown>>);
+        const l1Entry = entries.find(([name]) => name.toLowerCase().includes("l1"))?.[1];
+        const l2Entry = entries.find(([name]) => name.toLowerCase().includes("l2"))?.[1];
+
+        const nextL1 = toFiniteNumber(l1Entry?.max) ?? toFiniteNumber(l2Entry?.min);
+        const nextL2 = toFiniteNumber(l1Entry?.min) ?? toFiniteNumber(l2Entry?.max);
+
+        if (nextL1 == null && nextL2 == null && entries.length > 0) {
+            const legacy = entries[0][1] as Record<string, unknown>;
+            return {
+                l1: clampPercent(toFiniteNumber(legacy?.max)),
+                l2: clampPercent(toFiniteNumber(legacy?.min)),
+            };
+        }
+
+        return {
+            l1: clampPercent(nextL1),
+            l2: clampPercent(nextL2),
+        };
+    };
     const fetchCriticalAlerts = async () => {
         setLoadingAlerts(true);
         try {
@@ -156,14 +238,21 @@ export default function IVFTrackShipmentPage() {
         if (!tankId) {
             setHeaderTankCode("-");
             setHeaderBranchName("-");
+            setTankMaxCapacity(null);
+            setTankMinCapacity(null);
+            setLn2L2Threshold(null);
             return;
         }
 
         try {
             const kpiConfigResponse = await ivfService.getTankKpiConfig(tankId);
+            const thresholds = extractLn2Thresholds(kpiConfigResponse?.kpi_limits);
 
             setHeaderTankCode(kpiConfigResponse?.tank_code || "-");
             setHeaderBranchName(kpiConfigResponse?.branch_name || "-");
+            setTankMaxCapacity(kpiConfigResponse?.tank_max_capacity_reading ?? null);
+            setTankMinCapacity(kpiConfigResponse?.tank_min_capacity_reading ?? null);
+            setLn2L2Threshold(thresholds.l2);
         } catch (e: unknown) {
             const msg = (e as Error)?.message || "";
             if (msg.includes("403") || msg.toLowerCase().includes("access denied") || msg.toLowerCase().includes("does not belong")) {
@@ -172,6 +261,9 @@ export default function IVFTrackShipmentPage() {
             } else {
                 setHeaderTankCode("-");
                 setHeaderBranchName("-");
+                setTankMaxCapacity(null);
+                setTankMinCapacity(null);
+                setLn2L2Threshold(null);
             }
         }
     };
@@ -217,6 +309,100 @@ export default function IVFTrackShipmentPage() {
         return () => clearTimeout(timer);
     }, [accessDenied, countdown, navigate]);
 
+    useEffect(() => {
+        if (!useNewCryocan || !tankId) {
+            setCryocanCanisters([]);
+            setCryocanContents({});
+            return;
+        }
+
+        let cancelled = false;
+        ivfService
+            .getCanisterTrackingDetails(tankId)
+            .then((response) => {
+                if (cancelled) return;
+                const grouped = new Map<string, typeof response.data>();
+
+                response.data.forEach((row) => {
+                    const canisterId = String(row.canisterNum ?? "").trim();
+                    if (!canisterId) return;
+                    const current = grouped.get(canisterId) ?? [];
+                    current.push(row);
+                    grouped.set(canisterId, current);
+                });
+
+                const sorted = Array.from(grouped.entries()).sort(
+                    ([a], [b]) => {
+                        const aNum = Number(String(a).replace(/\D+/g, ""));
+                        const bNum = Number(String(b).replace(/\D+/g, ""));
+                        if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+                            return aNum - bNum;
+                        }
+                        return a.localeCompare(b);
+                    },
+                );
+
+                const nextCanisters = sorted.map(([id, rows]) => ({
+                    id,
+                    label: `Canister ${id}`,
+                    sampleCount: rows.length,
+                }));
+
+                const nextContents: Record<
+                    string,
+                    Array<{
+                        id?: string;
+                        type?: string;
+                        hisNumber?: string;
+                        cryolockNumber?: string;
+                        caneCode?: string;
+                        gobletColor?: string;
+                        cryolockColor?: string;
+                        vitrificationDate?: string;
+                        description?: string | null;
+                    }>
+                > = {};
+                sorted.forEach(([id, rows]) => {
+                    nextContents[id] = rows.map((row) => ({
+                        id: row.cryolockNum || row.hisNumber || undefined,
+                        type: "Cryolock",
+                        hisNumber: row.hisNumber || undefined,
+                        cryolockNumber: row.cryolockNum || undefined,
+                        caneCode: row.caneCode || undefined,
+                        gobletColor: row.gobletColor || undefined,
+                        cryolockColor: row.cryolockColor || undefined,
+                        vitrificationDate: row.dateOfVitrification || undefined,
+                        description: row.description ?? null,
+                    }));
+                });
+
+                setCryocanCanisters(nextCanisters);
+                setCryocanContents(nextContents);
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setCryocanCanisters([]);
+                setCryocanContents({});
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [useNewCryocan, tankId]);
+
+    useEffect(() => {
+        if (!useNewCryocan || !tankId) {
+            setSystemActivity([]);
+            return;
+        }
+        let cancelled = false;
+        activityLogService
+            .getActivityLogs({ target_type: "tank", target_id: tankId, page_size: 20 })
+            .then((res) => { if (!cancelled) setSystemActivity(res.logs ?? []); })
+            .catch(() => { if (!cancelled) setSystemActivity([]); });
+        return () => { cancelled = true; };
+    }, [useNewCryocan, tankId]);
+
     // Update stakeholder chats from WebSocket data
     useEffect(() => {
         if (wsUnreadMessages && wsUnreadMessages.length > 0) {
@@ -256,7 +442,7 @@ export default function IVFTrackShipmentPage() {
                 >
                     {exporting ? (
                         <svg
-                            className="animate-spin h-[25px] w-[25px] text-[#6B1176]"
+                            className="animate-spin h-[25px] w-[25px] text-primary"
                             xmlns="http://www.w3.org/2000/svg"
                             fill="none"
                             viewBox="0 0 24 24"
@@ -265,64 +451,49 @@ export default function IVFTrackShipmentPage() {
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     ) : (
-                        <Download size={21} strokeWidth={2.25} className="text-[#6B1176]" aria-label="Export Excel" />
+                        <Download size={21} strokeWidth={2.25} className="text-primary" aria-label="Export Excel" />
                     )}
                 </button>
-                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                     <div className="font-semibold text-black text-xs whitespace-nowrap">Export Combined Report</div>
-                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
                 </div>
             </div>
             {/* Critical Alerts */}
-            <div id="onboarding-ivf-critical-alerts-icon" className="relative group cursor-pointer" onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
-                <img
-                    className="w-[25px] h-[25px]"
-                    alt="Critical Alerts"
-                    src={CriticalAlertsIcon}
-                />
-                {criticalAlertsCount > 0 && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                        <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
-                    </div>
-                )}
-                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                    <div className="font-semibold text-black text-xs whitespace-nowrap">Critical Alerts</div>
-                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+            <div id="onboarding-ivf-critical-alerts-icon" className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
+                <div className="relative">
+                    <img className="w-[28px] h-[28px]" alt="Critical Alerts" src={CriticalAlertsIcon} />
+                    {criticalAlertsCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                            <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+                        </div>
+                    )}
                 </div>
+                <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Alerts</span>
             </div>
             {/* Stakeholder Chats */}
-            <div id="onboarding-ivf-stakeholder-chats-icon" className="relative group cursor-pointer" onClick={() => setShowStakeholderChatScreen(true)}>
-                <img
-                    className="w-[25px] h-[25px]"
-                    alt="Stakeholder Chats"
-                    src={StakeholderChatsIcon}
-                />
-                {stakeholderChatCount > 0 && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                        <span className="font-semibold text-white text-[10px]">{stakeholderChatCount}</span>
-                    </div>
-                )}
-                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                    <div className="font-semibold text-black text-xs whitespace-nowrap">Stakeholder Chats</div>
-                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+            <div id="onboarding-ivf-stakeholder-chats-icon" className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => setShowStakeholderChatScreen(true)}>
+                <div className="relative">
+                    <img className="w-[28px] h-[28px]" alt="Stakeholder Chats" src={StakeholderChatsIcon} />
+                    {stakeholderChatCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                            <span className="font-semibold text-white text-[10px]">{stakeholderChatCount}</span>
+                        </div>
+                    )}
                 </div>
+                <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Messages</span>
             </div>
             {/* My Tasks */}
-            <div id="onboarding-ivf-my-tasks-icon" className="relative group cursor-pointer" onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
-                <img
-                    className="w-[25px] h-[25px]"
-                    alt="My Tasks"
-                    src={MyTasksIcon}
-                />
-                {myTasksCount > 0 && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                        <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
-                    </div>
-                )}
-                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                    <div className="font-semibold text-black text-xs whitespace-nowrap">My Tasks</div>
-                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+            <div id="onboarding-ivf-my-tasks-icon" className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
+                <div className="relative">
+                    <img className="w-[28px] h-[28px]" alt="My Tasks" src={MyTasksIcon} />
+                    {myTasksCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                            <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
+                        </div>
+                    )}
                 </div>
+                <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Tasks</span>
             </div>
         </div>
     );
@@ -338,8 +509,8 @@ export default function IVFTrackShipmentPage() {
                     </div>
                     <h2 className="text-lg font-semibold text-gray-800 mb-2">Access Denied</h2>
                     <p className="text-sm text-gray-500 mb-6">You don't have access to this page.</p>
-                    <div className="w-12 h-12 rounded-full border-4 border-[#6b1176] flex items-center justify-center mx-auto">
-                        <span className="text-xl font-bold text-[#6b1176]">{countdown}</span>
+                    <div className="w-12 h-12 rounded-full border-4 border-primary flex items-center justify-center mx-auto">
+                        <span className="text-xl font-bold text-primary">{countdown}</span>
                     </div>
                     <p className="text-xs text-gray-400 mt-3">Redirecting in {countdown} second{countdown !== 1 ? "s" : ""}…</p>
                 </div>
@@ -351,7 +522,7 @@ export default function IVFTrackShipmentPage() {
         <>
           <PageLayout title="Cryocan" icon={ContainerQualityTrackingIcon} actions={pageActions}>
                             {/* Breadcrumb */}
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                                 <div className="flex items-center gap-1 text-sm">
                                     <button
                                         type="button"
@@ -363,36 +534,99 @@ export default function IVFTrackShipmentPage() {
                                     <span className="text-gray-500">/</span>
                                     <span className="text-black font-semibold">Cryocan Quality Tracking</span>
                                 </div>
-                                <div className="text-sm font-semibold text-black">
-                                    {headerTankCode} - {headerBranchName}
+                                <div className="flex items-center gap-3">
+                                    <div className="text-sm font-semibold text-black">
+                                        {headerTankCode} - {headerBranchName}
+                                    </div>
+                                    <div className="inline-flex rounded-lg border border-line bg-white p-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setUseNewCryocan(false)}
+                                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                                                !useNewCryocan
+                                                    ? 'bg-primary text-white'
+                                                    : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                            aria-pressed={!useNewCryocan}
+                                        >
+                                            Old UI
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setUseNewCryocan(true)}
+                                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                                                useNewCryocan
+                                                    ? 'bg-primary text-white'
+                                                    : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                            aria-pressed={useNewCryocan}
+                                        >
+                                            3D UI
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             {/* <ContainerProcessFlow /> */}
                             {/* Row 1: Quality Tracking (left) | Quality Parameter (right) */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                                {/* Left Column: Quality Tracking */}
-                                <div className="h-full">
-                                    <IVFQualityTrackingChart
-                                        canisterNumber={tankId}
-                                    />
+                            {!useNewCryocan ? (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                                    {/* Left Column: Quality Tracking */}
+                                    <div className="h-full">
+                                        <IVFQualityTrackingChart
+                                            canisterNumber={tankId}
+                                        />
+                                    </div>
+                                    {/* Right Column: Quality Parameter */}
+                                    <div className="h-full">
+                                        <IVFQualityParametersTable
+                                            tankId={tankId}
+                                        />
+                                    </div>
                                 </div>
-                                {/* Right Column: Quality Parameter */}
-                                <div className="h-full">
-                                    <IVFQualityParametersTable
-                                        tankId={tankId}
+                            ) : (
+                                <>
+                                    <CryocanVisualizer
+                                        variant="embedded"
+                                        ln2Level={ln2Level ?? undefined}
+                                        internalTemp={internalTemp ?? undefined}
+                                        externalTemp={externalTemp ?? undefined}
+                                        lidStatus={lidStatus ?? undefined}
+                                        tankMaxCapacity={tankMaxCapacity}
+                                        tankMinCapacity={tankMinCapacity}
+                                        ln2L2Threshold={ln2L2Threshold}
+                                        sensorTiles={sensorTiles}
+                                        canisters={cryocanCanisters}
+                                        canisterContents={cryocanContents}
+                                        systemActivity={systemActivity}
+                                        externalTempAlert={externalTempAlert}
+                                        internalTempAlert={internalTempAlert}
+                                        tankCode={headerTankCode !== "-" ? headerTankCode : undefined}
+                                        branchName={headerBranchName !== "-" ? headerBranchName : undefined}
+                                        selectedSensorId={selectedSensorId}
+                                        onSensorSelect={(id) => {
+                                            setSelectedSensorId(id);
+                                            setTimeout(() => qualityChartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+                                        }}
                                     />
-                                </div>
-                            </div>
+                                    <div ref={qualityChartRef} style={{ marginBottom: 16 }}>
+                                        <IVFQualityTrackingChart canisterNumber={tankId} selectedKpiKey={selectedSensorId} />
+                                    </div>
+                                </>
+                            )}
 
                             {/* Row 2: Container Data (full width) */}
-                            <div>
-                                <ContainerDataTable canisterNumber={tankId} />
-                            </div>
+                            {!useNewCryocan && (
+                                <div>
+                                    <ContainerDataTable canisterNumber={tankId} />
+                                </div>
+                            )}
 
-                            {/* Row 3: Refill Log (full width) */}
-                            <div>
-                                <RefillLogTable canisterNumber={tankId} />
-                            </div>
+                            {/* Row 3: Refill Log — old UI only */}
+                            {!useNewCryocan && (
+                                <div>
+                                    <RefillLogTable canisterNumber={tankId} />
+                                </div>
+                            )}
           </PageLayout>
 
             {/* Stakeholder Chat Box */}
@@ -432,12 +666,13 @@ export default function IVFTrackShipmentPage() {
                     message: a.message,
                     timestamp: new Date(a.occurred_at + "Z")+"" ,
                     status: a.status === "Active" ? "Active" : "Acknowledged",
+                    acknowledgementReason: a.acknowledgment_reason,
                 }))}
                 loading={loadingAlerts}
                 patientIdLabel=""
-                onAcknowledge={async (alertId) => {
+                onAcknowledge={async (alertId, reason) => {
                     try {
-                        await ivfAlertsService.acknowledgeAlert(alertId);
+                        await ivfAlertsService.acknowledgeAlert(alertId, reason);
                         // Refresh alerts after acknowledgment
                         fetchCriticalAlerts();
                     } catch (error) {
@@ -445,9 +680,9 @@ export default function IVFTrackShipmentPage() {
                         throw error;
                     }
                 }}
-                onAcknowledgeAll={async (alertIds) => {
+                onAcknowledgeAll={async (alertIds, reason) => {
                     try {
-                        await ivfAlertsService.acknowledgeAlerts(alertIds);
+                        await ivfAlertsService.acknowledgeAlerts(alertIds, reason);
                         fetchCriticalAlerts();
                     } catch (error) {
                         console.error("Error acknowledging alerts:", error);

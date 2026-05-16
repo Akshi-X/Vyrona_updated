@@ -233,13 +233,13 @@ export default function OnboardingOverlay() {
                         {/* Header */}
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className={`text-xs uppercase tracking-[0.3em] ${(quizLevelId || showLevelWelcome) ? "text-[#6b1176]" : "text-slate-400"}`}>
+                                <p className={`text-xs uppercase tracking-[0.3em] ${(quizLevelId || showLevelWelcome) ? "text-primary" : "text-slate-400"}`}>
                                     {(quizLevelId || showLevelWelcome) ? currentHeaderTitle : "Immersive Journey"}
                                 </p>
                                 <h2 className="text-lg font-semibold">{(quizLevelId || showLevelWelcome) ? displayLevelConfig?.title ?? "Onboarding Mission Control" : "Onboarding Mission Control"}</h2>
                             </div>
                             <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1.5 rounded-full bg-[#6b1176] px-3 py-1">
+                                <div className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1">
                                     <Zap className="h-3 w-3 text-violet-200" fill="currentColor" />
                                     <span className="text-sm font-bold text-white">{overallScore}</span>
                                     <span className="text-[10px] font-semibold text-violet-300">pts</span>
@@ -269,7 +269,7 @@ export default function OnboardingOverlay() {
                         <div className="mt-6 max-h-[70vh] overflow-y-auto pr-2">
                             {isHydrating ? (
                                 <div className="flex items-center justify-center py-16">
-                                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#6b1176] border-t-transparent" />
+                                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                                 </div>
                             ) : renderContent()}
                         </div>

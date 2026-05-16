@@ -1,0 +1,41 @@
+<svg width="1440" height="600" viewBox="0 0 1440 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Main flowing curves moved to bottom -->
+  <g stroke="#B79BC7" stroke-width="1.6" stroke-linecap="round" opacity="0.42">
+
+    <path d="M-120 360 C280 520 720 760 1560 220"/>
+    <path d="M-120 385 C300 540 740 750 1560 245"/>
+    <path d="M-120 410 C320 560 760 740 1560 270"/>
+    <path d="M-120 435 C340 580 780 730 1560 295"/>
+    <path d="M-120 460 C360 600 800 720 1560 320"/>
+    <path d="M-120 485 C380 620 820 710 1560 345"/>
+    <path d="M-120 510 C400 640 840 700 1560 370"/>
+    <path d="M-120 535 C420 660 860 690 1560 395"/>
+    <path d="M-120 560 C440 680 880 680 1560 420"/>
+    <path d="M-120 585 C460 700 900 670 1560 445"/>
+    <path d="M-120 610 C480 720 920 660 1560 470"/>
+    <path d="M-120 635 C500 740 940 650 1560 495"/>
+
+  </g>
+
+  <!-- Secondary variation curves -->
+  <g stroke="#CDB6DA" stroke-width="1.1" stroke-linecap="round" opacity="0.28">
+
+    <path d="M-80 420 C260 260 620 640 1520 320"/>
+    <path d="M-80 450 C300 290 680 660 1520 350"/>
+    <path d="M-80 480 C340 320 740 680 1520 380"/>
+    <path d="M-80 510 C380 350 800 700 1520 410"/>
+    <path d="M-80 540 C420 380 860 720 1520 440"/>
+
+  </g>
+
+  <!-- Bottom accent waves -->
+  <g stroke="#DCCCE6" stroke-width="0.9" stroke-linecap="round" opacity="0.22">
+
+    <path d="M0 470 C320 430 560 560 920 520 C1180 490 1320 500 1440 545"/>
+    <path d="M0 500 C340 455 590 585 940 545 C1200 515 1335 525 1440 570"/>
+    <path d="M0 530 C360 480 620 610 960 570 C1220 540 1350 550 1440 595"/>
+
+  </g>
+
+</svg>

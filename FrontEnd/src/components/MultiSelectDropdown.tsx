@@ -101,13 +101,13 @@ export default function MultiSelectDropdown({
                 className={`w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between transition-colors ${
                     disabled
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200"
-                        : "bg-white border-[#E7E1E1] hover:border-[#c49ad1]"
+                        : "bg-white border-line hover:border-[#c49ad1]"
                 }`}
             >
                 <span
                     className={
                         selected.length > 0
-                            ? "text-[#6b1176]"
+                            ? "text-primary"
                             : "text-gray-500"
                     }
                 >
@@ -131,23 +131,23 @@ export default function MultiSelectDropdown({
             </button>
 
             {open && !disabled && (
-                <div className="absolute z-20 top-full mt-1 w-full bg-white border border-[#E7E1E1] rounded-lg shadow-lg overflow-hidden">
-                    <div className="p-3 border-b border-[#F1E8F2]">
+                <div className="absolute z-20 top-full mt-1 w-full bg-white border border-line rounded-lg shadow-lg overflow-hidden">
+                    <div className="p-3 border-b border-primary-bg">
                         <input
                             type="text"
                             placeholder="Search tanks"
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
-                            className="w-full px-3 py-2 text-sm border border-[#E7E1E1] rounded-md focus:outline-none focus:ring-2 focus:ring-[#9c3aa6]"
+                            className="w-full px-3 py-2 text-sm border border-line rounded-md focus:outline-none focus:ring-2 focus:ring-primary-muted"
                         />
                     </div>
-                    <div className="flex items-center justify-between px-3 py-2 text-xs text-gray-500 border-b border-[#F1E8F2]">
+                    <div className="flex items-center justify-between px-3 py-2 text-xs text-gray-500 border-b border-primary-bg">
                         <span>{filteredOptions.length} options</span>
                         <div className="flex items-center gap-3">
                             <button
                                 type="button"
                                 onClick={toggleAll}
-                                className="text-[#6b1176] font-semibold hover:underline"
+                                className="text-primary font-semibold hover:underline"
                             >
                                 {selected.length === normalizedOptions.length
                                     ? "Clear all"
@@ -179,14 +179,14 @@ export default function MultiSelectDropdown({
                                     onClick={() => toggleOption(option.value)}
                                     className={`w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors ${
                                         isSelected
-                                            ? "bg-[#f7ecfb] text-[#6b1176]"
+                                            ? "bg-[#f7ecfb] text-primary"
                                             : "text-gray-700 hover:bg-gray-100"
                                     }`}
                                 >
                                     <span
                                         className={`w-4 h-4 border rounded-sm flex items-center justify-center ${
                                             isSelected
-                                                ? "border-[#6b1176] bg-[#6b1176]"
+                                                ? "border-primary bg-primary"
                                                 : "border-gray-300 bg-white"
                                         }`}
                                     >

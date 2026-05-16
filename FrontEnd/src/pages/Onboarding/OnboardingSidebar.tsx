@@ -124,7 +124,7 @@ export default function OnboardingSidebar({ onLogout }: OnboardingSidebarProps) 
                                                         key={ci}
                                                         onClick={() => { setDashboardOpen(true); go(child.path); }}
                                                         className={`h-auto w-full justify-start pr-3 py-2 rounded-[10px] flex items-center text-left transition-colors pl-5 ${ci === 0 ? "mt-2" : ""} ${
-                                                            isActive ? "bg-white text-[#6b1176]" : "text-white/85 hover:bg-white/10 hover:text-white"
+                                                            isActive ? "bg-white text-primary" : "text-white/85 hover:bg-white/10 hover:text-white"
                                                         }`}
                                                     >
                                                         <span className="font-medium text-xs md:text-sm">{child.label}</span>
@@ -154,11 +154,11 @@ export default function OnboardingSidebar({ onLogout }: OnboardingSidebarProps) 
                                 }`}
                             >
                                 {"lucideIcon" in item && item.lucideIcon ? (
-                                    <item.lucideIcon className="w-5 h-5" color={isActive ? "#6b1176" : "#ffffff"} />
+                                    <item.lucideIcon className="w-5 h-5" color={isActive ? "var(--color-primary)" : "#ffffff"} />
                                 ) : (
                                     <img className="w-5 h-5" src={iconSrc} alt="" style={needsInvert ? { filter: "brightness(0) saturate(100%) invert(100%)" } : undefined} />
                                 )}
-                                <span className={`font-semibold text-xs md:text-sm ${isActive ? "text-[#6b1176]" : "text-white"}`}>
+                                <span className={`font-semibold text-xs md:text-sm ${isActive ? "text-primary" : "text-white"}`}>
                                     {item.label}
                                 </span>
                             </button>

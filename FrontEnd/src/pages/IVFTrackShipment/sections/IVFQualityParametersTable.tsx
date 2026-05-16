@@ -52,7 +52,7 @@ const ShockIcon = ({ className = '' }: { className?: string }) => (
 );
 
 // Alert icon with dynamic fill color for threshold markers
-const AlertIcon = ({ color = '#6B1176' }: { color?: string }) => (
+const AlertIcon = ({ color = 'var(--color-primary)' }: { color?: string }) => (
   <svg width="18" height="18" viewBox="0 0 23 21" fill="none">
     <path d="M11.0476 0.100342C12.1558 0.100342 13.1313 0.667473 13.7 1.5271L13.8083 1.70288L13.8103 1.70581L13.8162 1.71753L21.5291 15.2136C21.7986 15.6712 21.9577 16.2213 21.9578 16.8074C21.9578 17.3947 21.7972 17.9445 21.5193 18.4167L21.5203 18.4177L21.5125 18.4314C20.9532 19.3859 19.9309 20.0173 18.7615 20.0173H3.31421L3.31519 20.0183C3.30974 20.0184 3.30344 20.0183 3.29761 20.0183C2.12295 20.0183 1.09697 19.3813 0.546631 18.4343L0.544678 18.4314L0.538818 18.4207L0.441162 18.2429C0.224877 17.8188 0.100342 17.3279 0.100342 16.8083C0.100355 16.2216 0.259389 15.6719 0.536865 15.2L8.24292 1.71753C8.79815 0.745596 9.82919 0.100394 11.0115 0.100342H11.0476ZM11.0193 1.80835C10.4697 1.80839 9.98895 2.10661 9.73315 2.55151L9.73413 2.55249L9.72925 2.5603L9.72827 2.56323L2.01343 16.0613L2.01245 16.0623C1.88734 16.2746 1.81323 16.5311 1.81323 16.8054C1.81327 17.08 1.88744 17.337 2.01733 17.5574H2.01831C2.27915 18.0069 2.75748 18.3035 3.30444 18.3035H18.7546C19.3009 18.3034 19.778 18.0077 20.0349 17.5671L20.0388 17.5603L20.0408 17.5564C20.1689 17.3421 20.2458 17.083 20.2458 16.8054C20.2458 16.5341 20.1727 16.2799 20.0457 16.0613L20.0437 16.0583L20.0398 16.0515V16.0505L12.3308 2.56323C12.0716 2.10844 11.5903 1.80839 11.0398 1.80835H11.0193ZM11.0281 13.3513C11.6395 13.3513 12.1353 13.8473 12.1355 14.4587C12.1355 15.0703 11.6396 15.5662 11.0281 15.5662C10.4205 15.5655 9.92723 15.0758 9.92163 14.4695V14.4636C9.92163 14.1595 10.0445 13.8834 10.2429 13.6833C10.4425 13.4801 10.7201 13.353 11.0271 13.3513H11.0281ZM11.03 6.56226C11.5023 6.56226 11.8853 6.94547 11.8855 7.41772V11.1853C11.8855 11.6282 11.5492 11.993 11.1179 12.0369L11.03 12.0408H11.0281C10.5561 12.0407 10.1733 11.6581 10.1726 11.1863V11.1453L10.1736 11.1443V7.41772C10.1738 6.94552 10.5568 6.56235 11.0291 6.56226H11.03Z" fill={color} stroke={color} strokeWidth="0.2"/>
   </svg>
@@ -103,7 +103,7 @@ interface KpiTileProps {
 const KpiTile = ({ icon, label, value, tooltip, muted = false, danger = false, loading = false, timestamp, id }: KpiTileProps) => (
   <div id={id} className="relative group w-full @max-[505px]:w-[150px]">
     {loading ? (
-      <div className="rounded-lg border border-[#E7E1E1] bg-white shadow-sm p-2 flex items-center gap-2 w-full @max-[505px]:h-[84px]">
+      <div className="rounded-lg border border-line bg-white shadow-sm p-2 flex items-center gap-2 w-full @max-[505px]:h-[84px]">
         <div className="relative overflow-hidden h-8 w-8 rounded-lg bg-gray-200 shrink-0">
           <div
             className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
@@ -126,8 +126,8 @@ const KpiTile = ({ icon, label, value, tooltip, muted = false, danger = false, l
         </div>
       </div>
     ) : (
-      <div className={`rounded-lg border shadow-sm p-2 flex items-center gap-2 w-full @max-[505px]:h-[84px] ${danger ? 'bg-[#FEF2F2] border-[#FECACA]' : 'bg-white border-[#E7E1E1]'} ${muted ? 'opacity-75' : ''}`}>
-        <div className={`${danger ? 'bg-[#FEE2E2]' : 'bg-[#FDF4FF]'} rounded-lg p-1 flex items-center justify-center`}>
+      <div className={`rounded-lg border shadow-sm p-2 flex items-center gap-2 w-full @max-[505px]:h-[84px] ${danger ? 'bg-[#FEF2F2] border-[#FECACA]' : 'bg-white border-line'} ${muted ? 'opacity-75' : ''}`}>
+        <div className={`${danger ? 'bg-[#FEE2E2]' : 'bg-surface'} rounded-lg p-1 flex items-center justify-center`}>
           {icon}
         </div>
         <div className="flex flex-col">
@@ -137,10 +137,10 @@ const KpiTile = ({ icon, label, value, tooltip, muted = false, danger = false, l
       </div>
     )}
     {(tooltip || timestamp) && (
-      <div className="absolute left-1/2 top-full z-50 mt-2 w-max max-w-60 -translate-x-1/2 rounded-lg border border-[#E7E1E1] bg-white px-3 py-2 text-center opacity-0 shadow-lg transition-opacity duration-200 pointer-events-none group-hover:opacity-100">
+      <div className="absolute left-1/2 top-full z-50 mt-2 w-max max-w-60 -translate-x-1/2 rounded-lg border border-line bg-white px-3 py-2 text-center opacity-0 shadow-lg transition-opacity duration-200 pointer-events-none group-hover:opacity-100">
         {tooltip && <div className="text-xs font-semibold text-black">{tooltip}</div>}
         {timestamp && <div className={`text-xs text-gray-500 ${tooltip ? 'mt-1' : ''}`}>{timestamp}</div>}
-        <div className="absolute bottom-full left-1/2 h-0 w-0 -translate-x-1/2 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+        <div className="absolute bottom-full left-1/2 h-0 w-0 -translate-x-1/2 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
       </div>
     )}
   </div>
@@ -444,6 +444,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         setL2(thresholds.l2);
         setTankMaxCapacity(res?.tank_max_capacity_reading ?? null);
         setTankMinCapacity(res?.tank_min_capacity_reading ?? null);
+        console.log("Tank details:",res);
         setKpiLimits((res?.kpi_limits ?? {}) as Record<string, Record<string, { alert_type?: string | null }>>);
       })
       .catch(() => {});
@@ -631,7 +632,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
 
   // Alert color based on level thresholds
   const alertColor = levelPercent == null
-    ? '#6B1176'
+    ? 'var(--color-primary)'
     : (l2 != null && levelPercent <= l2)
       ? '#EF4444' // Red if at or below L2
       : (l1 != null && levelPercent < l1)
@@ -639,7 +640,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         : '#22C55E'; // Green if at or above L1
 
   return (
-    <div id="onboarding-ivf-quality-parameters" className="@container bg-white border border-[#E7E1E1] rounded-lg p-4 flex flex-col gap-4 h-full min-h-0">
+    <div id="onboarding-ivf-quality-parameters" className="@container bg-white border border-line rounded-lg p-4 flex flex-col gap-4 h-full min-h-0">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-black text-[16px]">Current Quality Status</h3>
@@ -665,11 +666,11 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
               <div className="relative group flex items-center gap-1.5 rounded-full border border-[#FECACA] bg-[#FEF2F2] px-2.5 py-1">
                 <BatteryWarning className="h-4 w-4 text-[#DC2626]" />
                 <span className="text-xs font-semibold text-[#DC2626]">Battery Dead</span>
-                <div className="absolute right-0 top-full z-50 mt-2 w-max max-w-[280px] rounded-lg border border-[#E7E1E1] bg-white px-3 py-2 text-left opacity-0 shadow-lg transition-opacity duration-200 pointer-events-none group-hover:opacity-100">
+                <div className="absolute right-0 top-full z-50 mt-2 w-max max-w-[280px] rounded-lg border border-line bg-white px-3 py-2 text-left opacity-0 shadow-lg transition-opacity duration-200 pointer-events-none group-hover:opacity-100">
                   <div className="text-xs font-semibold text-black">
                     {batteryDeadTooltip}
                   </div>
-                  <div className="absolute bottom-full right-5 h-0 w-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                  <div className="absolute bottom-full right-5 h-0 w-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
                 </div>
               </div>
             ) : (
@@ -687,7 +688,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
           {(isInitialLoading || hasAlert('ln2_lid_state')) && (
             <KpiTile
               id="onboarding-kpi-lid"
-              icon={<LockIcon className="text-[#6B1176]" />}
+              icon={<LockIcon className="text-primary" />}
               label="Lid State"
               value={lidLabel}
               danger={isLidMissing}
@@ -698,7 +699,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
           {(isInitialLoading || hasAlert('temp_internal')) && (
             <KpiTile
               id="onboarding-kpi-internal-temp"
-              icon={<ThermometerIcon className="text-[#6B1176]" />}
+              icon={<ThermometerIcon className="text-primary" />}
               label="Internal Temperature"
               value={internalTemperatureValue}
               tooltip={deadBatteryTileTooltip}
@@ -813,17 +814,17 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             </g>
 
             {/* Tank inner shadow for depth */}
-            <rect x="30" y={tankBodyTop} width="140" height={tankBodyHeight} rx="30" fill="none" stroke="#6B1176" strokeWidth="1" opacity="0.1" />
+            <rect x="30" y={tankBodyTop} width="140" height={tankBodyHeight} rx="30" fill="none" stroke="var(--color-primary)" strokeWidth="1" opacity="0.1" />
 
             {/* L1 Level Marker */}
             <g id="onboarding-cryocan-l1-marker">
               {l1Y != null && (
                 <>
-                  <line x1="150" y1={l1Y} x2="185" y2={l1Y} stroke="#6B1176" strokeWidth="2" strokeDasharray="4,2" />
+                  <line x1="150" y1={l1Y} x2="185" y2={l1Y} stroke="var(--color-primary)" strokeWidth="2" strokeDasharray="4,2" />
                   <g transform={`translate(192, ${l1Y - 9})`}>
                     <AlertIcon color={alertColor} />
                   </g>
-                  <text x="212" y={l1Y + 4} fill="#6B1176" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L1</text>
+                  <text x="212" y={l1Y + 4} fill="var(--color-primary)" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L1</text>
                 </>
               )}
             </g>
@@ -831,11 +832,11 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             {/* L2 Level Marker */}
             {l2Y != null && (
               <g id="onboarding-cryocan-l2-marker">
-                <line x1="150" y1={l2Y} x2="185" y2={l2Y} stroke="#6B1176" strokeWidth="2" strokeDasharray="4,2" />
+                <line x1="150" y1={l2Y} x2="185" y2={l2Y} stroke="var(--color-primary)" strokeWidth="2" strokeDasharray="4,2" />
                 <g transform={`translate(192, ${l2Y - 9})`}>
                   <AlertIcon color={alertColor} />
                 </g>
-                <text x="212" y={l2Y + 4} fill="#6B1176" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L2</text>
+                <text x="212" y={l2Y + 4} fill="var(--color-primary)" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L2</text>
               </g>
             )}
 
@@ -846,7 +847,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
                 y="175"
                 textAnchor="middle"
                 className="text-[24px] font-bold"
-                fill="#6B1176"
+                fill="var(--color-primary)"
                 style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
               >
                 {levelPercent != null && ln2_100per != null && ln2_100per > 0 ? `${Math.min(100, Math.floor((levelPercent / ln2_100per) * 100))}%` : '—'}
@@ -856,7 +857,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
                 y="195"
                 textAnchor="middle"
                 className="text-[12px]"
-                fill="#6B1176"
+                fill="var(--color-primary)"
                 opacity="0.7"
                 style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
               >
@@ -871,7 +872,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
           {(isInitialLoading || hasAlert('temp_external')) && (
             <KpiTile
               id="onboarding-kpi-external-temp"
-              icon={<SunIcon className="text-[#6B1176]" />}
+              icon={<SunIcon className="text-primary" />}
               label="External Temperature"
               value={externalTemperatureValue}
               tooltip={deadBatteryTileTooltip}
@@ -884,7 +885,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
           {(isInitialLoading || hasAlert('ln2_evaporation_rate')) && (
             <KpiTile
               id="onboarding-kpi-evap-rate"
-              icon={<EvaporationIcon className="text-[#6B1176]" />}
+              icon={<EvaporationIcon className="text-primary" />}
               label="Evaporation Rate"
               value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
               danger={isEvaporationMissing}
@@ -892,9 +893,10 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
               timestamp={evapTimestamp}
             />
           )}
+
           {(isInitialLoading || hasAlert('shock')) && (
             <KpiTile
-              icon={<ShockIcon className="text-[#6B1176]" />}
+              icon={<ShockIcon className="text-primary" />}
               label="Shock Detection"
               value={shockValue}
               tooltip={deadBatteryTileTooltip}

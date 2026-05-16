@@ -67,7 +67,7 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
   if (isLoading || isCheckingDepartment || (isAuthenticated && onboardingCompleted === undefined)) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6b1176]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }

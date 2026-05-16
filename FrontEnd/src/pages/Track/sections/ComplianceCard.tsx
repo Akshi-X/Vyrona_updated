@@ -25,7 +25,7 @@ export default function ComplianceCard({ items, loading, error }: ComplianceCard
   });
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">
+    <div className="bg-white border border-line rounded-lg p-4 h-full">
       <h3 className="font-semibold text-black text-base mb-1 text-[16px]">Compliance</h3>
       <div className="text-xs text-gray-400 mb-3 text-[12px]">Logistic Document Checklist</div>
 
@@ -33,7 +33,7 @@ export default function ComplianceCard({ items, loading, error }: ComplianceCard
       <div className="mt-3 h-[165px] overflow-y-auto [scrollbar-width:thin] bg-[#F8F8F8]">
         <div className="inline-block min-w-full bg-white rounded-[5px]">
         <table className="w-full text-[12px]">
-          <thead className="bg-[#FDF4FF] text-[#6B1176] font-medium sticky top-0">
+          <thead className="bg-surface text-primary font-medium sticky top-0">
             <tr>
               <th className="px-4 py-2 text-left w-[154px] h-[56px] rounded-tl-[10px]">Transport Route</th>
               <th className="px-4 py-2 text-center w-[154px] whitespace-nowrap h-[56px]">Documents Required</th>

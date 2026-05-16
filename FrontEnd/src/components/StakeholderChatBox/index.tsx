@@ -3,7 +3,7 @@ import { chatService } from '../../services/chatService';
 import { userService, type UserListItem } from '../../services/userService';
 import renderMessageWithMentions from './utils/renderMessageWithMentions';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
-import { usePatientChatWebSocket, useCanisterChatWebSocket } from '../../hooks/useChatWebSocket';
+import { usePatientChatWebSocket, useCanisterChatWebSocket, useIncubatorChatWebSocket } from '../../hooks/useChatWebSocket';
 
 const formatTimestamp = (dateString: string): string => {
   try {
@@ -40,6 +40,8 @@ interface StakeholderChatBoxProps {
   onClose: () => void;
   patientId?: string | undefined; // For CGT flow
   canisterNumber?: string | undefined; // For IVF flow
+  incubatorId?: number | undefined; // For Incubator flow
+  chamberId?: string | undefined; // For Incubator flow (optional chamber scope)
   onMessagesUpdated?: () => void; // Callback to refresh unread messages in parent
 }
 
@@ -48,6 +50,8 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
   onClose,
   patientId,
   canisterNumber,
+  incubatorId,
+  chamberId,
   onMessagesUpdated
 }) => {
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
@@ -71,18 +75,27 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
   const [mentionIndex, setMentionIndex] = useState(-1);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
 
-  // Determine if this is CGT (patient) or IVF (canister) flow
+  // Determine which flow is active (exactly one should be set)
   // Treat empty strings as falsy to avoid sending empty patient_id
   const isCGTFlow = !!(patientId && patientId.trim());
   const isIVFFlow = !!(canisterNumber && canisterNumber.trim());
-  const chatIdentifier = (patientId && patientId.trim()) || (canisterNumber && canisterNumber.trim()) || undefined;
+  const isIncubatorFlow = !!(incubatorId != null);
+  const chatIdentifier =
+    (patientId && patientId.trim()) ||
+    (canisterNumber && canisterNumber.trim()) ||
+    (incubatorId != null ? incubatorId.toString() : undefined);
 
-  // WebSocket for patient messages (CGT) or canister messages (IVF)
+  // WebSocket hooks — only the active one actually connects
   const patientWs = usePatientChatWebSocket(isCGTFlow ? patientId : undefined);
   const canisterWs = useCanisterChatWebSocket(isIVFFlow ? canisterNumber : undefined);
-  
+  const incubatorWs = useIncubatorChatWebSocket(isIncubatorFlow ? incubatorId : undefined, chamberId);
+
   // Use the appropriate WebSocket hook based on flow
-  const { messages: wsMessages, unreadCount, markAsRead, refreshMessages } = isCGTFlow ? patientWs : canisterWs;
+  const { messages: wsMessages, unreadCount, markAsRead, refreshMessages } = isIncubatorFlow
+    ? incubatorWs
+    : isCGTFlow
+      ? patientWs
+      : canisterWs;
 
   // Fetch current user
   const fetchCurrentUser = async (): Promise<void> => {
@@ -403,25 +416,26 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         taggedUserIds = [];
       }
       
-      // Build request payload based on flow type
-      // For IVF: only include tank_code, omit patient_id completely
-      // For CGT: only include patient_id, omit tank_code completely
+      // Build request payload — only include the FK for the active flow
       const requestPayload: {
         message_content: string;
         patient_id?: string;
         tank_code?: string;
+        incubator_id?: number;
+        chamber_id?: string;
         tagged_user_ids: string[];
       } = {
         message_content: messageToSend,
         tagged_user_ids: taggedUserIds
       };
-      
+
       if (isCGTFlow && patientId && patientId.trim()) {
-        // CGT flow: only set patient_id, don't include tank_code
         requestPayload.patient_id = patientId.trim();
       } else if (isIVFFlow && canisterNumber && canisterNumber.trim()) {
-        // IVF flow: only set tank_code, don't include patient_id
         requestPayload.tank_code = canisterNumber.trim();
+      } else if (isIncubatorFlow && incubatorId != null) {
+        requestPayload.incubator_id = incubatorId;
+        if (chamberId) requestPayload.chamber_id = chamberId;
       }
       
       await chatService.sendMessage(requestPayload);
@@ -432,13 +446,11 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       } catch {
         // Fallback to HTTP API if WebSocket fails
         if (isCGTFlow && patientId) {
-          chatService.markPatientAsRead(patientId).catch(() => {
-            // Silently handle errors
-          });
+          chatService.markPatientAsRead(patientId).catch(() => {});
         } else if (isIVFFlow && canisterNumber) {
-          chatService.markCanisterAsRead(canisterNumber).catch(() => {
-            // Silently handle errors
-          });
+          chatService.markCanisterAsRead(canisterNumber).catch(() => {});
+        } else if (isIncubatorFlow && incubatorId != null) {
+          chatService.markIncubatorAsRead(incubatorId, chamberId).catch(() => {});
         }
       }
       hasMarkedAsReadRef.current = true;
@@ -501,13 +513,11 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       } catch {
         // Fallback to HTTP API if WebSocket fails
         if (isCGTFlow && patientId) {
-          chatService.markPatientAsRead(patientId).catch(() => {
-            // Silently handle errors
-          });
+          chatService.markPatientAsRead(patientId).catch(() => {});
         } else if (isIVFFlow && canisterNumber) {
-          chatService.markCanisterAsRead(canisterNumber).catch(() => {
-            // Silently handle errors
-          });
+          chatService.markCanisterAsRead(canisterNumber).catch(() => {});
+        } else if (isIncubatorFlow && incubatorId != null) {
+          chatService.markIncubatorAsRead(incubatorId, chamberId).catch(() => {});
         }
       }
       hasMarkedAsReadRef.current = true;
@@ -663,7 +673,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm" onClick={handleClose}>
-      <div id="onboarding-stakeholder-chatbox" className="w-[65vw] max-w-[700px] h-[70vh] bg-white rounded-lg border border-[#E7E1E1] shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div id="onboarding-stakeholder-chatbox" className="w-[65vw] max-w-[700px] h-[70vh] bg-white rounded-lg border border-line shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-5 pt-5 pb-3 border-b">
           <div className="flex items-center justify-between">

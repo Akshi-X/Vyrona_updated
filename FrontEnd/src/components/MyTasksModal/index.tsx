@@ -32,14 +32,16 @@ interface MyTasksModalProps {
     onAdd?: () => void;
     onEdit?: (task: MyTask) => void | Promise<void>;
     onDelete?: (taskId: string) => void;
-    variant?: "dashboard" | "track" | "ivf"; // Add variant to differentiate between Dashboard, Track & Trace and IVF
-    currentUserName?: string; // Current user's full name for "Assigned by" field
-    currentUserId?: string; // Current user's ID
-    onTaskCreated?: () => void; // Callback to refresh tasks after creation
-    userRole?: string; // User's role for role-based access control
-    defaultPatientId?: string; // Default patient ID to pre-fill when adding a new task
-    defaultCanisterNumber?: string; // Default canister number to pre-fill when adding a new IVF task
-    defaultTankId?: number; // Default tank ID for exact IVF task mapping
+    variant?: "dashboard" | "track" | "ivf" | "incubator";
+    currentUserName?: string;
+    currentUserId?: string;
+    onTaskCreated?: () => void;
+    userRole?: string;
+    defaultPatientId?: string;
+    defaultCanisterNumber?: string;
+    defaultTankId?: number;
+    defaultIncubatorId?: number;
+    defaultChamberId?: string;
     id?: string;
 }
 
@@ -58,10 +60,13 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     defaultPatientId = "",
     defaultCanisterNumber = "",
     defaultTankId,
+    defaultIncubatorId,
+    defaultChamberId,
     id,
 }) => {
     const isUserRole = userRole?.toLowerCase() === "user";
     const isIvfVariant = variant === "ivf";
+    const isIncubatorVariant = variant === "incubator";
     const [showInputRow, setShowInputRow] = useState(false);
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(
@@ -117,7 +122,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         // Reset form with current user as default and pre-fill patientId/canisterNumber if provided
         setNewTask({
             patientId: isIvfVariant ? "" : defaultPatientId || "",
-            canisterNumber: isIvfVariant ? defaultCanisterNumber || "" : "",
+            canisterNumber: (isIvfVariant || isIncubatorVariant) ? defaultCanisterNumber || "" : "",
             taskName: "",
             description: "",
             assigneeBy: currentUserName || "",
@@ -137,8 +142,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             assigneeId: TASK_FIELD_ERRORS.assigneeId,
         };
 
-        // CGT uses patient_id, IVF uses canister_number
-        if (isIvfVariant) {
+        // CGT uses patient_id; IVF and incubator variants use canister_number (display-only)
+        if (isIvfVariant || isIncubatorVariant) {
             requiredFields.canisterNumber = TASK_FIELD_ERRORS.canisterNumber;
         } else {
             requiredFields.patientId = TASK_FIELD_ERRORS.patientId;
@@ -173,14 +178,11 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     ? Number(defaultTankId)
                     : undefined;
 
-            // Map frontend fields to API format
-            // assignee_id should be the user_id (string) to assign the task to
-            // For now, we default to current user (self-assignment)
             const taskData = {
                 task_name: newTask.taskName.trim(),
                 description: newTask.description.trim(),
-                assignee_id: newTask.assigneeId || currentUserId, // Use assigneeId or fallback to current user
-                patient_id: isIvfVariant
+                assignee_id: newTask.assigneeId || currentUserId,
+                patient_id: (isIvfVariant || isIncubatorVariant)
                     ? undefined
                     : newTask.patientId.trim() || undefined,
                 tank_id: isIvfVariant ? normalizedTankId : undefined,
@@ -188,6 +190,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     isIvfVariant && normalizedTankId === undefined
                         ? normalizedCanisterNumber || undefined
                         : undefined,
+                incubator_id: isIncubatorVariant ? defaultIncubatorId : undefined,
+                chamber_id: isIncubatorVariant ? defaultChamberId : undefined,
                 due_date: newTask.dueDate
                     ? new Date(newTask.dueDate).toISOString()
                     : undefined,
@@ -527,7 +531,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     ? "My Tasks (Track & Trace)"
                     : variant === "ivf"
                       ? "My Tasks (Cryocan Quality Tracking)"
-                      : "My Tasks"
+                      : variant === "incubator"
+                        ? "My Tasks (Incubator)"
+                        : "My Tasks"
             }
             description="Manage and track your assigned tasks"
             icon={
@@ -538,14 +544,14 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 />
             }
             headerAction={
-                onAdd && (!isUserRole || isIvfVariant) ? (
+                onAdd && (!isUserRole || isIvfVariant || isIncubatorVariant) ? (
                     <button
                         id="onboarding-my-tasks-add-btn"
                         onClick={(e) => {
                             e.stopPropagation();
                             handleAddClick();
                         }}
-                        className="px-4 py-2 bg-[#6b1176] hover:bg-[#8b2a96] text-white text-sm font-medium rounded-md transition-colors flex items-center gap-1"
+                        className="px-4 py-2 bg-primary hover:bg-primary-light text-white text-sm font-medium rounded-md transition-colors flex items-center gap-1"
                     >
                         <svg
                             className="w-4 h-4"
@@ -587,7 +593,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%);
                   }
                   input[type="date"]:not(:placeholder-shown) {
-                    color: #6b1176;
+                    color: var(--color-primary);
                     font-weight: 500;
                   }
                   input[type="date"] { color-scheme: light; }
@@ -601,8 +607,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                             onClick={(e) => { e.stopPropagation(); setIsAssignedByFilterOpen(!isAssignedByFilterOpen); }}
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
                                 assignedByFilter !== "all"
-                                    ? "bg-[#6b1176] text-white border-[#6b1176]"
-                                    : "bg-white text-gray-600 border-gray-300 hover:border-[#6b1176] hover:text-[#6b1176]"
+                                    ? "bg-primary text-white border-primary"
+                                    : "bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary"
                             }`}
                         >
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -612,9 +618,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         </button>
                         {isAssignedByFilterOpen && (
                             <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] max-h-60 overflow-y-auto flex flex-col">
-                                <button onClick={() => { setAssignedByFilter("all"); setIsAssignedByFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedByFilter === "all" ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>All</button>
+                                <button onClick={() => { setAssignedByFilter("all"); setIsAssignedByFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedByFilter === "all" ? "bg-primary text-white" : "text-primary hover:bg-gray-100"}`}>All</button>
                                 {uniqueAssignedBy.map((name) => (
-                                    <button key={name} onClick={() => { setAssignedByFilter(name); setIsAssignedByFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedByFilter === name ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>{name}</button>
+                                    <button key={name} onClick={() => { setAssignedByFilter(name); setIsAssignedByFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedByFilter === name ? "bg-primary text-white" : "text-primary hover:bg-gray-100"}`}>{name}</button>
                                 ))}
                             </div>
                         )}
@@ -626,8 +632,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                             onClick={(e) => { e.stopPropagation(); setIsAssignedToFilterOpen(!isAssignedToFilterOpen); }}
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
                                 assignedToFilter !== "all"
-                                    ? "bg-[#6b1176] text-white border-[#6b1176]"
-                                    : "bg-white text-gray-600 border-gray-300 hover:border-[#6b1176] hover:text-[#6b1176]"
+                                    ? "bg-primary text-white border-primary"
+                                    : "bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary"
                             }`}
                         >
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -637,9 +643,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         </button>
                         {isAssignedToFilterOpen && (
                             <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] max-h-60 overflow-y-auto flex flex-col">
-                                <button onClick={() => { setAssignedToFilter("all"); setIsAssignedToFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedToFilter === "all" ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>All</button>
+                                <button onClick={() => { setAssignedToFilter("all"); setIsAssignedToFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedToFilter === "all" ? "bg-primary text-white" : "text-primary hover:bg-gray-100"}`}>All</button>
                                 {uniqueAssignedTo.map((name) => (
-                                    <button key={name} onClick={() => { setAssignedToFilter(name); setIsAssignedToFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedToFilter === name ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>{name}</button>
+                                    <button key={name} onClick={() => { setAssignedToFilter(name); setIsAssignedToFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedToFilter === name ? "bg-primary text-white" : "text-primary hover:bg-gray-100"}`}>{name}</button>
                                 ))}
                             </div>
                         )}
@@ -651,8 +657,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                             onClick={(e) => { e.stopPropagation(); setIsPriorityFilterOpen(!isPriorityFilterOpen); }}
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
                                 priorityFilter !== "all"
-                                    ? "bg-[#6b1176] text-white border-[#6b1176]"
-                                    : "bg-white text-gray-600 border-gray-300 hover:border-[#6b1176] hover:text-[#6b1176]"
+                                    ? "bg-primary text-white border-primary"
+                                    : "bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary"
                             }`}
                         >
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -662,9 +668,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         </button>
                         {isPriorityFilterOpen && (
                             <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[160px] flex flex-col">
-                                <button onClick={() => { setPriorityFilter("all"); setIsPriorityFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${priorityFilter === "all" ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>All</button>
+                                <button onClick={() => { setPriorityFilter("all"); setIsPriorityFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${priorityFilter === "all" ? "bg-primary text-white" : "text-primary hover:bg-gray-100"}`}>All</button>
                                 {priorities.map((p) => (
-                                    <button key={p} onClick={() => { setPriorityFilter(p); setIsPriorityFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${priorityFilter === p ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>{p}</button>
+                                    <button key={p} onClick={() => { setPriorityFilter(p); setIsPriorityFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${priorityFilter === p ? "bg-primary text-white" : "text-primary hover:bg-gray-100"}`}>{p}</button>
                                 ))}
                             </div>
                         )}
@@ -676,8 +682,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                             onClick={(e) => { e.stopPropagation(); setIsStatusFilterOpen(!isStatusFilterOpen); }}
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
                                 statusFilter !== "all"
-                                    ? "bg-[#6b1176] text-white border-[#6b1176]"
-                                    : "bg-white text-gray-600 border-gray-300 hover:border-[#6b1176] hover:text-[#6b1176]"
+                                    ? "bg-primary text-white border-primary"
+                                    : "bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary"
                             }`}
                         >
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -687,9 +693,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         </button>
                         {isStatusFilterOpen && (
                             <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[160px] flex flex-col">
-                                <button onClick={() => { setStatusFilter("all"); setIsStatusFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${statusFilter === "all" ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>All</button>
+                                <button onClick={() => { setStatusFilter("all"); setIsStatusFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${statusFilter === "all" ? "bg-primary text-white" : "text-primary hover:bg-gray-100"}`}>All</button>
                                 {statuses.map((s) => (
-                                    <button key={s} onClick={() => { setStatusFilter(s); setIsStatusFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${statusFilter === s ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>{s}</button>
+                                    <button key={s} onClick={() => { setStatusFilter(s); setIsStatusFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${statusFilter === s ? "bg-primary text-white" : "text-primary hover:bg-gray-100"}`}>{s}</button>
                                 ))}
                             </div>
                         )}
@@ -699,7 +705,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     {(assignedByFilter !== "all" || assignedToFilter !== "all" || priorityFilter !== "all" || statusFilter !== "all") && (
                         <button
                             onClick={() => { setAssignedByFilter("all"); setAssignedToFilter("all"); setPriorityFilter("all"); setStatusFilter("all"); }}
-                            className="text-xs text-gray-500 hover:text-[#6b1176] underline ml-1"
+                            className="text-xs text-gray-500 hover:text-primary underline ml-1"
                         >
                             Clear all
                         </button>
@@ -708,22 +714,24 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
 
                 {/* New task form card */}
                 {showInputRow && (
-                    <div id="onboarding-my-tasks-input-row" className="mx-4 mt-4 mb-2 border border-[#6b1176] rounded-xl bg-purple-50 p-4">
+                    <div id="onboarding-my-tasks-input-row" className="mx-4 mt-4 mb-2 border border-primary rounded-xl bg-purple-50 p-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs font-medium text-[#6b1176] mb-1">{isIvfVariant ? "Canister ID" : "Patient ID"}</label>
+                                <label className="block text-xs font-medium text-primary mb-1">
+                                    {isIncubatorVariant ? "Incubator ID" : isIvfVariant ? "Canister ID" : "Patient ID"}
+                                </label>
                                 <input
                                     type="text"
-                                    value={isIvfVariant ? newTask.canisterNumber : newTask.patientId}
-                                    onChange={(e) => handleInputChange(isIvfVariant ? "canisterNumber" : "patientId", e.target.value)}
-                                    placeholder={isIvfVariant ? "Canister ID" : "Patient ID"}
+                                    value={(isIvfVariant || isIncubatorVariant) ? newTask.canisterNumber : newTask.patientId}
+                                    onChange={(e) => handleInputChange((isIvfVariant || isIncubatorVariant) ? "canisterNumber" : "patientId", e.target.value)}
+                                    placeholder={isIncubatorVariant ? "Incubator ID" : isIvfVariant ? "Canister ID" : "Patient ID"}
                                     readOnly
-                                    className={`w-full px-3 py-1.5 text-sm border rounded-lg bg-white text-gray-700 cursor-not-allowed focus:outline-none ${(isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId) ? "border-red-400" : "border-gray-300"}`}
+                                    className={`w-full px-3 py-1.5 text-sm border rounded-lg bg-white text-gray-700 cursor-not-allowed focus:outline-none ${((isIvfVariant || isIncubatorVariant) ? validationErrors.canisterNumber : validationErrors.patientId) ? "border-red-400" : "border-gray-300"}`}
                                 />
-                                {(isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId) && <p className="text-xs text-red-500 mt-0.5">{isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId}</p>}
+                                {((isIvfVariant || isIncubatorVariant) ? validationErrors.canisterNumber : validationErrors.patientId) && <p className="text-xs text-red-500 mt-0.5">{(isIvfVariant || isIncubatorVariant) ? validationErrors.canisterNumber : validationErrors.patientId}</p>}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Task Name</label>
+                                <label className="block text-xs font-medium text-primary mb-1">Task Name</label>
                                 <input
                                     type="text"
                                     value={newTask.taskName}
@@ -734,7 +742,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                 {validationErrors.taskName && <p className="text-xs text-red-500 mt-0.5">{validationErrors.taskName}</p>}
                             </div>
                             <div className="sm:col-span-2">
-                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Description</label>
+                                <label className="block text-xs font-medium text-primary mb-1">Description</label>
                                 <input
                                     type="text"
                                     value={newTask.description}
@@ -745,11 +753,11 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                 {validationErrors.description && <p className="text-xs text-red-500 mt-0.5">{validationErrors.description}</p>}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Assigned by</label>
+                                <label className="block text-xs font-medium text-primary mb-1">Assigned by</label>
                                 <input type="text" value={newTask.assigneeBy} disabled className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-100 text-gray-400 cursor-not-allowed select-none" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Assign to</label>
+                                <label className="block text-xs font-medium text-primary mb-1">Assign to</label>
                                 <select
                                     value={newTask.assigneeId || ""}
                                     onChange={(e) => {
@@ -770,7 +778,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                 {validationErrors.assigneeBy && <p className="text-xs text-red-500 mt-0.5">{validationErrors.assigneeBy}</p>}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Due Date</label>
+                                <label className="block text-xs font-medium text-primary mb-1">Due Date</label>
                                 <input
                                     type="date"
                                     value={newTask.dueDate}
@@ -781,7 +789,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                 {validationErrors.dueDate && <p className="text-xs text-red-500 mt-0.5">{validationErrors.dueDate}</p>}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Priority</label>
+                                <label className="block text-xs font-medium text-primary mb-1">Priority</label>
                                 <select
                                     value={newTask.priority}
                                     onChange={(e) => handleInputChange("priority", e.target.value)}
@@ -798,7 +806,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                 id="onboarding-my-tasks-save-btn"
                                 onClick={handleSaveAdd}
                                 disabled={isSaving}
-                                className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${isSaving ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-[#6b1176] text-white hover:bg-[#8b2a96]"}`}
+                                className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${isSaving ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-primary text-white hover:bg-primary-light"}`}
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -839,7 +847,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         return (
                             <div
                                 key={task.id}
-                                className={`border rounded-xl p-4 shadow-sm transition-all ${isEditing ? "border-[#6b1176] bg-purple-50" : `border-gray-200 ${priorityAccent} hover:shadow-md`}`}
+                                className={`border rounded-xl p-4 shadow-sm transition-all ${isEditing ? "border-primary bg-purple-50" : `border-gray-200 ${priorityAccent} hover:shadow-md`}`}
                             >
                                 {/* Card header */}
                                 <div className="flex items-start justify-between gap-2 mb-2">
@@ -902,7 +910,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                                         }
                                                         setEditedTask(formattedTask);
                                                     }}
-                                                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:border-[#6b1176] hover:text-[#6b1176] transition-colors"
+                                                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:border-primary hover:text-primary transition-colors"
                                                     title={isCreatedByMe ? "Edit task" : "Edit status"}
                                                 >
                                                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" /></svg>

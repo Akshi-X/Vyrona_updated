@@ -11,10 +11,10 @@ type PageHeaderProps = {
 
 const PageHeader = ({ title, icon, iconAlt, lucideIcon: LucideIcon, actions }: PageHeaderProps) => {
     return (
-        <div className="flex items-center justify-between sticky top-0 z-30 bg-[#FDFAFF] -mx-4 px-4 py-3 md:static md:bg-transparent md:mx-0 md:px-0 md:py-0">
+        <div className="flex items-center justify-between sticky top-0 z-30 bg-surface -mx-4 px-4 py-3 md:static md:bg-transparent md:mx-0 md:px-0 md:py-0">
             <div className="flex items-center gap-2 md:gap-3">
                 <HamburgerButton />
-                {LucideIcon && <LucideIcon className="w-6 h-6 md:w-8 md:h-8 text-black" />}
+                {LucideIcon && <LucideIcon className="w-6 h-6 md:w-8 md:h-8 text-primary" />}
                 {icon && !LucideIcon && (
                     <img src={icon} alt={iconAlt ?? title} className="w-6 h-6 md:w-8 md:h-8" />
                 )}

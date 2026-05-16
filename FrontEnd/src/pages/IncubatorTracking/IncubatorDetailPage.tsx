@@ -10,11 +10,12 @@ import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
-import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import StakeholderChatBox from '../../components/StakeholderChatBox';
 import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { userService, type UserProfileDto } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useIncubatorChatWebSocket } from '../../hooks/useChatWebSocket';
 
 type IllustrationMetrics = {
   temp: string;
@@ -36,7 +37,7 @@ function IncubatorIllustrationPanel({ metrics }: { metrics: IllustrationMetrics 
   return (
     <div className="flex items-center justify-center w-full">
       <div className="flex-1 max-w-[760px] w-full">
-        <div className="bg-white border border-[#E7E1E1] rounded-xl p-4">
+        <div className="bg-white border border-line rounded-xl p-4">
           <svg
         width="100%"
         viewBox="0 0 680 520"
@@ -265,21 +266,21 @@ function IncubatorIllustrationPanel({ metrics }: { metrics: IllustrationMetrics 
         <line x1="588" y1="370" x2="588" y2="410" stroke="#d8d5cf" strokeWidth="1" strokeLinecap="round" />
       </svg>
           <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-            <div className="rounded-lg border border-[#E7E1E1] bg-[#FAF7FC] px-3 py-2">
+            <div className="rounded-lg border border-line bg-surface px-3 py-2">
               <div className="text-[11px] text-gray-500">Temp</div>
-              <div className="text-sm font-semibold text-[#6B1176]">{metrics.temp}</div>
+              <div className="text-sm font-semibold text-primary">{metrics.temp}</div>
             </div>
-            <div className="rounded-lg border border-[#E7E1E1] bg-[#FAF7FC] px-3 py-2">
+            <div className="rounded-lg border border-line bg-surface px-3 py-2">
               <div className="text-[11px] text-gray-500">CO₂</div>
-              <div className="text-sm font-semibold text-[#6B1176]">{metrics.co2}</div>
+              <div className="text-sm font-semibold text-primary">{metrics.co2}</div>
             </div>
-            <div className="rounded-lg border border-[#E7E1E1] bg-[#FAF7FC] px-3 py-2">
+            <div className="rounded-lg border border-line bg-surface px-3 py-2">
               <div className="text-[11px] text-gray-500">pH</div>
-              <div className="text-sm font-semibold text-[#6B1176]">{metrics.ph}</div>
+              <div className="text-sm font-semibold text-primary">{metrics.ph}</div>
             </div>
-            <div className="rounded-lg border border-[#E7E1E1] bg-[#FAF7FC] px-3 py-2">
+            <div className="rounded-lg border border-line bg-surface px-3 py-2">
               <div className="text-[11px] text-gray-500">Humidity</div>
-              <div className="text-sm font-semibold text-[#6B1176]">{metrics.humidity}</div>
+              <div className="text-sm font-semibold text-primary">{metrics.humidity}</div>
             </div>
           </div>
         </div>
@@ -312,6 +313,13 @@ export default function IncubatorDetailPage() {
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfileDto | null>(null);
+
+  const chamberIdForApi = chamberId || undefined;
+
+  const { unreadCount: chatUnreadCount } = useIncubatorChatWebSocket(
+    hasIncubatorId ? incubatorId : undefined,
+    chamberIdForApi
+  );
 
   const criticalAlertsCount = criticalAlerts.filter((a) => a.acknowledged_at == null).length;
   const myTasksCount = myTasks.filter((t) => t.status === 'Not started' || t.status === 'In progress').length;
@@ -349,8 +357,8 @@ export default function IncubatorDetailPage() {
   const fetchCriticalAlerts = async () => {
     setLoadingAlerts(true);
     try {
-      const response = id
-        ? await ivfAlertsService.getCanisterAlerts(id)
+      const response = hasIncubatorId
+        ? await ivfAlertsService.getIncubatorAlerts(incubatorId, chamberIdForApi)
         : await ivfAlertsService.getHospitalAlerts();
       setCriticalAlerts(response.alerts || []);
     } catch {
@@ -364,8 +372,8 @@ export default function IncubatorDetailPage() {
     setLoadingTasks(true);
     try {
       let allTasks: Task[] = [];
-      if (id) {
-        const res = await tasksService.getCanisterTasks(id);
+      if (hasIncubatorId) {
+        const res = await tasksService.getIncubatorTasks(incubatorId, chamberIdForApi);
         allTasks = Array.isArray(res.tasks) ? res.tasks : [];
       } else {
         const res = await tasksService.getMyTasks();
@@ -386,7 +394,7 @@ export default function IncubatorDetailPage() {
     fetchCriticalAlerts();
     fetchMyTasks();
     userService.getProfile().then(setCurrentUser).catch(() => {});
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [incubatorId, chamberId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageActions = (
     <div className="flex items-center gap-6">
@@ -403,9 +411,9 @@ export default function IncubatorDetailPage() {
             <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
           </div>
         )}
-        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
           <div className="font-semibold text-black text-xs whitespace-nowrap">Critical Alerts</div>
-          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]" />
+          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border" />
         </div>
       </div>
       {/* Stakeholder Chats */}
@@ -416,9 +424,14 @@ export default function IncubatorDetailPage() {
           src={StakeholderChatsIcon}
           onClick={() => setShowStakeholderChats(true)}
         />
-        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+        {chatUnreadCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-white flex items-center justify-center">
+            <span className="font-semibold text-white text-[10px]">{chatUnreadCount}</span>
+          </div>
+        )}
+        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
           <div className="font-semibold text-black text-xs whitespace-nowrap">Stakeholder Chats</div>
-          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]" />
+          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border" />
         </div>
       </div>
       {/* My Tasks */}
@@ -434,9 +447,9 @@ export default function IncubatorDetailPage() {
             <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
           </div>
         )}
-        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
           <div className="font-semibold text-black text-xs whitespace-nowrap">My Tasks</div>
-          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]" />
+          <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border" />
         </div>
       </div>
     </div>
@@ -482,8 +495,8 @@ export default function IncubatorDetailPage() {
                 onClick={() => setChamberId(ch)}
                 className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
                   ch === chamberId
-                    ? 'bg-[#6B1176] text-white border-[#6B1176]'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-[#6B1176] hover:text-[#6B1176]'
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
                 }`}
               >
                 {ch}
@@ -510,7 +523,7 @@ export default function IncubatorDetailPage() {
           </div>
           <div className="min-h-80 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
             <h2 className="font-semibold text-black text-[16px] mb-3 w-full">Current Quality Status</h2>
-            <div className="w-full rounded-lg bg-linear-to-br from-[#FDFAFF] to-[#f3e8f7] p-3">
+            <div className="w-full rounded-lg bg-linear-to-br from-surface to-[#f3e8f7] p-3">
               <IncubatorIllustrationPanel metrics={illustrationMetrics} />
             </div>
           </div>
@@ -539,15 +552,16 @@ export default function IncubatorDetailPage() {
           message: a.message,
           timestamp: new Date(a.occurred_at + 'Z').toLocaleString(),
           status: a.status === 'Active' ? 'Active' : 'Acknowledged',
+          acknowledgementReason: a.acknowledgment_reason,
         }))}
         loading={loadingAlerts}
         patientIdLabel=""
-        onAcknowledge={async (alertId) => {
-          await ivfAlertsService.acknowledgeAlert(alertId);
+        onAcknowledge={async (alertId, reason) => {
+          await ivfAlertsService.acknowledgeAlert(alertId, reason);
           fetchCriticalAlerts();
         }}
-        onAcknowledgeAll={async (alertIds) => {
-          await ivfAlertsService.acknowledgeAlerts(alertIds);
+        onAcknowledgeAll={async (alertIds, reason) => {
+          await ivfAlertsService.acknowledgeAlerts(alertIds, reason);
           fetchCriticalAlerts();
         }}
       />
@@ -557,9 +571,9 @@ export default function IncubatorDetailPage() {
         tasks={myTasks.map((task) => ({
           id: task.id.toString(),
           patientId: task.patient_id || 'N/A',
-          tankCode: (task.tank_code && String(task.tank_code).trim()) || resolvedCode || undefined,
+          tankCode: (task.tank_code && String(task.tank_code).trim()) || undefined,
           tankId: task.tank_id ?? undefined,
-          canisterNumber: task.canister_number || resolvedCode || 'N/A',
+          canisterNumber: resolvedCode || 'N/A',
           taskName: task.task_name,
           description: task.description || '',
           assigneeBy: task.created_by
@@ -573,11 +587,13 @@ export default function IncubatorDetailPage() {
           status: task.status,
         }))}
         loading={loadingTasks}
-        variant="ivf"
+        variant="incubator"
         currentUserName={currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : ''}
         currentUserId={currentUser?.user_id ?? ''}
         userRole={userRole || currentUser?.role || ''}
         defaultCanisterNumber={resolvedCode}
+        defaultIncubatorId={hasIncubatorId ? incubatorId : undefined}
+        defaultChamberId={chamberIdForApi}
         onTaskCreated={fetchMyTasks}
         onAdd={() => {}}
         onEdit={async (task: MyTask) => {
@@ -602,10 +618,12 @@ export default function IncubatorDetailPage() {
         }}
         onDelete={() => {}}
       />
-      <StakeholderChatsModal
+      <StakeholderChatBox
         isOpen={showStakeholderChats}
         onClose={() => setShowStakeholderChats(false)}
-        chats={[]}
+        incubatorId={hasIncubatorId ? incubatorId : undefined}
+        chamberId={chamberIdForApi}
+        onMessagesUpdated={fetchCriticalAlerts}
       />
     </>
   );
