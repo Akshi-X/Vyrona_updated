@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { X, Info, Trophy, GitCompare } from 'lucide-react';
-
+import { X, Trophy, GitCompare } from 'lucide-react';
 
 interface LeaderboardEmbryo {
   id: string; time: string; aiScore: number; grade: string; quality: string; rank: number;
@@ -22,10 +21,10 @@ const LEADERBOARD_EMBRYOS: LeaderboardEmbryo[] = [
 ];
 
 const SLOT_COLORS = [
-  { border: 'border-[#4f46e5]', badgeBg: 'bg-[#4f46e5]', textCol: 'text-[#4f46e5]', barCol: 'bg-[#4f46e5]' }, // indigo (blue-purple)
-  { border: 'border-[#6b1176]', badgeBg: 'bg-[#6b1176]', textCol: 'text-[#6b1176]', barCol: 'bg-[#6b1176]' }, // primary (classic purple)
-  { border: 'border-[#a21caf]', badgeBg: 'bg-[#a21caf]', textCol: 'text-[#a21caf]', barCol: 'bg-[#a21caf]' }, // fuchsia (red-purple)
-  { border: 'border-[#7c3aed]', badgeBg: 'bg-[#7c3aed]', textCol: 'text-[#7c3aed]', barCol: 'bg-[#7c3aed]' }, // violet (vivid)
+  { hex: '#4f46e5' },
+  { hex: '#6b1176' },
+  { hex: '#a21caf' },
+  { hex: '#7c3aed' },
 ];
 
 const eidToLabel = (id: string) => {
@@ -33,29 +32,52 @@ const eidToLabel = (id: string) => {
   return m ? `Oocyte #${m[1]}` : id;
 };
 
+function gradeCls(grade: string) {
+  if (!grade || grade.length < 2) return { bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200', dot: '#9ca3af' };
+  const icmTe = grade.slice(1);
+  if (icmTe === 'AA') return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: '#10b981' };
+  if (icmTe === 'AB' || icmTe === 'BA') return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: '#f59e0b' };
+  if (icmTe === 'BB') return { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', dot: '#eab308' };
+  return { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-200', dot: '#f43f5e' };
+}
+
+function scoreColor(score: number): string {
+  if (score >= 8) return '#10b981';
+  if (score >= 6) return '#f59e0b';
+  return '#f43f5e';
+}
+
+function scoreTextCls(score: number): string {
+  if (score >= 8) return 'text-emerald-600';
+  if (score >= 6) return 'text-amber-600';
+  return 'text-rose-500';
+}
+
 function RankBadge({ rank }: { rank: number }) {
-  const configs: Record<number, { outer: string; inner: string; glow: string }> = {
-    1: { outer: '#F59E0B', inner: '#FDE68A', glow: 'rgba(245,158,11,0.25)' },
-    2: { outer: '#9CA3AF', inner: '#E5E7EB', glow: 'rgba(156,163,175,0.25)' },
-    3: { outer: '#CD7C2F', inner: '#FCD9A0', glow: 'rgba(205,124,47,0.25)'  },
+  const medal: Record<number, { outer: string; inner: string; glow: string }> = {
+    1: { outer: '#F59E0B', inner: '#FDE68A', glow: 'rgba(245,158,11,0.2)' },
+    2: { outer: '#9CA3AF', inner: '#E5E7EB', glow: 'rgba(156,163,175,0.2)' },
+    3: { outer: '#CD7C2F', inner: '#FCD9A0', glow: 'rgba(205,124,47,0.2)' },
   };
-  const c = configs[rank];
-  if (!c) return null;
+  const c = medal[rank];
+  if (c) {
+    return (
+      <svg width="26" height="26" viewBox="0 0 30 30" fill="none">
+        <circle cx="15" cy="15" r="14" fill={c.glow} />
+        <circle cx="15" cy="16" r="11" fill="rgba(0,0,0,0.1)" />
+        <circle cx="15" cy="15" r="11" fill={c.outer} />
+        <circle cx="15" cy="12" r="7" fill={c.inner} opacity="0.3" />
+        <circle cx="15" cy="15" r="9" fill="none" stroke="white" strokeWidth="1" strokeOpacity="0.4" />
+        <text x="15" y="19.5" textAnchor="middle" fontSize="11" fontWeight="900" fill="white" fontFamily="system-ui,sans-serif">{rank}</text>
+      </svg>
+    );
+  }
+  const rankCls =
+    rank === 4 ? 'bg-violet-100 text-violet-600' :
+    rank === 5 ? 'bg-orange-100 text-orange-600' :
+    'bg-gray-100 text-gray-500';
   return (
-    <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Outer glow ring */}
-      <circle cx="15" cy="15" r="14" fill={c.glow} />
-      {/* Drop shadow */}
-      <circle cx="15" cy="16" r="11" fill="rgba(0,0,0,0.13)" />
-      {/* Medal body */}
-      <circle cx="15" cy="15" r="11" fill={c.outer} />
-      {/* Inner shine */}
-      <circle cx="15" cy="12" r="7" fill={c.inner} opacity="0.35" />
-      {/* Inner ring */}
-      <circle cx="15" cy="15" r="9" fill="none" stroke="white" strokeWidth="1" strokeOpacity="0.5" />
-      {/* Rank number */}
-      <text x="15" y="19.5" textAnchor="middle" fontSize="11" fontWeight="900" fill="white" fontFamily="system-ui,sans-serif">{rank}</text>
-    </svg>
+    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${rankCls}`}>{rank}</div>
   );
 }
 
@@ -71,245 +93,285 @@ export default function EmbryoComparePage() {
   };
 
   return (
-    <>
-      <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
+    <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
 
-        {/* ── Left: Leaderboard ── */}
-        <div className="w-[270px] shrink-0 flex flex-col gap-3 overflow-y-auto bg-white border border-primary/20 rounded-2xl p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
-                <Trophy size={14} className="text-primary" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">Leaderboard</h3>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <p className="text-[11px] text-gray-400">Embryos ranked by AI Score</p>
-                  <Info size={10} className="text-gray-300" />
-                </div>
-              </div>
-            </div>
+      {/* ── Leaderboard ── */}
+      <div className="w-[290px] shrink-0 flex flex-col overflow-hidden bg-white border border-gray-200 rounded-2xl">
+
+        {/* Panel header */}
+        <div className="shrink-0 px-4 py-3 flex items-center gap-2.5 border-b border-gray-100" style={{ background: 'linear-gradient(135deg,#f9f4ff 0%,#ffffff 100%)' }}>
+          <div className="w-7 h-7 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
+            <Trophy size={14} className="text-primary" />
           </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-gray-900">Leaderboard</h3>
+            <p className="text-[10px] text-gray-400 mt-0.5">Ranked by AI Score</p>
+          </div>
+          <span className="text-[10px] font-bold text-primary bg-primary-bg border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
+            {LEADERBOARD_EMBRYOS.length} embryos
+          </span>
+        </div>
 
-          <div className="flex flex-col gap-2">
-            {LEADERBOARD_EMBRYOS.map((emb) => {
-              const isSelected = selectedEmbryoIds.includes(emb.id);
-              const slotIdx = selectedEmbryoIds.indexOf(emb.id);
-              const color = slotIdx >= 0 ? SLOT_COLORS[slotIdx] : null;
+        {/* Embryo list */}
+        <div className="flex-1 overflow-y-auto flex flex-col gap-1.5 p-2.5">
+          {LEADERBOARD_EMBRYOS.map(emb => {
+            const isSelected = selectedEmbryoIds.includes(emb.id);
+            const slotIdx = selectedEmbryoIds.indexOf(emb.id);
+            const slot = slotIdx >= 0 ? SLOT_COLORS[slotIdx] : null;
+            const gc = gradeCls(emb.grade);
 
-              return (
-                <div
-                  key={emb.id}
-                  className="relative flex items-center gap-2 px-2.5 py-2 pr-8 rounded-xl cursor-pointer transition-all"
-                  style={{
-                    border: isSelected && color ? `1px solid ${color.border.replace('border-[','').replace(']','')}50` : '1px solid #EEE8F8',
-                    boxShadow: isSelected ? '0 4px 16px rgba(107,17,118,0.08)' : '0 1px 3px rgba(0,0,0,0.04)',
-                    background: isSelected && color
-                      ? `${color.badgeBg.replace('bg-[','').replace(']','')}18`
-                      : 'white',
-                  }}
-                  onClick={() => toggleEmbryo(emb.id)}
-                >
-                  {/* Left accent bar when selected */}
-                  {isSelected && color && (
-                    <div
-                      className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
-                      style={{ background: color.badgeBg.replace('bg-[','').replace(']','') }}
-                    />
-                  )}
+            return (
+              <div
+                key={emb.id}
+                className="relative flex items-center gap-2.5 pl-3 pr-8 py-2.5 rounded-xl cursor-pointer transition-all"
+                style={{
+                  border: isSelected && slot ? `1px solid ${slot.hex}45` : '1px solid #EEE8F8',
+                  background: isSelected && slot ? `${slot.hex}0d` : 'white',
+                  boxShadow: isSelected && slot ? `0 2px 10px ${slot.hex}1a` : '0 1px 2px rgba(0,0,0,0.03)',
+                }}
+                onClick={() => toggleEmbryo(emb.id)}
+              >
+                {/* Left accent */}
+                {isSelected && slot && (
+                  <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full" style={{ background: slot.hex }} />
+                )}
 
-                  {/* Rank badge */}
-                  <div className="shrink-0 flex items-center justify-center w-7">
-                    {emb.rank <= 3 ? (
-                      <RankBadge rank={emb.rank} />
-                    ) : (
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-gray-900 bg-gray-100">
-                        {emb.rank}
-                      </div>
-                    )}
-                  </div>
+                {/* Rank */}
+                <div className="shrink-0 w-6 flex items-center justify-center">
+                  <RankBadge rank={emb.rank} />
+                </div>
 
-                  {/* Thumbnail */}
-                  <div className="shrink-0 w-9 h-9 rounded-lg overflow-hidden bg-gray-100">
-                    <img src={emb.src} alt="" className="w-full h-full object-cover" />
-                  </div>
+                {/* Thumbnail */}
+                <div className="shrink-0 w-10 h-10 rounded-lg overflow-hidden bg-gray-100 ring-1 ring-gray-100">
+                  <img src={emb.src} alt="" className="w-full h-full object-cover" />
+                </div>
 
-                  {/* Select indicator — absolute vertically centered right */}
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 right-2 w-[16px] h-[16px] rounded-full flex items-center justify-center shadow-sm transition-all"
-                    style={isSelected && color ? {
-                      border: `1.5px solid ${color.border.replace('border-[','').replace(']','')}`,
-                      background: color.badgeBg.replace('bg-[','').replace(']',''),
-                    } : { border: '1.5px solid #D1D5DB', background: 'white' }}
-                  >
-                    {isSelected && (
-                      <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
-                        <path d="M2 5l2.5 2.5 4-4" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-bold text-gray-900 leading-none truncate block mb-1.5">{eidToLabel(emb.id)}</span>
-                    <div className="inline-flex items-center gap-1 bg-[#FAF5FF] border border-[#EDE0FA] rounded-full px-2 py-0.5">
-                      <span className="text-[8px] font-bold text-[#c084fc] uppercase tracking-widest leading-none">AI</span>
-                      <span className="text-[11px] font-black text-gray-800 leading-none">{emb.aiScore}</span>
+                {/* Name + score bar */}
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-bold text-gray-900 block truncate mb-1.5">{eidToLabel(emb.id)}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[11px] font-black tabular-nums ${scoreTextCls(emb.aiScore)}`}>{emb.aiScore}</span>
+                    <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${emb.aiScore * 10}%`, background: scoreColor(emb.aiScore) }}
+                      />
                     </div>
                   </div>
-
-                  {/* Grade box */}
-                  <div className="shrink-0 flex flex-col items-center rounded-lg bg-[#FAF5FF] px-2 py-1.5 min-w-[36px] border border-[#EDE0FA]">
-                    <span className="text-[7px] font-bold text-[#c084fc] uppercase tracking-widest leading-none mb-0.5">Grade</span>
-                    <span className="text-sm font-black leading-none text-gray-800">{emb.grade}</span>
-                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* ── Right: Compare panel ── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-auto rounded-2xl p-4 border border-primary/20" style={{ background: 'rgba(141, 84, 149, 0.1)' }}>
-          <div className="flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center shrink-0">
-                <GitCompare size={14} className="text-primary" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">Compare Embryos</h3>
-                <p className="text-[11px] text-gray-400 mt-0.5">Select up to 4 embryos to compare</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {selectedEmbryoIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedEmbryoIds([])}
-                  className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                  Clear All
-                </button>
-              )}
-              <span className="text-[11px] font-bold text-primary bg-[#F7ECFF] px-2 py-0.5 rounded-full border border-[#c084fc]/40">
-                {selectedEmbryoIds.length} / 4 Selected
-              </span>
-            </div>
-          </div>
+                {/* Grade chip */}
+                <div className={`shrink-0 rounded-lg px-2 py-1.5 border text-center min-w-[40px] ${gc.bg} ${gc.border}`}>
+                  <div className="text-[7px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">Grade</div>
+                  <div className={`text-sm font-black leading-none ${gc.text}`}>{emb.grade}</div>
+                </div>
 
-          {selectedEmbryoIds.length === 0 ? (
-            <div className="flex flex-col items-center justify-center flex-1 py-16 text-center">
-              <div className="w-14 h-14 rounded-full bg-[#F7ECFF] flex items-center justify-center mb-3 text-primary">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-              </div>
-              <p className="text-sm font-semibold text-gray-500">No embryos selected</p>
-              <p className="text-xs text-gray-400 mt-1">Select embryos from the leaderboard to compare</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto flex justify-center">
-              <div>
+                {/* Select dot */}
                 <div
-                  className="grid gap-3 items-start"
-                  style={{ gridTemplateColumns: `repeat(${selectedEmbryoIds.length}, minmax(165px, 240px))` }}
+                  className="absolute top-1/2 -translate-y-1/2 right-2.5 w-[14px] h-[14px] rounded-full flex items-center justify-center transition-all"
+                  style={isSelected && slot
+                    ? { background: slot.hex, border: `1.5px solid ${slot.hex}` }
+                    : { background: 'white', border: '1.5px solid #D1D5DB' }}
                 >
-                  {selectedEmbryoIds.map((eid, idx) => {
-                    const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
-                    const color = SLOT_COLORS[idx];
-                    const hex = color.barCol.replace('bg-[', '').replace(']', '');
-                    return (
-                      <div key={eid} className="flex flex-col gap-2">
-
-                        {/* Header */}
-                        <div
-                          className="rounded-xl flex items-center gap-1.5 px-2.5 py-2 border"
-                          style={{ borderColor: hex + '50', background: hex + '12' }}
-                        >
-                          <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0" style={{ background: hex }}>{idx + 1}</span>
-                          <span className="text-xs font-bold text-gray-800 flex-1 truncate">{eidToLabel(emb.id)}</span>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedEmbryoIds(prev => prev.filter(id => id !== eid))}
-                            className="text-gray-300 hover:text-gray-500 transition-colors shrink-0 ml-1"
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-
-                        {/* Image */}
-                        <div className="relative rounded-xl overflow-hidden" style={{ border: `1px solid ${hex}50` }}>
-                          <div className="aspect-square bg-gray-50">
-                            <img src={emb.src} alt="" className="w-full h-full object-cover" />
-                          </div>
-                        </div>
-
-                        {/* AI Score */}
-                        <div className="rounded-xl border border-gray-200 bg-white px-2.5 py-2.5">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[9px] font-semibold text-gray-600 uppercase tracking-wide">AI Score</span>
-                            <span className="text-sm font-black text-gray-900">{emb.aiScore} <span className="text-[10px] font-medium text-gray-500">/ 10</span></span>
-                          </div>
-                          <div className="h-1 rounded-full bg-gray-100 overflow-hidden">
-                            <div className="h-full rounded-full transition-all" style={{ width: `${emb.aiScore * 10}%`, background: hex }} />
-                          </div>
-                        </div>
-
-                        {/* Exp / ICM / TE */}
-                        <div className="flex gap-1.5">
-                          {[{ label: 'Exp', value: emb.expansion }, { label: 'ICM', value: emb.icm }, { label: 'TE', value: emb.te }].map(chip => (
-                            <div key={chip.label} className="flex-1 rounded-xl bg-white border border-gray-200 px-1 py-2 text-center">
-                              <div className="text-[8px] text-gray-600 font-semibold uppercase tracking-wide leading-none mb-1">{chip.label}</div>
-                              <div className="text-xs font-black text-gray-900">{chip.value}</div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Bar metrics */}
-                        {([
-                          { label: 'Fragmentation',  value: emb.fragPct,    bars: emb.fragBars    },
-                          { label: 'Symmetry',       value: emb.symText,    bars: emb.symBars     },
-                          { label: 'Zona Pellucida', value: emb.zonaText,   bars: emb.zonaBars    },
-                          { label: 'Blastocoel',     value: emb.blastoText, bars: emb.blastoBars  },
-                          { label: 'Vacuolization',  value: emb.vacuoleText,bars: emb.vacuoleBars },
-                        ]).map(m => (
-                          <div key={m.label} className="rounded-xl border border-gray-200 bg-white px-2.5 py-2">
-                            <div className="text-[8px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">{m.label}</div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-gray-900">{m.value}</span>
-                              <div className="flex gap-0.5">
-                                {[0, 1, 2, 3].map(i => (
-                                  <div key={i} className={`w-2.5 h-1.5 rounded-sm ${i < m.bars ? color.barCol : 'bg-gray-100'}`} />
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* Text-only metrics — 2 per row */}
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {([
-                            { label: 'Blast. Stage', value: emb.blastocystStage },
-                            { label: 'Hatching',     value: emb.hatchText       },
-                            { label: 'Bridge',       value: emb.bridgeText      },
-                            { label: 'Multinuc.',    value: emb.multinucText    },
-                            { label: 'Cyto. Gran.',  value: emb.cytogranText    },
-                          ]).map(m => (
-                            <div key={m.label} className="rounded-xl bg-white border border-gray-200 px-2 py-2">
-                              <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wide leading-none mb-1">{m.label}</div>
-                              <div className="text-[10px] font-bold text-gray-800 leading-tight">{m.value}</div>
-                            </div>
-                          ))}
-                        </div>
-
-                      </div>
-                    );
-                  })}
+                  {isSelected && (
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                      <path d="M2 5l2.5 2.5 4-4" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })}
         </div>
       </div>
-    </>
+
+      {/* ── Compare panel ── */}
+      <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-auto rounded-2xl p-4 border border-gray-200 bg-[#FAF8FF]">
+
+        {/* Panel header */}
+        <div className="flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-white border border-gray-100 flex items-center justify-center shrink-0 shadow-sm">
+              <GitCompare size={14} className="text-primary" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">Compare Embryos</h3>
+              <p className="text-[10px] text-gray-400 mt-0.5">Select up to 4 embryos to compare</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {selectedEmbryoIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedEmbryoIds([])}
+                className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-rose-500 transition-colors"
+              >
+                <X size={10} />
+                Clear All
+              </button>
+            )}
+            {/* Slot progress */}
+            <div className="flex items-center gap-1">
+              {[0, 1, 2, 3].map(i => (
+                <div
+                  key={i}
+                  className="h-1.5 w-7 rounded-full transition-all duration-300"
+                  style={{ background: i < selectedEmbryoIds.length ? SLOT_COLORS[i].hex : '#E5E7EB' }}
+                />
+              ))}
+              <span className="text-[10px] font-bold text-gray-400 ml-1">{selectedEmbryoIds.length}/4</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Empty state */}
+        {selectedEmbryoIds.length === 0 ? (
+          <div className="flex flex-col items-center justify-center flex-1 py-16 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-primary-bg flex items-center justify-center mb-4 text-primary">
+              <GitCompare size={26} />
+            </div>
+            <p className="text-sm font-bold text-gray-600">Select embryos to compare</p>
+            <p className="text-xs text-gray-400 mt-1.5 max-w-[200px]">Pick up to 4 from the leaderboard for a side-by-side view</p>
+            <div className="flex gap-2 mt-5">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="w-9 h-9 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center">
+                  <span className="text-[9px] font-bold text-gray-300">{i}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto flex justify-center">
+            <div>
+              <div
+                className="grid gap-3 items-start"
+                style={{ gridTemplateColumns: `repeat(${selectedEmbryoIds.length}, minmax(170px, 240px))` }}
+              >
+                {selectedEmbryoIds.map((eid, idx) => {
+                  const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
+                  const hex = SLOT_COLORS[idx].hex;
+                  const gc = gradeCls(emb.grade);
+
+                  return (
+                    <div key={eid} className="flex flex-col gap-2">
+
+                      {/* Column header */}
+                      <div
+                        className="rounded-xl flex items-center gap-1.5 px-2.5 py-2 border"
+                        style={{ borderColor: hex + '45', background: hex + '10' }}
+                      >
+                        <span
+                          className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0"
+                          style={{ background: hex }}
+                        >{idx + 1}</span>
+                        <span className="text-xs font-bold text-gray-800 flex-1 truncate">{eidToLabel(emb.id)}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedEmbryoIds(prev => prev.filter(id => id !== eid))}
+                          className="text-gray-300 hover:text-gray-500 transition-colors shrink-0"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+
+                      {/* Image */}
+                      <div
+                        className="rounded-xl overflow-hidden"
+                        style={{ border: `1px solid ${hex}40` }}
+                      >
+                        <div className="aspect-square bg-gray-100">
+                          <img src={emb.src} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+
+                      {/* Grade — quality-colored, full width */}
+                      <div className={`rounded-xl border px-3 py-2.5 flex items-center justify-between ${gc.bg} ${gc.border}`}>
+                        <div>
+                          <div className="text-[7px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Grade</div>
+                          <div className={`text-2xl font-black leading-none ${gc.text}`}>{emb.grade}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[7px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Quality</div>
+                          <div className={`text-[10px] font-bold ${gc.text}`}>{emb.quality.replace(' Quality', '')}</div>
+                        </div>
+                      </div>
+
+                      {/* AI Score */}
+                      <div className="rounded-xl border border-gray-200 bg-white px-2.5 py-2.5">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">AI Score</span>
+                          <span className={`text-sm font-black tabular-nums ${scoreTextCls(emb.aiScore)}`}>
+                            {emb.aiScore}
+                            <span className="text-[10px] font-medium text-gray-400"> / 10</span>
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${emb.aiScore * 10}%`, background: scoreColor(emb.aiScore) }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Exp / ICM / TE */}
+                      <div className="flex gap-1.5">
+                        {[{ label: 'Exp', value: emb.expansion }, { label: 'ICM', value: emb.icm }, { label: 'TE', value: emb.te }].map(chip => (
+                          <div key={chip.label} className="flex-1 rounded-xl bg-white border border-gray-200 px-1 py-2 text-center">
+                            <div className="text-[8px] text-gray-400 font-bold uppercase tracking-wide leading-none mb-1">{chip.label}</div>
+                            <div className="text-xs font-black text-gray-900">{chip.value}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Morphology section */}
+                      <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest px-0.5 mt-1">Morphology</div>
+                      {([
+                        { label: 'Fragmentation',  value: emb.fragPct,    bars: emb.fragBars    },
+                        { label: 'Symmetry',       value: emb.symText,    bars: emb.symBars     },
+                        { label: 'Zona Pellucida', value: emb.zonaText,   bars: emb.zonaBars    },
+                        { label: 'Blastocoel',     value: emb.blastoText, bars: emb.blastoBars  },
+                        { label: 'Vacuolization',  value: emb.vacuoleText,bars: emb.vacuoleBars },
+                      ]).map(m => (
+                        <div key={m.label} className="rounded-xl border border-gray-100 bg-white px-2.5 py-2">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">{m.label}</span>
+                            <span className="text-[10px] font-bold text-gray-800">{m.value}</span>
+                          </div>
+                          <div className="h-1 rounded-full bg-gray-100 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ width: `${(m.bars / 4) * 100}%`, background: hex }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Classification section */}
+                      <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest px-0.5 mt-1">Classification</div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {([
+                          { label: 'Blast. Stage', value: emb.blastocystStage },
+                          { label: 'Hatching',     value: emb.hatchText       },
+                          { label: 'Bridge',       value: emb.bridgeText      },
+                          { label: 'Multinuc.',    value: emb.multinucText    },
+                          { label: 'Cyto. Gran.',  value: emb.cytogranText    },
+                        ]).map(m => (
+                          <div key={m.label} className="rounded-xl bg-white border border-gray-100 px-2 py-2">
+                            <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wide leading-none mb-1">{m.label}</div>
+                            <div className="text-[10px] font-bold text-gray-800 leading-tight">{m.value}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+    </div>
   );
 }
