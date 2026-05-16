@@ -73,8 +73,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
         children: [
             { label: "Overview",                  path: "/dashboard"          },
             { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
-            // { label: "Incubator Tracking",      path: "/incubator-tracking" },
-            // { label: "Embryo Grading",          path: "/embryo-grading"     },
+            { label: "Incubator Tracking",         path: "/incubator-tracking" },
+            { label: "Embryo Grading",             path: "/embryo-grading"     },
         ],
     },
     { icon: DatabaseIconWhite,    label: "Database",            path: "/database"      },
@@ -86,7 +86,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
         dropdown: true,
         children: [
             { label: "Cryotanks",  path: "/alert-setting" },
-            // { label: "Incubators", path: "/alert-setting?direction=incubators" },
+            { label: "Incubators", path: "/alert-setting?direction=incubators" },
         ],
     },
     { icon: "", lucideIcon: Download, label: "Reports",         path: "/reports"       },
