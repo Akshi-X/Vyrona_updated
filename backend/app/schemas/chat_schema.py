@@ -11,9 +11,11 @@ class ChatMessageCreateRequest(BaseModel):
     """Schema for creating a new chat message"""
     patient_id: Optional[str] = None  # For CGT flow
     tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
+    incubator_id: Optional[int] = None  # For incubator tracking
+    chamber_id: Optional[str] = None  # Optional chamber within an incubator
     message_content: str
     tagged_user_ids: Optional[List[str]] = []
-    
+
     @field_validator('message_content')
     @classmethod
     def validate_message_content(cls, v):
@@ -22,25 +24,24 @@ class ChatMessageCreateRequest(BaseModel):
         if len(v.strip()) > 1000:
             raise ValueError("Message content cannot exceed 1000 characters")
         return v.strip()
-    
+
     @model_validator(mode='after')
     def validate_patient_or_tank(self):
-        """Validate that either patient_id or tank_code is provided"""
-        # Treat empty strings as None
+        """Validate that exactly one of patient_id, tank_code, incubator_id is provided"""
         patient_id = self.patient_id.strip() if self.patient_id and isinstance(self.patient_id, str) else self.patient_id
         tank_code = self.tank_code.strip() if self.tank_code and isinstance(self.tank_code, str) else self.tank_code
-        
-        # If both are None/empty, raise error
-        if not patient_id and not tank_code:
-            raise ValueError("Either patient_id (for CGT) or tank_code (for IVF) must be provided")
-        
-        # If both are provided, raise error
-        if patient_id and tank_code:
-            raise ValueError("Cannot provide both patient_id and tank_code. Use patient_id for CGT or tank_code for IVF")
-        
-        # Update the model with cleaned values
+        incubator_id = self.incubator_id
+
+        provided = [bool(patient_id), bool(tank_code), incubator_id is not None]
+        if sum(provided) == 0:
+            raise ValueError("One of patient_id (CGT), tank_code (IVF), or incubator_id must be provided")
+        if sum(provided) > 1:
+            raise ValueError("Provide only one of patient_id, tank_code, or incubator_id")
+
         self.patient_id = patient_id if patient_id else None
         self.tank_code = tank_code if tank_code else None
+        if self.chamber_id and not incubator_id:
+            self.chamber_id = None
         return self
     
     @field_validator('tagged_user_ids')
@@ -74,6 +75,8 @@ class ChatMessageResponse(BaseModel):
     message_content: str
     patient_id: Optional[str] = None  # For CGT flow
     tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
+    incubator_id: Optional[int] = None
+    chamber_id: Optional[str] = None
     sender_id: str
     sender_name: str
     sender_role: Optional[str] = None
@@ -82,8 +85,7 @@ class ChatMessageResponse(BaseModel):
     created_at: datetime
     is_read: bool = False
     read_at: Optional[datetime] = None
-    # Note: Frontend can derive was_unread = !is_read for unread separator bar
-    
+
     class Config:
         from_attributes = True
 
@@ -93,6 +95,8 @@ class ChatMessageCreateResponse(BaseModel):
     message_id: int
     patient_id: Optional[str] = None  # For CGT flow
     tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
+    incubator_id: Optional[int] = None
+    chamber_id: Optional[str] = None
     message_content: str
     sender_id: str
     sender_name: str
@@ -117,7 +121,19 @@ class PatientMessagesResponse(BaseModel):
     messages: List[ChatMessageResponse]
     total_messages: int
     unread_count: int = 0
-    
+
+    class Config:
+        from_attributes = True
+
+
+class IncubatorMessagesResponse(BaseModel):
+    """Schema for incubator messages response"""
+    incubator_id: int
+    chamber_id: Optional[str] = None
+    messages: List[ChatMessageResponse]
+    total_messages: int
+    unread_count: int = 0
+
     class Config:
         from_attributes = True
 

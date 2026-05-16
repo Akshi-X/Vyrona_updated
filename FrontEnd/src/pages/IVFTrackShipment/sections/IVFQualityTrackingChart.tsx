@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, Fragment } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ivfService } from '../../../services/ivfService';
 import {
@@ -23,6 +23,42 @@ ChartJS.register(
   Tooltip,
   Legend
 );
+
+const KPI_TAB_ICONS: Record<string, string> = {
+  temp_external: 'M12 2.69l5.66 5.66a8 8 0 11-11.31 0z', // droplet sun
+  temp_internal: 'M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z', // thermometer
+  ln2_level: 'M12 2.69l5.66 5.66a8 8 0 11-11.31 0z', // droplet
+  ln2_evaporation_rate: 'M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2', // wind
+  tive_battery_percentage: '', // battery — use rect
+  ln2_lid_state: 'M7 11V7a5 5 0 0110 0v4', // lock
+  shock: 'M13 2 3 14h9l-1 8 10-12h-9l1-8z', // zap
+};
+
+const KpiTabIcon = ({ id }: { id: string }) => {
+  if (id === 'tive_battery_percentage') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="6" width="18" height="12" rx="2" ry="2"/><line x1="23" y1="13" x2="23" y2="11"/>
+      </svg>
+    );
+  }
+  if (id === 'temp_external') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+      </svg>
+    );
+  }
+  const d = KPI_TAB_ICONS[id];
+  if (!d) return null;
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  );
+};
 
 export const KPI_TABS = [
   { id: 'temp_external', label: 'External Temperature', unit: '°C' },
@@ -309,9 +345,17 @@ function getKpiLabelFromLimits(limitGroup: unknown, kpiName: string): string {
 
 interface IVFQualityTrackingChartProps {
   canisterNumber?: string;
+  selectedKpiKey?: string | null;
+  hideTabs?: boolean;
+  onClose?: () => void;
 }
 
-export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTrackingChartProps) {
+export default function IVFQualityTrackingChart({
+  canisterNumber,
+  selectedKpiKey,
+  hideTabs = false,
+  onClose,
+}: IVFQualityTrackingChartProps) {
   const tankId = canisterNumber != null ? String(canisterNumber) : undefined;
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
@@ -347,6 +391,10 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
 
   const timeRangeConfig = TIME_RANGES.find((r) => r.id === timeRange) ?? TIME_RANGES[0];
   timeRangeRef.current = timeRange;
+  const activeTabLabel = useMemo(() => {
+    if (!activeTab) return '';
+    return kpiTabs.find((tab) => tab.id === activeTab)?.label ?? kpiNameToLabel(activeTab);
+  }, [activeTab, kpiTabs]);
   /** LIVE = last 10 min; 1H/24H/7D = filter by time window; CUSTOM = filter by selected dates. */
   const displayReadings = useMemo(() => {
     if (timeRange === 'CUSTOM') {
@@ -468,6 +516,14 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         setHasLoadedKpiConfig(true);
       });
   }, [tankId]);
+
+  useEffect(() => {
+    if (!selectedKpiKey) return;
+    if (!kpiTabs.length) return;
+    if (kpiTabs.some((tab) => tab.id === selectedKpiKey) && activeTab !== selectedKpiKey) {
+      setActiveTab(selectedKpiKey);
+    }
+  }, [selectedKpiKey, kpiTabs, activeTab]);
 
   // Fetch KPI history when tank or time range changes. LIVE = raw limit. 1H/24H/7D = aggregated. CUSTOM = raw from selected start.
   useEffect(() => {
@@ -974,7 +1030,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       type: 'line',
       label: showCandlestick ? `${datasetLabel} Avg` : datasetLabel,
       data: values,
-      borderColor: '#6B1176',
+      borderColor: '#6b1176',
       backgroundColor: (context: any) => {
         const chart = context.chart;
         const { ctx, chartArea } = chart;
@@ -989,8 +1045,8 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       borderWidth: 2,
       pointRadius: showCandlestick ? 0 : 2.5,
       pointHoverRadius: 4,
-      pointBackgroundColor: '#6B1176',
-      pointBorderColor: '#6B1176',
+      pointBackgroundColor: '#6b1176',
+      pointBorderColor: '#6b1176',
       pointBorderWidth: 0,
       tension: 0.3,
       fill: !showCandlestick,
@@ -1085,7 +1141,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       plugins: {
         legend: {
           display: true,
-          position: 'top' as const,
+          position: 'bottom' as const,
           labels: {
             boxWidth: 10,
             boxHeight: 10,
@@ -1240,9 +1296,14 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const hasData = displayReadings.length > 0;
 
   return (
-    <div id="onboarding-ivf-quality-chart" className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-4">
-      <div className="flex items-center justify-between mb-1 shrink-0">
-        <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
+    <div id="onboarding-ivf-quality-chart" className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-line rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
+          {hideTabs && activeTabLabel && (
+            <span className="text-xs text-gray-500">{activeTabLabel}</span>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           {isConnected && wsRef.current?.readyState === WebSocket.OPEN && (
             <span className="text-xs text-green-600">● Connected</span>
@@ -1251,31 +1312,50 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             <span className="text-xs text-yellow-600">● Connecting...</span>
           )}
           {error && <span className="text-xs text-red-600">● {error}</span>}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="ml-1 inline-flex items-center justify-center h-7 w-7 rounded-md border border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300"
+              aria-label="Close chart"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6l-12 12" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
       {/* KPI Tabs (from DB kpi_config when available) */}
-      <div id="onboarding-chart-kpi-tabs" className="flex gap-1 mb-3 flex-wrap">
-        {!hasLoadedKpiConfig ? (
-          <span className="text-xs text-[#7C7C7C]">Loading...</span>
-        ) : (
-          kpiTabs.map((tab) => (
-            <button
-              key={tab.id}
-              id={tab.id === 'ln2_level' ? 'onboarding-chart-tab-ln2' : undefined}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-purple-100 border-purple-300 text-purple-900'
-                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))
-        )}
-      </div>
+      {!hideTabs && (
+        <div id="onboarding-chart-kpi-tabs" className="flex items-center gap-0 mb-3 flex-wrap mt-2">
+          {!hasLoadedKpiConfig ? (
+            <span className="text-xs text-[#7C7C7C]">Loading...</span>
+          ) : (
+            kpiTabs.map((tab, index) => (
+              <Fragment key={tab.id}>
+                <button
+                  id={tab.id === 'ln2_level' ? 'onboarding-chart-tab-ln2' : undefined}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+                    activeTab === tab.id
+                      ? 'bg-[#f3e8ff] text-[#6B1176] border-[#6B1176]'
+                      : 'bg-transparent border-transparent text-gray-600 hover:border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <KpiTabIcon id={tab.id} />
+                  {tab.label}
+                </button>
+                {index < kpiTabs.length - 1 && (
+                  <div className="w-px h-4 bg-gray-200 mx-1 flex-shrink-0" />
+                )}
+              </Fragment>
+            ))
+          )}
+        </div>
+      )}
 
       {error && !isConnected && (
         <div className="text-red-500 text-xs mb-2" role="alert">
@@ -1288,7 +1368,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           isRangeLoading ? (
             <div className="flex items-center justify-center h-full">
               <svg
-                className="animate-spin h-8 w-8 text-[#6B1176]"
+                className="animate-spin h-8 w-8 text-primary"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -1340,7 +1420,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 aria-hidden="true"
               >
                 <svg
-                  className="animate-spin h-8 w-8 text-[#6B1176]"
+                  className="animate-spin h-8 w-8 text-primary"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -1382,7 +1462,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 timeRange === range.id
-                  ? 'bg-[#6B1176] text-white'
+                  ? 'bg-primary text-white'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
@@ -1398,7 +1478,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             onClick={() => setShowCustomPicker((v) => !v)}
             className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
               timeRange === 'CUSTOM'
-                ? 'bg-[#6B1176] text-white border-[#6B1176]'
+                ? 'bg-primary text-white border-primary'
                 : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
             }`}
           >
@@ -1413,7 +1493,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                   value={customFrom}
                   max={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setCustomFrom(e.target.value)}
-                  className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:border-[#6B1176]"
+                  className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:border-primary"
                 />
                 <button
                   type="button"
@@ -1424,7 +1504,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                     setIsRangeLoading(true);
                     setShowCustomPicker(false);
                   }}
-                  className="w-full py-1.5 text-xs font-medium rounded bg-[#6B1176] text-white disabled:opacity-40 hover:bg-[#591063] transition-colors"
+                  className="w-full py-1.5 text-xs font-medium rounded bg-primary text-white disabled:opacity-40 hover:bg-[#591063] transition-colors"
                 >
                   Apply
                 </button>

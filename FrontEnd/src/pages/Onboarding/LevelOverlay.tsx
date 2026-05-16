@@ -41,7 +41,7 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
         if (quizResult !== "pass" && !isCompleted) return;
 
         const isLastLevel = levelId === "level-8";
-        const colors = ["#6b1176", "#a855f7", "#ffffff", "#f9a8d4", "#fbbf24", "#34d399"];
+        const colors = ["var(--color-primary)", "#a855f7", "#ffffff", "#f9a8d4", "#fbbf24", "#34d399"];
 
         if (isLastLevel) {
             // Grand finale — centre burst + sustained side cannons for 5 s
@@ -149,7 +149,7 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
         return (
             <div className="space-y-4">
                 <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#6b1176]">{levelConfig?.title ?? "Level"}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-primary">{levelConfig?.title ?? "Level"}</p>
                     <h3 className="text-lg font-semibold text-slate-900">Quiz Score Card</h3>
                     <p className="text-sm text-slate-500 mt-0.5">Retry the tour to earn more points.</p>
                 </div>

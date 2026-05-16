@@ -82,7 +82,11 @@ class CriticalAlert(Base):
     alert_id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()), comment="UUID for alert identification")
     
     # Foreign Keys - reference to tanks, hospitals, and branches (tank-level monitoring)
-    tank_id = Column(Integer, ForeignKey("tanks.tank_id"), nullable=False, index=True, comment="Reference to tank (tank-level monitoring)")
+    tank_id = Column(Integer, ForeignKey("tanks.tank_id"), nullable=True, index=True, comment="Reference to tank (tank-level monitoring)")
+
+    # Incubator Reference (for incubator tracking; mutually exclusive with tank_id)
+    incubator_id = Column(Integer, ForeignKey("incubators.incubator_id"), nullable=True, index=True)
+    chamber_id = Column(String(255), nullable=True)
     hospital_id = Column(Integer, ForeignKey("hospitals.hospital_id"), nullable=False, index=True, comment="Hospital ID for scoping and compliance")
     branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id"), nullable=False, index=True, comment="Branch ID for scoping and compliance")
     
@@ -105,12 +109,14 @@ class CriticalAlert(Base):
     # Acknowledgment information
     acknowledged_by = Column(String, nullable=True, comment="User ID who acknowledged the alert")
     acknowledged_at = Column(DateTime, nullable=True, comment="Timestamp when alert was acknowledged")
+    acknowledgment_reason = Column(String(500), nullable=True, comment="Reason provided by user when acknowledging the alert")
     
     # Reminder tracking
     last_reminder_sent_at = Column(DateTime, nullable=True, index=True, comment="Timestamp when last reminder email was sent")
     
     # Relationships
     tank = relationship("Tank", backref="critical_alerts")
+    incubator = relationship("Incubator", backref="critical_alerts")
     hospital = relationship("Hospital", backref="critical_alerts")
     branch = relationship("HospitalBranch", backref="critical_alerts")
     
