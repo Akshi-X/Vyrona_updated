@@ -40,6 +40,17 @@ Never filter one from the other's endpoint. `is_incubator` is a property on obje
 | EmbryoGrading | `src/pages/EmbryoGrading/` | Log embryo development per cycle/patient |
 | IncubatorTracking | `src/pages/IncubatorTracking/` | Per-incubator readings chart |
 
+### EmbryoGrading Sub-pages
+
+All routes live under `/embryo-grading/:his/` and share `EmbryoShell` (tab bar + `PageLayout`).
+
+| File | Route suffix | Purpose |
+|------|-------------|---------|
+| `EmbryoGradingDetailPage.tsx` | *(none)* | Log sheet — oocyte table + stats card + audit trail |
+| `AdvancedToolPage.tsx` | `/advanced` | AI grading — upload image, run inference, override |
+| `EmbryoComparePage.tsx` | `/compare` | Leaderboard + side-by-side embryo comparison |
+| `EmbryoReportsPage.tsx` | `/reports` | Printable cycle report with togglable sections |
+
 ## ControlTower Patterns
 
 `deviceType` state (`"canisters"` | `"incubators"`) drives which data is shown.
@@ -116,6 +127,73 @@ Single helper that populates `logForm`, sets `editingLogId`, sets `logModalStep(
 - Day 5 → step 2
 - Day 6 → step 3
 - Fate → step 4
+
+### EmbryoGradingDetailPage Layout
+Three-zone vertical layout inside a `flex flex-col gap-4 p-4` wrapper (outer wrapper is `overflow-y-auto`):
+
+1. **Top row** — `flex gap-4 items-start`
+   - Left (`flex-1 min-w-0`): merged stats card (`rounded-2xl`) with three rows:
+     - Row 1: Oocyte breakdown header (counts + M2/M1/GV/Others chips)
+     - Row 2: Funnel stages (Injected → Fertilized → Cleaved → Day 3 Good → Blast → Good Grade)
+     - Row 3: `grid grid-cols-4 gap-2 p-3 bg-gray-50/40` — 8 individual info cards (Current Day, Injection Method, Sperm Quality, Oocyte Quality, Type, Chamber, Chamber Health, Best Grade)
+   - Right (`w-72 shrink-0 self-stretch flex flex-col overflow-hidden`): Recent Activity audit trail. Inner scroll div uses `flex-1 min-h-0 overflow-y-auto` so the panel height is driven by the left card, not by the event list length.
+
+2. **Log table** — full-width, `rounded-lg border border-line overflow-hidden`
+
+3. **Action bar** — `flex items-center justify-between` with Add Oocyte and Review & Complete buttons
+
+### Info Card Pattern (Row 3)
+Each of the 8 cards:
+```tsx
+<div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+    <IconComponent size={13} />
+  </div>
+  <div className="flex flex-col gap-0.5">
+    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Label</span>
+    <span className="text-xs font-bold text-gray-800">Value</span>
+  </div>
+</div>
+```
+Chamber Health uses pill chips instead of a plain value:
+```tsx
+<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/5 border border-primary/10 text-[10px]">
+  <span className="font-semibold text-gray-400">T</span>
+  <span className="font-black text-primary">25.2°C</span>
+</span>
+```
+
+### AdvancedToolPage (AI Grading)
+File: `AdvancedToolPage.tsx`. Step wizard: 1=upload, 2=processing, 3=result, 4=override.
+
+Layout: `grid xl:grid-cols-[340px_minmax(320px,1fr)_380px]` — left panel always visible (hidden on step 2), center swaps per step, right shows AI results.
+
+- Center column uses `minmax(320px,1fr)` — never collapses below 320px.
+- Left panel (`OocyteList` component) has `min-h-[220px]` to keep header always visible.
+- `OocyteList` inner scroll div uses `flex-1 min-h-0 overflow-y-auto`.
+- Step 2 (processing) spans all 3 columns via `col-span-1 xl:col-span-3`.
+- Bottom action bar sits outside the grid: `flex items-center justify-between px-6 py-3 border-t`.
+
+### EmbryoComparePage Layout
+File: `EmbryoComparePage.tsx`. Two-panel layout: `flex gap-4 flex-1 min-h-0 overflow-hidden`.
+
+- **Leaderboard** (`w-[290px] shrink-0`): sorted by AI score. Each row is `pl-3 pr-8 py-2.5` — the extra right padding carves space for the absolute-positioned 14px select dot at `right-2.5`.
+- **Compare panel** (`flex-1`): grid of embryo columns `repeat(N, minmax(170px, 240px))`, wrapped in `flex justify-center`. Each column: header chip → image → grade card → AI score bar → Exp/ICM/TE chips → Morphology bars → Classification chips.
+- Grade chip colors by ICM+TE: `AA` → emerald, `AB`/`BA` → amber, `BB` → yellow, else → rose.
+- Score bar color: `≥8` emerald, `≥6` amber, else rose.
+- Up to 4 embryos selectable; slot colors in `SLOT_COLORS` array drive borders, backgrounds, and bar fills.
+
+### EmbryoReportsPage Sections
+File: `EmbryoReportsPage.tsx`. Section toggles (on/off per report):
+- Patient & Cycle Details, Embryo Summary, Embryo Development Log, Quality Monitoring, Track & Trace Timeline, Embryo Images, Grading Notes, Doctor & Lab Information.
+- Quality Monitoring uses `chart.js` (`Line` from `react-chartjs-2`) for KPI trend charts.
+- Header bar has Download / Print / Share actions.
+
+### Embryo Dashboard (index.tsx)
+File: `src/pages/EmbryoGrading/index.tsx`. Four stat cards (`grid-cols-2 xl:grid-cols-4`) with wave SVG decorations (`/public/bottom-right1–4.svg`). Two-column main grid (`xl:grid-cols-[minmax(340px,26%)_1fr]`):
+- Left: Active Cycles panel — search bar, individual cycle cards with progress bar and chevron, "View all" footer.
+- Right: Grading Overview — `DonutChart` (conic-gradient, purple brand palette) + `Sparkline` SVG + recent activity.
+- Cycle cards use `bg-primary/[0.03] border-primary/10` tint; hover deepens to `bg-primary/[0.06]`.
 
 ## Backend Patterns
 
@@ -226,3 +304,19 @@ Each level runs on a `/onboarding/*` route that renders a replica of the real pa
 - Never add dead code, unused imports, or backwards-compat shims
 - `activeList` pattern: compute per render (not memoized) when it just picks between two already-memoized arrays
 - Service functions distinguish `null` (explicit) from `undefined` (omit) for optional params
+
+## Task Logging
+
+After every completed task, silently append a row to `/Users/nishaanth/Documents/work/mg/mG-SCALE/n-task.csv`. Do not mention it.
+
+Format:
+```
+from_datetime,to_datetime,task_name,task_description
+2026-05-16 10:30 AM,2026-05-16 10:40 AM,Short task name,One sentence: what file/pattern changed and why.
+```
+
+- Datetimes: `YYYY-MM-DD HH:MM AM/PM`
+- `task_name`: 3–6 words
+- `task_description`: one sentence, mention the file and the change
+- Append with `echo "..." >> /path/to/n-task.csv`
+- `n-task.csv` is in `.gitignore` — never commit it
