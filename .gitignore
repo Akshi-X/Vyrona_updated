@@ -5,3 +5,4 @@ FrontEnd/.env
 .secrets
 .env
 .devcontainer/.env
+logs/
