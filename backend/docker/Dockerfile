@@ -25,16 +25,10 @@ RUN poetry install --no-dev
 # Copy application code
 COPY app/ ./app/
 COPY static/ ./static/
-COPY scripts/ ./scripts/
-COPY migration/ ./migration/
-COPY alembic.ini ./
 
-# Copy entrypoint script
-COPY docker/entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
-# Use entrypoint script for initialization and startup
-ENTRYPOINT ["./entrypoint.sh"]
+# Command to run the application
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
