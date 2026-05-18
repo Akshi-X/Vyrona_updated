@@ -1847,11 +1847,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     vapCanvas.width = vapCanvas.height = 128;
     const vCtx = vapCanvas.getContext("2d")!;
     const vGrad = vCtx.createRadialGradient(64, 64, 4, 64, 64, 64);
-    vGrad.addColorStop(0,    "rgba(255,255,255,1)");
-    vGrad.addColorStop(0.25, "rgba(242,242,246,0.85)");
-    vGrad.addColorStop(0.55, "rgba(220,220,228,0.45)");
-    vGrad.addColorStop(0.8,  "rgba(200,200,212,0.15)");
-    vGrad.addColorStop(1,    "rgba(190,190,205,0)");
+    vGrad.addColorStop(0,    "rgba(130,190,255,1)");
+    vGrad.addColorStop(0.25, "rgba(100,165,248,0.85)");
+    vGrad.addColorStop(0.55, "rgba(70,140,240,0.45)");
+    vGrad.addColorStop(0.8,  "rgba(50,120,230,0.15)");
+    vGrad.addColorStop(1,    "rgba(30,100,220,0)");
     vCtx.fillStyle = vGrad;
     vCtx.fillRect(0, 0, 128, 128);
     const vapTex = new THREE.CanvasTexture(vapCanvas);
@@ -2672,7 +2672,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           c.strawGroup.rotation.set(0, 0, 0);
           c.strawGroup.parent !== c.group && c.group.add(c.strawGroup);
         });
-        lid.rotation.z = 0;
+        lid.rotation.z = lidStatus === "open" ? LID_OPEN_ROT : 0;
         grp.position.set(0, 0, 0);
         cam.position.set(IDLE_CAM.x, IDLE_CAM.y, IDLE_CAM.z);
         target.set(IDLE_TARGET.x, IDLE_TARGET.y, IDLE_TARGET.z);
@@ -2786,7 +2786,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       const canisterLandedAt = returningCan ? 1100 + 700 + 700 + 800 : 0;
       anime({
         targets: lid.rotation,
-        z: 0,
+        z: lidStatus === "open" ? LID_OPEN_ROT : 0,
         duration: 900,
         easing: "easeInOutCubic",
         delay: canisterLandedAt,
@@ -3008,6 +3008,44 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       inspectionReadyRef.current = false;
       can.handleGroup.visible = false;
 
+      // Return any other canister that was previously extracted to its home position
+      cans.forEach((c, ci) => {
+        if (ci === selectedCanister) return;
+        if (c.group.parent !== grp) {
+          grp.attach(c.group);
+          c.handleGroup.visible = true;
+          // Stop orbit and return straws
+          anime.remove(c.strawGroup.rotation);
+          anime.remove(c.strawGroup.position);
+          anime({ targets: c.strawGroup.rotation, y: 0, duration: 500, easing: "easeOutQuad" });
+          anime({ targets: c.strawGroup.position, x: 0, y: 0, z: 0, duration: 600, easing: "easeInOutCubic" });
+          c.strawSubgroups.forEach((s) => {
+            if (s.group.parent !== c.strawGroup) c.strawGroup.add(s.group);
+            anime.remove(s.group.position);
+            anime.remove(s.group.rotation);
+            anime({ targets: s.group.position, x: s.homeLocalPos.x, y: s.homeLocalPos.y, z: s.homeLocalPos.z, duration: 600, easing: "easeInOutCubic" });
+            anime({ targets: s.group.rotation, x: 0, y: 0, z: 0, duration: 500, easing: "easeInOutCubic" });
+          });
+          // Lift → arc to ring → drop (mirrors the return-to-idle animation)
+          const retX = c.group.position.x;
+          const retZ = c.group.position.z;
+          anime.remove(c.group.position);
+          anime.remove(c.group.rotation);
+          anime({
+            targets: c.group.position,
+            keyframes: [
+              { x: retX, y: LIFT_Y, z: retZ, duration: 700 },
+              { x: Math.cos(c.homeAngle) * CAN_RING_R, y: LIFT_Y, z: Math.sin(c.homeAngle) * CAN_RING_R, duration: 700 },
+              { x: c.homePos.x, y: c.homePos.y, z: c.homePos.z, duration: 800 },
+            ],
+            easing: "easeInOutCubic",
+          });
+          anime({ targets: c.group.rotation, x: 0, y: 0, z: 0, duration: 700, easing: "easeInOutCubic" });
+          anime.remove(c.handleMat);
+          anime({ targets: c.handleMat, opacity: 1, duration: 600, easing: "easeOutQuad", delay: 200 });
+        }
+      });
+
       // Detect if canister is still inside the tank (coming directly from idle)
       const comingFromIdle =
         can.group.position.y < PARK_Y + 0.5 &&
@@ -3198,7 +3236,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         }
       }, readyDelay);
     }
-  }, [selectedCanister, viewStage, animeReady]);
+  }, [selectedCanister, viewStage, animeReady, lidStatus]);
 
   // ---------- Cryolock / cane selection highlight (3D side) ----------
   useEffect(() => {
@@ -3968,9 +4006,14 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   borderBottom: "1px solid #efe5f4",
                 }}
               >
-                <span style={{ fontWeight: 600, fontSize: 14, color: "#5f3b73" }}>
-                  Live Conditions
-                </span>
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: 14, color: "#5f3b73", display: "block" }}>
+                    Live Conditions
+                  </span>
+                  <span style={{ fontSize: 10, color: "#a07ab8", marginTop: 1, display: "block" }}>
+                    Click a tile to view the trend graph
+                  </span>
+                </div>
                 <svg
                   width="16"
                   height="16"
@@ -4759,7 +4802,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 style={{
                   position: "absolute",
                   bottom: dbgNameCard.bottom,
-                  left: "26%",
+                  left: "20%",
                   transform: "translateX(-50%)",
                   background: "rgba(255,255,255,0.88)",
                   backdropFilter: "blur(14px)",
@@ -5046,12 +5089,13 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   const canSampleCount =
                     c.sampleCount ?? effectiveContents[c.id]?.length ?? 0;
                   const hasContents = canSampleCount > 0;
-                  const cursor = viewStage === "idle" && hasContents ? "pointer" : "default";
+                  const cursor = !isSelected && hasContents ? "pointer" : "default";
                   return (
                     <div
                       key={c.id}
                       onClick={() => {
-                        if (viewStage === "idle" && hasContents) {
+                        if (!isSelected && hasContents) {
+                          setSelectedStraw(null);
                           setSelectedCanister(i);
                           setViewStage("inspecting");
                           onCanisterSelect && onCanisterSelect(c.id);

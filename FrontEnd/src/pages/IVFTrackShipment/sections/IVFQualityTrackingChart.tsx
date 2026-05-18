@@ -348,6 +348,7 @@ interface IVFQualityTrackingChartProps {
   selectedKpiKey?: string | null;
   hideTabs?: boolean;
   onClose?: () => void;
+  onTabChange?: (tabId: string) => void;
 }
 
 export default function IVFQualityTrackingChart({
@@ -355,6 +356,7 @@ export default function IVFQualityTrackingChart({
   selectedKpiKey,
   hideTabs = false,
   onClose,
+  onTabChange,
 }: IVFQualityTrackingChartProps) {
   const tankId = canisterNumber != null ? String(canisterNumber) : undefined;
   const { token } = useAuth();
@@ -1338,7 +1340,7 @@ export default function IVFQualityTrackingChart({
                 <button
                   id={tab.id === 'ln2_level' ? 'onboarding-chart-tab-ln2' : undefined}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => { setActiveTab(tab.id); onTabChange?.(tab.id); }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
                     activeTab === tab.id
                       ? 'bg-[#f3e8ff] text-[#6B1176] border-[#6B1176]'
@@ -1486,7 +1488,7 @@ export default function IVFQualityTrackingChart({
           </button>
 
           {showCustomPicker && (
-            <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[180px]">
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[180px]">
               <div className="flex flex-col gap-2">
                 <input
                   type="date"

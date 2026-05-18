@@ -609,7 +609,7 @@ export default function IVFTrackShipmentPage() {
                                         }}
                                     />
                                     <div ref={qualityChartRef} style={{ marginBottom: 16 }}>
-                                        <IVFQualityTrackingChart canisterNumber={tankId} selectedKpiKey={selectedSensorId} />
+                                        <IVFQualityTrackingChart canisterNumber={tankId} selectedKpiKey={selectedSensorId} onTabChange={() => setSelectedSensorId(null)} />
                                     </div>
                                 </>
                             )}
