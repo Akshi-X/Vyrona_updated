@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CalendarRange, Microscope, ClipboardCheck, Gem, Search, SlidersHorizontal,
-  ChevronRight, Eye, MoreHorizontal, Timer, Camera, Clock,
+  ChevronRight, Timer, Camera, Clock,
   ShieldAlert, ArrowUpRight,
 } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
@@ -228,6 +228,7 @@ export default function EmbryoGradingPage() {
   const [cycleCreating, setCycleCreating] = useState(false);
   const [cyclesWithLogs, setCyclesWithLogs] = useState<IvfCycleWithLogs[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [completedSearchQuery, setCompletedSearchQuery] = useState('');
 
   const [newEmbryoForm, setNewEmbryoForm] = useState<NewEmbryoFormState>({
     hisNumber: '', patientName: '', oocytes: '', m2: '', m1: '', gv: '',
@@ -347,6 +348,14 @@ export default function EmbryoGradingPage() {
         return 0;
       }),
   [cycles]);
+
+  const filteredCompletedCycles = useMemo(() => {
+    if (!completedSearchQuery.trim()) return recentActivity;
+    const q = completedSearchQuery.toLowerCase();
+    return recentActivity.filter(c =>
+      c.patient_name?.toLowerCase().includes(q) || c.his_id.toLowerCase().includes(q)
+    );
+  }, [recentActivity, completedSearchQuery]);
 
   // ── Form helpers ───────────────────────────────────────────────────────────
 
@@ -509,7 +518,7 @@ export default function EmbryoGradingPage() {
                 <Search size={13} className="text-gray-400 shrink-0" />
                 <input
                   type="text"
-                  placeholder="Search by patient or HIS no."
+                  placeholder="Search by patient name or HIS no."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="flex-1 text-xs bg-transparent outline-none text-gray-600 placeholder-gray-400"
@@ -691,12 +700,8 @@ export default function EmbryoGradingPage() {
 
               {/* Right — Needs Attention */}
               <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-                <div className="px-4 py-3.5 flex items-center justify-between border-b border-gray-100">
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">Needs Attention</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Cycles requiring immediate review</p>
-                  </div>
-                  <button type="button" className="text-xs font-medium text-primary hover:underline">View all</button>
+                <div className="px-4 py-3.5 border-b border-gray-100">
+                  <p className="text-sm font-bold text-gray-900">Needs Attention</p>
                 </div>
                 <div className="divide-y divide-gray-50">
                   {needsAttentionItems.map(item => (
@@ -721,30 +726,38 @@ export default function EmbryoGradingPage() {
             {/* Bottom — Recent Cycle Activity (fills remaining height) */}
             <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col flex-1 min-h-0">
               <div className="px-5 py-3.5 flex items-center justify-between border-b border-gray-100 shrink-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <p className="text-sm font-bold text-gray-900">Completed Cycles</p>
                   <span className="text-[10px] font-semibold text-sky-600 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">{recentActivity.length}</span>
                 </div>
-                <button type="button" className="text-xs font-medium text-primary flex items-center gap-1 hover:underline">
-                  View all <ArrowUpRight size={11} />
-                </button>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white w-72">
+                  <Search size={13} className="text-gray-400 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search by patient name or HIS no."
+                    value={completedSearchQuery}
+                    onChange={e => setCompletedSearchQuery(e.target.value)}
+                    className="flex-1 text-xs bg-transparent outline-none text-gray-600 placeholder-gray-400"
+                  />
+                  <SlidersHorizontal size={13} className="text-gray-400 shrink-0" />
+                </div>
               </div>
               <div className="overflow-auto flex-1 min-h-0">
                 <table className="w-full">
                   <thead className="sticky top-0 z-10">
                     <tr className="border-b border-gray-100 bg-gray-50/95 backdrop-blur-sm">
-                      {['HIS No.', 'Patient', 'Day', 'Oocytes', 'Graded', 'Top Grade', 'Status', 'Last Activity', 'Actions'].map(h => (
+                      {['HIS No.', 'Patient', 'Graded', 'Top Grade', 'Status', 'Last Activity'].map(h => (
                         <th key={h} className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {loading ? (
-                      <tr><td colSpan={9} className="px-4 py-10 text-center text-xs text-gray-400">Loading…</td></tr>
+                      <tr><td colSpan={6} className="px-4 py-10 text-center text-xs text-gray-400">Loading…</td></tr>
                     ) : recentActivity.length === 0 ? (
-                      <tr><td colSpan={9} className="px-4 py-10 text-center text-xs text-gray-400">No completed cycles yet</td></tr>
+                      <tr><td colSpan={6} className="px-4 py-10 text-center text-xs text-gray-400">No completed cycles yet</td></tr>
                     ) : (
-                      recentActivity.map(c => {
+                      filteredCompletedCycles.map(c => {
                         const day = c.opu_date ? cycleDay(c.opu_date) : null;
                         const totalOocytes = (c.oocyte_m2 ?? 0) + (c.oocyte_m1 ?? 0) + (c.oocyte_gv ?? 0) + (c.oocyte_others ?? 0);
                         const withLogs = cyclesWithLogs.find(w => w.cycle_id === c.cycle_id);
@@ -773,8 +786,6 @@ export default function EmbryoGradingPage() {
                           >
                             <td className="px-4 py-3 text-xs font-bold text-primary whitespace-nowrap">{c.his_id}</td>
                             <td className="px-4 py-3 text-xs font-medium text-gray-800 truncate max-w-[140px]">{c.patient_name || '—'}</td>
-                            <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{day != null ? `Day ${day}` : '—'}</td>
-                            <td className="px-4 py-3 text-xs text-gray-600">{totalOocytes || '—'}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-gray-600 shrink-0 tabular-nums">{gradedCount} ({gradedPct}%)</span>
@@ -796,20 +807,6 @@ export default function EmbryoGradingPage() {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{actStr}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                <button
-                                  type="button"
-                                  onClick={() => navigate(`/embryo-console/${c.his_id}`)}
-                                  className="text-gray-300 hover:text-primary transition-colors"
-                                >
-                                  <Eye size={14} />
-                                </button>
-                                <button type="button" className="text-gray-300 hover:text-gray-500 transition-colors">
-                                  <MoreHorizontal size={14} />
-                                </button>
-                              </div>
-                            </td>
                           </tr>
                         );
                       })
