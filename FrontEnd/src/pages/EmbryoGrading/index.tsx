@@ -12,6 +12,7 @@ import WaveGreen  from '../../assets/bottom-right2.svg';
 import WaveBlue   from '../../assets/bottom-right3.svg';
 import WaveAmber  from '../../assets/bottom-right4.svg';
 import Modal from '../../components/Modal';
+import Tooltip from '../../components/Tooltip';
 import { ivfService, type IvfBranch, type IvfCycle, type IvfCycleCreate, type IvfCycleWithLogs } from '../../services/ivfService';
 import { shipmentService } from '../../services/shipmentService';
 
@@ -64,13 +65,14 @@ function gradeChipCls(grade: string | null) {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatCard({
-  label, value, sub, icon, accent, wave, trend, waveDown,
+  label, value, sub, icon, accent, iconBg, wave, trend, waveDown,
 }: {
   label: string;
   value: number | string;
   sub: string;
   icon: React.ReactNode;
   accent: string;
+  iconBg: string;
   wave: string;
   trend?: { value: string; up: boolean };
   waveDown?: boolean;
@@ -105,7 +107,7 @@ function StatCard({
       {/* Icon with soft circular backdrop */}
       <div
         className="relative z-10 shrink-0 w-14 h-14 rounded-full flex items-center justify-center"
-        style={{ background: `${accent}1a` }}
+        style={{ background: iconBg }}
       >
         {icon}
       </div>
@@ -421,7 +423,7 @@ export default function EmbryoGradingPage() {
       setCycles(prev => [newCycle, ...prev]);
       setIsAddEmbryoFormOpen(false);
       resetNewEmbryoForm();
-      navigate(`/embryo-grading/${newCycle.his_id}`);
+      navigate(`/embryo-console/${newCycle.his_id}`);
     } catch { /* silent */ }
     finally { setCycleCreating(false); }
   };
@@ -430,7 +432,8 @@ export default function EmbryoGradingPage() {
 
   return (
     <PageLayout
-      title="Embryo Grading"
+      title="Embryo Console"
+      description="Monitor and manage all embryo development cycles across your lab"
       icon={EmbryosIcon}
       actions={
         <button
@@ -451,6 +454,7 @@ export default function EmbryoGradingPage() {
             value={cycles.length}
             sub="All time"
             accent="#6b1176"
+            iconBg="#f1e8f2"
             wave={WavePurple}
             waveDown
             icon={<CalendarRange size={32} color="#6b1176" strokeWidth={1.5} />}
@@ -460,6 +464,7 @@ export default function EmbryoGradingPage() {
             value={activeCycles.length}
             sub="In progress"
             accent="#10b981"
+            iconBg="#ecf8f3"
             wave={WaveGreen}
             icon={<Microscope size={32} color="#10b981" strokeWidth={1.5} />}
           />
@@ -468,6 +473,7 @@ export default function EmbryoGradingPage() {
             value={completedCycles.length}
             sub="Finished cycles"
             accent="#0ea5e9"
+            iconBg="#ebf6fd"
             wave={WaveBlue}
             icon={<ClipboardCheck size={32} color="#0ea5e9" strokeWidth={1.5} />}
           />
@@ -476,6 +482,7 @@ export default function EmbryoGradingPage() {
             value={topGrade ?? 'N/A'}
             sub="vs yesterday"
             accent="#f59e0b"
+            iconBg="#fff6ea"
             wave={WaveAmber}
             icon={<Gem size={32} color="#f59e0b" strokeWidth={1.5} />}
             trend={topGrade ? { value: '0.6', up: true } : undefined}
@@ -488,9 +495,12 @@ export default function EmbryoGradingPage() {
           {/* Left — Active Cycles */}
           <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col max-h-80 xl:max-h-none xl:flex-1">
             {/* Header */}
-            <div className="px-4 py-3.5 flex items-center gap-2 border-b border-gray-100 shrink-0">
-              <p className="text-sm font-bold text-gray-900">Active Cycles</p>
-              <span className="text-[11px] font-bold text-primary bg-primary/10 rounded-full px-2 py-0.5">{activeCycles.length}</span>
+            <div className="px-4 py-3.5 flex flex-col border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-gray-900">Active Cycles</p>
+                <span className="text-[11px] font-bold text-primary bg-primary/10 rounded-full px-2 py-0.5">{activeCycles.length}</span>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-0.5">Click a cycle to view the patient dashboard</p>
             </div>
 
             {/* Search */}
@@ -523,7 +533,7 @@ export default function EmbryoGradingPage() {
                     <button
                       key={cycle.cycle_id}
                       type="button"
-                      onClick={() => navigate(`/embryo-grading/${cycle.his_id}`)}
+                      onClick={() => navigate(`/embryo-console/${cycle.his_id}`)}
                       className="w-full bg-primary/[0.03] border border-primary/10 rounded-xl px-4 py-3 text-left hover:bg-primary/[0.06] hover:border-primary/20 transition-colors"
                     >
                       <div className="flex items-start gap-2">
@@ -551,16 +561,6 @@ export default function EmbryoGradingPage() {
                 })
               )}
             </div>
-
-            {/* Footer */}
-            <div className="px-4 py-3 border-t border-gray-100 shrink-0">
-              <button
-                type="button"
-                className="w-full text-sm font-semibold text-primary flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
-              >
-                View all active cycles <ChevronRight size={14} />
-              </button>
-            </div>
           </div>
 
           {/* Right — Grading + Needs Attention on top, Recent Activity below */}
@@ -574,6 +574,7 @@ export default function EmbryoGradingPage() {
                 <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
                   <div className="px-4 py-3.5 border-b border-gray-100">
                     <p className="text-sm font-bold text-gray-900">Grading Overview</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Embryo quality distribution across all active cycles</p>
                   </div>
                   <div className="p-4 flex items-center gap-5">
                     <DonutChart
@@ -584,21 +585,76 @@ export default function EmbryoGradingPage() {
                       total={gradingOverview.total}
                     />
                     <div className="flex flex-col gap-2.5 flex-1 min-w-0">
-                      {[
-                        { label: 'High Grade (4AA, 4AB)',    count: gradingOverview.high,      color: '#22c55e' },
-                        { label: 'Mid Grade (3AA, 3AB, 3BB)', count: gradingOverview.mid,      color: '#f97316' },
-                        { label: 'Low Grade (2 & below)',    count: gradingOverview.low,        color: '#9ca3af' },
-                        { label: 'Not Graded',               count: gradingOverview.notGraded,  color: '#d1d5db' },
-                      ].map(item => {
+                      {([
+                        {
+                          label: 'High Grade',
+                          sub: '≥4 expansion · AA, AB, BA',
+                          count: gradingOverview.high,
+                          color: '#7c1e87',
+                          grades: ['4AA','4AB','4BA','5AA','5AB','5BA','6AA','6AB','6BA'],
+                          tip: 'Fully expanded blastocyst with excellent inner cell mass and trophectoderm. Best implantation potential.',
+                        },
+                        {
+                          label: 'Mid Grade',
+                          sub: '≥3 expansion · non-CC',
+                          count: gradingOverview.mid,
+                          color: '#a855c2',
+                          grades: ['3AA','3AB','3BA','3BB','4BB','4BC','4CB','5BB','5BC','5CB'],
+                          tip: 'Expanded or early blastocyst with acceptable morphology. Good implantation potential.',
+                        },
+                        {
+                          label: 'Low Grade',
+                          sub: 'expansion 1–2 or CC',
+                          count: gradingOverview.low,
+                          color: '#c8a8d8',
+                          grades: ['1AA','1AB','2AA','2AB','2BB','3CC','4CC'],
+                          tip: 'Early or poor-morphology blastocyst. Lower implantation potential — may improve with extended culture.',
+                        },
+                        {
+                          label: 'Not Graded',
+                          sub: 'pending assessment',
+                          count: gradingOverview.notGraded,
+                          color: '#e8d5f0',
+                          grades: [],
+                          tip: 'Oocyte has not yet reached a gradeable stage.',
+                        },
+                      ] as const).map(item => {
                         const pct = gradingOverview.total > 0 ? Math.round((item.count / gradingOverview.total) * 100) : 0;
                         return (
-                          <div key={item.label} className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
-                            <p className="text-[11px] text-gray-600 flex-1 truncate">{item.label}</p>
-                            <p className="text-[11px] font-semibold text-gray-800 shrink-0 tabular-nums">
-                              {item.count} <span className="font-normal text-gray-400">({pct}%)</span>
-                            </p>
-                          </div>
+                          <Tooltip
+                            key={item.label}
+                            placement="top"
+                            content={
+                              <div className="w-56">
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
+                                  <p className="text-xs font-bold text-gray-900">{item.label}</p>
+                                </div>
+                                <p className="text-[11px] text-gray-500 mb-2 leading-relaxed">{item.tip}</p>
+                                {item.grades.length > 0 && (
+                                  <>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Example grades</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {item.grades.map(g => (
+                                        <span key={g} className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ background: `${item.color}22`, color: item.color }}>{g}</span>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            }
+                          >
+                            <div className="flex items-center gap-2 cursor-default">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-semibold text-gray-700 leading-none">{item.label}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">{item.sub}</p>
+                              </div>
+                              <p className="text-[11px] font-semibold text-gray-800 shrink-0 tabular-nums">
+                                {item.count} <span className="font-normal text-gray-400">({pct}%)</span>
+                              </p>
+                            </div>
+                          </Tooltip>
                         );
                       })}
                     </div>
@@ -636,7 +692,10 @@ export default function EmbryoGradingPage() {
               {/* Right — Needs Attention */}
               <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
                 <div className="px-4 py-3.5 flex items-center justify-between border-b border-gray-100">
-                  <p className="text-sm font-bold text-gray-900">Needs Attention</p>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">Needs Attention</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Cycles requiring immediate review</p>
+                  </div>
                   <button type="button" className="text-xs font-medium text-primary hover:underline">View all</button>
                 </div>
                 <div className="divide-y divide-gray-50">
@@ -710,7 +769,7 @@ export default function EmbryoGradingPage() {
                           <tr
                             key={c.cycle_id}
                             className="hover:bg-gray-50/70 transition-colors cursor-pointer group"
-                            onClick={() => navigate(`/embryo-grading/${c.his_id}`)}
+                            onClick={() => navigate(`/embryo-console/${c.his_id}`)}
                           >
                             <td className="px-4 py-3 text-xs font-bold text-primary whitespace-nowrap">{c.his_id}</td>
                             <td className="px-4 py-3 text-xs font-medium text-gray-800 truncate max-w-[140px]">{c.patient_name || '—'}</td>
@@ -741,7 +800,7 @@ export default function EmbryoGradingPage() {
                               <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                                 <button
                                   type="button"
-                                  onClick={() => navigate(`/embryo-grading/${c.his_id}`)}
+                                  onClick={() => navigate(`/embryo-console/${c.his_id}`)}
                                   className="text-gray-300 hover:text-primary transition-colors"
                                 >
                                   <Eye size={14} />
