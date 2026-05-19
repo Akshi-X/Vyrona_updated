@@ -35,6 +35,7 @@ class CriticalAlertResponse(CriticalAlertBase):
     status: AlertStatus = Field(default=AlertStatus.ACTIVE, description="Status: Active, Acknowledged")
     acknowledged_by: Optional[str] = Field(None, description="User ID who acknowledged the alert")
     acknowledged_at: Optional[datetime] = Field(None, description="Timestamp when alert was acknowledged")
+    acknowledgment_reason: Optional[str] = Field(None, description="Reason provided when acknowledging the alert")
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -53,11 +54,13 @@ class CriticalAlertListResponse(BaseModel):
 class AcknowledgeAlertRequest(BaseModel):
     """Schema for acknowledging an alert"""
     alert_id: str = Field(..., description="UUID of the alert to acknowledge")
+    acknowledgment_reason: Optional[str] = Field(None, description="Reason for acknowledging (required for lid state alerts)")
 
 
 class AcknowledgeAlertsRequest(BaseModel):
     """Schema for acknowledging multiple alerts"""
     alert_id: List[str] = Field(..., description="UUIDs of alerts to acknowledge")
+    acknowledgment_reason: Optional[str] = Field(None, description="Reason for acknowledging (required for lid state alerts)")
 
 
 class AcknowledgeAlertResponse(BaseModel):
@@ -66,6 +69,7 @@ class AcknowledgeAlertResponse(BaseModel):
     status: AlertStatus
     message: str = Field(..., description="Success message")
     acknowledged_at: datetime
+    acknowledgment_reason: Optional[str] = None
 
 
 class AcknowledgeAlertsResponse(BaseModel):
@@ -75,6 +79,7 @@ class AcknowledgeAlertsResponse(BaseModel):
     message: str = Field(..., description="Success message")
     acknowledged_count: int
     acknowledged_at: datetime
+    acknowledgment_reason: Optional[str] = None
 
 
 class TankAlertsResponse(BaseModel):

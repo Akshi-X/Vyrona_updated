@@ -6,3 +6,4 @@ FrontEnd/.env
 .env
 .devcontainer/.env
 logs/
+n-task.csv

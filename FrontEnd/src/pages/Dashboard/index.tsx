@@ -837,7 +837,8 @@ export default function Dashboard({ }: DashboardProps) {
         dedupKey: (ivfAlert as IVFAlert & { dedup_key?: string }).dedup_key,
         message: ivfAlert.message,
         timestamp: new Date(ivfAlert.occurred_at+"Z")+"",
-        status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated'
+        status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated',
+        acknowledgementReason: ivfAlert.acknowledgment_reason
       };
     } else {
       const cgtAlert = alert as ServiceCriticalAlert;
@@ -1046,7 +1047,7 @@ export default function Dashboard({ }: DashboardProps) {
                         {loadingUserProfile ? (
                           <span className="inline-block h-7 w-[150px] max-w-full animate-pulse rounded-md bg-gray-200" />
                         ) : (
-                          <span className="text-[#6b1176]">{displayName}</span>
+                          <span className="text-primary">{displayName}</span>
                         )}
                       </p>
                     );
@@ -1065,9 +1066,9 @@ export default function Dashboard({ }: DashboardProps) {
                     <h2 className="font-semibold text-black text-base mb-4">Volume</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Total Embryos/Cryolocks */}
-                      <div id="onboarding-dashboard-kpi-cryolocks" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-kpi-cryolocks" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
-                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Embryos" src={EmbryosIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
@@ -1084,9 +1085,9 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Total number of Containers */}
-                      <div id="onboarding-dashboard-kpi-containers" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-kpi-containers" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
-                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Containers" src={ContainersIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
@@ -1109,9 +1110,9 @@ export default function Dashboard({ }: DashboardProps) {
                     <h2 className="font-semibold text-black text-base mb-4">Container Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Quality Deviations Flagged */}
-                      <div id="onboarding-dashboard-performance-deviations" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-performance-deviations" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
-                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={CriticalAlertsIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
@@ -1128,9 +1129,9 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Top Deviation Driver */}
-                      <div id="onboarding-dashboard-performance-driver" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-2 md:p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-performance-driver" className="flex flex-col bg-white border border-line rounded-lg p-2 md:p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start md:mb-2 ml-2 md:ml-3 w-full min-w-0">
-                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
@@ -1153,9 +1154,9 @@ export default function Dashboard({ }: DashboardProps) {
                     <h2 className="font-semibold text-black text-base mb-4">Incubator Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Outbound Shipments */}
-                      <div id="onboarding-dashboard-incubator-deviations" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-incubator-deviations" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
-                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={CriticalAlertsIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
@@ -1170,9 +1171,9 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Incubator Top Deviation Driver */}
-                      <div id="onboarding-dashboard-incubator-driver" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-incubator-driver" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
-                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
@@ -1201,7 +1202,7 @@ export default function Dashboard({ }: DashboardProps) {
                       {/* Container Quality Tracking */}
                           <div
                             id="onboarding-dashboard-cryocan-card"
-                            className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5"
+                            className="flex-1 bg-primary rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5"
                         onClick={() => {
                           setShowTrackCanister(true);
                           setCanisterError(undefined);
@@ -1237,7 +1238,7 @@ export default function Dashboard({ }: DashboardProps) {
                           {/* Arrow Button at Bottom Right */}
                           <div className="absolute bottom-0 right-0">
                             <button
-                              className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
+                              className="w-[26px] h-[24px] bg-primary-muted rounded-tl-lg flex items-center justify-center transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setShowTrackCanister(true);
@@ -1256,7 +1257,7 @@ export default function Dashboard({ }: DashboardProps) {
 
                       {/* Embryo Grading */}
                       <div
-                        className="flex-1 bg-[#6B1176] rounded-lg hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5 cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
+                        className="flex-1 bg-primary rounded-lg hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5 cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
                         onClick={() => {
                           // Embryo Grading: no redirect for now
                         }}
@@ -1281,7 +1282,7 @@ export default function Dashboard({ }: DashboardProps) {
                           {/* Arrow Button at Bottom Right */}
                           <div className="absolute bottom-0 right-0">
                             <button
-                              className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
+                              className="w-[26px] h-[24px] bg-primary-muted rounded-tl-lg flex items-center justify-center transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 // Embryo Grading: no redirect for now
@@ -1298,7 +1299,7 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Incubator Quality Tracking */}
-                      <div className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden  hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5">
+                      <div className="flex-1 bg-primary rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden  hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5">
                         {/* Background Graphic - Subtle Icon */}
                         <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
                           <img
@@ -1327,7 +1328,7 @@ export default function Dashboard({ }: DashboardProps) {
                           {/* Arrow Button at Bottom Right */}
                           <div className="absolute bottom-0 right-0">
                             <button
-                              className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
+                              className="w-[26px] h-[24px] bg-primary-muted rounded-tl-lg flex items-center justify-center transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
                               }}
@@ -1347,11 +1348,11 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* Quality Deviation Chart - Below Quality Tracking */}
                   <section id="onboarding-dashboard-deviation-chart" className="flex-1 h-[347px]">
                     {loadingIvfQualityDeviationChart ? (
-                      <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[347px] flex items-center justify-center">
+                      <div className="bg-white border border-line rounded-lg p-4 h-[347px] flex items-center justify-center">
                         <p className="text-gray-500">Loading quality deviation data...</p>
                       </div>
                     ) : ivfQualityDeviationChartError ? (
-                      <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[347px] flex items-center justify-center">
+                      <div className="bg-white border border-line rounded-lg p-4 h-[347px] flex items-center justify-center">
                         <p className="text-red-500">Error: {ivfQualityDeviationChartError}</p>
                       </div>
                     ) : ivfQualityDeviationChart ? (
@@ -1366,7 +1367,7 @@ export default function Dashboard({ }: DashboardProps) {
 
               {/* Ongoing Treatments Section */}
               <section id="onboarding-dashboard-shipments" className="w-full">
-                <div className="flex flex-col border border-[#E7E1E1] rounded-2xl p-4 w-full overflow-x-auto">
+                <div className="flex flex-col border border-line rounded-2xl p-4 w-full overflow-x-auto">
                 <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
                   <div className="w-full">
@@ -1381,16 +1382,16 @@ export default function Dashboard({ }: DashboardProps) {
                     <div>
                       <table className="min-w-max w-full">
                         <thead className="sticky top-0 z-10">
-                          <tr className="bg-[#FDF4FF]">
-                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">HIS # (PK)</th>
-                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cryolock #</th>
-                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Canister #</th>
-                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Tank ID</th>
-                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cane ID</th>
-                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Goblet Color</th>
-                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cryolock Color</th>
-                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Date of Vitrification</th>
-                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Site Name</th>
+                          <tr className="bg-surface">
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">HIS # (PK)</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Cryolock #</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Canister #</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Tank ID</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Cane ID</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Goblet Color</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Cryolock Color</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Date of Vitrification</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Site Name</th>
                           </tr>
                         </thead>
                         <tbody >
@@ -1418,16 +1419,16 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="w-full">
                     <table className="min-w-max w-full">
                       <thead className="sticky top-0 z-10">
-                        <tr className="bg-[#FDF4FF]">
-                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">HIS # (PK)</th>
-                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cryolock #</th>
-                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Canister #</th>
-                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Tank ID</th>
-                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cane ID</th>
-                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Goblet Color</th>
-                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cryolock Color</th>
-                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Date of Vitrification</th>
-                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Site Name</th>
+                        <tr className="bg-surface">
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">HIS # (PK)</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Cryolock #</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Canister #</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Tank ID</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Cane ID</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Goblet Color</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Cryolock Color</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Date of Vitrification</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-primary text-xs whitespace-nowrap">Site Name</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1454,7 +1455,7 @@ export default function Dashboard({ }: DashboardProps) {
                               <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="flex flex-col items-center gap-1.5 bg-white/80 text-gray-700 text-sm px-4 py-2 rounded shadow-sm text-center">
                                   <svg
-                                    className="w-6 h-6 text-[#6B1176]"
+                                    className="w-6 h-6 text-primary"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -1517,9 +1518,9 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* Patient Count */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
+                    <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
-                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                        <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
                             alt="Patient Count"
@@ -1536,9 +1537,9 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Treatment Count */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
+                    <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
-                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                        <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
                             alt="Treatments Count"
@@ -1566,7 +1567,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* Cold Chain Packaging Failure */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
+                    <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 mr-4 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1589,7 +1590,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Average Quality Lost per Patient */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
+                    <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1623,9 +1624,9 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* On Time Percentage */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
+                    <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
-                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                        <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
                             alt="On Time Performance"
@@ -1646,9 +1647,9 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Average Lead Time */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
+                    <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
-                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                        <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
                             alt="Average Lead Time"
@@ -1697,11 +1698,11 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
                     )}
                     {/* Tooltip */}
-                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
                         Critical Alerts
                       </div>
-                      <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                      <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
                     </div>
                   </div>
 
@@ -1727,11 +1728,11 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
                     )}
                     {/* Tooltip */}
-                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
                         Stakeholder Chats
                       </div>
-                      <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                      <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
                     </div>
                   </div>
 
@@ -1755,11 +1756,11 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
                     )}
                     {/* Tooltip */}
-                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
                         My Tasks
                       </div>
-                      <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                      <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
                     </div>
                   </div>
                 </div>
@@ -1771,7 +1772,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {volumeCards.map((card, index) => (
                     <div
                       key={index}
-                      className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
+                      className="flex-1 bg-primary rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
                       onClick={() => {
                         if (card.alt === 'My Tasks') {
                           fetchMyTasks();
@@ -1814,7 +1815,7 @@ export default function Dashboard({ }: DashboardProps) {
                         {/* Arrow Button at Bottom Right */}
                         <div className="absolute bottom-0 right-0">
                           <button
-                            className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
+                            className="w-[26px] h-[24px] bg-primary-muted rounded-tl-lg flex items-center justify-center transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (card.alt === 'Track Shipment') {
@@ -1838,7 +1839,7 @@ export default function Dashboard({ }: DashboardProps) {
               {/* Risk and Compliance Section */}
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Risk Section */}
-                <div className="flex-1 bg-[#fff3ee] rounded-lg border border-[#E7E1E1] p-5 h-[349px] flex flex-col items-center">
+                <div className="flex-1 bg-[#fff3ee] rounded-lg border border-line p-5 h-[349px] flex flex-col items-center">
                   <div className="w-full mb-12">
                     <h3 className="font-semibold text-black text-base">
                       Risk
@@ -1891,7 +1892,7 @@ export default function Dashboard({ }: DashboardProps) {
                 </div>
 
                 {/* Compliance Section */}
-                <div className="flex-1 bg-[#e4f5ff] rounded-lg border border-[#E7E1E1] p-5 flex flex-col items-center ">
+                <div className="flex-1 bg-[#e4f5ff] rounded-lg border border-line p-5 flex flex-col items-center ">
                   <h2 className="self-start font-semibold text-black text-base">
                     Shipment Status
                   </h2>

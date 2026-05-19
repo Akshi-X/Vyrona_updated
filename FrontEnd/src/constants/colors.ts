@@ -2,9 +2,9 @@
 export const COLORS = {
   // Primary colors
   primary: {
-    purple: '#6B1176',      // Header background
+    purple: 'var(--color-primary)',      // Header background
     purpleDark: '#703F99',  // Ticket IDs
-    purpleLight: '#F2E4FF', // Light purple accent
+    purpleLight: 'var(--color-primary-bg)', // Light purple accent
     blue: '#2563EB',        // Primary blue for buttons
   },
   
@@ -28,7 +28,7 @@ export const COLORS = {
   background: {
     light: '#F8F9FA',       // Page background
     white: '#FFFFFF',       // Card backgrounds
-    purpleLight: '#F2E4FF', // Light purple background accent
+    purpleLight: 'var(--color-primary-bg)', // Light purple background accent
     gray: {
       light: '#F3F4F6',     // Disabled inputs
       medium: '#E5E7EB',    // Borders
@@ -56,8 +56,8 @@ export const COLORS = {
   // Brand palette (exact colors from design)
   brand: {
     white: '#FFFFFF',       // Pure white
-    purple: '#6B1176',      // Deep purple
-    purpleLight: '#F2E4FF', // Light lavender
+    purple: 'var(--color-primary)',      // Deep purple
+    purpleLight: 'var(--color-primary-bg)', // Light lavender
     purpleDark: '#703F99',  // Medium purple
     black: '#000000',       // Pure black
   }

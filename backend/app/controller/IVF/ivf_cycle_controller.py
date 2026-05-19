@@ -96,7 +96,7 @@ def create_cycle(
     try:
         svc = IvfCycleService(db)
         cycle = svc.create_cycle(hospital_id, payload, user_id=str(user.user_id))
-        total_oocytes = (payload.oocyte_m2 or 0) + (payload.oocyte_m1 or 0) + (payload.oocyte_others or 0)
+        total_oocytes = (payload.oocyte_m2 or 0) + (payload.oocyte_m1 or 0)
         ActivityLogService(db).log_activity(
             action="ivf_cycle.created",
             outcome=ActivityOutcome.SUCCESS.value,

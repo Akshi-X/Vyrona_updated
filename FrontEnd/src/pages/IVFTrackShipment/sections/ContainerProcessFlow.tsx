@@ -25,7 +25,7 @@ export default function ContainerProcessFlow() {
   const currentIndex = 2;
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 pb-8 px-[40px]">
+    <div className="bg-white border border-line rounded-lg p-4 pb-8 px-[40px]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-0 w-full">
           {ivfSteps.map((s, idx) => {

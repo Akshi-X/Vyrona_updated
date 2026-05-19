@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, DateTime, Date, ForeignKey
 from sqlalchemy.orm import relationship
 
 from ...config.database import Base
@@ -23,6 +23,7 @@ class IvfCycle(Base):
     oocyte_m1 = Column(Integer, nullable=True)
     oocyte_gv = Column(Integer, nullable=True)
     oocyte_others = Column(Integer, nullable=True)
+    opu_date = Column(Date, nullable=True)
     status = Column(String(30), nullable=True)
     created_by = Column(String(50), nullable=True)
     updated_by = Column(String(50), nullable=True)

@@ -729,7 +729,7 @@ export default function IncubatorQualityTrackingChart({
       type: 'line',
       label: showCandlestick ? `${datasetLabel} Avg` : datasetLabel,
       data: values,
-      borderColor: '#6B1176',
+      borderColor: '#6b1176',
       backgroundColor: (context: any) => {
         const { ctx, chartArea } = context.chart;
         if (!chartArea) return 'rgba(107, 17, 118, 0.75)';
@@ -739,7 +739,7 @@ export default function IncubatorQualityTrackingChart({
         return gradient;
       },
       borderWidth: 2, pointRadius: showCandlestick ? 0 : 2.5, pointHoverRadius: 4,
-      pointBackgroundColor: '#6B1176', pointBorderColor: '#6B1176', pointBorderWidth: 0,
+      pointBackgroundColor: '#6b1176', pointBorderColor: '#6b1176', pointBorderWidth: 0,
       tension: 0.3, fill: !showCandlestick, spanGaps: true, order: 2,
     });
 
@@ -871,7 +871,7 @@ export default function IncubatorQualityTrackingChart({
   const hasData = displayReadings.length > 0;
 
   return (
-    <div className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-4">
+    <div className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-line rounded-lg p-4">
       <div className="flex items-center justify-between mb-1 shrink-0">
         <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
         <div className="flex items-center gap-3">
@@ -913,7 +913,7 @@ export default function IncubatorQualityTrackingChart({
         {!hasData ? (
           isRangeLoading ? (
             <div className="flex items-center justify-center h-full">
-              <svg className="animate-spin h-8 w-8 text-[#6B1176]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-label="Loading">
+              <svg className="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-label="Loading">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
@@ -932,7 +932,7 @@ export default function IncubatorQualityTrackingChart({
             <Chart type="line" data={chartData} options={chartOptions as any} />
             {isRangeLoading && (
               <div className="absolute inset-0 bg-white/75 flex items-center justify-center z-10" aria-hidden="true">
-                <svg className="animate-spin h-8 w-8 text-[#6B1176]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-label="Loading">
+                <svg className="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-label="Loading">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
@@ -956,7 +956,7 @@ export default function IncubatorQualityTrackingChart({
                 setShowCustomPicker(false);
               }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                timeRange === range.id ? 'bg-[#6B1176] text-white' : 'text-gray-600 hover:bg-gray-100'
+                timeRange === range.id ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               {range.label}
@@ -969,7 +969,7 @@ export default function IncubatorQualityTrackingChart({
             type="button"
             onClick={() => setShowCustomPicker((v) => !v)}
             className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-              timeRange === 'CUSTOM' ? 'bg-[#6B1176] text-white border-[#6B1176]' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+              timeRange === 'CUSTOM' ? 'bg-primary text-white border-primary' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
             }`}
           >
             {timeRange === 'CUSTOM' && appliedCustomFrom ? appliedCustomFrom : 'Custom'}
@@ -982,7 +982,7 @@ export default function IncubatorQualityTrackingChart({
                   value={customFrom}
                   max={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setCustomFrom(e.target.value)}
-                  className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:border-[#6B1176]"
+                  className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:border-primary"
                 />
                 <button
                   type="button"
@@ -993,7 +993,7 @@ export default function IncubatorQualityTrackingChart({
                     setIsRangeLoading(true);
                     setShowCustomPicker(false);
                   }}
-                  className="w-full py-1.5 text-xs font-medium rounded bg-[#6B1176] text-white disabled:opacity-40 hover:bg-[#591063] transition-colors"
+                  className="w-full py-1.5 text-xs font-medium rounded bg-primary text-white disabled:opacity-40 hover:bg-[#591063] transition-colors"
                 >
                   Apply
                 </button>

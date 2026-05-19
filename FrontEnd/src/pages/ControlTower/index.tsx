@@ -663,7 +663,7 @@ const ControlTower = () => {
                         <div className="order-2 lg:order-1 flex flex-col gap-6 min-w-0 lg:h-full lg:min-h-0 lg:row-span-2">
 
                             {/* Inline Filter Panel — desktop only */}
-                            <div id="onboarding-control-filter-panel" className="hidden lg:flex flex-col gap-3 bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 shrink-0">
+                            <div id="onboarding-control-filter-panel" className="hidden lg:flex flex-col gap-3 bg-white border border-line rounded-lg px-3 py-3 shrink-0">
                                 {isIvfUser && (
                                     <div id="onboarding-control-filter-direction">
                                         <FilterToggle
@@ -742,13 +742,13 @@ const ControlTower = () => {
                             </div>
 
                             {/* Active Routes/Canisters List */}
-                            <div id="onboarding-control-active-containers" className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
+                            <div id="onboarding-control-active-containers" className="bg-white border border-line rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
                                 <h2 className="font-bold text-black text-base mb-2">
                                     {isIvfUser
                                         ? deviceType === "incubators" ? "Active Incubators" : "Active Containers"
                                         : "Active Routes"}
                                 </h2>
-                                <div className="grid grid-cols-3 pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
+                                <div className="grid grid-cols-3 pl-2 pr-2 py-2 rounded-t-lg bg-primary-bg text-xs font-semibold text-primary gap-3">
                                     <div className="text-left">
                                         {isIvfUser
                                             ? deviceType === "incubators" ? "Incubators #" : "Containers #"
@@ -913,7 +913,7 @@ const ControlTower = () => {
                                                                         {route?.patientId ? (
                                                                             <Link
                                                                                 to={`${isOnboarding ? "/onboarding" : ""}/track/${route.patientId}`}
-                                                                                className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
+                                                                                className="text-primary text-xs font-bold hover:underline cursor-pointer truncate block"
                                                                                 onClick={(
                                                                                     e,
                                                                                 ) =>
@@ -925,7 +925,7 @@ const ControlTower = () => {
                                                                                 }
                                                                             </Link>
                                                                         ) : (
-                                                                            <span className="text-[#6b1176] text-xs font-bold">
+                                                                            <span className="text-primary text-xs font-bold">
                                                                                 N/A
                                                                             </span>
                                                                         )}
@@ -1009,39 +1009,39 @@ const ControlTower = () => {
                                                                     className="grid grid-cols-3 pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
                                                                     onClick={() => {
                                                                         try {
-                                                                            if (
-                                                                                canister.branchId &&
-                                                                                canister.branchId !==
-                                                                                    "N/A"
-                                                                            ) {
-                                                                                sessionStorage.setItem(
-                                                                                    "ivf_selected_branch_id",
-                                                                                    String(
-                                                                                        canister.branchId,
-                                                                                    ),
-                                                                                );
-                                                                            }
-                                                                            const tankParam = encodeURIComponent(
-                                                                                canister.tankId &&
-                                                                                    canister.tankId !== "N/A"
-                                                                                    ? canister.tankId
-                                                                                    : canister.canisterId,
-                                                                            );
                                                                             const prefix = isOnboarding ? "/onboarding" : "";
-                                                                            navigate(`${prefix}/ivf-track-shipment/${tankParam}`);
+                                                                            if (deviceType === "incubators") {
+                                                                                navigate(`${prefix}/incubator-tracking/${canister.tankId}`);
+                                                                            } else {
+                                                                                if (
+                                                                                    canister.branchId &&
+                                                                                    canister.branchId !== "N/A"
+                                                                                ) {
+                                                                                    sessionStorage.setItem(
+                                                                                        "ivf_selected_branch_id",
+                                                                                        String(canister.branchId),
+                                                                                    );
+                                                                                }
+                                                                                const tankParam = encodeURIComponent(
+                                                                                    canister.tankId && canister.tankId !== "N/A"
+                                                                                        ? canister.tankId
+                                                                                        : canister.canisterId,
+                                                                                );
+                                                                                navigate(`${prefix}/ivf-track-shipment/${tankParam}`);
+                                                                            }
                                                                         } catch {}
                                                                     }}
                                                                 >
                                                                     <div className="min-w-0 text-left overflow-hidden">
                                                                         {canister.canisterId ? (
-                                                                            <span className="text-[#6b1176] text-xs font-bold hover:underline truncate block">
+                                                                            <span className="text-primary text-xs font-bold hover:underline truncate block">
                                                                                 {deviceType === "incubators" ? "Incubator" : "Container"}{" "}
                                                                                 {
                                                                                     canister.canisterId
                                                                                 }
                                                                             </span>
                                                                         ) : (
-                                                                            <span className="text-[#6b1176] text-xs font-bold">
+                                                                            <span className="text-primary text-xs font-bold">
                                                                                 {deviceType === "incubators" ? "Incubator" : "Container"}{" "}
                                                                                 {
                                                                                     canister.canisterId

@@ -163,7 +163,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
   }, []);
 
   return (
-    <div id="onboarding-ivf-container-data" className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[398px] flex flex-col">
+    <div id="onboarding-ivf-container-data" className="bg-white border border-line rounded-lg p-4 h-[398px] flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-black text-[13px] md:text-[16px]">Container Data</h3>
         <div className="flex items-center gap-4">
@@ -182,7 +182,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
         className="flex-1 overflow-auto bg-[#F8F8F8] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
       >
         <table className="min-w-max w-full text-xs bg-white">
-          <thead className="sticky top-0 z-10 bg-[#FDF4FF] text-[#6B1176] text-[10px] md:text-[12px] font-medium h-[56px]">
+          <thead className="sticky top-0 z-10 bg-surface text-primary text-[10px] md:text-[12px] font-medium h-[56px]">
             <tr>
               <th className="px-3 py-2 text-left rounded-tl-[10px] whitespace-nowrap">HIS # (PK)</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Cryolock #</th>
@@ -244,7 +244,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="flex flex-col items-center gap-1.5 bg-white/80 text-gray-700 text-sm px-4 py-2 rounded shadow-sm text-center">
                         <svg
-                          className="w-6 h-6 text-[#6B1176]"
+                          className="w-6 h-6 text-primary"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -280,7 +280,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
                           onChange={(e) =>
                             setEditValues({ ...editValues, gobletColor: e.target.value })
                           }
-                          className="w-full px-2 py-1 border border-[#6B1176] rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                          className="w-full px-2 py-1 border border-primary rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
                           autoFocus
                         />
                       ) : (
@@ -295,7 +295,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
                           onChange={(e) =>
                             setEditValues({ ...editValues, cryolockColor: e.target.value })
                           }
-                          className="w-full px-2 py-1 border border-[#6B1176] rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                          className="w-full px-2 py-1 border border-primary rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
                         />
                       ) : (
                         row.cryolockColor || '-'
@@ -336,7 +336,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
                         <div className="flex justify-center items-center">
                           <button
                             onClick={() => startEditing(index, row)}
-                            className="p-1 text-gray-600 hover:text-[#6B1176] transition-colors"
+                            className="p-1 text-gray-600 hover:text-primary transition-colors"
                             title="Edit"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

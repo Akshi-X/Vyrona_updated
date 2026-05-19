@@ -369,6 +369,50 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
         return lines;
     }
 
+    if (action.startsWith("ivf_cycle.")) {
+        if (metadata.patient_name) lines.push(`Patient: ${metadata.patient_name}`);
+        if (metadata.his_id) lines.push(`HIS ID: ${metadata.his_id}`);
+
+        if (action === "ivf_cycle.created") {
+            if (metadata.injection_method) lines.push(`Method: ${metadata.injection_method}`);
+            const parts: string[] = [];
+            if (metadata.oocyte_m2 != null) parts.push(`MII: ${metadata.oocyte_m2}`);
+            if (metadata.oocyte_m1 != null) parts.push(`MI: ${metadata.oocyte_m1}`);
+            if (metadata.oocyte_others != null) parts.push(`Others: ${metadata.oocyte_others}`);
+            if (parts.length) lines.push(`Oocytes: ${parts.join(", ")}`);
+            return lines;
+        }
+
+        if (action === "ivf_cycle.updated") {
+            if (Array.isArray(metadata.fields_updated) && metadata.fields_updated.length) {
+                lines.push(`Updated: ${metadata.fields_updated.join(", ")}`);
+            }
+            return lines;
+        }
+
+        if (metadata.oocyte_no != null) lines.push(`Oocyte #${metadata.oocyte_no}`);
+
+        if (action === "ivf_cycle.oocyte_log.d0_saved") {
+            if (metadata.d0_maturity) lines.push(`Maturity: ${metadata.d0_maturity}`);
+        } else if (action === "ivf_cycle.oocyte_log.d1_updated") {
+            if (metadata.d1_pn) lines.push(`PN: ${metadata.d1_pn}`);
+            if (metadata.d1_zygote_status) lines.push(`Zygote: ${metadata.d1_zygote_status}`);
+        } else if (action === "ivf_cycle.oocyte_log.d3_updated") {
+            if (metadata.d3_grade) lines.push(`Grade: ${metadata.d3_grade}`);
+            if (metadata.d3_symmetry) lines.push(`Symmetry: ${metadata.d3_symmetry}`);
+        } else if (action === "ivf_cycle.oocyte_log.d5_updated") {
+            if (metadata.d5_grade) lines.push(`Grade: ${metadata.d5_grade}`);
+            if (metadata.d5_stage) lines.push(`Stage: ${metadata.d5_stage}`);
+        } else if (action === "ivf_cycle.oocyte_log.d6_updated") {
+            if (metadata.d6_grade) lines.push(`Grade: ${metadata.d6_grade}`);
+            if (metadata.d6_progression) lines.push(`Progression: ${metadata.d6_progression}`);
+        } else if (action === "ivf_cycle.oocyte_log.fate_set") {
+            if (metadata.fate) lines.push(`Fate: ${metadata.fate}`);
+        }
+
+        return lines;
+    }
+
     return [formatMetadataSummary(metadata)];
 };
 
@@ -885,7 +929,7 @@ export default function ReportsPage() {
     return (
                 <PageLayout title="Reports" lucideIcon={Download}>
 
-                    <section id="onboarding-reports-filters" className="bg-white border border-[#E7E1E1] rounded-lg p-5">
+                    <section id="onboarding-reports-filters" className="bg-white border border-line rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
                                 <h2 className="text-base font-semibold text-black">
@@ -909,7 +953,7 @@ export default function ReportsPage() {
                                             canViewActivityLogs
                                         )
                                     }
-                                    className="px-3 py-2 border border-[#E7E1E1] rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                                    className="px-3 py-2 border border-line rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                                 >
                                     Reset Filters
                                 </button>
@@ -935,7 +979,7 @@ export default function ReportsPage() {
                                     </label>
                                     <input
                                         type="month"
-                                        className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                        className="border border-line rounded-lg px-3 h-12 text-sm"
                                         value={filters.month}
                                         onChange={(event) =>
                                             setFilters((prev) => ({
@@ -956,7 +1000,7 @@ export default function ReportsPage() {
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            className="border border-line rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateFrom}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -973,7 +1017,7 @@ export default function ReportsPage() {
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            className="border border-line rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateTo}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1030,7 +1074,7 @@ export default function ReportsPage() {
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            className="border border-line rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateFrom}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1047,7 +1091,7 @@ export default function ReportsPage() {
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            className="border border-line rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateTo}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1094,7 +1138,7 @@ export default function ReportsPage() {
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            className="border border-line rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateFrom}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1111,7 +1155,7 @@ export default function ReportsPage() {
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            className="border border-line rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateTo}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1163,7 +1207,7 @@ export default function ReportsPage() {
                                         </label>
                                         <input
                                             type="text"
-                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            className="border border-line rounded-lg px-3 h-12 text-sm"
                                             placeholder="Press Enter to apply"
                                             value={activitySearchInput}
                                             onChange={(event) =>
@@ -1192,7 +1236,7 @@ export default function ReportsPage() {
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            className="border border-line rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateFrom}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1209,7 +1253,7 @@ export default function ReportsPage() {
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
+                                            className="border border-line rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateTo}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1250,7 +1294,7 @@ export default function ReportsPage() {
                         </div>
                     </section>
 
-                    <section id="onboarding-reports-results" className="bg-white border border-[#E7E1E1] rounded-lg p-5">
+                    <section id="onboarding-reports-results" className="bg-white border border-line rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
                                 <h2 className="text-base font-semibold text-black">
@@ -1271,7 +1315,7 @@ export default function ReportsPage() {
                                         ? !canViewActivityLogs
                                         : !isIvfUser)
                                 }
-                                className="px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Download CSV
                             </button>
@@ -1293,7 +1337,7 @@ export default function ReportsPage() {
                                 </label>
                                 <select
                                     id="pageSize"
-                                    className="border border-[#E7E1E1] rounded-md px-2 py-1 text-sm"
+                                    className="border border-line rounded-md px-2 py-1 text-sm"
                                     value={pageSize}
                                     onChange={(event) =>
                                         setPageSize(Number(event.target.value))
@@ -1310,7 +1354,7 @@ export default function ReportsPage() {
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
-                                    className="px-3 py-1.5 rounded-md border border-[#E7E1E1] text-gray-700 disabled:opacity-50"
+                                    className="px-3 py-1.5 rounded-md border border-line text-gray-700 disabled:opacity-50"
                                     onClick={() =>
                                         setPage((prev) => Math.max(1, prev - 1))
                                     }
@@ -1320,7 +1364,7 @@ export default function ReportsPage() {
                                 </button>
                                 <button
                                     type="button"
-                                    className="px-3 py-1.5 rounded-md border border-[#E7E1E1] text-gray-700 disabled:opacity-50"
+                                    className="px-3 py-1.5 rounded-md border border-line text-gray-700 disabled:opacity-50"
                                     onClick={() =>
                                         setPage((prev) =>
                                             Math.min(totalPages, prev + 1),
@@ -1347,15 +1391,15 @@ export default function ReportsPage() {
                         <div className="mt-4 overflow-x-auto">
                             {filters.reportType === "monthly-summary" && (
                                 <table className="min-w-full text-sm">
-                                    <thead className="bg-[#fdeeff]">
+                                    <thead className="bg-surface">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 KPI Config
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Alerts Sent
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 KPI Deviations
                                             </th>
                                         </tr>
@@ -1363,7 +1407,7 @@ export default function ReportsPage() {
                                     <tbody>
                                         {loading
                                             ? Array.from({ length: 6 }).map((_, i) => (
-                                                <tr key={i} className="border-b border-[#F1E8F2] bg-white">
+                                                <tr key={i} className="border-b border-primary-bg bg-white">
                                                     {[140, 75, 90].map((w, col) => (
                                                         <td key={col} className="px-4 py-3">
                                                             <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
@@ -1379,7 +1423,7 @@ export default function ReportsPage() {
                                             : monthlySummaryRows.map((row) => (
                                                 <tr
                                                     key={row.kpi_name}
-                                                    className="border-b border-[#F1E8F2]"
+                                                    className="border-b border-primary-bg"
                                                 >
                                                     <td className="px-4 py-3 text-gray-700">
                                                         {row.kpi_name}
@@ -1409,24 +1453,24 @@ export default function ReportsPage() {
 
                             {filters.reportType === "critical-alerts" && (
                                 <table className="min-w-full text-sm">
-                                    <thead className="bg-[#fdeeff]">
+                                    <thead className="bg-surface">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Occurred Date
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Occurred Time
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Severity
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Status
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Tank Code
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Message
                                             </th>
                                         </tr>
@@ -1434,7 +1478,7 @@ export default function ReportsPage() {
                                     <tbody>
                                         {loading
                                             ? Array.from({ length: 6 }).map((_, i) => (
-                                                <tr key={i} className="border-b border-[#F1E8F2] bg-white">
+                                                <tr key={i} className="border-b border-primary-bg bg-white">
                                                     {[85, 85, 65, 80, 80, 160].map((w, col) => (
                                                         <td key={col} className="px-4 py-3">
                                                             <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
@@ -1450,7 +1494,7 @@ export default function ReportsPage() {
                                             : sortedAlertRows.map((row) => (
                                             <tr
                                                 key={row.alert_id}
-                                                className="border-b border-[#F1E8F2]"
+                                                className="border-b border-primary-bg"
                                             >
                                                 <td className="px-4 py-3 text-gray-700">
                                                     {
@@ -1503,33 +1547,33 @@ export default function ReportsPage() {
 
                             {filters.reportType === "refill-logs" && (
                                 <table className="min-w-full text-sm">
-                                    <thead className="bg-[#fdeeff]">
+                                    <thead className="bg-surface">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Refill Date
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Refill Time
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Tank Code
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Branch
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Refilled By
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Description
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Reservoir
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 LN2 Ordered
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 LN2 Received
                                             </th>
                                         </tr>
@@ -1537,7 +1581,7 @@ export default function ReportsPage() {
                                     <tbody>
                                         {loading
                                             ? Array.from({ length: 6 }).map((_, i) => (
-                                                <tr key={i} className="border-b border-[#F1E8F2] bg-white">
+                                                <tr key={i} className="border-b border-primary-bg bg-white">
                                                     {[85, 85, 80, 90, 90, 120, 80, 85, 85].map((w, col) => (
                                                         <td key={col} className="px-4 py-3">
                                                             <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
@@ -1553,7 +1597,7 @@ export default function ReportsPage() {
                                             : sortedRefillLogRows.map((row) => (
                                             <tr
                                                 key={row.log_id}
-                                                className="border-b border-[#F1E8F2]"
+                                                className="border-b border-primary-bg"
                                             >
                                                 <td className="px-4 py-3 text-gray-700">
                                                     {formatLocaleDate(row.refill_date) || "-"}
@@ -1605,21 +1649,21 @@ export default function ReportsPage() {
 
                             {(filters.reportType === "activity-logs" || filters.reportType === "embryo-tracking") && (
                                 <table className="min-w-full text-sm">
-                                    <thead className="bg-[#fdeeff]">
+                                    <thead className="bg-surface">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Action
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Actor
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Target
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Outcome
                                             </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Details
                                             </th>
                                         </tr>
@@ -1627,7 +1671,7 @@ export default function ReportsPage() {
                                     <tbody>
                                         {loading
                                             ? Array.from({ length: 6 }).map((_, i) => (
-                                                <tr key={i} className="border-b border-[#F1E8F2] bg-white">
+                                                <tr key={i} className="border-b border-primary-bg bg-white">
                                                     {[200, 140, 140, 90, 200].map((w, col) => (
                                                         <td key={col} className="px-4 py-3">
                                                             <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
@@ -1643,7 +1687,7 @@ export default function ReportsPage() {
                                             : activityLogRows.map((row) => (
                                             <tr
                                                 key={row.id}
-                                                className="border-b border-[#F1E8F2]"
+                                                className="border-b border-primary-bg"
                                             >
                                                 <td className="px-4 py-3 text-gray-700">
                                                     <div className="font-semibold text-[#1f2937]">
@@ -1669,7 +1713,7 @@ export default function ReportsPage() {
                                                             {row.metadata?.tank_id ? (
                                                                 <Link
                                                                     to={`/ivf-track-shipment/${row.metadata.tank_id}`}
-                                                                    className="text-[#6b1176] hover:underline"
+                                                                    className="text-primary hover:underline"
                                                                 >
                                                                     {row.metadata?.tank_code || row.metadata?.tank_id}
                                                                 </Link>
@@ -1688,7 +1732,7 @@ export default function ReportsPage() {
                                                         <div className="flex flex-col">
                                                             <Link
                                                                 to={`/ivf-track-shipment/${row.target_id}`}
-                                                                className="text-[#6b1176] hover:underline"
+                                                                className="text-primary hover:underline"
                                                             >
                                                                 {formatTargetLabel(row)}
                                                             </Link>

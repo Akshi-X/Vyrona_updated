@@ -176,7 +176,7 @@ export default function RiskGraph(props: RiskGraphProps) {
   );
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[398px]">
+    <div className="bg-white border border-line rounded-lg p-4 h-[398px]">
       <h3 className="font-semibold text-black text-[16px] mb-12">Risk graph</h3>
       <div className="h-[278px]">
         <Line data={chartData} options={chartOptions as any} />
