@@ -59,9 +59,9 @@ export const FilterSelect = ({
                         e.stopPropagation();
                         setIsOpen((v) => !v);
                     }}
-                    className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                    className="w-full px-3 h-12 border border-line rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary-muted focus:border-transparent bg-white"
                 >
-                    <span className={value !== "All" ? "text-[#6b1176]" : "text-gray-700"}>
+                    <span className={value !== "All" ? "text-primary" : "text-gray-700"}>
                         {selectedLabel}
                     </span>
                     <svg
@@ -95,8 +95,8 @@ export const FilterSelect = ({
                                     }}
                                     className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
                                         value === optVal
-                                            ? "bg-[#6b1176] text-white"
-                                            : "text-[#6b1176] hover:bg-gray-100"
+                                            ? "bg-primary text-white"
+                                            : "text-primary hover:bg-gray-100"
                                     }`}
                                 >
                                     {optVal === "All" ? allLabel : optLabel}
@@ -139,8 +139,8 @@ export const FilterToggle = ({
                     onClick={() => !opt.disabled && onChange(opt.value)}
                     className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
                         value === opt.value
-                            ? "bg-[#6b1176] text-white border-[#6b1176]"
-                            : "bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50"
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white text-gray-700 border-line hover:bg-gray-50"
                     } ${opt.disabled ? "opacity-50 cursor-not-allowed hover:bg-white" : ""}`}
                 >
                     {opt.label}
@@ -177,19 +177,19 @@ const FilterPanel = ({ children, activeCount = 0 }: FilterPanelProps) => {
                 onClick={() => setIsOpen((v) => !v)}
                 className={`relative flex items-center justify-center w-9 h-9 border rounded-lg transition-colors ${
                     activeCount > 0 || isOpen
-                        ? "bg-[#6b1176] text-white border-[#6b1176]"
-                        : "bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50"
+                        ? "bg-primary text-white border-primary"
+                        : "bg-white text-gray-700 border-line hover:bg-gray-50"
                 }`}
             >
                 <SlidersHorizontal className="w-4 h-4" />
                 {activeCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] rounded-full bg-[#6b1176] border-2 border-white text-white text-[10px] font-bold flex items-center justify-center px-0.5">
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] rounded-full bg-primary border-2 border-white text-white text-[10px] font-bold flex items-center justify-center px-0.5">
                         {activeCount}
                     </span>
                 )}
             </button>
             {isOpen && (
-                <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-[#E7E1E1] rounded-lg shadow-lg p-4 w-72 flex flex-col gap-3">
+                <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-line rounded-lg shadow-lg p-4 w-72 flex flex-col gap-3">
                     {children}
                 </div>
             )}

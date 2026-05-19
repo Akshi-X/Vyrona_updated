@@ -13,7 +13,7 @@ export default function NonComplianceCard({ percentage, missedDocsCount, loading
   const display = Math.round(value);
 
   return (
-    <div className="bg-[#FFF4EE] border border-[#E7E1E1] rounded-lg p-4 h-full flex flex-col">
+    <div className="bg-[#FFF4EE] border border-line rounded-lg p-4 h-full flex flex-col">
       <h3 className="font-semibold text-gray-700 text-sm mb-4 text-[16px]">Non-Compliance</h3>
       
       {loading ? (

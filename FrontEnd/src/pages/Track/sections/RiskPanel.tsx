@@ -157,7 +157,7 @@ export default function RiskPanel() {
   );
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full flex flex-col">
+    <div className="bg-white border border-line rounded-lg p-4 h-full flex flex-col">
       <h3 className="font-semibold text-black text-sm text-[16px]">Risk</h3>
 
       {/* Phase Risk Prediction - Line Chart */}

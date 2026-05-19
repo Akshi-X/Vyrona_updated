@@ -506,7 +506,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
                                 style={{ top: branchMenuStyle.top, left: branchMenuStyle.left, width: branchMenuStyle.width, transform: branchMenuStyle.placement === "top" ? "translateY(-100%)" : undefined }}>
                                 {branches.map((option) => (
                                     <div key={option.branch_id}
-                                        className={`px-3 py-1.5 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${selectedBranchId === option.branch_id ? "bg-[#8b2a96] text-white" : "text-black"}`}
+                                        className={`px-3 py-1.5 cursor-pointer hover:bg-primary-light hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${selectedBranchId === option.branch_id ? "bg-primary-light text-white" : "text-black"}`}
                                         onClick={() => {
                                             setSelectedBranchName(option.branch_name);
                                             setSelectedBranchId(option.branch_id);
@@ -527,7 +527,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
                                 style={{ top: tankMenuStyle.top, left: tankMenuStyle.left, width: tankMenuStyle.width, transform: tankMenuStyle.placement === "top" ? "translateY(-100%)" : undefined }}>
                                 {tanks.map((tank) => (
                                     <div key={tank.tank_id}
-                                        className={`px-3 py-1.5 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${canisterId === tank.tank_code ? "bg-[#8b2a96] text-white" : "text-black"}`}
+                                        className={`px-3 py-1.5 cursor-pointer hover:bg-primary-light hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${canisterId === tank.tank_code ? "bg-primary-light text-white" : "text-black"}`}
                                         onClick={() => {
                                             setCanisterId(tank.tank_code);
                                             setCanisterCheckMessage(null);
@@ -573,7 +573,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
 
     if (inlineMode) {
         return (
-            <div className="w-full max-w-[560px] rounded-[14px] border border-[#E7E1E1] bg-white p-6 shadow-sm">
+            <div className="w-full max-w-[560px] rounded-[14px] border border-line bg-white p-6 shadow-sm">
                 <div className="mb-5 flex items-start gap-3">
                     <img
                         src={icon}

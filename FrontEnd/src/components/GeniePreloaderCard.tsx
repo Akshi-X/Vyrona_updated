@@ -16,12 +16,12 @@ export const GeniePreloaderCard: React.FC = () => {
     const failedCount = state.failed.length;
 
     return (
-        <div className="flex min-h-screen w-full items-center justify-center bg-[#FDFAFF] px-4 py-10">
+        <div className="flex min-h-screen w-full items-center justify-center bg-surface px-4 py-10">
             <div className="mx-auto w-full max-w-2xl rounded-3xl border border-white/60 bg-white/80 p-8 shadow-sm backdrop-blur">
                 <div className="grid gap-8 md:grid-cols-[1.1fr_0.9fr]">
                     <div className="space-y-5">
                         <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wider text-[#6b1176]">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-primary">
                                 Getting things ready
                             </p>
                             <h2 className="text-2xl font-semibold text-slate-900">
@@ -46,7 +46,7 @@ export const GeniePreloaderCard: React.FC = () => {
                             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                                 <div
                                     className={`h-full rounded-full transition-all duration-300 ease-out ${
-                                        isError ? "bg-rose-400" : "bg-[#6b1176]"
+                                        isError ? "bg-rose-400" : "bg-primary"
                                     }`}
                                     style={{ width: `${percent}%` }}
                                 />

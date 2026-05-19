@@ -89,7 +89,7 @@ const mockRows: EmbryoRow[] = [
 
 export default function MockContainerDataTable() {
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[398px] flex flex-col">
+    <div className="bg-white border border-line rounded-lg p-4 h-[398px] flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-black text-[16px]">Container Data</h3>
         <div className="text-black text-sm">
@@ -100,7 +100,7 @@ export default function MockContainerDataTable() {
 
       <div className="flex-1 overflow-auto bg-[#F8F8F8] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
         <table className="min-w-max w-full text-xs bg-white">
-          <thead className="sticky top-0 z-10 bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px]">
+          <thead className="sticky top-0 z-10 bg-surface text-primary text-[12px] font-medium h-[56px]">
             <tr>
               <th className="px-3 py-2 text-left rounded-tl-[10px] whitespace-nowrap">Embryo ID</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">HIS # (PK)</th>

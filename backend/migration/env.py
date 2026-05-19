@@ -71,6 +71,7 @@ from app.models.IVF import (
     hospital_model,
     hospital_branch_model,
     tank_model,
+    incubator_model,
     canister_ln2_log_model,
     critical_alert_model,
     ivf_telemetry_data_model,
@@ -85,12 +86,15 @@ from app.models.IVF import (
     ln2_readings_model,
     ln2_refill_detection_model,
     device_model,
+    ivf_cycle_model,
+    ivf_cycle_log_model,
 )
 
 # Import IVF model classes explicitly
 from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.incubator_model import Incubator
 from app.models.IVF.canister_ln2_log_model import CanisterLn2Log
 from app.models.IVF.critical_alert_model import CriticalAlert
 from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
@@ -105,6 +109,8 @@ from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
 from app.models.IVF.ln2_readings_model import Ln2Reading
 from app.models.IVF.ln2_refill_detection_model import Ln2RefillDetection
 from app.models.IVF.device_model import Device
+from app.models.IVF.ivf_cycle_model import IvfCycle
+from app.models.IVF.ivf_cycle_log_model import IvfCycleLog
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
