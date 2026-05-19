@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Trophy, GitCompare } from 'lucide-react';
+import { X, Trophy, GitCompare, Star, Search } from 'lucide-react';
 
 interface LeaderboardEmbryo {
   id: string; time: string; aiScore: number; grade: string; quality: string; rank: number;
@@ -200,60 +200,134 @@ export default function EmbryoComparePage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {selectedEmbryoIds.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setSelectedEmbryoIds([])}
-                className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-rose-500 transition-colors"
-              >
-                <X size={10} />
-                Clear All
-              </button>
-            )}
-            {/* Slot progress */}
-            <div className="flex items-center gap-1">
-              {[0, 1, 2, 3].map(i => (
-                <div
-                  key={i}
-                  className="h-1.5 w-7 rounded-full transition-all duration-300"
-                  style={{ background: i < selectedEmbryoIds.length ? SLOT_COLORS[i].hex : '#E5E7EB' }}
-                />
-              ))}
-              <span className="text-[10px] font-bold text-gray-400 ml-1">{selectedEmbryoIds.length}/4</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedEmbryoIds([])}
+              disabled={selectedEmbryoIds.length === 0}
+              className={`flex items-center gap-1 text-[11px] transition-colors ${selectedEmbryoIds.length > 0 ? 'text-gray-500 hover:text-rose-500 cursor-pointer' : 'text-gray-300 cursor-not-allowed'}`}
+            >
+              <X size={10} />
+              Clear All
+            </button>
+            <span className="text-[11px] text-gray-400 font-medium">{selectedEmbryoIds.length} / 4 selected</span>
           </div>
         </div>
 
         {/* Empty state */}
         {selectedEmbryoIds.length === 0 ? (
-          <div className="flex flex-col items-center justify-center flex-1 py-16 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-primary-bg flex items-center justify-center mb-4 text-primary">
-              <GitCompare size={26} />
-            </div>
-            <p className="text-sm font-bold text-gray-600">Select embryos to compare</p>
-            <p className="text-xs text-gray-400 mt-1.5 max-w-[200px]">Pick up to 4 from the leaderboard for a side-by-side view</p>
-            <div className="flex gap-2 mt-5">
+          <div className="flex flex-col flex-1 gap-3 min-h-0">
+
+            {/* 4 slot cards */}
+            <div className="grid grid-cols-4 gap-3 flex-1 min-h-0">
               {[1, 2, 3, 4].map(i => (
-                <div key={i} className="w-9 h-9 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center">
-                  <span className="text-[9px] font-bold text-gray-300">{i}</span>
+                <div
+                  key={i}
+                  className="border border-dashed border-primary/20 rounded-2xl bg-primary/[0.02] flex flex-col items-center justify-center relative p-5"
+                >
+                  <div className="absolute top-3 left-3 w-6 h-6 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-gray-500">{i}</span>
+                  </div>
+                  <div className="w-11 h-11 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
+                    <span className="text-xl font-light text-gray-300 leading-none">+</span>
+                  </div>
+                  <p className="text-sm font-medium text-gray-400 text-center">Select embryo</p>
+                  <p className="text-[11px] text-gray-300 mt-1 text-center">Choose from leaderboard</p>
                 </div>
               ))}
             </div>
+
+            {/* Info strip */}
+            <div className="shrink-0 border border-gray-100 rounded-2xl bg-white px-4 py-3.5 flex items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3l2 6.5L20 11l-6.5 2L12 19.5l-1.5-6.5L4 11l6.5-2z"/>
+                  </svg>
+                  <p className="text-sm font-bold text-gray-900">Select embryos to view comparison</p>
+                </div>
+                <p className="text-[11px] text-gray-400">Choose up to 4 embryos from the leaderboard to compare their grades and metrics side by side.</p>
+              </div>
+              <div className="flex gap-1.5 shrink-0 opacity-25">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="w-14 h-16 rounded-xl border border-gray-300 bg-gray-100 flex flex-col gap-1 p-1.5">
+                    <div className="h-2 rounded bg-gray-200 w-full" />
+                    <div className="h-2 rounded bg-gray-200 w-3/4" />
+                    <div className="h-2 rounded bg-gray-200 w-full mt-auto" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Legend bar */}
+            <div className="shrink-0 border border-gray-100 rounded-2xl bg-white px-4 py-3 flex items-start gap-6 flex-wrap">
+              <div className="flex items-start gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="1.5" className="shrink-0 mt-0.5">
+                  <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="#6b1176"/>
+                </svg>
+                <div>
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">AI Score</div>
+                  <div className="text-[10px] text-gray-600">Overall prediction score</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Star size={15} className="text-primary shrink-0 mt-0.5" strokeWidth={1.5} />
+                <div>
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Grade</div>
+                  <div className="text-[10px] text-gray-600">Best grade prediction</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="flex gap-1 shrink-0 mt-0.5">
+                  {['EXP', 'ICM', 'TE'].map(tag => (
+                    <span key={tag} className="text-[8px] font-bold bg-primary/10 text-primary rounded px-1 py-0.5">{tag}</span>
+                  ))}
+                </div>
+                <div>
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Morphology</div>
+                  <div className="text-[10px] text-gray-600">
+                    <span className="font-semibold">EXP</span> Expansion &nbsp;
+                    <span className="font-semibold">ICM</span> Inner Cell Mass &nbsp;
+                    <span className="font-semibold">TE</span> Trophectoderm
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Search size={15} className="text-primary shrink-0 mt-0.5" strokeWidth={1.5} />
+                <div>
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Quality</div>
+                  <div className="text-[10px] text-gray-600">High / Good / Average / Low / Poor</div>
+                </div>
+              </div>
+            </div>
+
           </div>
         ) : (
-          <div className="overflow-x-auto flex justify-center">
+          <div className="overflow-x-auto flex justify-start">
             <div>
               <div
-                className="grid gap-3 items-start"
-                style={{ gridTemplateColumns: `repeat(${selectedEmbryoIds.length}, minmax(170px, 240px))` }}
+                className="grid gap-3 items-stretch"
+                style={{ gridTemplateColumns: `repeat(4, minmax(170px, 240px))` }}
               >
-                {selectedEmbryoIds.map((eid, idx) => {
+                {[0, 1, 2, 3].map(idx => {
+                  const eid = selectedEmbryoIds[idx];
+                  if (!eid) return (
+                    <div key={idx} className="border border-dashed border-primary/20 rounded-2xl bg-primary/[0.02] flex flex-col items-center justify-center relative p-5">
+                      <div className="absolute top-3 left-3 w-6 h-6 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-gray-400">{idx + 1}</span>
+                      </div>
+                      <div className="w-11 h-11 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
+                        <span className="text-xl font-light text-gray-300 leading-none">+</span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-400">Select embryo</p>
+                      <p className="text-[11px] text-gray-300 mt-1">Choose from leaderboard</p>
+                    </div>
+                  );
                   const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
                   const hex = SLOT_COLORS[idx].hex;
                   const gc = gradeCls(emb.grade);
 
                   return (
-                    <div key={eid} className="flex flex-col gap-2">
+                    <div key={idx} className="flex flex-col gap-2">
 
                       {/* Column header */}
                       <div
@@ -284,43 +358,27 @@ export default function EmbryoComparePage() {
                         </div>
                       </div>
 
-                      {/* Grade — quality-colored, full width */}
-                      <div className={`rounded-xl border px-3 py-2.5 flex items-center justify-between ${gc.bg} ${gc.border}`}>
-                        <div>
+                      {/* Grade + AI Score */}
+                      <div className={`rounded-xl border px-3 py-2.5 flex items-center gap-3 ${gc.bg} ${gc.border}`}>
+                        <div className="shrink-0">
                           <div className="text-[7px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Grade</div>
                           <div className={`text-2xl font-black leading-none ${gc.text}`}>{emb.grade}</div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-[7px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Quality</div>
-                          <div className={`text-[10px] font-bold ${gc.text}`}>{emb.quality.replace(' Quality', '')}</div>
-                        </div>
-                      </div>
-
-                      {/* AI Score */}
-                      <div className="rounded-xl border border-gray-200 bg-white px-2.5 py-2.5">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">AI Score</span>
-                          <span className={`text-sm font-black tabular-nums ${scoreTextCls(emb.aiScore)}`}>
-                            {emb.aiScore}
-                            <span className="text-[10px] font-medium text-gray-400"> / 10</span>
-                          </span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{ width: `${emb.aiScore * 10}%`, background: scoreColor(emb.aiScore) }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Exp / ICM / TE */}
-                      <div className="flex gap-1.5">
-                        {[{ label: 'Exp', value: emb.expansion }, { label: 'ICM', value: emb.icm }, { label: 'TE', value: emb.te }].map(chip => (
-                          <div key={chip.label} className="flex-1 rounded-xl bg-white border border-gray-200 px-1 py-2 text-center">
-                            <div className="text-[8px] text-gray-400 font-bold uppercase tracking-wide leading-none mb-1">{chip.label}</div>
-                            <div className="text-xs font-black text-gray-900">{chip.value}</div>
+                        <div className="w-px self-stretch bg-black/10 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest">AI Score</span>
+                            <span className={`text-sm font-black tabular-nums ${scoreTextCls(emb.aiScore)}`}>
+                              {emb.aiScore}<span className="text-[10px] font-medium text-gray-400"> / 10</span>
+                            </span>
                           </div>
-                        ))}
+                          <div className="h-1.5 rounded-full bg-black/10 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ width: `${emb.aiScore * 10}%`, background: scoreColor(emb.aiScore) }}
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       {/* Morphology section */}

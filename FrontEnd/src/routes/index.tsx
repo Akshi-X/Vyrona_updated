@@ -284,8 +284,8 @@ export const router = createBrowserRouter([
             { path: "/onboarding/support",                               element: <><Support /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/success",                               element: <><OnboardingSuccess /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/users",                                 element: <><UsersPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/embryo-grading",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/embryo-grading/:his/advanced",          element: <><AdvancedEmbryoGradingPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/embryo-console",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/embryo-console/:his/advanced",          element: <><AdvancedEmbryoGradingPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking/:id",                element: <><IncubatorDetailPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/track/:patientId",                      element: <><TrackPage /><ActiveOnboardingLevel /></> },
@@ -310,9 +310,9 @@ export const router = createBrowserRouter([
             { path: "/outbound-quality-tracking", element: <OutboundQualityTrackingWithVariant /> },
             { path: "/alert-setting", element: <AlertSettingWithAuth /> },
             { path: "/refill-log", element: <RefillLogWithAuth /> },
-            { path: "/embryo-grading", element: <EmbryoGradingWithAuth /> },
+            { path: "/embryo-console", element: <EmbryoGradingWithAuth /> },
             {
-                path: "/embryo-grading/:his",
+                path: "/embryo-console/:his",
                 element: <EmbryoShellWithAuth />,
                 children: [
                     { index: true,         element: <EmbryoGradingDetailPage /> },
