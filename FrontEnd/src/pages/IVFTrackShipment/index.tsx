@@ -64,7 +64,8 @@ export default function IVFTrackShipmentPage() {
         }>
     >([]);
     const [exporting, setExporting] = useState(false);
-    const [useNewCryocan, setUseNewCryocan] = useState(false);
+    const [useNewCryocan,] = useState(false);
+    // const [useNewCryocan, setUseNewCryocan] = useState(false);
     const [systemActivity, setSystemActivity] = useState<ActivityLogRecord[]>([]);
     const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
     const qualityChartRef = useRef<HTMLDivElement>(null);
@@ -538,7 +539,7 @@ export default function IVFTrackShipmentPage() {
                                     <div className="text-sm font-semibold text-black">
                                         {headerTankCode} - {headerBranchName}
                                     </div>
-                                    <div className="inline-flex rounded-lg border border-line bg-white p-1">
+                                    {/* <div className="inline-flex rounded-lg border border-line bg-white p-1">
                                         <button
                                             type="button"
                                             onClick={() => setUseNewCryocan(false)}
@@ -563,7 +564,7 @@ export default function IVFTrackShipmentPage() {
                                         >
                                             3D UI
                                         </button>
-                                    </div>
+                                    </div> */}
                                 </div>
                             </div>
                             {/* <ContainerProcessFlow /> */}
