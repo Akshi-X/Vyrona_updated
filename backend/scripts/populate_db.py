@@ -21,7 +21,11 @@ Usage:
 
 import logging
 import sys
+import os
 from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 from sqlalchemy.orm import Session
 from app.config.database import init_db as create_tables
@@ -202,17 +206,17 @@ USERS = [
         "department": "Medical",
     },
     {
-    "first_name": "Priya",
-    "last_name": "Raman",
-    "email": "priya.ivf@test.com",
-    "password": "Ivf@1234",
-    "role": "User",
-    "pharma_id": None,
-    "pharma_name": None,
-    "hospital_name": "ARC Fertility Hospitals",
-    "branch_name": "Chennai Main",
-    "department": "IVF",
-},
+        "first_name": "Priya",
+        "last_name": "Raman",
+        "email": "priya.ivf@test.com",
+        "password": "Ivf@1234",
+        "role": "User",
+        "pharma_id": None,
+        "pharma_name": None,
+        "hospital_name": "ARC Fertility Hospitals",
+        "branch_name": "Chennai Main",
+        "department": "IVF",
+    },
 ]
 
 
