@@ -82,7 +82,7 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 export default function EmbryoComparePage() {
-  const [selectedEmbryoIds, setSelectedEmbryoIds] = useState<string[]>(['EID 1.2']);
+  const [selectedEmbryoIds, setSelectedEmbryoIds] = useState<string[]>([]);
 
   const toggleEmbryo = (id: string) => {
     setSelectedEmbryoIds(prev => {
@@ -186,7 +186,7 @@ export default function EmbryoComparePage() {
       </div>
 
       {/* ── Compare panel ── */}
-      <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-auto rounded-2xl p-4 border border-gray-200 bg-[#FAF8FF]">
+      <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden rounded-2xl p-4 border border-gray-200 bg-[#FAF8FF]">
 
         {/* Panel header */}
         <div className="flex items-center justify-between shrink-0">
@@ -302,32 +302,34 @@ export default function EmbryoComparePage() {
 
           </div>
         ) : (
-          <div className="overflow-x-auto flex justify-start">
-            <div>
-              <div
-                className="grid gap-3 items-stretch"
-                style={{ gridTemplateColumns: `repeat(4, minmax(170px, 240px))` }}
-              >
-                {[0, 1, 2, 3].map(idx => {
-                  const eid = selectedEmbryoIds[idx];
-                  if (!eid) return (
-                    <div key={idx} className="border border-dashed border-primary/20 rounded-2xl bg-primary/[0.02] flex flex-col items-center justify-center relative p-5">
-                      <div className="absolute top-3 left-3 w-6 h-6 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
-                        <span className="text-[10px] font-bold text-gray-400">{idx + 1}</span>
-                      </div>
-                      <div className="w-11 h-11 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
-                        <span className="text-xl font-light text-gray-300 leading-none">+</span>
-                      </div>
-                      <p className="text-sm font-medium text-gray-400">Select embryo</p>
-                      <p className="text-[11px] text-gray-300 mt-1">Choose from leaderboard</p>
+          <div className="flex-1 min-h-0 overflow-x-auto">
+            <div
+              className="grid gap-3 h-full"
+              style={{ gridTemplateColumns: `repeat(4, minmax(170px, 240px))` }}
+            >
+              {[0, 1, 2, 3].map(idx => {
+                const eid = selectedEmbryoIds[idx];
+                if (!eid) return (
+                  <div key={idx} className="border border-dashed border-primary/20 rounded-2xl bg-primary/[0.02] flex flex-col items-center justify-center relative p-5">
+                    <div className="absolute top-3 left-3 w-6 h-6 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
+                      <span className="text-[10px] font-bold text-gray-400">{idx + 1}</span>
                     </div>
-                  );
-                  const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
-                  const hex = SLOT_COLORS[idx].hex;
-                  const gc = gradeCls(emb.grade);
+                    <div className="w-11 h-11 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
+                      <span className="text-xl font-light text-gray-300 leading-none">+</span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-400">Select embryo</p>
+                    <p className="text-[11px] text-gray-300 mt-1">Choose from leaderboard</p>
+                  </div>
+                );
+                const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
+                const hex = SLOT_COLORS[idx].hex;
+                const gc = gradeCls(emb.grade);
 
-                  return (
-                    <div key={idx} className="flex flex-col gap-2">
+                return (
+                  <div key={idx} className="flex flex-col min-h-0">
+
+                    {/* Fixed top: header + image + grade+score */}
+                    <div className="shrink-0 flex flex-col gap-2">
 
                       {/* Column header */}
                       <div
@@ -381,8 +383,13 @@ export default function EmbryoComparePage() {
                         </div>
                       </div>
 
+                    </div>
+
+                    {/* Scrollable bottom: morphology + classification */}
+                    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 pt-2">
+
                       {/* Morphology section */}
-                      <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest px-0.5 mt-1">Morphology</div>
+                      <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Morphology</div>
                       {([
                         { label: 'Fragmentation',  value: emb.fragPct,    bars: emb.fragBars    },
                         { label: 'Symmetry',       value: emb.symText,    bars: emb.symBars     },
@@ -390,7 +397,7 @@ export default function EmbryoComparePage() {
                         { label: 'Blastocoel',     value: emb.blastoText, bars: emb.blastoBars  },
                         { label: 'Vacuolization',  value: emb.vacuoleText,bars: emb.vacuoleBars },
                       ]).map(m => (
-                        <div key={m.label} className="rounded-xl border border-gray-100 bg-white px-2.5 py-2">
+                        <div key={m.label} className="rounded-xl border border-gray-100 bg-white px-2.5 py-2 shrink-0">
                           <div className="flex items-center justify-between mb-1.5">
                             <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">{m.label}</span>
                             <span className="text-[10px] font-bold text-gray-800">{m.value}</span>
@@ -422,9 +429,10 @@ export default function EmbryoComparePage() {
                       </div>
 
                     </div>
-                  );
-                })}
-              </div>
+
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

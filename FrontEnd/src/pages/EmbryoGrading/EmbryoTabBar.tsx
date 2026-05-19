@@ -28,7 +28,7 @@ export default function EmbryoTabBar({ his }: EmbryoTabBarProps) {
   ];
 
   return (
-    <div className="flex border border-primary mb-3 shrink-0 rounded-xl overflow-hidden" style={{ background: 'var(--gradient-primary)' }}>
+    <div className="flex border border-primary shrink-0 rounded-xl overflow-hidden" style={{ background: 'var(--gradient-primary)' }}>
       {tabs.map(tab => (
         <button
           key={tab.id}
