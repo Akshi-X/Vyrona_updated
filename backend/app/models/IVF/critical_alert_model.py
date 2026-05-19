@@ -109,6 +109,7 @@ class CriticalAlert(Base):
     # Acknowledgment information
     acknowledged_by = Column(String, nullable=True, comment="User ID who acknowledged the alert")
     acknowledged_at = Column(DateTime, nullable=True, comment="Timestamp when alert was acknowledged")
+    acknowledgment_reason = Column(String(500), nullable=True, comment="Reason provided by user when acknowledging the alert")
     
     # Reminder tracking
     last_reminder_sent_at = Column(DateTime, nullable=True, index=True, comment="Timestamp when last reminder email was sent")

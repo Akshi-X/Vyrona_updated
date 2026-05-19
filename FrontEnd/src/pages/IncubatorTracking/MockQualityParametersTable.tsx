@@ -2,11 +2,11 @@
 
 // Minimal mock version of IVFQualityParametersTable for incubator details
 export default function MockQualityParametersTable() {
-  const tileClass = "bg-white rounded-lg border border-[#E7E1E1] shadow-sm p-2 flex items-center gap-2 w-full";
+  const tileClass = "bg-white rounded-lg border border-line shadow-sm p-2 flex items-center gap-2 w-full";
 
   const renderTile = (label: string, value: string) => (
     <div className={tileClass}>
-      <div className="bg-[#FDF4FF] rounded-lg p-1 flex items-center justify-center">
+      <div className="bg-surface rounded-lg p-1 flex items-center justify-center">
         {/* empty icon placeholder */}
         <div className="h-5 w-5 bg-[#B58BC6] rounded-full" />
       </div>

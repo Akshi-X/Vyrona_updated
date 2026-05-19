@@ -43,14 +43,14 @@ const OnboardingSuccess: React.FC = () => {
                         <button
                             id="onboarding-success-dashboard-btn"
                             onClick={() => navigate("/onboarding/dashboard")}
-                            className="w-full bg-[#6b1176] text-white py-4 px-6 rounded-lg font-medium hover:bg-[#8a2a95] transition-colors duration-200"
+                            className="w-full bg-primary text-white py-4 px-6 rounded-lg font-medium hover:bg-[#8a2a95] transition-colors duration-200"
                         >
                             Go to Dashboard
                         </button>
                         <button
                             id="onboarding-success-profile-btn"
                             onClick={() => navigate("/onboarding/user-profile")}
-                            className="w-full border border-[#6b1176] text-[#6b1176] py-4 px-6 rounded-lg font-medium hover:bg-purple-50 transition-colors duration-200"
+                            className="w-full border border-primary text-primary py-4 px-6 rounded-lg font-medium hover:bg-purple-50 transition-colors duration-200"
                         >
                             Go to Profile
                         </button>

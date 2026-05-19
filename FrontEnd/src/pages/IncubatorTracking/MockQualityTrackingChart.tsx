@@ -88,8 +88,8 @@ export default function MockQualityTrackingChart() {
               onClick={() => setActiveKpi(tab.id)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
                 isActive
-                  ? 'bg-[#6B1176] text-white border-[#6B1176]'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-[#6B1176] hover:text-[#6B1176]'
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-primary hover:text-primary'
               }`}
             >
               {tab.label}
@@ -98,7 +98,7 @@ export default function MockQualityTrackingChart() {
         })}
       </div>
 
-      <div className="flex-1 rounded-lg border border-[#E7E1E1] bg-[#FBF9FD] p-3 min-h-[210px]">
+      <div className="flex-1 rounded-lg border border-line bg-[#FBF9FD] p-3 min-h-[210px]">
         {filteredSeries.length === 0 ? (
           <div className="h-full w-full flex items-center justify-center text-gray-400 text-sm">Waiting for data...</div>
         ) : (
@@ -106,7 +106,7 @@ export default function MockQualityTrackingChart() {
             <defs>
               <linearGradient id="incuChartLine" x1="0" x2="1" y1="0" y2="0">
                 <stop offset="0%" stopColor="#8b48a0" />
-                <stop offset="100%" stopColor="#6B1176" />
+                <stop offset="100%" stopColor="var(--color-primary)" />
               </linearGradient>
             </defs>
             {[0, 1, 2, 3].map((row) => (
@@ -127,7 +127,7 @@ export default function MockQualityTrackingChart() {
               const span = Math.max(max - min, 0.0001);
               const x = (idx / (values.length - 1 || 1)) * 840;
               const y = 210 - ((value - min) / span) * (210 - 12) - 6;
-              return <circle key={`${idx}-${value}`} cx={x} cy={y} r="2.8" fill="#6B1176" />;
+              return <circle key={`${idx}-${value}`} cx={x} cy={y} r="2.8" fill="var(--color-primary)" />;
             })}
           </svg>
         )}
@@ -148,8 +148,8 @@ export default function MockQualityTrackingChart() {
                 onClick={() => setTimeRange(range)}
                 className={`px-2 py-1 rounded text-xs font-medium border ${
                   isActive
-                    ? 'bg-[#6B1176] text-white border-[#6B1176]'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-[#6B1176] hover:text-[#6B1176]'
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-primary hover:text-primary'
                 }`}
               >
                 {range}

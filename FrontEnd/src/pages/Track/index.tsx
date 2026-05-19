@@ -301,11 +301,11 @@ export default function TrackPage() {
   }, [patientId]);
 
   return (
-    <div className="bg-[#FDFAFF] flex w-full h-full">
+    <div className="bg-surface flex w-full h-full">
       <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
 
         {/* Subheader with patient summary and icons */}
-        <div className="bg-[#ffffff] border-b border-[#E7E1E1] px-6 py-5 flex items-center justify-between">
+        <div className="bg-[#ffffff] border-b border-line px-6 py-5 flex items-center justify-between">
           <div className="flex items-center text-black text-sm font-semibold">
             <span>
               Patient ID: {patientId} - {loadingPatient ? 'Loading...' : (patientData?.condition || 'Condition Unknown')}
@@ -326,11 +326,11 @@ export default function TrackPage() {
                 </div>
               )}
               {/* Tooltip */}
-              <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+              <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                 <div className="font-semibold text-black text-xs whitespace-nowrap">
                   Critical Alerts
                 </div>
-                <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
               </div>
             </div>
             {/* Stakeholder Chats */}
@@ -347,11 +347,11 @@ export default function TrackPage() {
                 </div>
               )}
               {/* Tooltip */}
-              <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+              <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                 <div className="font-semibold text-black text-xs whitespace-nowrap">
                   Stakeholder Chats
                 </div>
-                <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
               </div>
             </div>
             {/* My Tasks */}
@@ -368,11 +368,11 @@ export default function TrackPage() {
                 </div>
               )}
               {/* Tooltip */}
-              <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+              <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                 <div className="font-semibold text-black text-xs whitespace-nowrap">
                   My Tasks
                 </div>
-                <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
               </div>
             </div>
              {/* Patient Summary */}
@@ -388,11 +388,11 @@ export default function TrackPage() {
                 }}
               />
               {/* Tooltip */}
-              <div className="absolute top-full -left-20 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+              <div className="absolute top-full -left-20 mt-2 px-3 py-2 bg-white border border-line rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                 <div className="font-semibold text-black text-xs whitespace-nowrap">
                   Patient Summary
                 </div>
-                <div className="absolute bottom-full left-[95px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                <div className="absolute bottom-full left-[95px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-border"></div>
               </div>
             </div>
           </div>
@@ -411,7 +411,7 @@ export default function TrackPage() {
 
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
           {/* Top progress rail with icons (dynamic) */}
-          <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 pb-8 px-[40px]">
+          <div className="bg-white border border-line rounded-lg p-4 pb-8 px-[40px]">
             {(() => {
               return (
             <div className="flex items-center justify-between">

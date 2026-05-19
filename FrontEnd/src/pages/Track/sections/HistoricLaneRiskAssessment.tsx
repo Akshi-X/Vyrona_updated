@@ -74,7 +74,7 @@ export default function HistoricLaneRiskAssessment() {
   }, [patientId]);
 
   return (
-    <div className="bg-white rounded-lg border border-[#E7E1E1] p-5 h-full">
+    <div className="bg-white rounded-lg border border-line p-5 h-full">
       <h3 className="font-semibold text-black text-[16px] mb-3">Historic Lane Risk Assessment</h3>
       <div className="overflow-x-auto rounded-lg ">
         {loading ? (
@@ -86,7 +86,7 @@ export default function HistoricLaneRiskAssessment() {
         ) : (
           <div className="max-h-[360px] overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
             <table className="w-full text-xs">
-              <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] sticky top-0 z-10">
+              <thead className="bg-surface text-primary text-[12px] sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-5 text-left font-[600]">Risk Factor</th>
                   <th className="px-4 py-5 text-left font-[600]">Risk Contributor</th>
