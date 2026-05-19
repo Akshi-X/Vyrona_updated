@@ -29,16 +29,13 @@ class IvfCycleService:
 
         m2 = data.oocyte_m2 or 0
         m1 = data.oocyte_m1 or 0
-        others = data.oocyte_others or 0
-        total_injected = m2 + m1 + others
+        total_injected = m2 + m1
 
         for i in range(total_injected):
             if i < m2:
                 maturity = "MII"
-            elif i < m2 + m1:
-                maturity = "MI"
             else:
-                maturity = "Others"
+                maturity = "MI"
             self.db.add(IvfCycleLog(
                 cycle_id=cycle.cycle_id,
                 oocyte_no=i + 1,

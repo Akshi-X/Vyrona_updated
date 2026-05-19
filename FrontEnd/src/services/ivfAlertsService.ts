@@ -24,6 +24,7 @@ export interface IVFAlert {
   occurred_at: string;
   acknowledged_by?: string;
   acknowledged_at?: string;
+  acknowledgment_reason?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -52,10 +53,12 @@ export interface HospitalAlertsResponse {
 
 export interface AcknowledgeAlertRequest {
   alert_id: string;
+  acknowledgment_reason?: string;
 }
 
 export interface AcknowledgeAlertsRequest {
   alert_id: string[];
+  acknowledgment_reason?: string;
 }
 
 export interface AcknowledgeAlertResponse {
@@ -63,6 +66,7 @@ export interface AcknowledgeAlertResponse {
   status: 'Active' | 'Acknowledged';
   message: string;
   acknowledged_at: string;
+  acknowledgment_reason?: string;
 }
 
 export interface AcknowledgeAlertsResponse {
@@ -71,6 +75,7 @@ export interface AcknowledgeAlertsResponse {
   message: string;
   acknowledged_count: number;
   acknowledged_at: string;
+  acknowledgment_reason?: string;
 }
 
 export interface CheckAlertsResponse {
@@ -105,20 +110,20 @@ export class IvfAlertsService extends BaseApiService {
   /**
    * Acknowledge an alert
    */
-  async acknowledgeAlert(alertId: string): Promise<AcknowledgeAlertResponse> {
+  async acknowledgeAlert(alertId: string, reason?: string): Promise<AcknowledgeAlertResponse> {
     return await this.post<AcknowledgeAlertResponse>(
       '/api/ivf/alerts/acknowledge',
-      { alert_id: alertId }
+      { alert_id: alertId, acknowledgment_reason: reason }
     );
   }
 
   /**
    * Acknowledge multiple alerts
    */
-  async acknowledgeAlerts(alertIds: string[]): Promise<AcknowledgeAlertsResponse> {
+  async acknowledgeAlerts(alertIds: string[], reason?: string): Promise<AcknowledgeAlertsResponse> {
     return await this.post<AcknowledgeAlertsResponse>(
       '/api/ivf/alerts/acknowledge-all',
-      { alert_id: alertIds }
+      { alert_id: alertIds, acknowledgment_reason: reason }
     );
   }
 

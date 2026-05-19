@@ -348,7 +348,7 @@ const VerifyOtp: React.FC = () => {
                                 onChange={(e) => setOtp(e.target.value)}
                                 maxLength={6}
                                 placeholder="Enter OTP"
-                                className="w-full border border-gray-300 rounded-md px-3 py-3 text-center text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-[#8b2a96]"
+                                className="w-full border border-gray-300 rounded-md px-3 py-3 text-center text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-primary-light"
                             />
 
 
@@ -381,7 +381,7 @@ const VerifyOtp: React.FC = () => {
                                     type="button"
                                     onClick={handleResendOTP}
                                     disabled={resending}
-                                    className="text-[#8b2a96] font-semibold underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="text-primary-light font-semibold underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {resending ? "Sending..." : "Resend OTP"}
                                 </button>
@@ -393,7 +393,7 @@ const VerifyOtp: React.FC = () => {
                             disabled={loading || timer === 0}
                             className={`w-full py-3 mb-3 rounded-md font-medium text-white transition ${loading || timer === 0
                                 ? "bg-gray-400 cursor-not-allowed"
-                                : "bg-[#6b1176] hover:bg-[#8b2a96] cursor-pointer"
+                                : "bg-primary hover:bg-primary-light cursor-pointer"
                                 }`}
                         >
                             {loading ? "Verifying..." : "Verify OTP"}
@@ -401,7 +401,7 @@ const VerifyOtp: React.FC = () => {
 
                         <button
                             type="button"
-                            className="w-full py-2 text-[#8b2a96] text-sm font-semibold underline mt-2 cursor-pointer"
+                            className="w-full py-2 text-primary-light text-sm font-semibold underline mt-2 cursor-pointer"
                             onClick={() => navigate("/login")}
                         >
                             Back to Login

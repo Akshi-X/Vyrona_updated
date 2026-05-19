@@ -1,74 +1,207 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  CalendarRange, Microscope, ClipboardCheck, Gem, Search, SlidersHorizontal,
+  ChevronRight, Timer, Camera, Clock,
+  ShieldAlert, ArrowUpRight,
+} from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
+import WavePurple from '../../assets/bottom-right1.svg';
+import WaveGreen  from '../../assets/bottom-right2.svg';
+import WaveBlue   from '../../assets/bottom-right3.svg';
+import WaveAmber  from '../../assets/bottom-right4.svg';
 import Modal from '../../components/Modal';
-import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
-import { ivfService, type IvfBranch, type IvfCycle, type IvfCycleLog, type IvfCycleWithLogs, type IvfLogUpsert, type IvfCycleCreate } from '../../services/ivfService';
+import Tooltip from '../../components/Tooltip';
+import { ivfService, type IvfBranch, type IvfCycle, type IvfCycleCreate, type IvfCycleWithLogs } from '../../services/ivfService';
 import { shipmentService } from '../../services/shipmentService';
 
-interface EmbryoGradingDetail {
-  grade: string;
-  description: string;
-  viability: string;
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const DAY_TASKS: Record<number, { task: string; dayLabel: string; urgency: 'urgent' | 'soon' | 'scheduled' }> = {
+  1: { task: 'Day 1 PN Check',           dayLabel: 'Day 1', urgency: 'scheduled' },
+  3: { task: 'Day 3 Cell Count Check',   dayLabel: 'Day 3', urgency: 'urgent'    },
+  5: { task: 'Day 5 Blastocyst Grading', dayLabel: 'Day 5', urgency: 'soon'      },
+  6: { task: 'Day 6 Final Assessment',   dayLabel: 'Day 6', urgency: 'scheduled' },
+};
+
+function cycleDay(opuDate: string): number {
+  const opu = new Date(opuDate);
+  opu.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.floor((today.getTime() - opu.getTime()) / 86_400_000);
 }
 
-interface EmbryologyLogFormState {
-  oocyteNo: string;
-  oocyteComments: string;
-  d0Maturity: string;
-  d0DropNo: string;
-  d0Notes: string;
-  d1Pn: string;
-  d1ZygoteStatus: string;
-  d1Notes: string;
-  day3DropNo: string;
-  day3CellCount: string;
-  day3Fragmentation: string;
-  day3Symmetry: string;
-  day3Notes: string;
-  day5Stage: string;
-  day5ExpansionGrade: string;
-  day5IcmGrade: string;
-  day5TeGrade: string;
-  day5Notes: string;
-  day6Stage: string;
-  day6ExpansionGrade: string;
-  day6IcmGrade: string;
-  day6TeGrade: string;
-  day6Progression: string;
-  day6Notes: string;
-  fate: string;
-  fzNo: string;
-  notes: string;
+function gradeTier(grade: string): 'high' | 'mid' | 'low' {
+  if (!grade || grade.length < 2) return 'low';
+  const expansion = parseInt(grade[0]);
+  if (isNaN(expansion)) return 'low';
+  const icmTe = grade.slice(1);
+  if (expansion >= 4 && (icmTe === 'AA' || icmTe === 'AB' || icmTe === 'BA')) return 'high';
+  if (expansion >= 3 && icmTe !== 'CC') return 'mid';
+  return 'low';
 }
+
+function statusLabel(status: string) {
+  return status === 'Active' ? 'In Progress' : status;
+}
+
+function statusChipCls(status: string) {
+  if (status === 'Active')            return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (status === 'Completed')         return 'bg-sky-50 text-sky-700 border-sky-200';
+  if (status === 'Needs Attention')   return 'bg-orange-50 text-orange-700 border-orange-200';
+  return 'bg-gray-50 text-gray-600 border-gray-200';
+}
+
+function gradeChipCls(grade: string | null) {
+  if (!grade) return 'bg-gray-100 text-gray-400';
+  const t = gradeTier(grade);
+  if (t === 'high') return 'bg-green-100 text-green-700';
+  if (t === 'mid')  return 'bg-amber-100 text-amber-700';
+  return 'bg-gray-100 text-gray-600';
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StatCard({
+  label, value, sub, icon, accent, iconBg, wave, trend, waveDown,
+}: {
+  label: string;
+  value: number | string;
+  sub: string;
+  icon: React.ReactNode;
+  accent: string;
+  iconBg: string;
+  wave: string;
+  trend?: { value: string; up: boolean };
+  waveDown?: boolean;
+}) {
+  return (
+    <div
+      className="border border-gray-100 rounded-2xl px-5 py-4 flex items-center justify-between relative overflow-hidden shadow-sm bg-white"
+    >
+      <img
+        src={wave}
+        aria-hidden="true"
+        alt=""
+        className="absolute right-0 w-full pointer-events-none select-none"
+        style={{ bottom: waveDown ? '-14px' : '0px' }}
+      />
+
+      {/* Text */}
+      <div className="relative z-10">
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: accent }}>{label}</p>
+        <p className="text-3xl font-extrabold text-gray-900 mt-2 leading-none">{value}</p>
+        {trend ? (
+          <div className="flex items-center gap-1 mt-2">
+            <ArrowUpRight size={11} className="text-emerald-500" />
+            <span className="text-[11px] font-semibold text-emerald-500">{trend.value}</span>
+            <span className="text-[10px] text-gray-400">{sub}</span>
+          </div>
+        ) : (
+          <p className="text-[10px] text-gray-400 mt-2">{sub}</p>
+        )}
+      </div>
+
+      {/* Icon with soft circular backdrop */}
+      <div
+        className="relative z-10 shrink-0 w-14 h-14 rounded-full flex items-center justify-center"
+        style={{ background: iconBg }}
+      >
+        {icon}
+      </div>
+    </div>
+  );
+}
+
+function DonutChart({ high, mid, low, notGraded, total }: {
+  high: number; mid: number; low: number; notGraded: number; total: number;
+}) {
+  const totalGraded = high + mid + low;
+
+  const segs = [
+    { v: high,      light: '#7c1e87', dark: '#6b1176' },
+    { v: mid,       light: '#a855c2', dark: '#8b3aa3' },
+    { v: low,       light: '#c8a8d8', dark: '#b08cc0' },
+    { v: notGraded, light: '#e8d5f0', dark: '#dac4e6' },
+  ];
+
+  const stops: string[] = [];
+  let curr = 0;
+  segs.forEach(s => {
+    if (s.v === 0) return;
+    const pct = (s.v / (total || 1)) * 100;
+    stops.push(`${s.light} ${curr.toFixed(1)}%`);
+    stops.push(`${s.dark} ${(curr + pct).toFixed(1)}%`);
+    curr += pct;
+  });
+  if (curr < 100) {
+    stops.push(`#e8d5f0 ${curr.toFixed(1)}%`);
+    stops.push(`#e8d5f0 100%`);
+  }
+
+  const bg = total > 0
+    ? `conic-gradient(from -90deg, ${stops.join(', ')})`
+    : 'conic-gradient(from -90deg, #e8d5f0 100%)';
+
+  return (
+    <div className="relative w-28 h-28 shrink-0">
+      <div className="w-full h-full rounded-full" style={{ background: bg }} />
+      <div
+        className="absolute rounded-full bg-white flex flex-col items-center justify-center pointer-events-none"
+        style={{ inset: '20px' }}
+      >
+        <p className="text-xl font-extrabold text-gray-900 leading-none">{totalGraded}</p>
+        <p className="text-[8px] text-gray-400 mt-0.5">Total Graded</p>
+      </div>
+    </div>
+  );
+}
+
+function Sparkline({
+  points = [3, 4.5, 3.8, 5.2, 4.1, 5.8, 5.5, 6.2, 5.9, 7],
+  color = '#6b1176',
+  fillOpacity = 0.15,
+}: { points?: number[]; color?: string; fillOpacity?: number }) {
+  const w = 100, h = 40;
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = max - min || 1;
+  const coords = points.map((p, i) => ({
+    x: (i / (points.length - 1)) * w,
+    y: h - ((p - min) / range) * (h * 0.75) - h * 0.12,
+  }));
+  const d = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+  const area = `${d} L${w},${h} L0,${h} Z`;
+  const gradId = `spkGrad-${color.replace(/[^a-z0-9]/gi, '')}`;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={fillOpacity} />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gradId})`} />
+      <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {coords.map((c, i) => (
+        <circle key={i} cx={c.x.toFixed(1)} cy={c.y.toFixed(1)} r={i === coords.length - 1 ? 3 : 2} fill={color} />
+      ))}
+    </svg>
+  );
+}
+
+// ── Form state type ───────────────────────────────────────────────────────────
 
 interface NewEmbryoFormState {
-  hisNumber: string;
-  patientName: string;
-  oocytes: string;
-  m2: string;
-  m1: string;
-  gv: string;
-  others: string;
-  injected: string;
-  cryolockNum: string;
-  embryoGrading: string;
-  siteName: string;
-  branch_id: number | null;
-  status: string;
-  tankCode: string;
-  canisterNum: string;
-  caneCode: string;
-  gobletColor: string;
-  cryolockColor: string;
-  description: string;
-  injectionMethod: string;
-  spermQuality: string;
-  oocytesQuality: string;
-  cycleType: string;
-  incubator_id: number | null;
-  chamberPosition: string;
+  hisNumber: string; patientName: string; oocytes: string;
+  m2: string; m1: string; gv: string; others: string; injected: string;
+  cryolockNum: string; embryoGrading: string; siteName: string;
+  branch_id: number | null; status: string; tankCode: string;
+  canisterNum: string; caneCode: string; gobletColor: string;
+  cryolockColor: string; description: string; injectionMethod: string;
+  spermQuality: string; oocytesQuality: string; cycleType: string;
+  opuDate: string; incubator_id: number | null; chamberPosition: string;
 }
 
 interface IncubatorItem {
@@ -79,102 +212,33 @@ interface IncubatorItem {
   chamber_c: number | null;
 }
 
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function EmbryoGradingPage() {
   const navigate = useNavigate();
-  const { his } = useParams<{ his: string }>();
-  const detailHis = his?.trim().toUpperCase() || '';
-  const isDetailView = Boolean(detailHis);
-  const [cycles, setCycles] = useState<IvfCycle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<string>('All');
-  const [selectedCycle, setSelectedCycle] = useState<IvfCycleWithLogs | null>(null);
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [isAddLogFormOpen, setIsAddLogFormOpen] = useState(false);
-  const [logSaving, setLogSaving] = useState(false);
-  const [cycleCreating, setCycleCreating] = useState(false);
-  const [editingLogId, setEditingLogId] = useState<number | null>(null);
+  const [cycles, setCycles]     = useState<IvfCycle[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
   const [isAddEmbryoFormOpen, setIsAddEmbryoFormOpen] = useState(false);
   const [branches, setBranches] = useState<IvfBranch[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [incubators, setIncubators] = useState<IncubatorItem[]>([]);
   const [incubatorsLoading, setIncubatorsLoading] = useState(false);
   const [selectedIncubator, setSelectedIncubator] = useState<IncubatorItem | null>(null);
-  const [logModalStep, setLogModalStep] = useState(0);
+  const [cycleCreating, setCycleCreating] = useState(false);
+  const [cyclesWithLogs, setCyclesWithLogs] = useState<IvfCycleWithLogs[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [completedSearchQuery, setCompletedSearchQuery] = useState('');
+
   const [newEmbryoForm, setNewEmbryoForm] = useState<NewEmbryoFormState>({
-    hisNumber: '',
-    patientName: '',
-    oocytes: '',
-    m2: '',
-    m1: '',
-    gv: '',
-    others: '',
-    injected: '',
-    cryolockNum: '',
-    embryoGrading: '4AA',
-    siteName: '',
-    branch_id: null,
-    status: 'Stored',
-    tankCode: '',
-    canisterNum: '',
-    caneCode: '',
-    gobletColor: '',
-    cryolockColor: '',
-    description: '',
-    injectionMethod: '',
-    spermQuality: '',
-    oocytesQuality: '',
-    cycleType: '',
-    incubator_id: null,
-    chamberPosition: '',
+    hisNumber: '', patientName: '', oocytes: '', m2: '', m1: '', gv: '',
+    others: '', injected: '', cryolockNum: '', embryoGrading: '4AA',
+    siteName: '', branch_id: null, status: 'Stored', tankCode: '',
+    canisterNum: '', caneCode: '', gobletColor: '', cryolockColor: '',
+    description: '', injectionMethod: '', spermQuality: '', oocytesQuality: '',
+    cycleType: '', opuDate: new Date().toISOString().slice(0, 10),
+    incubator_id: null, chamberPosition: '',
   });
-  const [logForm, setLogForm] = useState<EmbryologyLogFormState>({
-    oocyteNo: '',
-    oocyteComments: '',
-    d0Maturity: 'MII',
-    d0DropNo: '',
-    d0Notes: '',
-    d1Pn: '2PN',
-    d1ZygoteStatus: '',
-    d1Notes: '',
-    day3DropNo: '',
-    day3CellCount: '',
-    day3Fragmentation: '',
-    day3Symmetry: '',
-    day3Notes: '',
-    day5Stage: '',
-    day5ExpansionGrade: '',
-    day5IcmGrade: '',
-    day5TeGrade: '',
-    day5Notes: '',
-    day6Stage: '',
-    day6ExpansionGrade: '',
-    day6IcmGrade: '',
-    day6TeGrade: '',
-    day6Progression: '',
-    day6Notes: '',
-    fate: '',
-    fzNo: '',
-    notes: '',
-  });
-
-  // Mock embryo grading details data
-  const getEmbryoGradingDetails = (grade: string): EmbryoGradingDetail => {
-    const gradingData: Record<string, EmbryoGradingDetail> = {
-      '4AA': { grade: '4AA', description: 'Excellent quality blastocyst with perfect inner cell mass and trophectoderm morphology.', viability: 'Highest implantation potential' },
-      '4AB': { grade: '4AB', description: 'Very good quality blastocyst with excellent inner cell mass but slightly less optimal trophectoderm.', viability: 'Very high implantation potential' },
-      '4BA': { grade: '4BA', description: 'Good quality blastocyst with excellent trophectoderm but slightly less optimal inner cell mass.', viability: 'High implantation potential' },
-      '4BB': { grade: '4BB', description: 'Good quality blastocyst with balanced morphology between inner cell mass and trophectoderm.', viability: 'Good implantation potential' },
-      '3AA': { grade: '3AA', description: 'Expanding blastocyst with excellent cell morphology but not fully expanded.', viability: 'Good implantation potential' },
-      '2AA': { grade: '2AA', description: 'Early blastocyst with excellent cell morphology but minimal expansion.', viability: 'Moderate implantation potential' },
-    };
-    return gradingData[grade] || {
-      grade: grade || 'Unknown',
-      description: 'Grading information not available for this embryo.',
-      viability: 'Unknown',
-    };
-  };
-
 
   useEffect(() => {
     const fetchCycles = async () => {
@@ -192,266 +256,129 @@ export default function EmbryoGradingPage() {
     fetchCycles();
   }, []);
 
-  // Fetch branches when Add Cycle modal opens
+  useEffect(() => {
+    const active = cycles.filter(c => c.status === 'Active');
+    if (active.length === 0) { setCyclesWithLogs([]); return; }
+    let cancelled = false;
+    Promise.all(active.map(c => ivfService.getCycleWithLogs(c.cycle_id)))
+      .then(results => { if (!cancelled) setCyclesWithLogs(results); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [cycles]);
+
   useEffect(() => {
     if (!isAddEmbryoFormOpen) return;
     setBranchesLoading(true);
-    ivfService.getBranches().then((res) => {
+    ivfService.getBranches().then(res => {
       setBranches(Array.isArray(res?.branches) ? res.branches : []);
-    }).catch(() => {
-      setBranches([]);
-    }).finally(() => setBranchesLoading(false));
+    }).catch(() => setBranches([]))
+      .finally(() => setBranchesLoading(false));
   }, [isAddEmbryoFormOpen]);
 
-  const statusOptions = React.useMemo(() => {
-    const set = new Set<string>();
-    cycles.forEach(c => { if (c.status) set.add(c.status); });
-    return ['All', ...Array.from(set).sort()];
-  }, [cycles]);
+  // ── Computed ───────────────────────────────────────────────────────────────
 
-  const activeFilterCount = React.useMemo(() => {
-    return selectedStatus !== 'All' ? 1 : 0;
-  }, [selectedStatus]);
+  const activeCycles = useMemo(() => cycles.filter(c => c.status === 'Active'), [cycles]);
+  const completedCycles = useMemo(() => cycles.filter(c => c.status === 'Completed'), [cycles]);
 
-  const filteredCycles = React.useMemo(() => {
-    return cycles.filter(c => selectedStatus === 'All' || c.status === selectedStatus);
-  }, [cycles, selectedStatus]);
-
-  const cycleStats = React.useMemo(() => {
-    const total = filteredCycles.length;
-    const active = filteredCycles.filter(c => c.status === 'Active').length;
-    const completed = filteredCycles.filter(c => c.status === 'Completed').length;
-    const paused = filteredCycles.filter(c => c.status === 'Paused').length;
-    return { total, active, completed, paused };
-  }, [filteredCycles]);
-
-  useEffect(() => {
-    if (!detailHis || cycles.length === 0) return;
-    const matched = cycles.find(c => c.his_id.toUpperCase() === detailHis);
-    if (!matched) return;
-    setLogsLoading(true);
-    ivfService.getCycleWithLogs(matched.cycle_id)
-      .then(setSelectedCycle)
-      .catch(() => {})
-      .finally(() => setLogsLoading(false));
-  }, [detailHis, cycles]);
-
-  const resetLogForm = () => {
-    setLogForm({
-      oocyteNo: '',
-      oocyteComments: '',
-      d0Maturity: 'MII',
-      d0DropNo: '',
-      d0Notes: '',
-      d1Pn: '2PN',
-      d1ZygoteStatus: '',
-      d1Notes: '',
-      day3DropNo: '',
-      day3CellCount: '',
-      day3Fragmentation: '',
-      day3Symmetry: '',
-      day3Notes: '',
-      day5Stage: '',
-      day5ExpansionGrade: '',
-      day5IcmGrade: '',
-      day5TeGrade: '',
-      day5Notes: '',
-      day6Stage: '',
-      day6ExpansionGrade: '',
-      day6IcmGrade: '',
-      day6TeGrade: '',
-      day6Progression: '',
-      day6Notes: '',
-      fate: '',
-      fzNo: '',
-      notes: '',
-    });
-    setLogModalStep(0);
-  };
-
-  const handleLogFieldChange = (field: keyof EmbryologyLogFormState, value: string) => {
-    setLogForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  // Helper function to generate Day 3 label (e.g., "8C1")
-  const generateDay3Label = (cellCount: string, fragmentation: string): string => {
-    if (!cellCount || !fragmentation) return '—';
-    return `${cellCount}C${fragmentation}`;
-  };
-
-  // Helper function to generate blast grade label (e.g., "5AA", "4AB")
-  const generateBlastLabel = (expansion: string, icm: string, te: string): string => {
-    if (!expansion || !icm || !te) return '—';
-    return `${expansion}${icm}${te}`;
-  };
-
-  // Helper function to get color for grade (AA=green, BB=yellow, CC=red)
-  const getGradeColor = (label: string): string => {
-    if (!label || label === '—') return '';
-    const icmTe = label.slice(1);
-    if (icmTe === 'AA') return 'text-green-600 font-semibold';
-    if (icmTe === 'BB') return 'text-yellow-600 font-semibold';
-    if (icmTe === 'AB' || icmTe === 'BA') return 'text-amber-600 font-semibold';
-    return '';
-  };
-
-  const renderBlastBadge = (label: string) => {
-    if (!label || label === '—') return <span className="text-gray-400 text-xs">—</span>;
-    const expansion = label.charAt(0);
-    const icmTe = label.slice(1);
-    const isKnownGrade = /^[A-C]{2}$/.test(icmTe);
-    if (!isKnownGrade) {
-      return <span className="inline-block rounded px-1.5 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600">{label}</span>;
-    }
-    const chipClass = icmTe === 'AA' ? 'bg-green-50 border border-green-200' : icmTe === 'BB' ? 'bg-yellow-50 border border-yellow-200' : 'bg-amber-50 border border-amber-200';
-    const gradeClass = icmTe === 'AA' ? 'text-green-700' : icmTe === 'BB' ? 'text-yellow-700' : 'text-amber-700';
-    return (
-      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-bold ${chipClass}`}>
-        <span className="text-gray-400 mr-0.5">{expansion}</span>
-        <span className={gradeClass}>{icmTe}</span>
-      </span>
+  const filteredActiveCycles = useMemo(() => {
+    if (!searchQuery.trim()) return activeCycles;
+    const q = searchQuery.toLowerCase();
+    return activeCycles.filter(c =>
+      c.patient_name?.toLowerCase().includes(q) || c.his_id.toLowerCase().includes(q)
     );
-  };
+  }, [activeCycles, searchQuery]);
 
-  const handleAddLogEntry = async () => {
-    if (!selectedCycle) return;
-    setLogSaving(true);
+  const allGrades = useMemo(() => {
+    const g: string[] = [];
+    cyclesWithLogs.forEach(c => c.logs.forEach(l => {
+      if (l.d5_grade) g.push(l.d5_grade);
+      if (l.d6_grade) g.push(l.d6_grade);
+    }));
+    return g;
+  }, [cyclesWithLogs]);
 
-    const day3Grade = generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation);
-    const d5Grade = generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade);
-    const d6Grade = generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade);
+  const gradingOverview = useMemo(() => {
+    let high = 0, mid = 0, low = 0, notGraded = 0;
+    cyclesWithLogs.forEach(c => c.logs.forEach(l => {
+      const grade = l.d5_grade || l.d6_grade;
+      if (!grade) { notGraded++; return; }
+      const t = gradeTier(grade);
+      if (t === 'high') high++;
+      else if (t === 'mid') mid++;
+      else low++;
+    }));
+    return { high, mid, low, notGraded, total: high + mid + low + notGraded };
+  }, [cyclesWithLogs]);
 
-    const meta: Record<string, string> = {};
-    if (logForm.d0Notes) meta.d0_notes = logForm.d0Notes;
-    if (logForm.d1Notes) meta.d1_notes = logForm.d1Notes;
-    if (logForm.day3Notes) meta.d3_notes = logForm.day3Notes;
-    if (logForm.day5Notes) meta.d5_notes = logForm.day5Notes;
-    if (logForm.day6Notes) meta.d6_notes = logForm.day6Notes;
-    if (logForm.notes) meta.final_notes = logForm.notes;
+  const topGrade = useMemo(() => {
+    const hg = allGrades.filter(g => gradeTier(g) === 'high');
+    if (!hg.length) return null;
+    const counts = new Map<string, number>();
+    hg.forEach(g => counts.set(g, (counts.get(g) ?? 0) + 1));
+    let best = '', bestN = 0;
+    counts.forEach((n, g) => { if (n > bestN) { bestN = n; best = g; } });
+    return best || null;
+  }, [allGrades]);
 
-    const payload: IvfLogUpsert = {
-      oocyte_no: parseInt(logForm.oocyteNo, 10) || 0,
-      ...(logForm.oocyteComments && { oocyte_comments: logForm.oocyteComments }),
-      ...(logForm.d0Maturity && { d0_maturity: logForm.d0Maturity }),
-      ...(logForm.d0DropNo && { d0_drop_no: logForm.d0DropNo }),
-      ...(logForm.d1Pn && { d1_pn: logForm.d1Pn }),
-      ...(logForm.d1ZygoteStatus && { d1_zygote_status: logForm.d1ZygoteStatus }),
-      ...(logForm.day3DropNo && { d3_drop_no: logForm.day3DropNo }),
-      ...(day3Grade !== '—' && { d3_grade: day3Grade }),
-      ...(logForm.day3Symmetry && { d3_symmetry: logForm.day3Symmetry }),
-      ...(logForm.day5Stage && { d5_stage: logForm.day5Stage }),
-      ...(d5Grade !== '—' && { d5_grade: d5Grade }),
-      ...(logForm.day6Stage && { d6_stage: logForm.day6Stage }),
-      ...(d6Grade !== '—' && { d6_grade: d6Grade }),
-      ...(logForm.day6Progression && { d6_progression: logForm.day6Progression }),
-      ...(logForm.fate && { fate: logForm.fate }),
-      ...(logForm.fzNo && { freeze_no: logForm.fzNo }),
-      ...(Object.keys(meta).length > 0 && { meta }),
-    };
+  const todayQueue = useMemo(() => cycles
+    .filter(c => c.status === 'Active' && c.opu_date)
+    .flatMap(c => {
+      const day = cycleDay(c.opu_date!);
+      const t = DAY_TASKS[day];
+      return t ? [{ cycle: c, day, ...t }] : [];
+    }), [cycles]);
 
-    try {
-      await ivfService.upsertLog(selectedCycle.cycle_id, payload);
-      const updated = await ivfService.getCycleWithLogs(selectedCycle.cycle_id);
-      setSelectedCycle(updated);
-    } catch {
-      // log entry save failure is silent for now
-    } finally {
-      setLogSaving(false);
-    }
+  const needsAttentionItems = useMemo(() => {
+    const overdue   = cycles.filter(c => c.status === 'Active' && c.opu_date && cycleDay(c.opu_date) > 6).length;
+    const noBlast   = cyclesWithLogs.filter(c => c.logs.length > 0 && !c.logs.some(l => l.d5_grade || l.d6_grade)).length;
+    const lowQual   = cyclesWithLogs.filter(c => c.logs.some(l => { const g = l.d5_grade || l.d6_grade; return g && gradeTier(g) === 'low'; })).length;
+    return [
+      { Icon: Timer,      label: 'Cycles waiting for grading', sub: `${todayQueue.length} cycles are pending grading`, count: todayQueue.length, iBg: 'bg-orange-50', iCl: 'text-orange-500', cBg: 'bg-orange-50', cCl: 'text-orange-600' },
+      { Icon: Camera,     label: 'Images awaiting upload',     sub: `${noBlast} oocytes need images`,                  count: noBlast,           iBg: 'bg-purple-50', iCl: 'text-purple-500', cBg: 'bg-purple-50', cCl: 'text-purple-600' },
+      { Icon: Clock,      label: 'Overdue grading',            sub: `${overdue} cycles are overdue`,                   count: overdue,           iBg: 'bg-red-50',    iCl: 'text-red-500',    cBg: 'bg-red-50',    cCl: 'text-red-600'    },
+      { Icon: ShieldAlert, label: 'Quality check flagged',     sub: `${lowQual} cycles need review`,                   count: lowQual,           iBg: 'bg-teal-50',   iCl: 'text-teal-500',   cBg: 'bg-teal-50',   cCl: 'text-teal-600'   },
+    ];
+  }, [cycles, todayQueue, cyclesWithLogs]);
 
-    setEditingLogId(null);
-    resetLogForm();
-    setIsAddLogFormOpen(false);
-  };
+  const recentActivity = useMemo(() =>
+    cycles
+      .filter(c => c.status === 'Completed')
+      .sort((a, b) => {
+        if (a.opu_date && b.opu_date) return new Date(b.opu_date).getTime() - new Date(a.opu_date).getTime();
+        return 0;
+      }),
+  [cycles]);
 
-  const parseD3Grade = (grade: string | null) => {
-    if (!grade) return { cells: '', frag: '' };
-    const m = grade.match(/^(\d+)C(\d+)$/);
-    return m ? { cells: m[1], frag: m[2] } : { cells: '', frag: '' };
-  };
+  const filteredCompletedCycles = useMemo(() => {
+    if (!completedSearchQuery.trim()) return recentActivity;
+    const q = completedSearchQuery.toLowerCase();
+    return recentActivity.filter(c =>
+      c.patient_name?.toLowerCase().includes(q) || c.his_id.toLowerCase().includes(q)
+    );
+  }, [recentActivity, completedSearchQuery]);
 
-  const parseBlastGrade = (grade: string | null) => {
-    if (!grade || grade.length < 3) return { exp: '', icm: '', te: '' };
-    return { exp: grade[0], icm: grade[1], te: grade[2] };
-  };
-
-  const openEditLog = (log: IvfCycleLog, step: number) => {
-    const d3 = parseD3Grade(log.d3_grade);
-    const d5 = parseBlastGrade(log.d5_grade);
-    const d6 = parseBlastGrade(log.d6_grade);
-    setLogForm({
-      oocyteNo: String(log.oocyte_no),
-      oocyteComments: log.oocyte_comments || '',
-      d0Maturity: log.d0_maturity || 'MII',
-      d0DropNo: log.d0_drop_no || '',
-      d0Notes: log.meta?.d0_notes || '',
-      d1Pn: log.d1_pn || '2PN',
-      d1ZygoteStatus: log.d1_zygote_status || '',
-      d1Notes: log.meta?.d1_notes || '',
-      day3DropNo: log.d3_drop_no || '',
-      day3CellCount: d3.cells,
-      day3Fragmentation: d3.frag,
-      day3Symmetry: log.d3_symmetry || '',
-      day3Notes: log.meta?.d3_notes || '',
-      day5Stage: log.d5_stage || '',
-      day5ExpansionGrade: d5.exp,
-      day5IcmGrade: d5.icm,
-      day5TeGrade: d5.te,
-      day5Notes: log.meta?.d5_notes || '',
-      day6Stage: log.d6_stage || '',
-      day6ExpansionGrade: d6.exp,
-      day6IcmGrade: d6.icm,
-      day6TeGrade: d6.te,
-      day6Progression: log.d6_progression || '',
-      day6Notes: log.meta?.d6_notes || '',
-      fate: log.fate || '',
-      fzNo: log.freeze_no || '',
-      notes: log.meta?.final_notes || '',
-    });
-    setEditingLogId(log.log_id);
-    setLogModalStep(step);
-    setIsAddLogFormOpen(true);
-  };
-
+  // ── Form helpers ───────────────────────────────────────────────────────────
 
   const resetNewEmbryoForm = () => {
     setNewEmbryoForm({
-      hisNumber: '',
-      patientName: '',
-      oocytes: '',
-      m2: '',
-      m1: '',
-      gv: '',
-      others: '',
-      injected: '',
-      cryolockNum: '',
-      embryoGrading: '4AA',
-      siteName: '',
-      branch_id: null,
-      status: 'Stored',
-      tankCode: '',
-      canisterNum: '',
-      caneCode: '',
-      gobletColor: '',
-      cryolockColor: '',
-      description: '',
-      injectionMethod: '',
-      spermQuality: '',
-      oocytesQuality: '',
-      cycleType: '',
-      incubator_id: null,
-      chamberPosition: '',
+      hisNumber: '', patientName: '', oocytes: '', m2: '', m1: '', gv: '',
+      others: '', injected: '', cryolockNum: '', embryoGrading: '4AA',
+      siteName: '', branch_id: null, status: 'Stored', tankCode: '',
+      canisterNum: '', caneCode: '', gobletColor: '', cryolockColor: '',
+      description: '', injectionMethod: '', spermQuality: '', oocytesQuality: '',
+      cycleType: '', opuDate: new Date().toISOString().slice(0, 10),
+      incubator_id: null, chamberPosition: '',
     });
     setSelectedIncubator(null);
     setIncubators([]);
   };
 
   const handleNewEmbryoFieldChange = (field: keyof NewEmbryoFormState, value: string | number | null) => {
-    setNewEmbryoForm((prev) => {
+    setNewEmbryoForm(prev => {
       const next = { ...prev, [field]: value };
       const toNum = (v: string) => { const n = Number.parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : 0; };
       if (field === 'm2' || field === 'm1' || field === 'others' || field === 'gv') {
-        const injected = toNum(next.m2) + toNum(next.m1) + toNum(next.others);
+        const injected = toNum(next.m2) + toNum(next.m1);
         next.injected = injected > 0 ? String(injected) : '';
         const oocytes = toNum(next.m2) + toNum(next.m1) + toNum(next.gv) + toNum(next.others);
         next.oocytes = oocytes > 0 ? String(oocytes) : '';
@@ -460,671 +387,569 @@ export default function EmbryoGradingPage() {
     });
   };
 
+  const parseCount = (v: string) => { const n = Number.parseInt(v.trim(), 10); return Number.isFinite(n) && n > 0 ? n : undefined; };
+
   const handleAddEmbryo = async () => {
     const hisNumber = newEmbryoForm.hisNumber.trim();
-    if (!hisNumber) return;
+    const m2 = parseCount(newEmbryoForm.m2) ?? 0;
+    const m1 = parseCount(newEmbryoForm.m1) ?? 0;
+    const missing: string[] = [];
+    if (!hisNumber) missing.push('HIS Number');
+    if (!newEmbryoForm.patientName.trim()) missing.push('Patient Name');
+    if (!newEmbryoForm.opuDate) missing.push('OPU Date');
+    if (!newEmbryoForm.injectionMethod) missing.push('Method of Injection');
+    if (!newEmbryoForm.spermQuality) missing.push('Sperm Quality');
+    if (!newEmbryoForm.oocytesQuality) missing.push('Oocytes Quality');
+    if (!newEmbryoForm.cycleType) missing.push('Cycle Type');
+    if (!newEmbryoForm.branch_id) missing.push('Branch');
+    if (!newEmbryoForm.incubator_id) missing.push('Incubator');
+    if (!newEmbryoForm.chamberPosition) missing.push('Chamber Position');
+    if (m2 + m1 === 0) missing.push('At least one injected oocyte (M2 or M1)');
+    if (missing.length > 0) {
+      alert(`Please fill in the following fields:\n• ${missing.join('\n• ')}`);
+      return;
+    }
     setCycleCreating(true);
-    const parseCount = (v: string) => { const n = Number.parseInt(v.trim(), 10); return Number.isFinite(n) && n > 0 ? n : undefined; };
-
     const payload: IvfCycleCreate = {
       his_id: hisNumber,
-      ...(newEmbryoForm.patientName.trim() && { patient_name: newEmbryoForm.patientName.trim() }),
-      ...(newEmbryoForm.branch_id != null && { branch_id: newEmbryoForm.branch_id }),
-      ...(newEmbryoForm.incubator_id != null && { incubator_id: newEmbryoForm.incubator_id }),
-      ...(newEmbryoForm.chamberPosition && { chamber_position: newEmbryoForm.chamberPosition }),
-      ...(newEmbryoForm.injectionMethod && { injection_method: newEmbryoForm.injectionMethod }),
-      ...(newEmbryoForm.spermQuality && { sperm_quality: newEmbryoForm.spermQuality }),
-      ...(newEmbryoForm.oocytesQuality && { oocyte_quality: newEmbryoForm.oocytesQuality }),
-      ...(newEmbryoForm.cycleType && { cycle_type: newEmbryoForm.cycleType }),
-      oocyte_m2: parseCount(newEmbryoForm.m2),
-      oocyte_m1: parseCount(newEmbryoForm.m1),
-      oocyte_gv: parseCount(newEmbryoForm.gv),
+      ...(newEmbryoForm.patientName.trim()       && { patient_name:       newEmbryoForm.patientName.trim() }),
+      ...(newEmbryoForm.branch_id   != null      && { branch_id:          newEmbryoForm.branch_id }),
+      ...(newEmbryoForm.incubator_id != null     && { incubator_id:       newEmbryoForm.incubator_id }),
+      ...(newEmbryoForm.chamberPosition          && { chamber_position:   newEmbryoForm.chamberPosition }),
+      ...(newEmbryoForm.injectionMethod          && { injection_method:   newEmbryoForm.injectionMethod }),
+      ...(newEmbryoForm.spermQuality             && { sperm_quality:      newEmbryoForm.spermQuality }),
+      ...(newEmbryoForm.oocytesQuality           && { oocyte_quality:     newEmbryoForm.oocytesQuality }),
+      ...(newEmbryoForm.cycleType                && { cycle_type:         newEmbryoForm.cycleType }),
+      ...(newEmbryoForm.opuDate                  && { opu_date:           newEmbryoForm.opuDate }),
+      oocyte_m2:     parseCount(newEmbryoForm.m2),
+      oocyte_m1:     parseCount(newEmbryoForm.m1),
+      oocyte_gv:     parseCount(newEmbryoForm.gv),
       oocyte_others: parseCount(newEmbryoForm.others),
       status: 'Active',
     };
-
     try {
       const newCycle = await ivfService.createCycle(payload);
       setCycles(prev => [newCycle, ...prev]);
-      setSelectedCycle({ ...newCycle, logs: [] });
       setIsAddEmbryoFormOpen(false);
       resetNewEmbryoForm();
-      navigate(`/embryo-grading/${newCycle.his_id}`);
-    } catch {
-      // creation failure is silent for now
-    } finally {
-      setCycleCreating(false);
-    }
+      navigate(`/embryo-console/${newCycle.his_id}`);
+    } catch { /* silent */ }
+    finally { setCycleCreating(false); }
   };
 
-  const logs = selectedCycle?.logs ?? [];
-
-  const bestGrade = React.useMemo(() => {
-    for (const log of logs) {
-      if (log.d5_grade) return log.d5_grade;
-    }
-    for (const log of logs) {
-      if (log.d6_grade) return log.d6_grade;
-    }
-    return null;
-  }, [logs]);
-
-  const primaryGradeDetails = bestGrade ? getEmbryoGradingDetails(bestGrade) : null;
-
-  const logSummary = React.useMemo(() => {
-    const totalRows = logs.length;
-    const fertilized = logs.filter(l => l.d1_pn === '2PN').length;
-    const cleaved = logs.filter(l => l.d3_grade).length;
-    const day3GoodGrade = logs.filter(l => {
-      const frag = parseD3Grade(l.d3_grade).frag;
-      return frag === '1' || frag === '0';
-    }).length;
-    const blastRows = logs.filter(l => l.d5_grade || l.d6_grade).length;
-    const blastGoodGrades = logs
-      .filter(l => l.d5_grade || l.d6_grade)
-      .map(l => l.d5_grade ? `D5×${l.d5_grade}` : `D6×${l.d6_grade}`)
-      .join(', ');
-    const frozenRows = logs.filter(l => l.fate?.toLowerCase() === 'freeze').length;
-    return { totalRows, fertilized, cleaved, day3GoodGrade, blastRows, blastGoodGrades, frozenRows };
-  }, [logs]);
-
-  const calculateDayInCycle = (): string => {
-    if (!selectedCycle?.created_at) return 'Day 0';
-    try {
-      const startDate = new Date(selectedCycle.created_at);
-      const today = new Date();
-      const daysDiff = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
-      if (daysDiff <= 0) return 'Day 0';
-      return `Day ${daysDiff}`;
-    } catch {
-      return 'Day 0';
-    }
-  };
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <PageLayout
-      title="Embryo Grading"
+      title="Embryo Console"
+      description="Monitor and manage all embryo development cycles across your lab"
       icon={EmbryosIcon}
       actions={
-        <div className="flex items-center gap-2">
-          <div className="md:hidden">
-            <FilterPanel activeCount={activeFilterCount}>
-              <FilterSelect
-                label="Status"
-                value={selectedStatus}
-                onChange={setSelectedStatus}
-                options={statusOptions}
-                allLabel="All Statuses"
-              />
-            </FilterPanel>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsAddEmbryoFormOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
-          >
-            + Add Cycle
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setIsAddEmbryoFormOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
+        >
+          + Add Cycle
+        </button>
       }
     >
-      <div className="flex-1 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0">
+      <div className="flex-1 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-h-0">
 
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 gap-3 lg:gap-6 min-h-0 lg:flex-1 lg:grid-cols-[380px_1fr] items-start">
-            {/* Left Panel - Filters and Embryo List */}
-            <div className="flex flex-col gap-3 lg:gap-6 min-w-0">
-              {/* Filters Section — desktop only */}
-              <div className="hidden md:flex flex-col gap-3 bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-full shrink-0">
-                <div className="mb-3 pb-2 border-b border-gray-100">
-                  <h2 className="text-sm font-semibold text-black">Filters</h2>
-                  <p className="text-xs text-gray-500">Refine cycles by status</p>
-                </div>
-                <div className="flex flex-col gap-3">
-                  <FilterSelect
-                    label="Status"
-                    value={selectedStatus}
-                    onChange={setSelectedStatus}
-                    options={statusOptions}
-                    allLabel="All Statuses"
-                  />
-                </div>
+        {/* ── Stat Cards ── */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 shrink-0">
+          <StatCard
+            label="Total Cycles"
+            value={cycles.length}
+            sub="All time"
+            accent="#6b1176"
+            iconBg="#f1e8f2"
+            wave={WavePurple}
+            waveDown
+            icon={<CalendarRange size={32} color="#6b1176" strokeWidth={1.5} />}
+          />
+          <StatCard
+            label="Active Cycles"
+            value={activeCycles.length}
+            sub="In progress"
+            accent="#10b981"
+            iconBg="#ecf8f3"
+            wave={WaveGreen}
+            icon={<Microscope size={32} color="#10b981" strokeWidth={1.5} />}
+          />
+          <StatCard
+            label="Completed Cycles"
+            value={completedCycles.length}
+            sub="Finished cycles"
+            accent="#0ea5e9"
+            iconBg="#ebf6fd"
+            wave={WaveBlue}
+            icon={<ClipboardCheck size={32} color="#0ea5e9" strokeWidth={1.5} />}
+          />
+          <StatCard
+            label="Avg. Top Grade"
+            value={topGrade ?? 'N/A'}
+            sub="vs yesterday"
+            accent="#f59e0b"
+            iconBg="#fff6ea"
+            wave={WaveAmber}
+            icon={<Gem size={32} color="#f59e0b" strokeWidth={1.5} />}
+            trend={topGrade ? { value: '0.6', up: true } : undefined}
+          />
+        </div>
+
+        {/* ── 2-col layout: Active Cycles left, everything else right ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-[min(340px,26%)_1fr] gap-4 xl:items-stretch xl:flex-1 min-h-0">
+
+          {/* Left — Active Cycles */}
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col max-h-80 xl:max-h-none xl:flex-1">
+            {/* Header */}
+            <div className="px-4 py-3.5 flex flex-col border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-gray-900">Active Cycles</p>
+                <span className="text-[11px] font-bold text-primary bg-primary/10 rounded-full px-2 py-0.5">{activeCycles.length}</span>
               </div>
+              <p className="text-[11px] text-gray-400 mt-0.5">Click a cycle to view the patient dashboard</p>
+            </div>
 
-              {/* Active Cycles List */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="font-bold text-black text-base">Active Cycles</h2>
-                  <span className="text-xs font-medium text-[#6b1176] bg-[#F7ECFF] px-2 py-1 rounded-full">{filteredCycles.length}</span>
-                </div>
-                <div className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
-                  <div className="text-left">HIS / Patient</div>
-                  <div className="text-center">Status</div>
-                  <div className="text-center">Date</div>
-                </div>
-                <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100" style={{ scrollbarWidth: 'thin' }}>
-                  {loading ? (
-                    <div className="p-4 text-xs text-gray-500">Loading...</div>
-                  ) : error ? (
-                    <div className="p-4 text-xs text-red-600">{error}</div>
-                  ) : filteredCycles.length === 0 ? (
-                    <div className="p-4 text-xs text-gray-500">No cycles found.</div>
-                  ) : (
-                    filteredCycles.map((cycle) => {
-                      const isSelected = selectedCycle?.his_id === cycle.his_id;
-                      return (
-                        <div
-                          key={cycle.cycle_id}
-                          className={`grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer ${isSelected ? 'bg-[#F7ECFF]' : ''}`}
-                          onClick={() => navigate(`/embryo-grading/${cycle.his_id}`)}
-                        >
-                          <div className="min-w-0 text-left overflow-hidden">
-                            <div className="text-[#6b1176] text-xs font-bold truncate">{cycle.his_id}</div>
-                            <div className="text-[10px] text-gray-400 truncate">{cycle.patient_name || '—'}</div>
-                          </div>
-                          <div className="text-center">
-                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                              cycle.status === 'Active' ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                              : cycle.status === 'Completed' ? 'bg-sky-100 text-sky-700 border-sky-200'
-                              : 'bg-slate-100 text-slate-700 border-slate-200'
-                            }`}>
-                              {cycle.status || '—'}
-                            </span>
-                          </div>
-                          <div className="text-center text-xs font-bold text-gray-600 truncate">
-                            {cycle.created_at ? new Date(cycle.created_at).toLocaleDateString('en-GB') : '—'}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+            {/* Search */}
+            <div className="px-3 py-2.5 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white">
+                <Search size={13} className="text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search by patient name or HIS no."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="flex-1 text-xs bg-transparent outline-none text-gray-600 placeholder-gray-400"
+                />
+                <SlidersHorizontal size={13} className="text-gray-400 shrink-0" />
               </div>
             </div>
 
-            {/* Right Panel - Log Sheet or Status Overview */}
-            {isDetailView ? (
-            <div className="flex flex-col gap-6 min-w-0 w-full h-full min-h-0">
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col h-full">
-                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Embryology Log Sheet</h2>
-                    {selectedCycle && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        {selectedCycle.his_id}
-                        {selectedCycle.patient_name && <span className="ml-2 text-gray-400">· {selectedCycle.patient_name}</span>}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedCycle(null); navigate('/embryo-grading'); }}
-                    className="p-2 rounded-md border border-[#E7E1E1] text-gray-500 hover:bg-gray-50 transition-colors"
-                    title="Close"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  </button>
-                  </div>
-                </div>
+            {/* Cycle cards */}
+            <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-2" style={{ scrollbarWidth: 'thin' }}>
+              {loading ? (
+                <div className="flex items-center justify-center py-10 text-xs text-gray-400">Loading...</div>
+              ) : error ? (
+                <div className="px-2 py-3 text-xs text-red-500">{error}</div>
+              ) : filteredActiveCycles.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-xs text-gray-400">No cycles found</div>
+              ) : (
+                filteredActiveCycles.map(cycle => {
+                  const day = cycle.opu_date ? cycleDay(cycle.opu_date) : null;
+                  return (
+                    <button
+                      key={cycle.cycle_id}
+                      type="button"
+                      onClick={() => navigate(`/embryo-console/${cycle.his_id}`)}
+                      className="w-full bg-primary/[0.03] border border-primary/10 rounded-xl px-4 py-3 text-left hover:bg-primary/[0.06] hover:border-primary/20 transition-colors"
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-bold text-gray-900 truncate">{cycle.patient_name || cycle.his_id}</p>
+                            <p className="text-[11px] text-gray-400 shrink-0">{day != null ? `Day ${day}` : ''}</p>
+                          </div>
+                          <div className="flex items-center gap-3 mt-2">
+                            <p className="text-[11px] text-gray-400 shrink-0">HIS: {cycle.his_id}</p>
+                            <div className="flex gap-1 flex-1">
+                              {[1, 2, 3, 4, 5, 6].map(d => (
+                                <div
+                                  key={d}
+                                  className={`flex-1 h-[3px] rounded-full ${day != null && day >= d ? 'bg-primary' : 'bg-gray-200'}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronRight size={14} className="text-primary shrink-0 mt-0.5" />
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
-                <div className="flex-1 overflow-y-auto p-6">
-                  {selectedCycle ? (
-                    <div className="space-y-4">
-                      {/* Cycle Journey — single panoramic card */}
-                      {(() => {
-                        const totalOocytes = (selectedCycle.oocyte_m2 ?? 0) + (selectedCycle.oocyte_m1 ?? 0) + (selectedCycle.oocyte_gv ?? 0) + (selectedCycle.oocyte_others ?? 0);
-                        const injected = logSummary.totalRows;
-                        const pct = (n: number, of: number) => of > 0 ? Math.round((n / of) * 100) : 0;
-                        const stages = [
-                          { label: 'Oocytes',   value: totalOocytes,              base: totalOocytes,              bar: 'from-[#c084fc] to-[#a855f7]' },
-                          { label: 'Injected',  value: injected,                  base: totalOocytes,              bar: 'from-[#d8b4fe] to-[#9c3aa6]' },
-                          { label: 'Fertilized',value: logSummary.fertilized,     base: injected,                  bar: 'from-[#f9a8d4] to-[#ec4899]' },
-                          { label: 'Cleaved',   value: logSummary.cleaved,        base: logSummary.fertilized,     bar: 'from-[#fcd34d] to-[#f59e0b]' },
-                          { label: 'Day 3 Good',value: logSummary.day3GoodGrade,  base: logSummary.cleaved,        bar: 'from-[#86efac] to-[#22c55e]' },
-                          { label: 'Blast',     value: logSummary.blastRows,      base: logSummary.day3GoodGrade,  bar: 'from-[#7dd3fc] to-[#0ea5e9]' },
-                        ];
-                        const breakdown = [
-                          { label: 'M2',     value: selectedCycle.oocyte_m2 ?? 0,     color: 'text-white' },
-                          { label: 'M1',     value: selectedCycle.oocyte_m1 ?? 0,     color: 'text-white' },
-                          { label: 'GV',     value: selectedCycle.oocyte_gv ?? 0,     color: 'text-white/80' },
-                          { label: 'Others', value: selectedCycle.oocyte_others ?? 0, color: 'text-white/80' },
-                        ];
+          {/* Right — Grading + Needs Attention on top, Recent Activity below */}
+          <div className="flex flex-col gap-4 min-h-0 overflow-hidden">
+
+            {/* Top row: Grading Overview + Needs Attention */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
+
+              {/* Center — Grading Overview + Trend */}
+              <div className="flex flex-col gap-3">
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                  <div className="px-4 py-3.5 border-b border-gray-100">
+                    <p className="text-sm font-bold text-gray-900">Grading Overview</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Embryo quality distribution across all active cycles</p>
+                  </div>
+                  <div className="p-4 flex items-center gap-5">
+                    <DonutChart
+                      high={gradingOverview.high}
+                      mid={gradingOverview.mid}
+                      low={gradingOverview.low}
+                      notGraded={gradingOverview.notGraded}
+                      total={gradingOverview.total}
+                    />
+                    <div className="flex flex-col gap-2.5 flex-1 min-w-0">
+                      {([
+                        {
+                          label: 'High Grade',
+                          sub: '≥4 expansion · AA, AB, BA',
+                          count: gradingOverview.high,
+                          color: '#7c1e87',
+                          grades: ['4AA','4AB','4BA','5AA','5AB','5BA','6AA','6AB','6BA'],
+                          tip: 'Fully expanded blastocyst with excellent inner cell mass and trophectoderm. Best implantation potential.',
+                        },
+                        {
+                          label: 'Mid Grade',
+                          sub: '≥3 expansion · non-CC',
+                          count: gradingOverview.mid,
+                          color: '#a855c2',
+                          grades: ['3AA','3AB','3BA','3BB','4BB','4BC','4CB','5BB','5BC','5CB'],
+                          tip: 'Expanded or early blastocyst with acceptable morphology. Good implantation potential.',
+                        },
+                        {
+                          label: 'Low Grade',
+                          sub: 'expansion 1–2 or CC',
+                          count: gradingOverview.low,
+                          color: '#c8a8d8',
+                          grades: ['1AA','1AB','2AA','2AB','2BB','3CC','4CC'],
+                          tip: 'Early or poor-morphology blastocyst. Lower implantation potential — may improve with extended culture.',
+                        },
+                        {
+                          label: 'Not Graded',
+                          sub: 'pending assessment',
+                          count: gradingOverview.notGraded,
+                          color: '#e8d5f0',
+                          grades: [],
+                          tip: 'Oocyte has not yet reached a gradeable stage.',
+                        },
+                      ] as const).map(item => {
+                        const pct = gradingOverview.total > 0 ? Math.round((item.count / gradingOverview.total) * 100) : 0;
                         return (
-                          <div className="rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-[#3b0764] via-[#6b1176] to-[#4a044e] border border-[#9c3aa6]/40">
-                            <div className="flex divide-x divide-white/10">
-                              {stages.map((s, i) => (
-                                <div key={s.label} className="flex-1 flex flex-col items-center px-3 py-4 relative">
-                                  <div className="absolute bottom-0 left-0 right-0 h-[6px] bg-white/10">
-                                    <div className={`h-full bg-gradient-to-r ${s.bar} transition-all duration-700`} style={{ width: `${pct(s.value, s.base)}%` }} />
-                                  </div>
-                                  <span className="text-xs font-extrabold uppercase tracking-widest mb-2 text-[#e9d5ff]">{s.label}</span>
-                                  <span className="text-3xl font-black text-white leading-none tabular-nums">{s.value}</span>
-                                  {i > 0 ? (
-                                    <span className="mt-1.5 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/10 text-[#e9d5ff]">
-                                      {pct(s.value, s.base)}%
-                                    </span>
-                                  ) : (
-                                    <div className="flex items-center gap-1.5 mt-2 flex-wrap justify-center">
-                                      {breakdown.map((b) => (
-                                        <span key={b.label} className={`text-[10px] font-bold ${b.color}`}>
-                                          {b.value} <span className="font-bold text-white/80">{b.label}</span>
-                                        </span>
+                          <Tooltip
+                            key={item.label}
+                            placement="top"
+                            content={
+                              <div className="w-56">
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
+                                  <p className="text-xs font-bold text-gray-900">{item.label}</p>
+                                </div>
+                                <p className="text-[11px] text-gray-500 mb-2 leading-relaxed">{item.tip}</p>
+                                {item.grades.length > 0 && (
+                                  <>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Example grades</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {item.grades.map(g => (
+                                        <span key={g} className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ background: `${item.color}22`, color: item.color }}>{g}</span>
                                       ))}
                                     </div>
-                                  )}
-                                </div>
-                              ))}
-                              <div className="flex-1 flex flex-col items-center px-3 py-4">
-                                <span className="text-xs font-extrabold uppercase tracking-widest mb-2 text-[#e9d5ff]">Good Grade</span>
-                                <span className="text-sm font-black text-white leading-snug text-center">{logSummary.blastGoodGrades || '—'}</span>
+                                  </>
+                                )}
                               </div>
+                            }
+                          >
+                            <div className="flex items-center gap-2 cursor-default">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-semibold text-gray-700 leading-none">{item.label}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">{item.sub}</p>
+                              </div>
+                              <p className="text-[11px] font-semibold text-gray-800 shrink-0 tabular-nums">
+                                {item.count} <span className="font-normal text-gray-400">({pct}%)</span>
+                              </p>
                             </div>
-                          </div>
+                          </Tooltip>
                         );
-                      })()}
+                      })}
+                    </div>
+                  </div>
+                </div>
 
-                      {(() => {
-                        const rawDay = calculateDayInCycle();
-                        const dayNum = parseInt(rawDay.replace('Day ', ''), 10);
-                        const dayDisplay = dayNum > 6 ? '6+' : rawDay;
-                        return (
-                          <div className="rounded-lg border border-[#E7E1E1] bg-white overflow-hidden">
-                            <div className="flex divide-x divide-[#F0EAF4] overflow-x-auto">
-                              <div className="px-4 py-3 bg-[#F7ECFF] min-w-[110px]">
-                                <p className="text-xs font-extrabold text-[#9c3aa6] uppercase tracking-wide mb-1 whitespace-nowrap">Current Day</p>
-                                <p className="text-sm font-black text-[#6b1176]">{dayDisplay}</p>
-                              </div>
-                              {([
-                                { label: 'Injection Method',    value: selectedCycle.injection_method || '—' },
-                                { label: 'Sperm Quality',       value: selectedCycle.sperm_quality || '—' },
-                                { label: 'Oocyte Quality',      value: selectedCycle.oocyte_quality || '—' },
-                                { label: 'Type',                value: selectedCycle.cycle_type || '—' },
-                                { label: 'Chamber',             value: selectedCycle.chamber_position || '—' },
-                              ] as { label: string; value: string }[]).map((item) => (
-                                <div key={item.label} className="flex-1 min-w-[110px] px-4 py-3">
-                                  <p className="text-xs font-extrabold uppercase tracking-wide mb-1 whitespace-nowrap text-[#9c3aa6]">{item.label}</p>
-                                  <p className="text-sm font-semibold text-gray-900">{item.value}</p>
-                                </div>
-                              ))}
-                              <div className="px-4 py-3 min-w-[110px]">
-                                <p className="text-xs font-extrabold uppercase tracking-wide mb-1 whitespace-nowrap text-[#9c3aa6]">Best Grade</p>
-                                <p className="text-sm font-semibold text-gray-900">{primaryGradeDetails?.grade || '—'}</p>
-                              </div>
-                            </div>
+                {/* Top Grade Trend */}
+                <div className="rounded-2xl p-5 relative overflow-hidden" style={{ background: 'var(--gradient-primary)' }}>
+                  {/* Decorative circles */}
+                  <div className="absolute -right-5 -top-5 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
+                  <div className="absolute right-6 -bottom-8 w-20 h-20 rounded-full bg-white/5 pointer-events-none" />
+
+                  <div className="relative flex items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-white/60 uppercase tracking-widest font-semibold">Top Grade Trend</p>
+                      <div className="flex items-end gap-3 mt-2">
+                        <p className="text-4xl font-extrabold text-white leading-none">{topGrade ?? '—'}</p>
+                        {topGrade && (
+                          <div className="flex items-center gap-1 bg-emerald-400/20 border border-emerald-300/30 rounded-full px-2.5 py-0.5 mb-0.5">
+                            <ArrowUpRight size={11} className="text-emerald-300" />
+                            <span className="text-[11px] font-bold text-emerald-300">0.6</span>
                           </div>
-                        );
-                      })()}
-
-                      <div className="rounded-lg border border-[#E7E1E1] overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="min-w-[1320px] w-full text-sm">
-                            <thead className="bg-[#F7ECFF] text-[#6b1176]">
-                              <tr className="divide-x divide-[#E7E1E1]">
-                                <th className="px-2 py-2 text-left font-semibold">Oocyte</th>
-                                <th className="px-2 py-2 text-left font-semibold">Day 1 (PN)</th>
-                                <th className="px-2 py-2 text-left font-semibold">Day 3/4</th>
-                                <th className="px-2 py-2 text-left font-semibold">Day 5</th>
-                                <th className="px-2 py-2 text-left font-semibold">Day 6</th>
-                                <th className="px-2 py-2 text-left font-semibold">Fate</th>
-                                <th className="px-2 py-2 text-left font-semibold">Notes</th>
-                                <th className="px-2 py-2 text-left font-semibold w-24 sticky right-0 z-10 bg-[#F7ECFF] border-l border-[#E7E1E1]">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {logsLoading ? (
-                                <tr><td colSpan={10} className="px-3 py-6 text-center text-gray-400">Loading logs…</td></tr>
-                              ) : logs.length === 0 ? (
-                                <tr>
-                                  <td colSpan={10} className="px-3 py-6 text-center text-gray-500">No log entries yet. Click Add Oocyte.</td>
-                                </tr>
-                              ) : (
-                                logs.map((log) => (
-                                  <tr key={log.log_id} className="border-t border-[#F1F1F1] hover:bg-[#FCF9FF] divide-x divide-[#E7E1E1]">
-                                    <td className="px-2 py-2 whitespace-nowrap cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 0)}>
-                                      <div className="font-medium">#{log.oocyte_no}</div>
-                                      <div className="text-[10px] text-gray-400">{log.d0_maturity || '—'}{log.d0_drop_no ? ` · Drop ${log.d0_drop_no}` : ''}</div>
-                                    </td>
-                                    <td className="px-2 py-2 cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 1)}>{log.d1_pn || '—'}</td>
-                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 2)}>
-                                      {log.d3_grade
-                                        ? <span className="inline-block rounded px-1.5 py-0.5 text-xs font-bold bg-[#F7ECFF] text-[#6b1176]">{log.d3_grade}</span>
-                                        : <span className="text-gray-400 text-xs">—</span>}
-                                    </td>
-                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 3)}>{renderBlastBadge(log.d5_grade || '—')}</td>
-                                    <td className="px-2 py-2 text-center cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 4)}>{renderBlastBadge(log.d6_grade || '—')}</td>
-                                    <td className="px-2 py-2 cursor-pointer hover:bg-[#F7ECFF]/60 transition-colors" onClick={() => openEditLog(log, 5)}>
-                                      <div className="flex items-center gap-1.5">
-                                        {log.fate === 'Freeze' ? (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 text-sm font-semibold border border-sky-200">
-                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 7l-5 5-5-5"/><path d="M17 17l-5-5-5 5"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M7 7l5 5 5-5"/><path d="M7 17l5-5 5 5"/></svg>
-                                            Freeze
-                                          </span>
-                                        ) : log.fate === 'Transfer' ? (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200">
-                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-                                            Transfer
-                                          </span>
-                                        ) : log.fate === 'Discard' ? (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-sm font-semibold border border-red-200">
-                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                                            Discard
-                                          </span>
-                                        ) : (
-                                          <span className="text-gray-400">—</span>
-                                        )}
-                                        {log.fate === 'Freeze' && log.freeze_no && (
-                                          <span className="text-xs text-gray-400 font-medium">#{log.freeze_no}</span>
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td className="px-2 py-2 text-xs text-gray-500">{log.meta?.final_notes || '—'}</td>
-                                    <td className="px-2 py-2 flex gap-1 sticky right-0 z-10 bg-white border-l border-[#E7E1E1]">
-                                      <button
-                                        type="button"
-                                        onClick={() => openEditLog(log, 0)}
-                                        className="px-2 py-1 text-xs bg-[#6b1176] text-white rounded hover:bg-[#5a0f62] transition-colors"
-                                        title="Update entry"
-                                      >
-                                        Update
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
+                        )}
                       </div>
-
-                      <div className="flex justify-start">
-                        <button
-                          type="button"
-                          onClick={() => setIsAddLogFormOpen(true)}
-                          className="px-2.5 py-1.5 rounded bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] transition-colors"
-                        >
-                          Add Oocyte
-                        </button>
-                      </div>
-
-                      <div className="rounded-lg border border-[#E7E1E1] p-4 bg-white">
-                        <h3 className="text-sm font-semibold text-gray-900 mb-2">Grade Context</h3>
-                        <p className="text-sm text-gray-700">{primaryGradeDetails?.description || 'No grade context available.'}</p>
-                        <p className="text-xs text-gray-500 mt-2">{primaryGradeDetails?.viability || '—'}</p>
-                      </div>
+                      <p className="text-[10px] text-white/40 mt-1.5">vs last week</p>
                     </div>
-                  ) : (
-                    <div className="text-center text-gray-500 py-8">
-                      <p>Select a cycle from the left list to view its embryology log sheet.</p>
+                    <div className="w-28 h-14 mt-1 shrink-0">
+                      <Sparkline color="rgba(255,255,255,0.85)" fillOpacity={0.2} />
                     </div>
-                  )}
+                  </div>
+
                 </div>
               </div>
-            </div>
-            ) : (
-            <div className="order-first lg:order-last w-full flex flex-col gap-4">
 
-              {/* ── Embryo Snapshot ── */}
-              <div className="rounded-lg border border-[#E7E1E1] bg-white p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">Status Overview</p>
-                    <p className="text-sm font-bold text-[#6b1176] mt-0.5">Embryo Snapshot</p>
-                  </div>
-                  <span className="text-[10px] bg-green-50 text-green-700 font-semibold px-2.5 py-1 rounded-full border border-green-200">Live</span>
+              {/* Right — Needs Attention */}
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="px-4 py-3.5 border-b border-gray-100">
+                  <p className="text-sm font-bold text-gray-900">Needs Attention</p>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
-                    { label: "Total", value: cycleStats.total, sub: "cycles", border: "border-[#E8E1F0]", from: "from-[#FCF9FF]", to: "to-[#F8F4FD]", val: "text-black" },
-                    { label: "Active", value: cycleStats.active, sub: "in progress", border: "border-[#E6F4EC]", from: "from-[#F5FCF8]", to: "to-[#EEFAF6]", val: "text-emerald-700" },
-                    { label: "Completed", value: cycleStats.completed, sub: "finished", border: "border-[#DDEFFA]", from: "from-[#F4FAFF]", to: "to-[#EBF7FF]", val: "text-sky-700" },
-                    { label: "Paused", value: cycleStats.paused, sub: "on hold", border: "border-[#FFF3CD]", from: "from-[#FFF8E9]", to: "to-[#FFF5DB]", val: "text-amber-700" },
-                  ].map((s) => (
-                    <div key={s.label} className={`rounded-lg border ${s.border} bg-gradient-to-br ${s.from} ${s.to} px-4 py-3 flex flex-col`}>
-                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{s.label}</p>
-                      <p className={`text-3xl font-bold ${s.val} leading-none mt-1`}>{s.value}</p>
-                      <p className="text-[10px] text-gray-400 mt-1">{s.sub}</p>
+                <div className="divide-y divide-gray-50">
+                  {needsAttentionItems.map(item => (
+                    <div key={item.label} className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer">
+                      <div className={`w-9 h-9 rounded-xl ${item.iBg} flex items-center justify-center shrink-0`}>
+                        <item.Icon size={16} className={item.iCl} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-800 leading-tight">{item.label}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{item.sub}</p>
+                      </div>
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${item.count > 0 ? item.cBg : 'bg-gray-100'}`}>
+                        <span className={`text-[11px] font-bold ${item.count > 0 ? item.cCl : 'text-gray-400'}`}>{item.count}</span>
+                      </div>
+                      <ChevronRight size={13} className="text-gray-300 shrink-0" />
                     </div>
                   ))}
                 </div>
               </div>
-
-              {/* ── Cycle Type Distribution ── */}
-              <div className="rounded-lg border border-[#E7E1E1] bg-white p-5 flex flex-col gap-3">
-                <div>
-                  <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">Cycle Distribution</p>
-                  <p className="text-sm font-bold text-black mt-0.5">By Injection Method</p>
-                </div>
-                {(() => {
-                  const counts: Record<string, number> = {};
-                  filteredCycles.forEach(c => {
-                    const k = c.injection_method || 'Unknown';
-                    counts[k] = (counts[k] || 0) + 1;
-                  });
-                  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
-                  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-                  const colors = ['bg-[#6b1176]', 'bg-[#9c3aa6]', 'bg-[#c084fc]', 'bg-slate-400'];
-                  return (
-                    <div className="space-y-2.5">
-                      {sorted.map(([method, count], i) => (
-                        <div key={method} className="flex items-center gap-3">
-                          <span className="text-[10px] font-bold w-10 shrink-0 text-right text-gray-600">{method}</span>
-                          <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
-                            <div className={`h-full rounded-full transition-all ${colors[i % colors.length]}`} style={{ width: `${Math.round((count / total) * 100)}%` }} />
-                          </div>
-                          <span className="text-xs text-gray-500 w-5 shrink-0 text-right">{count}</span>
-                        </div>
-                      ))}
-                      {sorted.length === 0 && <p className="text-xs text-gray-400">No cycles yet.</p>}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* ── All Cycles ── */}
-              <div className="rounded-lg border border-[#E7E1E1] bg-white p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">All Cycles</p>
-                    <p className="text-sm font-bold text-black mt-0.5">Patient Cycle Register</p>
-                  </div>
-                  <span className="text-[10px] font-semibold text-[#6b1176] bg-[#F7ECFF] px-2.5 py-1 rounded-full">{filteredCycles.length} records</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-[#F7ECFF]">
-                        {["HIS No.", "Patient", "Method", "Type", "Status", "Created", ""].map((h, i) => (
-                          <th key={i} className={`text-left text-[10px] font-semibold text-[#6b1176] px-3 py-2.5 ${i === 0 ? 'rounded-l-lg' : ''} ${i === 6 ? 'rounded-r-lg' : ''}`}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {filteredCycles.length === 0 ? (
-                        <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-gray-400">No cycles yet.</td></tr>
-                      ) : (
-                        filteredCycles.map(c => (
-                          <tr key={c.cycle_id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate(`/embryo-grading/${c.his_id}`)}>
-                            <td className="px-3 py-2.5 text-xs font-semibold text-[#6b1176]">{c.his_id}</td>
-                            <td className="px-3 py-2.5 text-xs text-gray-700 max-w-[140px] truncate">{c.patient_name || '—'}</td>
-                            <td className="px-3 py-2.5 text-xs text-gray-500">{c.injection_method || '—'}</td>
-                            <td className="px-3 py-2.5 text-xs text-gray-500">{c.cycle_type || '—'}</td>
-                            <td className="px-3 py-2.5">
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                                c.status === 'Active'    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : c.status === 'Completed' ? 'bg-sky-50 text-sky-700 border-sky-200'
-                              : c.status === 'Paused'    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : 'bg-gray-50 text-gray-600 border-gray-200'
-                              }`}>{c.status || '—'}</span>
-                            </td>
-                            <td className="px-3 py-2.5 text-xs text-gray-500">{new Date(c.created_at).toLocaleDateString('en-GB')}</td>
-                            <td className="px-3 py-2.5 text-[10px] text-[#6b1176] font-semibold">View →</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* ── Recent Activity ── */}
-              <div className="rounded-lg border border-[#E7E1E1] bg-white p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold text-[#8A7892]">Recent Activity</p>
-                    <p className="text-sm font-bold text-black mt-0.5">Lab Event Log</p>
-                  </div>
-                  <button className="text-xs text-[#6b1176] font-semibold hover:underline">View All</button>
-                </div>
-                <div className="relative">
-                  <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-100" />
-                  <div className="space-y-4 pl-10">
-                    {[
-                      { time: "Today, 09:14 AM", event: "HIS001 · Day 5 blastocyst graded 4AA — High Grade", user: "Dr. Priya S.", dot: "bg-emerald-100 text-emerald-700", label: "G" },
-                      { time: "Today, 08:52 AM", event: "HIS006 · Day 3 check — 8 cells, <10% fragmentation, symmetric", user: "Lab Tech Ravi", dot: "bg-[#F7ECFF] text-[#6b1176]", label: "✓" },
-                      { time: "Yesterday, 05:45 PM", event: "HIS002 · Status changed to In Transit (Tambaram → Egmore)", user: "Dr. Meena R.", dot: "bg-amber-100 text-amber-700", label: "T" },
-                      { time: "Yesterday, 02:15 PM", event: "HIS004 · Thawed for FET — warming protocol initiated", user: "Dr. Anand K.", dot: "bg-orange-100 text-orange-700", label: "❄" },
-                      { time: "May 06, 10:00 AM", event: "HIS008 · New cycle created — 10 oocytes retrieved (8 MII)", user: "Dr. Priya S.", dot: "bg-blue-100 text-blue-700", label: "+" },
-                    ].map((item, i) => (
-                      <div key={i} className="relative flex gap-3">
-                        <div className={`absolute -left-6 w-4 h-4 rounded-full ${item.dot} flex items-center justify-center shrink-0 text-[9px] font-bold`} style={{ top: 2 }}>
-                          {item.label}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-800 font-medium leading-snug">{item.event}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-gray-400">{item.time}</span>
-                            <span className="text-gray-300">·</span>
-                            <span className="text-xs text-gray-500">{item.user}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
             </div>
-            )}
+
+            {/* Bottom — Recent Cycle Activity (fills remaining height) */}
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col flex-1 min-h-0">
+              <div className="px-5 py-3.5 flex items-center justify-between border-b border-gray-100 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
+                  <p className="text-sm font-bold text-gray-900">Completed Cycles</p>
+                  <span className="text-[10px] font-semibold text-sky-600 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">{recentActivity.length}</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white w-72">
+                  <Search size={13} className="text-gray-400 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search by patient name or HIS no."
+                    value={completedSearchQuery}
+                    onChange={e => setCompletedSearchQuery(e.target.value)}
+                    className="flex-1 text-xs bg-transparent outline-none text-gray-600 placeholder-gray-400"
+                  />
+                  <SlidersHorizontal size={13} className="text-gray-400 shrink-0" />
+                </div>
+              </div>
+              <div className="overflow-auto flex-1 min-h-0">
+                <table className="w-full">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-gray-100 bg-gray-50/95 backdrop-blur-sm">
+                      {['HIS No.', 'Patient', 'Graded', 'Top Grade', 'Status', 'Last Activity'].map(h => (
+                        <th key={h} className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5 whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {loading ? (
+                      <tr><td colSpan={6} className="px-4 py-10 text-center text-xs text-gray-400">Loading…</td></tr>
+                    ) : recentActivity.length === 0 ? (
+                      <tr><td colSpan={6} className="px-4 py-10 text-center text-xs text-gray-400">No completed cycles yet</td></tr>
+                    ) : (
+                      filteredCompletedCycles.map(c => {
+                        const day = c.opu_date ? cycleDay(c.opu_date) : null;
+                        const totalOocytes = (c.oocyte_m2 ?? 0) + (c.oocyte_m1 ?? 0) + (c.oocyte_gv ?? 0) + (c.oocyte_others ?? 0);
+                        const withLogs = cyclesWithLogs.find(w => w.cycle_id === c.cycle_id);
+                        const gradedCount = withLogs?.logs.filter(l => l.d5_grade || l.d6_grade).length ?? 0;
+                        const gradedPct = totalOocytes > 0 ? Math.round((gradedCount / totalOocytes) * 100) : 0;
+                        const cycleTopGrade = withLogs?.logs
+                          .flatMap(l => [l.d5_grade, l.d6_grade].filter(Boolean) as string[])
+                          .sort((a, b) => {
+                            const ta = gradeTier(a), tb = gradeTier(b);
+                            if (ta === tb) return 0;
+                            return ta === 'high' ? -1 : tb === 'high' ? 1 : ta === 'mid' ? -1 : 1;
+                          })[0] ?? null;
+                        const actDate = c.opu_date
+                          ? new Date(new Date(c.opu_date).getTime() + (day ?? 0) * 86_400_000)
+                          : null;
+                        const actStr = actDate
+                          ? actDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' +
+                            actDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                          : '—';
+
+                        return (
+                          <tr
+                            key={c.cycle_id}
+                            className="hover:bg-gray-50/70 transition-colors cursor-pointer group"
+                            onClick={() => navigate(`/embryo-console/${c.his_id}`)}
+                          >
+                            <td className="px-4 py-3 text-xs font-bold text-primary whitespace-nowrap">{c.his_id}</td>
+                            <td className="px-4 py-3 text-xs font-medium text-gray-800 truncate max-w-[140px]">{c.patient_name || '—'}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-600 shrink-0 tabular-nums">{gradedCount} ({gradedPct}%)</span>
+                                <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-primary rounded-full" style={{ width: `${gradedPct}%` }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {cycleTopGrade ? (
+                                <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${gradeChipCls(cycleTopGrade)}`}>
+                                  {cycleTopGrade}
+                                </span>
+                              ) : <span className="text-xs text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${statusChipCls(c.status ?? '')}`}>
+                                {statusLabel(c.status ?? '')}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{actStr}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         </div>
+      </div>
 
+      {/* ── Add Cycle Modal ── */}
       <Modal
         isOpen={isAddEmbryoFormOpen}
-        onClose={() => {
-          setIsAddEmbryoFormOpen(false);
-          resetNewEmbryoForm();
-        }}
+        onClose={() => { setIsAddEmbryoFormOpen(false); resetNewEmbryoForm(); }}
         title="Add New Cycle"
         description="Enter cycle details to register a new IVF treatment entry"
         containerClassName="w-full max-w-[750px]"
       >
         <div className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="HIS Number *" value={newEmbryoForm.hisNumber} onChange={(e) => handleNewEmbryoFieldChange('hisNumber', e.target.value)} />
-            <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Patient Name" value={newEmbryoForm.patientName} onChange={(e) => handleNewEmbryoFieldChange('patientName', e.target.value)} />
-            <select
-              className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white text-gray-700"
-              value={newEmbryoForm.injectionMethod}
-              onChange={(e) => handleNewEmbryoFieldChange('injectionMethod', e.target.value)}
-            >
-              <option value="">Method of Injection</option>
-              <option value="ICSI">ICSI</option>
-              <option value="PICSI">PICSI</option>
-              <option value="IMSI">IMSI</option>
-            </select>
-            <select
-              className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white text-gray-700"
-              value={newEmbryoForm.spermQuality}
-              onChange={(e) => handleNewEmbryoFieldChange('spermQuality', e.target.value)}
-            >
-              <option value="">Sperm Quality</option>
-              <option value="Good">Good</option>
-              <option value="Average">Average</option>
-              <option value="Average (NI)">Average (NI)</option>
-              <option value="Poor">Poor</option>
-            </select>
-            <select
-              className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white text-gray-700"
-              value={newEmbryoForm.oocytesQuality}
-              onChange={(e) => handleNewEmbryoFieldChange('oocytesQuality', e.target.value)}
-            >
-              <option value="">Oocytes Quality</option>
-              <option value="Good">Good</option>
-              <option value="Average">Average</option>
-              <option value="Average to Poor">Average to Poor</option>
-              <option value="Poor">Poor</option>
-            </select>
-            <select
-              className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white text-gray-700"
-              value={newEmbryoForm.cycleType}
-              onChange={(e) => handleNewEmbryoFieldChange('cycleType', e.target.value)}
-            >
-              <option value="">Type</option>
-              <option value="DOHSP">Donor Oocytes with Husband's Sperm (DOHSP)</option>
-              <option value="OG">Own Gametes (OG)</option>
-              <option value="DET">Donor Embryo (DET)</option>
-            </select>
-            <select
-              className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white text-gray-700 disabled:opacity-50"
-              value={newEmbryoForm.branch_id ?? ""}
-              disabled={branchesLoading}
-              onChange={(e) => {
-                const selected = branches.find(b => String(b.branch_id) === e.target.value);
-                handleNewEmbryoFieldChange('branch_id', e.target.value ? Number(e.target.value) : null);
-                handleNewEmbryoFieldChange('siteName', selected?.branch_name ?? "");
-                handleNewEmbryoFieldChange('incubator_id', null);
-                handleNewEmbryoFieldChange('chamberPosition', '');
-                setSelectedIncubator(null);
-                if (selected?.branch_id) {
-                  setIncubatorsLoading(true);
-                  shipmentService.getActiveIncubators({ branch_id: selected.branch_id })
-                    .then(res => {
-                      const list = res.branches.find(b => b.branch_id === selected.branch_id)?.incubators ?? [];
-                      setIncubators(list);
-                    })
-                    .catch(() => setIncubators([]))
-                    .finally(() => setIncubatorsLoading(false));
-                } else {
-                  setIncubators([]);
-                }
-              }}
-            >
-              <option value="">{branchesLoading ? "Loading branches..." : "Select Branch"}</option>
-              {branches.map(b => (
-                <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
-              ))}
-            </select>
-            <select
-              className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white text-gray-700 disabled:opacity-50"
-              value={newEmbryoForm.incubator_id ?? ""}
-              disabled={incubatorsLoading || !newEmbryoForm.branch_id}
-              onChange={(e) => {
-                const inc = incubators.find(i => String(i.incubator_id) === e.target.value) ?? null;
-                handleNewEmbryoFieldChange('incubator_id', e.target.value ? Number(e.target.value) : null);
-                handleNewEmbryoFieldChange('tankCode', inc?.incubator_code ?? inc?.external_id ?? '');
-                handleNewEmbryoFieldChange('chamberPosition', '');
-                setSelectedIncubator(inc);
-              }}
-            >
-              <option value="">
-                {incubatorsLoading ? "Loading incubators..." : !newEmbryoForm.branch_id ? "Select branch first" : "Select Incubator"}
-              </option>
-              {incubators.map(i => (
-                <option key={i.incubator_id} value={i.incubator_id}>
-                  {i.incubator_code || i.external_id || `Incubator #${i.incubator_id}`}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {(() => {
+              const lbl = "text-xs text-gray-500 mb-1 ml-0.5";
+              const inp = "h-10 rounded-md border border-line px-3 text-sm w-full";
+              const sel = "h-10 rounded-md border border-line px-3 text-sm bg-white text-gray-700 w-full";
+              return (<>
+                <div className="flex flex-col">
+                  <label className={lbl}>HIS Number <span className="text-red-500">*</span></label>
+                  <input className={inp} value={newEmbryoForm.hisNumber} onChange={e => handleNewEmbryoFieldChange('hisNumber', e.target.value)} />
+                </div>
+                <div className="flex flex-col">
+                  <label className={lbl}>Patient Name</label>
+                  <input className={inp} value={newEmbryoForm.patientName} onChange={e => handleNewEmbryoFieldChange('patientName', e.target.value)} />
+                </div>
+                <div className="flex flex-col">
+                  <label className={lbl}>OPU Date</label>
+                  <input type="date" className={inp} value={newEmbryoForm.opuDate} onChange={e => handleNewEmbryoFieldChange('opuDate', e.target.value)} />
+                </div>
+                <div className="flex flex-col">
+                  <label className={lbl}>Method of Injection</label>
+                  <select className={sel} value={newEmbryoForm.injectionMethod} onChange={e => handleNewEmbryoFieldChange('injectionMethod', e.target.value)}>
+                    <option value="">— Select —</option>
+                    <option value="ICSI">ICSI</option>
+                    <option value="PICSI">PICSI</option>
+                    <option value="IMSI">IMSI</option>
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className={lbl}>Sperm Quality</label>
+                  <select className={sel} value={newEmbryoForm.spermQuality} onChange={e => handleNewEmbryoFieldChange('spermQuality', e.target.value)}>
+                    <option value="">— Select —</option>
+                    <option value="Good">Good</option>
+                    <option value="Average">Average</option>
+                    <option value="Average (NI)">Average (NI)</option>
+                    <option value="Poor">Poor</option>
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className={lbl}>Oocytes Quality</label>
+                  <select className={sel} value={newEmbryoForm.oocytesQuality} onChange={e => handleNewEmbryoFieldChange('oocytesQuality', e.target.value)}>
+                    <option value="">— Select —</option>
+                    <option value="Good">Good</option>
+                    <option value="Average">Average</option>
+                    <option value="Average to Poor">Average to Poor</option>
+                    <option value="Poor">Poor</option>
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className={lbl}>Cycle Type</label>
+                  <select className={sel} value={newEmbryoForm.cycleType} onChange={e => handleNewEmbryoFieldChange('cycleType', e.target.value)}>
+                    <option value="">— Select —</option>
+                    <option value="DOHSP">Donor Oocytes with Husband's Sperm (DOHSP)</option>
+                    <option value="OG">Own Gametes (OG)</option>
+                    <option value="DET">Donor Embryo (DET)</option>
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className={lbl}>Branch</label>
+                  <select
+                    className={`${sel} disabled:opacity-50`}
+                    value={newEmbryoForm.branch_id ?? ""}
+                    disabled={branchesLoading}
+                    onChange={e => {
+                      const selected = branches.find(b => String(b.branch_id) === e.target.value);
+                      handleNewEmbryoFieldChange('branch_id', e.target.value ? Number(e.target.value) : null);
+                      handleNewEmbryoFieldChange('siteName', selected?.branch_name ?? "");
+                      handleNewEmbryoFieldChange('incubator_id', null);
+                      handleNewEmbryoFieldChange('chamberPosition', '');
+                      setSelectedIncubator(null);
+                      if (selected?.branch_id) {
+                        setIncubatorsLoading(true);
+                        shipmentService.getActiveIncubators({ branch_id: selected.branch_id })
+                          .then(res => {
+                            const list = res.branches.find(b => b.branch_id === selected.branch_id)?.incubators ?? [];
+                            setIncubators(list);
+                          })
+                          .catch(() => setIncubators([]))
+                          .finally(() => setIncubatorsLoading(false));
+                      } else {
+                        setIncubators([]);
+                      }
+                    }}
+                  >
+                    <option value="">{branchesLoading ? "Loading..." : "— Select —"}</option>
+                    {branches.map(b => <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className={lbl}>Incubator</label>
+                  <select
+                    className={`${sel} disabled:opacity-50`}
+                    value={newEmbryoForm.incubator_id ?? ""}
+                    disabled={incubatorsLoading || !newEmbryoForm.branch_id}
+                    onChange={e => {
+                      const inc = incubators.find(i => String(i.incubator_id) === e.target.value) ?? null;
+                      handleNewEmbryoFieldChange('incubator_id', e.target.value ? Number(e.target.value) : null);
+                      handleNewEmbryoFieldChange('tankCode', inc?.incubator_code ?? inc?.external_id ?? '');
+                      handleNewEmbryoFieldChange('chamberPosition', '');
+                      setSelectedIncubator(inc);
+                    }}
+                  >
+                    <option value="">
+                      {incubatorsLoading ? "Loading..." : !newEmbryoForm.branch_id ? "Select branch first" : "— Select —"}
+                    </option>
+                    {incubators.map(i => (
+                      <option key={i.incubator_id} value={i.incubator_id}>
+                        {i.incubator_code || i.external_id || `Incubator #${i.incubator_id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>);
+            })()}
           </div>
 
-          {/* Chamber position picker */}
           {selectedIncubator && selectedIncubator.chamber_r && selectedIncubator.chamber_c && (
-            <div className="rounded-lg border border-[#E7E1E1] p-3">
+            <div className="rounded-lg border border-line p-3">
               <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
                 Select Chamber Position
                 {newEmbryoForm.chamberPosition && (
-                  <span className="ml-2 text-[#6b1176]">— Slot {newEmbryoForm.chamberPosition} selected</span>
+                  <span className="ml-2 text-primary">— Slot {newEmbryoForm.chamberPosition} selected</span>
                 )}
               </p>
               <div
@@ -1142,8 +967,8 @@ export default function EmbryoGradingPage() {
                         onClick={() => handleNewEmbryoFieldChange('chamberPosition', active ? '' : pos)}
                         className={`h-9 rounded-lg text-xs font-semibold transition-all duration-150 ${
                           active
-                            ? 'bg-[#6b1176] text-white scale-105'
-                            : 'bg-white text-gray-500 border border-gray-200 hover:border-[#6b1176] hover:text-[#6b1176] hover:scale-105'
+                            ? 'bg-primary text-white scale-105'
+                            : 'bg-white text-gray-500 border border-gray-200 hover:border-primary hover:text-primary hover:scale-105'
                         }`}
                       >
                         {pos}
@@ -1155,12 +980,11 @@ export default function EmbryoGradingPage() {
             </div>
           )}
 
-          {/* Oocyte injection count table */}
-          <div className="overflow-x-auto rounded-md border border-[#E7E1E1]">
+          <div className="overflow-x-auto rounded-md border border-line">
             <table className="w-full text-xs text-center">
               <thead>
-                <tr className="bg-gray-50 border-b border-[#E7E1E1]">
-                  {(['M2', 'M1', 'GV', 'OTHERS', 'INJECTED', 'OOCYTES'] as const).map((col) => (
+                <tr className="bg-gray-50 border-b border-line">
+                  {(['M2', 'M1', 'GV', 'OTHERS', 'INJECTED', 'OOCYTES'] as const).map(col => (
                     <React.Fragment key={col}>
                       {col === 'OOCYTES' && <th className="text-gray-300 font-light px-0">/</th>}
                       <th className="px-3 py-2 font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">{col}</th>
@@ -1170,27 +994,18 @@ export default function EmbryoGradingPage() {
               </thead>
               <tbody>
                 <tr>
-                  {([
-                    { key: 'm2' },
-                    { key: 'm1' },
-                    { key: 'gv' },
-                    { key: 'others' },
-                    { key: 'injected' },
-                    { key: 'oocytes' },
-                  ] as { key: keyof NewEmbryoFormState }[]).map(({ key }) => {
-                    const isInjected = key === 'injected' || key === 'oocytes';
+                  {(['m2', 'm1', 'gv', 'others', 'injected', 'oocytes'] as (keyof NewEmbryoFormState)[]).map(key => {
+                    const isReadOnly = key === 'injected' || key === 'oocytes';
                     return (
                       <React.Fragment key={key}>
                         {key === 'oocytes' && <td className="text-gray-300 text-sm px-0 text-center">/</td>}
                         <td className="px-2 py-2">
                           <input
-                            type="number"
-                            min={0}
-                            max={isInjected ? undefined : 99}
-                            disabled={isInjected}
-                            className={`w-full min-w-[48px] h-8 rounded border px-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-[#8b2a96] ${isInjected ? 'border-[#E7E1E1] bg-gray-50 text-gray-500 cursor-not-allowed font-semibold' : 'border-[#E7E1E1]'}`}
+                            type="number" min={0} max={isReadOnly ? undefined : 99}
+                            disabled={isReadOnly}
+                            className={`w-full min-w-[48px] h-8 rounded border px-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-primary-light ${isReadOnly ? 'border-line bg-gray-50 text-gray-500 cursor-not-allowed font-semibold' : 'border-line'}`}
                             value={newEmbryoForm[key] as string}
-                            onChange={(e) => handleNewEmbryoFieldChange(key, e.target.value)}
+                            onChange={e => handleNewEmbryoFieldChange(key, e.target.value)}
                           />
                         </td>
                       </React.Fragment>
@@ -1204,11 +1019,8 @@ export default function EmbryoGradingPage() {
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              onClick={() => {
-                setIsAddEmbryoFormOpen(false);
-                resetNewEmbryoForm();
-              }}
-              className="px-3 py-2 rounded-md border border-[#E7E1E1] text-gray-700 text-sm font-medium hover:bg-gray-50"
+              onClick={() => { setIsAddEmbryoFormOpen(false); resetNewEmbryoForm(); }}
+              className="px-3 py-2 rounded-md border border-line text-gray-700 text-sm font-medium hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -1216,400 +1028,18 @@ export default function EmbryoGradingPage() {
               type="button"
               onClick={handleAddEmbryo}
               disabled={!newEmbryoForm.hisNumber.trim() || cycleCreating}
-              className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-3 py-2 rounded-md bg-primary text-white text-sm font-medium hover:bg-[#5a0f62] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {cycleCreating && <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
+              {cycleCreating && (
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+              )}
               {cycleCreating ? 'Adding...' : 'Add Cycle'}
             </button>
           </div>
         </div>
-      </Modal>
-
-      <Modal
-        isOpen={isAddLogFormOpen}
-        onClose={() => {
-          setIsAddLogFormOpen(false);
-          resetLogForm();
-          setEditingLogId(null);
-        }}
-        title={editingLogId ? "Edit Log Entry" : "Add Log Entry"}
-        description={editingLogId ? "Update embryology sheet details for the selected entry" : "Enter embryology sheet details for the selected HIS"}
-        containerClassName="w-full max-w-[680px]"
-      >
-        {(() => {
-          const inp = "w-full h-9 rounded-lg border border-gray-200 px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6]/30 focus:border-[#9c3aa6] bg-white";
-          const sel = inp;
-          const lbl = "block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1";
-          const day6Locked = logForm.day5Stage === 'Blastocyst';
-          const blastGradeFields5 = logForm.day5ExpansionGrade && logForm.day5IcmGrade && logForm.day5TeGrade;
-          const blastGradeFields6 = logForm.day6ExpansionGrade && logForm.day6IcmGrade && logForm.day6TeGrade;
-
-          const STEP_BASE = { activeBg: 'bg-[#6b1176]', doneBg: 'bg-[#9c3aa6]', ring: 'ring-[#9c3aa6]', lineActive: 'bg-[#e9d5ff]', textActive: 'text-[#6b1176]', border: 'border-[#E7E1E1]', headerBg: 'bg-gradient-to-r from-[#3b0764] to-[#6b1176]', chipCls: 'bg-[#F7ECFF] border-[#c084fc]/40 text-[#6b1176]' };
-          const STEPS = [
-            { dayKey: 'D0', label: 'Day 0', sub: 'Fertilization',                   ...STEP_BASE },
-            { dayKey: 'D1', label: 'Day 1', sub: 'PN Check',                        ...STEP_BASE },
-            { dayKey: 'D3', label: 'Day 3', sub: 'Cleavage',                        ...STEP_BASE },
-            { dayKey: 'D5', label: 'Day 5', sub: 'Blastocyst',                      ...STEP_BASE },
-            { dayKey: 'D6', label: 'Day 6', sub: day6Locked ? 'N/A' : 'Late Blast', ...STEP_BASE, activeBg: day6Locked ? 'bg-gray-400' : 'bg-[#6b1176]', headerBg: day6Locked ? 'bg-gray-400' : 'bg-gradient-to-r from-[#3b0764] to-[#6b1176]' },
-            { dayKey: 'F',  label: 'Final', sub: 'Decision',                        ...STEP_BASE },
-          ];
-
-          const stepSummary = (i: number): string => {
-            if (i === 0) { const p: string[] = []; if (logForm.d0Maturity) p.push(logForm.d0Maturity); if (logForm.d0DropNo) p.push(`Drop ${logForm.d0DropNo}`); return p.join(' · ') || '—'; }
-            if (i === 1) { return logForm.d1Pn || '—'; }
-            if (i === 2) { const l = generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation); return l !== '—' ? l : (logForm.day3CellCount ? `${logForm.day3CellCount}C` : '—'); }
-            if (i === 3) { if (logForm.day5Stage === 'Blastocyst' && blastGradeFields5) return generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade); return logForm.day5Stage || '—'; }
-            if (i === 4) { if (day6Locked) return 'N/A'; if (logForm.day6Stage === 'Blastocyst' && blastGradeFields6) return generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade); return logForm.day6Stage || '—'; }
-            return logForm.fate || '—';
-          };
-
-          const s = STEPS[logModalStep];
-
-          return (
-            <div className="flex flex-col gap-4">
-              {/* Identity bar */}
-              <div className="rounded-2xl bg-gradient-to-br from-[#3b0764] via-[#6b1176] to-[#4a044e] border border-[#9c3aa6]/40 shadow-lg px-5 py-3 flex items-center justify-between">
-                {/* Left: HIS + Patient Name */}
-                <div>
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-[#e9d5ff]/60">HIS</span>
-                  <p className="text-white font-bold text-sm leading-tight">{selectedCycle?.his_id || '—'}</p>
-                  <p className="text-[#e9d5ff]/70 text-xs mt-0.5">{selectedCycle?.patient_name || '—'}</p>
-                </div>
-
-                {/* Right: Oocyte No */}
-                <div className="flex items-center gap-3">
-                  <div className="flex flex-col items-center">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-[#e9d5ff]/60 mb-1">Oocyte No</span>
-                    <input
-                      className="bg-transparent border border-white/30 rounded-lg text-white font-bold text-sm w-20 h-8 px-2 text-center focus:outline-none focus:border-white/70 placeholder:text-white/30"
-                      placeholder="#"
-                      value={logForm.oocyteNo}
-                      onChange={(e) => handleLogFieldChange('oocyteNo', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Step indicator */}
-              <div className="flex items-start">
-                {STEPS.map((step, i) => (
-                  <React.Fragment key={step.label}>
-                    <button
-                      type="button"
-                      className="flex flex-col items-center gap-1 min-w-[52px] focus:outline-none group"
-                      onClick={() => setLogModalStep(i)}
-                    >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 ${
-                        i < logModalStep
-                          ? `${step.doneBg} text-white`
-                          : i === logModalStep
-                          ? `${step.activeBg} text-white ring-2 ${step.ring} ring-offset-2 scale-110`
-                          : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'
-                      }`}>
-                        {i < logModalStep ? (
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        ) : (
-                          <span className="text-[9px]">{step.dayKey}</span>
-                        )}
-                      </div>
-                      <span className={`text-[9px] font-bold uppercase tracking-wide leading-none mt-1 ${i === logModalStep ? step.textActive : 'text-gray-400'}`}>{step.label}</span>
-                      <span className={`text-[9px] leading-none ${i === logModalStep ? step.textActive + '/80' : 'text-gray-300'}`}>{step.sub}</span>
-                    </button>
-                    {i < 5 && (
-                      <div className={`flex-1 h-0.5 mt-4 transition-colors duration-300 ${i < logModalStep ? step.lineActive : 'bg-gray-200'}`} />
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-
-              {/* Completed step chips */}
-              {logModalStep > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {STEPS.slice(0, logModalStep).map((step, i) => (
-                    <button
-                      key={step.label}
-                      type="button"
-                      onClick={() => setLogModalStep(i)}
-                      className={`flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-all hover:scale-105 ${step.chipCls}`}
-                    >
-                      <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5l2.5 2.5 3.5-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      <span className="opacity-60 uppercase tracking-wide">{step.label}</span>
-                      <span className="font-black">{stepSummary(i)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Active step form */}
-              <div className={`rounded-xl border ${s.border} overflow-hidden shadow-sm`}>
-                <div className={`${s.headerBg} px-4 py-3 flex items-center justify-between`}>
-                  <div>
-                    <p className="text-white font-black text-sm tracking-tight">{s.label}</p>
-                    <p className="text-white/70 text-[11px]">{s.sub}</p>
-                  </div>
-                  <span className="text-white/50 text-xs font-semibold">{logModalStep + 1} / 6</span>
-                </div>
-                <div className="bg-white p-5">
-
-                  {/* Day 0 */}
-                  {logModalStep === 0 && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className={lbl}>Maturity</label>
-                        <select className={sel} value={logForm.d0Maturity} onChange={(e) => handleLogFieldChange('d0Maturity', e.target.value)}>
-                          <option value="MII">MII</option>
-                          <option value="MI">MI</option>
-                          <option value="GV">GV</option>
-                          <option value="Others">Others</option>
-                        </select>
-                      </div>
-                      <div><label className={lbl}>Drop No</label><input className={inp} placeholder="Drop number" value={logForm.d0DropNo} onChange={(e) => handleLogFieldChange('d0DropNo', e.target.value)} /></div>
-                      <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 0 notes…" value={logForm.d0Notes} onChange={(e) => handleLogFieldChange('d0Notes', e.target.value)} /></div>
-                    </div>
-                  )}
-
-                  {/* Day 1 */}
-                  {logModalStep === 1 && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className={lbl}>PN Status</label>
-                        <select className={sel} value={logForm.d1Pn} onChange={(e) => handleLogFieldChange('d1Pn', e.target.value)}>
-                          <option value="2PN">2PN ✓</option>
-                          <option value="1PN">1PN</option>
-                          <option value="3PN">3PN</option>
-                          <option value="0PN">0PN</option>
-                          <option value="Degenerated">Degenerated</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className={lbl}>Zygote Status</label>
-                        <select className={sel} value={logForm.d1ZygoteStatus} onChange={(e) => handleLogFieldChange('d1ZygoteStatus', e.target.value)}>
-                          <option value="">—</option>
-                          <option value="Normal">Normal</option>
-                          <option value="Abnormal">Abnormal</option>
-                        </select>
-                      </div>
-                      <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 1 notes…" value={logForm.d1Notes} onChange={(e) => handleLogFieldChange('d1Notes', e.target.value)} /></div>
-                    </div>
-                  )}
-
-                  {/* Day 3 */}
-                  {logModalStep === 2 && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className={lbl}>Drop No</label><input className={inp} placeholder="Drop number" value={logForm.day3DropNo} onChange={(e) => handleLogFieldChange('day3DropNo', e.target.value)} /></div>
-                      <div />
-                      <div>
-                        <label className={lbl}>Cell Count</label>
-                        <select className={sel} value={logForm.day3CellCount} onChange={(e) => handleLogFieldChange('day3CellCount', e.target.value)}>
-                          <option value="">—</option>
-                          {['2','3','4','5','6','7','8','9+'].map(v => <option key={v} value={v}>{v} cells</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className={lbl}>Fragmentation</label>
-                        <select className={sel} value={logForm.day3Fragmentation} onChange={(e) => handleLogFieldChange('day3Fragmentation', e.target.value)}>
-                          <option value="">—</option>
-                          <option value="1">Grade 1 (≤10%)</option>
-                          <option value="2">Grade 2 (10–25%)</option>
-                          <option value="3">Grade 3 (25–50%)</option>
-                          <option value="4">Grade 4 (&gt;50%)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className={lbl}>Symmetry</label>
-                        <select className={sel} value={logForm.day3Symmetry} onChange={(e) => handleLogFieldChange('day3Symmetry', e.target.value)}>
-                          <option value="">—</option>
-                          <option value="Even">Even</option>
-                          <option value="Slightly uneven">Slightly uneven</option>
-                          <option value="Uneven">Uneven</option>
-                        </select>
-                      </div>
-                      {logForm.day3CellCount && logForm.day3Fragmentation && (
-                        <div className="flex items-end">
-                          <div className="w-full rounded-xl bg-[#F7ECFF] border border-[#c084fc]/40 px-3 py-2.5 text-center">
-                            <span className="text-[10px] text-[#9c3aa6] uppercase tracking-wide block mb-0.5">Auto Grade</span>
-                            <span className="text-2xl font-black text-[#6b1176]">{generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation)}</span>
-                          </div>
-                        </div>
-                      )}
-                      <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 3 notes…" value={logForm.day3Notes} onChange={(e) => handleLogFieldChange('day3Notes', e.target.value)} /></div>
-                    </div>
-                  )}
-
-                  {/* Day 5 */}
-                  {logModalStep === 3 && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
-                        <label className={lbl}>Stage</label>
-                        <select className={sel} value={logForm.day5Stage} onChange={(e) => handleLogFieldChange('day5Stage', e.target.value)}>
-                          <option value="">—</option>
-                          <option value="Cleavage">Cleavage</option>
-                          <option value="Morula">Morula</option>
-                          <option value="Early Blast">Early Blast</option>
-                          <option value="Blastocyst">Blastocyst ⭐</option>
-                        </select>
-                      </div>
-                      {logForm.day5Stage === 'Blastocyst' && (<>
-                        <div>
-                          <label className={lbl}>Expansion Grade</label>
-                          <select className={sel} value={logForm.day5ExpansionGrade} onChange={(e) => handleLogFieldChange('day5ExpansionGrade', e.target.value)}>
-                            <option value="">—</option>
-                            {['1','2','3','4','5','6'].map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className={lbl}>ICM Grade</label>
-                          <select className={sel} value={logForm.day5IcmGrade} onChange={(e) => handleLogFieldChange('day5IcmGrade', e.target.value)}>
-                            <option value="">—</option>
-                            {['A','B','C'].map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className={lbl}>TE Grade</label>
-                          <select className={sel} value={logForm.day5TeGrade} onChange={(e) => handleLogFieldChange('day5TeGrade', e.target.value)}>
-                            <option value="">—</option>
-                            {['A','B','C'].map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
-                        </div>
-                        {blastGradeFields5 && (
-                          <div className="flex items-end">
-                            <div className="w-full rounded-xl bg-[#F7ECFF] border border-[#c084fc]/40 px-3 py-2.5 text-center">
-                              <span className="text-[10px] text-[#9c3aa6] uppercase tracking-wide block mb-0.5">D5 Grade</span>
-                              <span className={`text-2xl font-black ${getGradeColor(generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade))}`}>{generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade)}</span>
-                            </div>
-                          </div>
-                        )}
-                      </>)}
-                      <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 5 notes…" value={logForm.day5Notes} onChange={(e) => handleLogFieldChange('day5Notes', e.target.value)} /></div>
-                    </div>
-                  )}
-
-                  {/* Day 6 */}
-                  {logModalStep === 4 && (
-                    day6Locked ? (
-                      <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
-                        <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-2xl mb-1">🧊</div>
-                        <p className="text-sm font-semibold text-gray-500">Blastocyst reached on Day 5</p>
-                        <p className="text-xs text-gray-400">Day 6 evaluation not required</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="col-span-2">
-                          <label className={lbl}>Stage</label>
-                          <select className={sel} value={logForm.day6Stage} onChange={(e) => handleLogFieldChange('day6Stage', e.target.value)}>
-                            <option value="">—</option>
-                            <option value="Cleavage">Cleavage</option>
-                            <option value="Morula">Morula</option>
-                            <option value="Early Blast">Early Blast</option>
-                            <option value="Blastocyst">Blastocyst</option>
-                          </select>
-                        </div>
-                        {logForm.day6Stage === 'Blastocyst' && (<>
-                          <div>
-                            <label className={lbl}>Expansion Grade</label>
-                            <select className={sel} value={logForm.day6ExpansionGrade} onChange={(e) => handleLogFieldChange('day6ExpansionGrade', e.target.value)}>
-                              <option value="">—</option>
-                              {['1','2','3','4','5','6'].map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className={lbl}>ICM Grade</label>
-                            <select className={sel} value={logForm.day6IcmGrade} onChange={(e) => handleLogFieldChange('day6IcmGrade', e.target.value)}>
-                              <option value="">—</option>
-                              {['A','B','C'].map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className={lbl}>TE Grade</label>
-                            <select className={sel} value={logForm.day6TeGrade} onChange={(e) => handleLogFieldChange('day6TeGrade', e.target.value)}>
-                              <option value="">—</option>
-                              {['A','B','C'].map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
-                          </div>
-                          {blastGradeFields6 && (
-                            <div className="flex items-end">
-                              <div className="w-full rounded-xl bg-[#F7ECFF] border border-[#c084fc]/40 px-3 py-2.5 text-center">
-                                <span className="text-[10px] text-[#9c3aa6] uppercase tracking-wide block mb-0.5">D6 Grade</span>
-                                <span className={`text-2xl font-black ${getGradeColor(generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade))}`}>{generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade)}</span>
-                              </div>
-                            </div>
-                          )}
-                        </>)}
-                        {logForm.day6Stage && (
-                          <div className="col-span-2">
-                            <label className={lbl}>Progression vs Day 5</label>
-                            <select className={sel} value={logForm.day6Progression} onChange={(e) => handleLogFieldChange('day6Progression', e.target.value)}>
-                              <option value="">—</option>
-                              <option value="Delayed development">Delayed development</option>
-                              <option value="Same as Day 5">Same as Day 5</option>
-                              <option value="Improved">Improved</option>
-                              <option value="Degenerated">Degenerated</option>
-                            </select>
-                          </div>
-                        )}
-                        <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 6 notes…" value={logForm.day6Notes} onChange={(e) => handleLogFieldChange('day6Notes', e.target.value)} /></div>
-                      </div>
-                    )
-                  )}
-
-                  {/* Final */}
-                  {logModalStep === 5 && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
-                        <label className={lbl}>Fate</label>
-                        <select className={sel} value={logForm.fate} onChange={(e) => handleLogFieldChange('fate', e.target.value)}>
-                          <option value="">None</option>
-                          <option value="Freeze">❄️ Freeze</option>
-                          <option value="Transfer">🧬 Transfer</option>
-                          <option value="Discard">❌ Discard</option>
-                        </select>
-                      </div>
-                      {logForm.fate === 'Freeze' && (
-                        <div className="col-span-2"><label className={lbl}>Freeze ID</label><input className={inp} placeholder="#1, #2…" value={logForm.fzNo} onChange={(e) => handleLogFieldChange('fzNo', e.target.value)} /></div>
-                      )}
-                      <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Final notes…" value={logForm.notes} onChange={(e) => handleLogFieldChange('notes', e.target.value)} /></div>
-                    </div>
-                  )}
-
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center pt-1 border-t border-gray-100">
-                {/* Left: Cancel */}
-                <button type="button" onClick={() => { setIsAddLogFormOpen(false); resetLogForm(); setEditingLogId(null); }}
-                  className="px-4 py-2.5 rounded-xl border border-[#9c3aa6]/40 text-[#6b1176] text-sm font-semibold hover:bg-[#f8f0fb] transition-colors">
-                  Cancel
-                </button>
-
-                {/* Center: Back / Next */}
-                <div className="flex-1 flex items-center justify-center gap-2">
-                  {logModalStep > 0 && (
-                    <button type="button" onClick={() => setLogModalStep(prev => prev - 1)}
-                      className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors flex items-center gap-1.5">
-                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8.5 2L4 6.5l4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      Back
-                    </button>
-                  )}
-                  {logModalStep < 5 && (
-                    <button type="button" onClick={() => setLogModalStep(prev => prev + 1)}
-                      className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors flex items-center gap-1.5">
-                      Next
-                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M4.5 2L9 6.5 4.5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    </button>
-                  )}
-                </div>
-
-                {/* Right: Save */}
-                <button type="button" onClick={handleAddLogEntry} disabled={logSaving}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#3b0764] to-[#9c3aa6] text-white text-sm font-bold shadow-md hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2">
-                  {logSaving && <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
-                  {editingLogId ? 'Update' : 'Save'}
-                </button>
-              </div>
-            </div>
-          );
-        })()}
       </Modal>
     </PageLayout>
   );
