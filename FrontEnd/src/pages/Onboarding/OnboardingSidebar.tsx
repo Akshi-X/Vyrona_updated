@@ -26,7 +26,7 @@ const NAV_ITEMS = [
             { label: "Overview",                  path: "/onboarding/dashboard"           },
             { label: "Cryocan Quality Tracking",  path: "/onboarding/ivf-track-shipment"  },
             { label: "Incubator Tracking",         path: "/onboarding/incubator-tracking"  },
-            { label: "Embryo Grading",             path: "/onboarding/embryo-grading"      },
+            { label: "Embryo Console",              path: "/onboarding/embryo-console"      },
         ],
     },
     { icon: ControlTowerIconWhite, label: "Control Tower",      path: "/onboarding/control-tower"  },
@@ -39,7 +39,7 @@ const DASHBOARD_CHILD_PATHS = [
     "/onboarding/dashboard",
     "/onboarding/ivf-track-shipment",
     "/onboarding/incubator-tracking",
-    "/onboarding/embryo-grading",
+    "/onboarding/embryo-console",
 ];
 
 interface OnboardingSidebarProps {

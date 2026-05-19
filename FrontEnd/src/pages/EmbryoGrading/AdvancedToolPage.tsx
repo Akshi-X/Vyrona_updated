@@ -123,7 +123,7 @@ export default function AdvancedEmbryoGradingPage() {
   }, [his]);
 
   const handleComplete = () => {
-    navigate(his ? `/embryo-grading/${his}` : '/embryo-grading', {
+    navigate(his ? `/embryo-console/${his}` : '/embryo-console', {
       state: {
         gradeResult: { expansion: mockAI.expansion, icm: mockAI.icm, te: mockAI.te },
         savedLogForm: routeState.savedLogForm,

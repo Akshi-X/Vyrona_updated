@@ -27,17 +27,25 @@ export default function EmbryoShell() {
   const isReports  = pathname.endsWith('/reports');
 
   const title = isAdvanced
-    ? `Advanced Embryo Grading | ${hisPart}`
+    ? `AI Grading | ${hisPart}`
     : isCompare
-    ? `Leaderboard & Compare | ${hisPart}`
+    ? `Compare | ${hisPart}`
     : isReports
     ? `Embryo Reports | ${hisPart}`
-    : `Embryology Log Sheet | ${hisPart}`;
+    : `Development Tracker | ${hisPart}`;
+
+  const description = isAdvanced
+    ? 'AI-powered embryo image analysis and morphology grading'
+    : isCompare
+    ? 'Side-by-side comparison of embryo quality and morphology scores'
+    : isReports
+    ? 'Generate and export comprehensive cycle reports for clinical records'
+    : 'Track day-by-day embryo development from fertilization to fate';
 
   const homeBtn = (
     <button
       type="button"
-      onClick={() => navigate('/embryo-grading')}
+      onClick={() => navigate('/embryo-console')}
       className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-line bg-white text-sm text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
     >
       <Home size={15} />
@@ -64,7 +72,7 @@ export default function EmbryoShell() {
   );
 
   return (
-    <PageLayout title={title} actions={pageActions}>
+    <PageLayout title={title} description={description} actions={pageActions}>
       <EmbryoTabBar his={his} />
       <Outlet />
     </PageLayout>
