@@ -342,7 +342,7 @@ export default function EmbryoComparePage() {
                         <button
                           type="button"
                           onClick={() => setSelectedEmbryoIds(prev => prev.filter(id => id !== eid))}
-                          className="text-gray-300 hover:text-gray-500 transition-colors shrink-0"
+                          className="text-gray-500 hover:text-gray-900 transition-colors shrink-0"
                         >
                           <X size={10} />
                         </button>
