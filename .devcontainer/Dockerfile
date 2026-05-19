@@ -1,6 +1,14 @@
-FROM mcr.microsoft.com/devcontainers/base:ubuntu
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 
-RUN apt-get update && apt-get install -y \
+# Python runtime hygiene
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    # Install Poetry to a system-wide, user-agnostic location
+    POETRY_HOME=/opt/poetry \
+    PATH="/opt/poetry/bin:/usr/local/bin:$PATH"
+
+# All apt dependencies + Node.js in one layer to minimise image size
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
@@ -10,19 +18,11 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     git \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    # Set python3 as default in the same layer — no extra RUN needed
+    && ln -sf /usr/bin/python3 /usr/local/bin/python
 
-# Install Poetry as vscode user
-USER vscode
+# Install Poetry as root into /opt/poetry — no user-switching required
 RUN curl -sSL https://install.python-poetry.org | python3 -
-ENV PATH="/home/vscode/.local/bin:$PATH"
-USER root
-RUN ln -sf /home/vscode/.local/bin/poetry /usr/local/bin/poetry
-
-# Install Node.js and npm
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && npm --version && node --version
-
-# Set Python 3 as default
-RUN ln -sf /usr/bin/python3 /usr/local/bin/python
