@@ -6,9 +6,10 @@ These are used with Depends() in route handlers.
 Supports both HTTP/REST and WebSocket authentication.
 """
 
-from fastapi import Depends, Request, WebSocket, Query
+from fastapi import Depends, Request, WebSocket, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from pydantic import BaseModel, EmailStr, ValidationError
 from typing import Tuple
 import logging
 
@@ -59,10 +60,10 @@ logger = logging.getLogger(__name__)
 def get_current_user(request: Request) -> User:
     """
     Get current authenticated user from request state.
-    
+
     This is set by TokenValidationMiddleware.
     Use this in protected endpoints.
-    
+
     Usage:
         @router.get("/profile")
         def get_profile(current_user: User = Depends(get_current_user)):
@@ -70,18 +71,18 @@ def get_current_user(request: Request) -> User:
     """
     if not hasattr(request.state, "current_user"):
         raise InvalidCredentialsException(email="unknown")
-    
+
     return request.state.current_user
 
 
 def get_current_user_pharma_id(request: Request) -> int:
     """
     Get pharma_id for the current authenticated user from JWT token.
-    
+
     This extracts pharma_id directly from the token payload, eliminating
     the need for a database query. This is safe because pharma_id is
     immutable for each user in our architecture.
-    
+
     Usage:
         @router.get("/ongoing")
         def get_ongoing(pharma_id: int = Depends(get_current_user_pharma_id)):
@@ -89,44 +90,44 @@ def get_current_user_pharma_id(request: Request) -> int:
     """
     from ..auth.auth import verify_token
     from ..exceptions import InvalidTokenException, UserNotFoundException
-    
+
     # First try to get from request state (set by middleware)
     if hasattr(request.state, "pharma_id") and request.state.pharma_id is not None:
         return request.state.pharma_id
-    
+
     # Fallback: Extract token from Authorization header
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         raise InvalidTokenException()
-    
+
     # Parse Authorization header (format: "Bearer <token>")
     parts = auth_header.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise InvalidTokenException()
-    
+
     token = parts[1]
-    
+
     # Verify token and get payload
     payload = verify_token(token)
-    
+
     # Extract pharma_id from token payload
     pharma_id = payload.get("pharma_id")
-    
+
     if pharma_id is None:
         raise UserNotFoundException(
             user_id="unknown"
-        )
-    
+            )
+
     return pharma_id
 
 
 def get_pharma_id_from_request(request: Request) -> int:
     """
     Get pharma_id from request state (set by middleware).
-    
+
     This is a lightweight alternative to get_current_user_pharma_id
     when you know the middleware has already processed the token.
-    
+
     Usage:
         @router.get("/patients")
         def get_patients(request: Request):
@@ -137,16 +138,16 @@ def get_pharma_id_from_request(request: Request) -> int:
         raise UserNotFoundException(
             user_id="unknown"
         )
-    
+
     return request.state.pharma_id
 
 
 def get_hospital_id_from_request(request: Request) -> int:
     """
     Get hospital_id from request state (set by middleware for hospital users).
-    
+
     This is for hospital users (IVF flow) to get their hospital_id.
-    
+
     Usage:
         @router.get("/canisters")
         def get_canisters(request: Request):
@@ -157,24 +158,24 @@ def get_hospital_id_from_request(request: Request) -> int:
         raise UserNotFoundException(
             user_id="unknown"
         )
-    
+
     return request.state.hospital_id
 
 
 def validate_login_request(email: str, password: str, db: Session) -> User:
     """
     Validate login request.
-    
+
     Args:
         email: User email
         password: User password
         db: Database session
-        
+
     Returns:
         Validated User object
     """
     print(f"\n[AUTH_DEPENDENCIES] STEP A: validate_login_request called for {email}")
-    
+
     try:
         # Validation 1: User exists
         print(f"[AUTH_DEPENDENCIES] STEP B: Looking up user by email: {email}")
@@ -183,26 +184,26 @@ def validate_login_request(email: str, password: str, db: Session) -> User:
             print(f"[AUTH_DEPENDENCIES] ERROR: User not found for email: {email}")
             raise UserNotFoundException(email=email)
         print(f"[AUTH_DEPENDENCIES] STEP C: User found - ID: {user.user_id}")
-        
+
         # Validation 2: Check account lock (auto-unlocks if expired)
         print(f"[AUTH_DEPENDENCIES] STEP D: Checking account lock status...")
         check_account_lock_status(user, db)
         print(f"[AUTH_DEPENDENCIES] STEP E: Account lock check passed")
-        
+
         # Validation 3: Account is active
         print(f"[AUTH_DEPENDENCIES] STEP F: Checking if account is active - status: {user.status}")
         if not user.status:
             print(f"[AUTH_DEPENDENCIES] ERROR: Account is inactive")
             raise AccountInactiveException(user_id=user.user_id)
         print(f"[AUTH_DEPENDENCIES] STEP G: Account is active")
-        
+
         # Validation 4: User is approved
         print(f"[AUTH_DEPENDENCIES] STEP H: Checking approval status - approved_status: {user.approved_status}")
         if user.approved_status != 'approved':
             print(f"[AUTH_DEPENDENCIES] ERROR: User not approved")
             raise UserNotApprovedException(user_id=user.user_id)
         print(f"[AUTH_DEPENDENCIES] STEP I: User is approved")
-        
+
         # Validation 5: Password is correct
         print(f"[AUTH_DEPENDENCIES] STEP J: Verifying password...")
         if not verify_password(password, user.password_hash):
@@ -210,20 +211,20 @@ def validate_login_request(email: str, password: str, db: Session) -> User:
             # Increment failed attempts and possibly lock
             increment_failed_login_attempt(user, db)
             attempts_remaining = get_remaining_attempts(user)
-            
+
             raise InvalidCredentialsException(
                 email=email,
                 attempts_remaining=attempts_remaining if attempts_remaining > 0 else None
-            )
+                )
         print(f"[AUTH_DEPENDENCIES] STEP K: Password verified successfully")
-        
+
         # All validations passed! Reset login attempts
         print(f"[AUTH_DEPENDENCIES] STEP L: Resetting login attempts...")
         reset_login_attempts(user, db)
         print(f"[AUTH_DEPENDENCIES] STEP M: All validations passed! Returning user")
-        
+
         return user
-        
+
     except Exception as e:
         print(f"\n[AUTH_DEPENDENCIES] EXCEPTION in validate_login_request: {str(e)}")
         print(f"  Error type: {type(e).__name__}")
@@ -235,21 +236,21 @@ def validate_login_request(email: str, password: str, db: Session) -> User:
 def validate_registration_request(request: UserRegister, db: Session) -> UserRegister:
     """
     Validate registration request.
-    
+
     Checks passwords match and email doesn't exist.
-    
+
     Returns:
         Validated request
     """
     # Validation 1: Passwords match
     if request.password != request.confirm_password:
         raise PasswordMismatchException()
-    
+
     # Validation 2: Email doesn't already exist
     existing_user = get_user_by_email(request.email, db)
     if existing_user:
         raise EmailAlreadyExistsException(email=request.email)
-    
+
     # Validation 3: Apply DB-driven domain classification defaults
     hospital = get_hospital_by_email_domain(request.email, db)
 
@@ -272,43 +273,61 @@ def validate_registration_request(request: UserRegister, db: Session) -> UserReg
 def validate_get_user_request(user_id: str, db: Session) -> User:
     """
     Validate get user request.
-    
+
     Returns:
         Validated User object
     """
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise UserGetNotFoundException(registration_id=str(user_id))
-    
+
     return user
 
 
 def validate_approve_user_request(user_id: str, db: Session) -> User:
     """
     Validate approve user request.
-    
+
     Returns:
         Validated User object
     """
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise UserApproveNotFoundException(registration_id=str(user_id))
-    
+
     return user
 
 
 def validate_reject_user_request(user_id: str, db: Session) -> User:
     """
     Validate reject user request.
-    
+
     Returns:
         Validated User object
     """
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise UserRejectNotFoundException(registration_id=str(user_id))
-    
+
     return user
+
+
+def validate_email_format(email: str) -> str:
+    """
+    Validates that a string matches a proper email format.
+    Throws an HTTP 422 exception if validation fails to match FastAPI's default style.
+    """
+
+    class EmailModel(BaseModel):
+        email: EmailStr
+
+    try:
+        EmailModel(email=email)
+        return email
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=422, detail=e.errors(include_url=False, include_context=False)
+        )
 
 
 # ============================================
@@ -321,10 +340,10 @@ async def authenticate_websocket(
 ) -> Tuple[User, int]:
     """
     Authenticate WebSocket connection using JWT token
-    
+
     Returns:
         Tuple of (user, pharma_id, db_session)
-    
+
     Raises:
         ChatWebSocketAuthFailedException if authentication fails
     """
@@ -379,4 +398,3 @@ async def authenticate_websocket(
     except Exception as e:
         logger.error(f"Unexpected error during WebSocket authentication: {e}", exc_info=True)
         raise ChatWebSocketAuthFailedException(reason=str(e))
-
