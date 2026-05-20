@@ -7,6 +7,15 @@ from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.auth.auth import get_password_hash
 
+@pytest.fixture(scope="session", autouse=True)
+def fix_missing_columns():
+    from app.config.database import engine
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        conn.execute(text(
+            "ALTER TABLE critical_alerts ADD COLUMN IF NOT EXISTS acknowledgment_reason TEXT;"
+        ))
+        conn.commit()
 
 @pytest.fixture
 def setup_hospital_user():
@@ -67,8 +76,9 @@ def setup_hospital_user():
 
     # CLEANUP
     for db, user, branch, hospital in created_items:
-
-        db.delete(user)
+        from app.models.user_model import User as UserModel
+        
+        db.query(UserModel).filter(UserModel.branch_id == branch.branch_id).delete()
         db.commit()
 
         db.delete(branch)

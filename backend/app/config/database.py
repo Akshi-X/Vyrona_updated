@@ -4,7 +4,13 @@ from sqlalchemy.orm import sessionmaker
 import logging
 
 from .config import settings
-from ..constants.app_constants import DB_POOL_SIZE, DB_MAX_OVERFLOW, DB_POOL_TIMEOUT, DB_POOL_RECYCLE, DB_ECHO
+from ..constants.app_constants import (
+    DB_POOL_SIZE,
+    DB_MAX_OVERFLOW,
+    DB_POOL_TIMEOUT,
+    DB_POOL_RECYCLE,
+    DB_ECHO,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -13,14 +19,15 @@ DATABASE_URL = settings.database_url
 
 # Create engine with connection pooling
 engine = create_engine(
-    DATABASE_URL, 
-    pool_pre_ping=True, 
-    echo=DB_ECHO,   
+    DATABASE_URL,
+    pool_pre_ping=True,
+    echo=DB_ECHO,
     pool_size=DB_POOL_SIZE,
     max_overflow=DB_MAX_OVERFLOW,
     pool_timeout=DB_POOL_TIMEOUT,
-    pool_recycle=DB_POOL_RECYCLE
+    pool_recycle=DB_POOL_RECYCLE,
 )
+
 
 # Priority 3: Add pool monitoring function
 def log_pool_status():
@@ -33,6 +40,7 @@ def log_pool_status():
         )
     except Exception as e:
         logger.warning(f"Failed to log pool status: {e}")
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -77,6 +85,7 @@ def init_db():
         geolocation_model,
         activity_log_model,
     )
+
     # Import IVF models
     from ..models.IVF import (
         hospital_model,
@@ -100,6 +109,6 @@ def init_db():
     # All tables (including IVF tables) are now in public schema
     # If you need to migrate existing tables from ivf schema to public schema,
     # run the migration script: migrations/move_ivf_schema_to_public.sql
-    
+
     # Create all tables in public schema
     Base.metadata.create_all(bind=engine)

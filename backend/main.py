@@ -146,7 +146,7 @@ setup_exception_handlers(app)
 @app.on_event("startup")
 async def startup_event():
     """Run on application startup"""
-    #logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
     #logger.info("=" * 60)
     #logger.info("APPLICATION STARTUP EVENT")
     #logger.info("=" * 60)

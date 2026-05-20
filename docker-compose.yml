@@ -112,7 +112,7 @@ services:
       - SMTP_PORT=25
       - SMTP_USERNAME=${SMTP_USERNAME}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - FIXED_OTP_MODE=true
+      - FIXED_OTP_MODE=true #change this value to true to enable fixed OTP code for testing purposes
       - FIXED_OTP_CODE=123456
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
       - BACKEND_URL=${BACKEND_URL:-http://localhost:8000}
