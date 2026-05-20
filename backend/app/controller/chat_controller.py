@@ -9,14 +9,17 @@ import time
 from app.config import database
 from app.config.database import SessionLocal
 from app.schemas.chat_schema import (
-    ChatMessageCreateRequest, ChatMessageCreateResponse, 
-    PatientMessagesResponse, UnreadMessagesResponse,
+    ChatMessageCreateRequest, ChatMessageCreateResponse,
+    PatientMessagesResponse, IncubatorMessagesResponse, UnreadMessagesResponse,
     ChatErrorResponse
 )
 from app.service.chat_service import (
-    create_chat_message, get_patient_messages, get_canister_messages, get_unread_messages,
-    broadcast_new_message, broadcast_unread_messages_update, handle_websocket_connection, handle_websocket_message_loop,
-    mark_canister_as_read, get_canister_unread_count, mark_patient_as_read, get_patient_unread_count
+    create_chat_message, get_patient_messages, get_canister_messages, get_incubator_messages,
+    get_unread_messages, broadcast_new_message, broadcast_unread_messages_update,
+    handle_websocket_connection, handle_websocket_message_loop,
+    mark_canister_as_read, get_canister_unread_count,
+    mark_incubator_as_read, get_incubator_unread_count,
+    mark_patient_as_read, get_patient_unread_count
 )
 from app.dependencies.auth_dependencies import (
     get_current_user, get_pharma_id_from_request, get_current_user_pharma_id, 
@@ -375,6 +378,69 @@ async def mark_canister_messages_as_read(
         }
     except ChatPatientNotFoundException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={
+            "error_code": "CHAT_INTERNAL_ERROR",
+            "message": "Internal server error",
+            "details": str(e)
+        })
+
+
+@router.get("/incubators/{incubator_id}/messages",
+    response_model=IncubatorMessagesResponse,
+    summary="Get incubator messages")
+async def get_incubator_chat_messages(
+    incubator_id: int = Path(..., description="Incubator ID"),
+    chamber_id: str = Query(None, description="Filter by chamber (omit for all chambers)"),
+    db: Session = Depends(database.get_db),
+    current_user: user_model.User = Depends(get_current_user),
+    http_request: Request = None
+):
+    """Get all messages for a specific incubator (does NOT mark as read)."""
+    try:
+        hospital_id = None
+        if http_request and hasattr(http_request.state, "hospital_id") and http_request.state.hospital_id is not None:
+            hospital_id = http_request.state.hospital_id
+
+        result = await get_incubator_messages(
+            incubator_id,
+            current_user.user_id,
+            hospital_id,
+            db,
+            chamber_id=chamber_id or None,
+            mark_as_read=False,
+        )
+        return result
+    except ChatPatientNotFoundException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.to_dict())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={
+            "error_code": "CHAT_INTERNAL_ERROR",
+            "message": "Internal server error",
+            "details": str(e)
+        })
+
+
+@router.post("/incubators/{incubator_id}/mark-read",
+    summary="Mark incubator messages as read")
+async def mark_incubator_messages_as_read(
+    incubator_id: int = Path(..., description="Incubator ID"),
+    chamber_id: str = Query(None),
+    db: Session = Depends(database.get_db),
+    current_user: user_model.User = Depends(get_current_user),
+):
+    """Mark all messages for an incubator (and optional chamber) as read."""
+    try:
+        latest_message_id = mark_incubator_as_read(current_user.user_id, incubator_id, chamber_id or None, db)
+        unread_count = get_incubator_unread_count(current_user.user_id, incubator_id, chamber_id or None, db)
+        return {
+            "success": True,
+            "message": f"Messages for incubator {incubator_id} marked as read",
+            "incubator_id": incubator_id,
+            "chamber_id": chamber_id or None,
+            "last_read_message_id": latest_message_id,
+            "unread_count": unread_count,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail={
             "error_code": "CHAT_INTERNAL_ERROR",

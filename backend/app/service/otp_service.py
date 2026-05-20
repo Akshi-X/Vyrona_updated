@@ -10,6 +10,7 @@ from ..models.otp_model import OTP
 from ..models.user_model import User
 from ..models.IVF.hospital_branch_model import HospitalBranch
 from ..models.IVF.hospital_model import Hospital
+from ..config.config import settings
 from ..auth.auth import create_access_token
 from ..constants.app_constants import REMEMBER_ME_SESSION_DURATION_MINUTES, NO_REMEMBER_ME_SESSION_DURATION_MINUTES
 from ..exceptions import (
@@ -42,6 +43,14 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
     """
     Generate and send OTP to user's email with proper transaction handling.
     
+    FIXED_OTP_MODE (Docker):
+    - Generates a fixed OTP code (default: 123456)
+    - Skips email sending entirely (no SMTP/SendGrid required)
+    
+    Production Mode:
+    - Generates random OTP code
+    - Sends via SMTP or SendGrid
+    
     If email sending fails, OTP record is rolled back to prevent orphaned OTP codes.
     
     Args:
@@ -62,10 +71,8 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
     print(f"  Remember Me: {remember_me}")
     
     try:
-        # Generate OTP code
-        print(f"[OTP_SERVICE] STEP 2: Generating OTP code...")
-        otp_code = generate_otp_code()
-        print(f"[OTP_SERVICE] STEP 3: OTP code generated: {otp_code}")
+        # Use fixed OTP in local/docker dev mode so SMTP is not required.
+        otp_code = settings.FIXED_OTP_CODE if settings.FIXED_OTP_MODE else generate_otp_code()
         
         # Set expiration time (10 minutes from now)
         print(f"[OTP_SERVICE] STEP 4: Setting OTP expiration time...")
@@ -90,14 +97,19 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
         db.flush()  # Flush but don't commit - validate first
         print(f"[OTP_SERVICE] STEP 8: OTP flushed successfully")
         
-        # Send OTP via email BEFORE committing
+        # Send OTP via email BEFORE committing (only if not in FIXED_OTP_MODE)
         # If email fails, transaction will rollback
-        print(f"[OTP_SERVICE] STEP 9: Sending OTP email to {email}...")
-        send_otp_email(email, otp_code) # TODO:DevlopmentUncomment
-        print(f"[OTP_SERVICE] STEP 10: OTP email sent successfully")
+        if not settings.FIXED_OTP_MODE:
+            logger.info(f"Sending OTP email to {email} (FIXED_OTP_MODE disabled)")
+            send_otp_email(email, otp_code)
+            logger.info(f"OTP email sent successfully to {email}")
+        else:
+            logger.info(
+                f"FIXED_OTP_MODE enabled: skipping email send. Using fixed OTP '{otp_code}' for {email}. "
+                f"Any OTP can be used to login for testing."
+            )
         
-        # Email sent successfully, NOW commit the transaction
-        print(f"[OTP_SERVICE] STEP 11: Committing transaction...")
+        # Email sent successfully (or skipped in FIXED_OTP_MODE), NOW commit the transaction
         db.commit()
         db.refresh(otp)
         print(f"[OTP_SERVICE] STEP 12: Transaction committed and OTP refreshed")
@@ -108,7 +120,7 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
             action="email.otp_sent",
             outcome=ActivityOutcome.SUCCESS.value,
             actor=build_actor_from_user(user),
-            metadata={"recipient_email": email},
+            metadata={"recipient_email": email, "fixed_otp_mode": settings.FIXED_OTP_MODE},
             audit_log_disabled=is_audit_log_disabled_for_user(user),
         )
         print(f"[OTP_SERVICE] STEP 14: Activity logged")
@@ -124,6 +136,7 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
         # Rollback on ANY error (including email failure)
         print(f"[OTP_SERVICE] Rolling back transaction...")
         db.rollback()
+        logger.error(f"Failed to send OTP: {str(e)}")
         # Handle EmailServiceException properly
         if hasattr(e, 'details') and 'reason' in e.details:
             reason = e.details['reason']
@@ -136,6 +149,9 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
     """
     Verify OTP code for a user
     
+    In FIXED_OTP_MODE (Docker development), any OTP is accepted for testing.
+    In production, OTP must match exactly.
+    
     Args:
         db: Database session
         user_id: User ID
@@ -145,6 +161,25 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
         True if OTP is valid, False otherwise
     """
     try:
+        # In FIXED_OTP_MODE (docker), accept any OTP for testing
+        if settings.FIXED_OTP_MODE:
+            logger.debug(f"FIXED_OTP_MODE enabled: accepting any OTP for testing")
+            # Still mark the OTP as used (best practice)
+            otp = db.query(OTP).filter(
+                and_(
+                    OTP.user_id == user_id,
+                    OTP.is_used == False,
+                    OTP.expires_at > datetime.now(timezone.utc)
+                )
+            ).order_by(OTP.created_at.desc()).first()
+            
+            if otp:
+                otp.is_used = True
+                db.commit()
+            
+            return True
+        
+        # Production mode: verify exact OTP code
         # Find the most recent unused OTP for the user
         otp = db.query(OTP).filter(
             and_(

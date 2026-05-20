@@ -146,7 +146,7 @@ export default function UsersPage() {
                             <input
                                 type="email"
                                 placeholder="user@example.com"
-                                className={`border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1176]/30 ${inviteEmailError ? "border-red-400" : "border-[#E7E1E1]"}`}
+                                className={`border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${inviteEmailError ? "border-red-400" : "border-line"}`}
                                 value={inviteEmail}
                                 onChange={(e) => { setInviteEmail(e.target.value); setInviteEmailError(null); }}
                                 disabled={inviteLoading}
@@ -157,7 +157,7 @@ export default function UsersPage() {
                         <div id="onboarding-users-invite-role" className="flex flex-col gap-1.5">
                             <label className="text-xs font-semibold text-gray-600">Role</label>
                             <select
-                                className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                className="border border-line rounded-md px-3 py-2 text-sm"
                                 value={inviteRole}
                                 onChange={(e) => { setInviteRole(e.target.value); setInviteBranch(""); }}
                                 disabled={inviteLoading}
@@ -172,7 +172,7 @@ export default function UsersPage() {
                             <div id="onboarding-users-invite-branch" className="flex flex-col gap-1.5">
                                 <label className="text-xs font-semibold text-gray-600">Branch</label>
                                 <select
-                                    className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                    className="border border-line rounded-md px-3 py-2 text-sm"
                                     value={inviteBranch}
                                     onChange={(e) => setInviteBranch(e.target.value)}
                                     disabled={inviteLoading}
@@ -197,7 +197,7 @@ export default function UsersPage() {
                             type="button"
                             onClick={closeInviteModal}
                             disabled={inviteLoading}
-                            className="px-4 py-2 bg-[#F2E4FF] text-[#6b1176] rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
+                            className="px-4 py-2 bg-primary-bg text-primary rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
                         >
                             Cancel
                         </button>
@@ -211,7 +211,7 @@ export default function UsersPage() {
                                 !validateEmail(inviteEmail) ||
                                 (inviteRole === "User" && !inviteBranch)
                             }
-                            className="px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
+                            className="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
                         >
                             {inviteLoading ? "Sending..." : "Send Invite"}
                         </button>
@@ -227,7 +227,7 @@ export default function UsersPage() {
                     id="onboarding-users-add-btn"
                     type="button"
                     onClick={() => setShowInviteModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
                 >
                     <UserPlus className="w-4 h-4" />
                     Add User
@@ -235,7 +235,7 @@ export default function UsersPage() {
             }
         >
             {/* Filters */}
-            <section id="onboarding-users-filters" className="bg-white border border-[#E7E1E1] rounded-lg p-5">
+            <section id="onboarding-users-filters" className="bg-white border border-line rounded-lg p-5">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
                         <h2 className="text-base font-semibold text-black">Filters</h2>
@@ -244,7 +244,7 @@ export default function UsersPage() {
                     <button
                         type="button"
                         onClick={handleReset}
-                        className="px-3 py-2 border border-[#E7E1E1] rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                        className="px-3 py-2 border border-line rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                     >
                         Reset Filters
                     </button>
@@ -254,7 +254,7 @@ export default function UsersPage() {
                     <div id="onboarding-users-filter-role" className="flex flex-col gap-2">
                         <label className="text-xs font-semibold text-gray-600">Role</label>
                         <select
-                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                            className="border border-line rounded-md px-3 py-2 text-sm"
                             value={filters.role}
                             onChange={(e) => setFilters((prev) => ({ ...prev, role: e.target.value }))}
                         >
@@ -267,7 +267,7 @@ export default function UsersPage() {
                     <div id="onboarding-users-filter-branch" className="flex flex-col gap-2">
                         <label className="text-xs font-semibold text-gray-600">Branch</label>
                         <select
-                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                            className="border border-line rounded-md px-3 py-2 text-sm"
                             value={filters.branch}
                             onChange={(e) => setFilters((prev) => ({ ...prev, branch: e.target.value }))}
                         >
@@ -280,7 +280,7 @@ export default function UsersPage() {
             </section>
 
             {/* Results */}
-            <section id="onboarding-users-results" className="bg-white border border-[#E7E1E1] rounded-lg p-5">
+            <section id="onboarding-users-results" className="bg-white border border-line rounded-lg p-5">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
                         <h2 className="text-base font-semibold text-black">Users</h2>
@@ -296,22 +296,22 @@ export default function UsersPage() {
 
                 <div id="onboarding-users-table" className="mt-4 overflow-x-auto">
                     <table className="min-w-full text-sm">
-                        <thead className="bg-[#fdeeff]">
+                        <thead className="bg-surface">
                             <tr>
-                                <th id="onboarding-users-col-name" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Name</th>
-                                <th id="onboarding-users-col-email" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Email</th>
-                                <th id="onboarding-users-col-role" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Role</th>
-                                <th id="onboarding-users-col-branch" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Branch</th>
-                                <th id="onboarding-users-col-status" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Status</th>
-                                <th id="onboarding-users-col-approved" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Approved</th>
-                                <th id="onboarding-users-col-lastlogin" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Last Login</th>
-                                <th id="onboarding-users-col-invite" className="px-4 py-3 text-left font-semibold text-[#6b1176]">Invite</th>
+                                <th id="onboarding-users-col-name" className="px-4 py-3 text-left font-semibold text-primary">Name</th>
+                                <th id="onboarding-users-col-email" className="px-4 py-3 text-left font-semibold text-primary">Email</th>
+                                <th id="onboarding-users-col-role" className="px-4 py-3 text-left font-semibold text-primary">Role</th>
+                                <th id="onboarding-users-col-branch" className="px-4 py-3 text-left font-semibold text-primary">Branch</th>
+                                <th id="onboarding-users-col-status" className="px-4 py-3 text-left font-semibold text-primary">Status</th>
+                                <th id="onboarding-users-col-approved" className="px-4 py-3 text-left font-semibold text-primary">Approved</th>
+                                <th id="onboarding-users-col-lastlogin" className="px-4 py-3 text-left font-semibold text-primary">Last Login</th>
+                                <th id="onboarding-users-col-invite" className="px-4 py-3 text-left font-semibold text-primary">Invite</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading
                                 ? Array.from({ length: 6 }).map((_, i) => (
-                                    <tr key={i} className="border-b border-[#F1E8F2] bg-white">
+                                    <tr key={i} className="border-b border-primary-bg bg-white">
                                         {[120, 160, 80, 100, 70, 80, 110, 100].map((w, col) => (
                                             <td key={col} className="px-4 py-3">
                                                 <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
@@ -325,7 +325,7 @@ export default function UsersPage() {
                                     </tr>
                                 ))
                                 : filteredUsers.map((user) => (
-                                    <tr key={user.user_id} className="border-b border-[#F1E8F2]">
+                                    <tr key={user.user_id} className="border-b border-primary-bg">
                                         <td className="px-4 py-3 text-gray-700">
                                             {user.invite_pending ? (
                                                 <span className="text-gray-400 italic">Pending…</span>
@@ -361,7 +361,7 @@ export default function UsersPage() {
                                                     type="button"
                                                     onClick={() => handleResendInvite(user.user_id)}
                                                     disabled={resendingId === user.user_id}
-                                                    className="text-xs font-semibold text-[#6b1176] hover:underline disabled:opacity-50"
+                                                    className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
                                                 >
                                                     {resendingId === user.user_id ? "Sending…" : "Resend Invite"}
                                                 </button>

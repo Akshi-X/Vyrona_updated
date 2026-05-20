@@ -40,6 +40,7 @@ from app.controller.IVF import (
     internal_alert_controller,
     internal_refill_controller,
     ivf_controller,
+    ivf_cycle_controller,
     ivf_dashboard_controller,
     ivf_quality_controller,
     ivf_reports_controller,
@@ -154,19 +155,19 @@ setup_exception_handlers(app)
 async def startup_event():
     """Run on application startup"""
     logger = logging.getLogger(__name__)
-    #     logger.info("=" * 60)
-    #     logger.info("APPLICATION STARTUP EVENT")
-    #     logger.info("=" * 60)
+    # logger.info("=" * 60)
+    # logger.info("APPLICATION STARTUP EVENT")
+    # logger.info("=" * 60)
 
-    #     # Step 1: Create database tables first
-    #     logger.info("Creating database tables...")
+    # #     # Step 1: Create database tables first
+    # logger.info("Creating database tables...")
     # create_tables()
-    # Run schema sync/init migrations (safe/idempotent)
+    # # Run schema sync/init migrations (safe/idempotent)
     # sync_ivf_schema()
 
-    #     # Step 2: Create pharma admin users
-    #     logger.info("Creating pharma admin users...")
-    #    create_admin()
+    # #     # Step 2: Create pharma admin users
+    # logger.info("Creating pharma admin users...")
+    # create_admin()
 
     # Step 3: Start quality monitoring background tasks
     logger.info("Starting quality monitoring background tasks...")
@@ -245,6 +246,7 @@ app.include_router(quality_controller.router, prefix=API_PREFIX)
 app.include_router(quality_tracking_controller.router, prefix=API_PREFIX)
 app.include_router(iot_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_controller.router, prefix=API_PREFIX)
+app.include_router(ivf_cycle_controller.router, prefix=API_PREFIX)
 app.include_router(kpi_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)

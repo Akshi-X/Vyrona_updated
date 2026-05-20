@@ -46,10 +46,21 @@ export interface PatientMessagesResponse {
   unread_count: number;
 }
 
+export interface IncubatorMessagesResponse {
+  incubator_id: number;
+  chamber_id?: string | null;
+  messages: ChatMessageResponse[];
+  total_messages: number;
+  unread_count: number;
+}
+
 export interface ChatMessageCreateRequest {
   message_content: string;
   patient_id?: string; // For CGT flow
   canister_number?: string; // For IVF flow
+  tank_code?: string; // For IVF flow (alternative)
+  incubator_id?: number; // For incubator flow
+  chamber_id?: string; // For incubator flow (optional chamber)
   tagged_user_ids?: string[];
 }
 
@@ -135,6 +146,32 @@ export class ChatService extends BaseApiService {
     unread_count: number;
   }> {
     return await this.request(`/api/chat/canisters/${encodeURIComponent(tankId)}/mark-read`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Get all messages for a specific incubator (optionally filtered by chamber)
+   */
+  async getIncubatorMessages(incubatorId: number, chamberId?: string): Promise<IncubatorMessagesResponse> {
+    const query = chamberId ? `?chamber_id=${encodeURIComponent(chamberId)}` : '';
+    return await this.request<IncubatorMessagesResponse>(
+      `/api/chat/incubators/${incubatorId}/messages${query}`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * Mark incubator messages as read
+   */
+  async markIncubatorAsRead(incubatorId: number, chamberId?: string): Promise<{
+    success: boolean;
+    incubator_id: number;
+    last_read_message_id: number;
+    unread_count: number;
+  }> {
+    const query = chamberId ? `?chamber_id=${encodeURIComponent(chamberId)}` : '';
+    return await this.request(`/api/chat/incubators/${incubatorId}/mark-read${query}`, {
       method: 'POST',
     });
   }

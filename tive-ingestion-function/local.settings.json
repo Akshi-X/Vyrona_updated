@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "TIVE_WEBHOOK_KEY": "MDYzZDYyNjItMzNkZi00YjEzLTk0MGItZWVlZTFjZmZiZDZj",
+    "EVENTHUB_CONNECTION": "Endpoint=sb://mgscale-eventhub-tive-dev.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=Vr/uU35FSqG+I/OXOcPxRIlfKHoVNoEJy+AEhIt2HkE=",
+    "EVENTHUB_NAME": "mgscale-eventhub-tive-telemetry-dev"
+  }
+}

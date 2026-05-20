@@ -17,6 +17,7 @@ from .task_model import Tasks
 from .chat_model import ChatMessage
 from .chat_read_status import ChatReadStatus
 from .chat_read_status_canister import ChatReadStatusCanister
+from .chat_read_status_incubator import ChatReadStatusIncubator
 from .telemetry_model import TelemetryData
 from .quality_log_model import QualityLog
 from .geolocation_model import Geolocation

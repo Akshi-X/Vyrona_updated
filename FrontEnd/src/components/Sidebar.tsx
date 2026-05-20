@@ -51,8 +51,8 @@ const isDropdown = (item: NavItem): item is NavGroup =>
 const DASHBOARD_CHILD_PATHS = [
     "/dashboard",
     "/ivf-track-shipment",
-    // "/incubator-tracking",
-    // "/embryo-grading",
+    "/incubator-tracking",
+    "/embryo-console",
 ];
 
 const isDashboardRoute = (pathname: string) =>
@@ -73,8 +73,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
         children: [
             { label: "Overview",                  path: "/dashboard"          },
             { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
-            //{ label: "Incubator Tracking",         path: "/incubator-tracking" },
-            //{ label: "Embryo Grading",             path: "/embryo-grading"     },
+            { label: "Incubator Tracking",         path: "/incubator-tracking" },
+            { label: "Embryo Console",              path: "/embryo-console"     },
         ],
     },
     { icon: DatabaseIconWhite,    label: "Database",            path: "/database"      },
@@ -86,7 +86,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
         dropdown: true,
         children: [
             { label: "Cryotanks",  path: "/alert-setting" },
-            //{ label: "Incubators", path: "/alert-setting?direction=incubators" },
+            { label: "Incubators", path: "/alert-setting?direction=incubators" },
         ],
     },
     { icon: "", lucideIcon: Download, label: "Reports",         path: "/reports"       },
@@ -301,7 +301,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                         }}
                                                         className={`h-auto w-full justify-start pr-3 py-2 rounded-[10px] flex items-center text-left transition-colors pl-5 ${ci === 0 ? "mt-2" : ""} ${
                                                             childActive
-                                                                ? "bg-white text-[#6b1176]"
+                                                                ? "bg-white text-primary"
                                                                 : "text-white/85 hover:bg-white/10 hover:text-white"
                                                         }`}
                                                     >
@@ -347,7 +347,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                 }`}
                             >
                                 {LucideIcon ? (
-                                    <LucideIcon className="w-5 h-5" color={isActive ? "#6b1176" : "#ffffff"} />
+                                    <LucideIcon className="w-5 h-5" color={isActive ? "var(--color-primary)" : "#ffffff"} />
                                 ) : (
                                     <img
                                         src={iconSrc}
@@ -356,7 +356,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                         style={needsInvert ? { filter: "brightness(0) saturate(100%) invert(100%)" } : undefined}
                                     />
                                 )}
-                                <span className={`font-semibold text-xs md:text-sm ${isActive ? "text-[#6b1176]" : "text-white"}`}>
+                                <span className={`font-semibold text-xs md:text-sm ${isActive ? "text-primary" : "text-white"}`}>
                                     {label}
                                 </span>
                             </button>
@@ -408,7 +408,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                             </button>
                             <button
                                 onClick={() => { setShowLogoutConfirm(false); onLogout(); }}
-                                className="px-4 py-2 text-sm rounded-lg bg-[#6b1176] text-white hover:bg-[#8a2a95] transition-colors"
+                                className="px-4 py-2 text-sm rounded-lg bg-primary text-white hover:bg-[#8a2a95] transition-colors"
                             >
                                 Logout
                             </button>

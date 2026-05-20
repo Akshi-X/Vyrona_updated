@@ -1,0 +1,10 @@
+.git
+.gitignore
+.funcignore
+local.settings.json
+.env*
+__pycache__
+*.pyc
+test_*.py
+refill_test.csv
+TEST_DRIVER_README.md

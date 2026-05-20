@@ -36,6 +36,7 @@ from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.tank_model import Tank
+from ...models.IVF.incubator_model import Incubator
 from ...models.user_model import User
 from ...schemas.IVF.critical_alert_schema import (
     AcknowledgeAlertResponse,
@@ -43,6 +44,7 @@ from ...schemas.IVF.critical_alert_schema import (
     CriticalAlertListResponse,
     CriticalAlertResponse,
     HospitalAlertsResponse,
+    IncubatorAlertsResponse,
     TankAlertsResponse,
 )
 from ...service.email_service import send_email
@@ -695,7 +697,7 @@ class CriticalAlertService:
 
             # Frame message
             message = f"{kpi_config.alert_name} is deviated to {round(deviation.kpi_value, 2)} in {branch_name} branch for {tank_code} tank"
-            if kpi_config.kpi_name == "ln2_lid_state":
+            if kpi_config.kpi_name in _LID_STATE_KPI_NAMES:
                 message = f"{kpi_config.alert_name} is {'OPEN' if deviation.kpi_value == 1 else 'CLOSED'} in {branch_name} branch for {tank_code} tank"
 
             if kpi_config.kpi_name == "ln2_level":
@@ -2239,6 +2241,46 @@ class CriticalAlertService:
 
         return self.get_tank_alerts(tank_id)
 
+    def get_incubator_alerts(
+        self,
+        incubator_id: int,
+        chamber_id: Optional[str] = None,
+        branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
+    ) -> IncubatorAlertsResponse:
+        """Get all alerts for a specific incubator, optionally filtered by chamber."""
+        incubator_query = self.db.query(Incubator).filter(Incubator.incubator_id == incubator_id)
+        if hospital_id is not None:
+            incubator_query = incubator_query.filter(Incubator.hospital_id == hospital_id)
+        if branch_id is not None:
+            incubator_query = incubator_query.filter(Incubator.branch_id == branch_id)
+        incubator = incubator_query.first()
+        if not incubator:
+            raise ValueError(f"Incubator {incubator_id} not found")
+
+        alert_query = (
+            self.db.query(CriticalAlert)
+            .filter(CriticalAlert.incubator_id == incubator_id)
+            .order_by(desc(CriticalAlert.occurred_at))
+        )
+        if chamber_id:
+            alert_query = alert_query.filter(CriticalAlert.chamber_id == chamber_id)
+        alerts = alert_query.all()
+
+        incubator_code = incubator.incubator_code or f"Incubator-{incubator_id}"
+        alert_responses = []
+        for alert in alerts:
+            alert_dict = {**alert.__dict__, "incubator_code": incubator_code}
+            alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
+
+        return IncubatorAlertsResponse(
+            incubator_id=incubator_id,
+            incubator_code=incubator_code,
+            chamber_id=chamber_id,
+            alerts=alert_responses,
+            total_count=len(alert_responses),
+        )
+
     def get_hospital_alerts(
         self,
         branch_id: Optional[int] = None,
@@ -2294,7 +2336,7 @@ class CriticalAlertService:
         )
 
     def acknowledge_alert(
-        self, alert_id: str, user_id: str
+        self, alert_id: str, user_id: str, acknowledgment_reason: Optional[str] = None
     ) -> AcknowledgeAlertResponse:
         """Acknowledge an alert"""
         alert = (
@@ -2313,6 +2355,7 @@ class CriticalAlertService:
         alert.status = AlertStatus.ACKNOWLEDGED.value
         alert.acknowledged_by = user_id
         alert.acknowledged_at = datetime.now(timezone.utc)
+        alert.acknowledgment_reason = acknowledgment_reason
         alert.updated_at = datetime.now(timezone.utc)
 
         self.db.commit()
@@ -2323,10 +2366,11 @@ class CriticalAlertService:
             status=AlertStatus.ACKNOWLEDGED,
             message="Alert acknowledged successfully",
             acknowledged_at=alert.acknowledged_at,
+            acknowledgment_reason=acknowledgment_reason,
         )
 
     def acknowledge_alerts(
-        self, alert_ids: List[str], user_id: str
+        self, alert_ids: List[str], user_id: str, acknowledgment_reason: Optional[str] = None
     ) -> AcknowledgeAlertsResponse:
         """Acknowledge multiple alerts in one transaction."""
         unique_alert_ids = list(dict.fromkeys(alert_ids))
@@ -2361,6 +2405,7 @@ class CriticalAlertService:
             alert.status = AlertStatus.ACKNOWLEDGED.value
             alert.acknowledged_by = user_id
             alert.acknowledged_at = acknowledged_at
+            alert.acknowledgment_reason = acknowledgment_reason
             alert.updated_at = acknowledged_at
 
         self.db.commit()
@@ -2371,6 +2416,7 @@ class CriticalAlertService:
             message="Alerts acknowledged successfully",
             acknowledged_count=len(unique_alert_ids),
             acknowledged_at=acknowledged_at,
+            acknowledgment_reason=acknowledgment_reason,
         )
 
     async def send_reminder_emails(self):

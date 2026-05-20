@@ -113,7 +113,7 @@ export default function TransportTimeComparison() {
         {
           label: 'Scheduled',
           data: scheduled,
-          backgroundColor: '#6B1176',
+          backgroundColor: '#6b1176',
           borderRadius: { topLeft: 5, bottomLeft: 5,topRight: 0, bottomRight: 0 },
           borderSkipped: false as any,
           maxBarThickness: 8,
@@ -121,7 +121,7 @@ export default function TransportTimeComparison() {
         {
           label: 'Actual',
           data: actual,
-          backgroundColor: '#9C3AA6',
+          backgroundColor: '#9c3aa6',
           borderRadius: 0,
           borderSkipped: false as any,
           maxBarThickness: 8,
@@ -236,7 +236,7 @@ export default function TransportTimeComparison() {
   );
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">
+    <div className="bg-white border border-line rounded-lg p-4 h-full">
       <h3 className="font-semibold text-black text-sm mb-3 text-[16px]">Transport Time Comparison</h3>
 
       {error && (

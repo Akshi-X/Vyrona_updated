@@ -1,0 +1,75 @@
+name: Reusable Node Web App Deployment
+
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        required: true
+        type: string
+      frontend_path:
+        required: true
+        type: string
+      node_version:
+        required: false
+        type: string
+        default: "22.x"
+    secrets:
+      AZURE_CREDENTIALS:
+        required: true
+      VITE_API_BASE_URL:
+        required: true
+      VITE_GOOGLE_MAPS_API_KEY:
+        required: false
+      VITE_GOOGLE_MAP_ID:
+        required: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.frontend_path }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.frontend_path }}
+        run: npm ci
+
+      - name: Validate API URL secret
+        run: |
+          if [ -z "${{ secrets.VITE_API_BASE_URL }}" ]; then
+            echo "::error::VITE_API_BASE_URL secret is missing! Please add it to GitHub Secrets."
+            exit 1
+          fi
+
+      - name: Build frontend
+        working-directory: ${{ inputs.frontend_path }}
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+          VITE_GOOGLE_MAP_ID: ${{ secrets.VITE_GOOGLE_MAP_ID }}
+        run: |
+          npm run build
+          if [ -f web.config ]; then
+            cp web.config dist/
+          fi
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          auth-type: SERVICE_PRINCIPAL
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ inputs.app_name }}
+          package: ${{ inputs.frontend_path }}/dist

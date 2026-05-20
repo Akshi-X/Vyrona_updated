@@ -88,9 +88,7 @@ def handle_login(email: str, password: str, remember_me: bool, db: Session) -> d
             raise OTPSendFailedException(email=user.email, reason=str(e))
             
     except Exception as e:
-        print(f"\n[LOGIN_SERVICE] ERROR in handle_login: {str(e)}")
-        print(f"  Error type: {type(e).__name__}")
-        import traceback
-        print(f"  Traceback: {traceback.format_exc()}")
-        raise
+        import logging
+        logging.getLogger(__name__).error(f"OTP send failed: {e}", exc_info=True)
+        raise OTPSendFailedException(email=user.email, reason=str(e))
 
