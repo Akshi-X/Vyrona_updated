@@ -1,3 +1,5 @@
+from urllib import response
+
 from app.constants.error_codes import get_error_code
 from fastapi.testclient import TestClient
 from app.main import app
@@ -53,14 +55,15 @@ def test_wrong_email_and_password():
     print(f"Body   : {response.text}")
 
     assert response.status_code == 400
-    assert response_data["error_code"] == get_error_code("USER_NOT_FOUND")  # UserNotFoundException
+    assert response_data["error_code"] == get_error_code(
+        "USER_NOT_FOUND"
+    )  # UserNotFoundException
     assert response_data["status"] == "Failed"
     assert "message" in response_data
 
     print(f"\n error_code : {response_data['error_code']}")
     print(f" message    : {response_data['message']}")
     print("\n✓ PASSED — Wrong credentials correctly rejected")
-    
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -84,10 +87,14 @@ def test_invalid_email_format():
     print(f"Body   : {response.text}")
 
     assert response.status_code == 422
-    assert "detail" in response_data  # FastAPI validation errors use "detail"
+    assert response.json()["error_code"] == get_error_code(
+        "INVALID_EMAIL_FORMAT"
+    )  # Maps to "ERR_2004"
+    assert "message" in response_data
 
-    print(f"\n detail : {response_data['detail']}")
-    print("\n✓ PASSED — Invalid email format rejected by Pydantic validation")
+    print(f"\n error_code : {response_data['error_code']}")
+    print(f" message    : {response_data['message']}")
+    print("\n✓ PASSED — Invalid email format rejected by middleware validation")
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -242,7 +249,10 @@ def test_otp_after_expiry(setup_hospital_user):
     print(f"Body       : {otp_response.text}")
 
     assert otp_response.status_code == 400
-    assert otp_data["error_code"] in (get_error_code("OTP_EXPIRED"), get_error_code("INVALID_OTP"))
+    assert otp_data["error_code"] in (
+        get_error_code("OTP_EXPIRED"),
+        get_error_code("INVALID_OTP"),
+    )
     assert otp_data["status"] == "Failed"
     assert otp_data["user_id"] == user_id
 
@@ -279,7 +289,7 @@ def test_resend_otp_10_times(setup_hospital_user):
 
     resend_payload = {
         "user_id": user_id,
-        "email": user.email  # Fixed payload
+        "email": user.email,  # Fixed payload
     }
     last_response = None
     limit_hit = False
@@ -295,7 +305,9 @@ def test_resend_otp_10_times(setup_hospital_user):
 
         if resend_response.status_code in (429, 400):
             print(f"  → Resend limit hit after {attempt} attempt(s)")
-            assert resend_data["error_code"] == get_error_code("RESEND_TOO_MANY_REQUESTS")
+            assert resend_data["error_code"] == get_error_code(
+                "RESEND_TOO_MANY_REQUESTS"
+            )
             assert resend_data["status"] == "Failed"
             assert "email" in resend_data
             print(f"  error_code : {resend_data['error_code']}")
@@ -430,16 +442,21 @@ def test_register_with_invalid_email():
     print(f"Body   : {response.text}")
 
     assert response.status_code == 422
-    
+
     # 1. Assert against your specific registration error layout
     assert response_data["status"] == "Failed"
-    assert response_data["error_code"] == get_error_code("VALIDATION_INPUT_ERROR")  # Maps to "ERR_2004"
+    assert response_data["error_code"] == get_error_code(
+        "VALIDATION_INPUT_ERROR"
+    )  # Maps to "ERR_2004"
 
     # 2. Use .get() safely so your print statement never crashes the test runner again
     print(f"\n error_code : {response_data.get('error_code')}")
-    print(f"\n message    : {response_data.get('message', 'No message field provided')}")
+    print(
+        f"\n message    : {response_data.get('message', 'No message field provided')}"
+    )
 
     print("\n✓ PASSED — Invalid email rejected at registration with ERR_2004")
+
 
 # ══════════════════════════════════════════════════════════════════
 # SCENARIO 10: Multiple attempts with the same invite link
@@ -463,7 +480,7 @@ def test_multiple_uses_of_same_invite_link(setup_hospital_user):
     token_payload = {
         "sub": str(admin_user.user_id),
         "email": admin_user.email,
-        "role": "Admin"
+        "role": "Admin",
     }
     token = create_access_token(data=token_payload)
     headers = {"Authorization": f"Bearer {token}"}
@@ -475,10 +492,12 @@ def test_multiple_uses_of_same_invite_link(setup_hospital_user):
     create_payload = {
         "email": unique_invited_email,
         "role": "User",
-        "branch_name": "Main Branch"
+        "branch_name": "Main Branch",
     }
     CREATE_INVITE_URL = "/api/hospital/users/invite"
-    create_response = client.post(CREATE_INVITE_URL, json=create_payload, headers=headers)
+    create_response = client.post(
+        CREATE_INVITE_URL, json=create_payload, headers=headers
+    )
 
     print("\nSTEP 1: CREATE INVITE")
     print(f"Status : {create_response.status_code}")
@@ -492,7 +511,10 @@ def test_multiple_uses_of_same_invite_link(setup_hospital_user):
     db = data["db"]
     db.expire_all()
     from app.models.user_model import User as UserModel
-    invited_user = db.query(UserModel).filter(UserModel.email == unique_invited_email).first()
+
+    invited_user = (
+        db.query(UserModel).filter(UserModel.email == unique_invited_email).first()
+    )
     invite_token = invited_user.invite_token
     print(f"Invite token : {invite_token}")
     assert invite_token, "No invite_token found on invited user in DB"
@@ -533,6 +555,8 @@ def test_multiple_uses_of_same_invite_link(setup_hospital_user):
             print("  → Reuse rejected ✓")
 
     print("\n✓ PASSED — Invite link enforced as single-use")
+
+
 # ══════════════════════════════════════════════════════════════════
 def test_email_injection_in_invite_link(setup_hospital_user):
     print("\n" + "=" * 60)
@@ -545,7 +569,7 @@ def test_email_injection_in_invite_link(setup_hospital_user):
     token_payload = {
         "sub": str(admin_user.user_id),
         "email": admin_user.email,
-        "role": "Admin"
+        "role": "Admin",
     }
     token = create_access_token(data=token_payload)
     headers = {"Authorization": f"Bearer {token}"}
@@ -563,11 +587,13 @@ def test_email_injection_in_invite_link(setup_hospital_user):
         payload = {
             "email": malicious_email,
             "role": "User",
-            "branch_name": "Main Branch"
+            "branch_name": "Main Branch",
         }
         print(f"\n  Injection attempt {i}")
         print(f"  Payload : {repr(malicious_email)}")
-        response = client.post("/api/hospital/users/invite", json=payload, headers=headers)
+        response = client.post(
+            "/api/hospital/users/invite", json=payload, headers=headers
+        )
         response_data = response.json()
         print(f"  Status  : {response.status_code}")
         print(f"  Body    : {response.text}")
@@ -576,9 +602,10 @@ def test_email_injection_in_invite_link(setup_hospital_user):
             f"Attempt {i} NOT rejected! "
             f"Got {response.status_code} for {repr(malicious_email)}"
         )
-        assert "detail" in response_data or response_data.get("status") in ("Failed", "Blocked"),(
-    f"Attempt {i}: response body doesn't match either error shape"
-)
+        assert "detail" in response_data or response_data.get("status") in (
+            "Failed",
+            "Blocked",
+        ), f"Attempt {i}: response body doesn't match either error shape"
         print(f"  → Rejected ✓")
 
     print("\n✓ PASSED — All injection payloads rejected")

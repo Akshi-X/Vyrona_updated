@@ -77,7 +77,11 @@ def setup_hospital_user():
     # CLEANUP
     for db, user, branch, hospital in created_items:
         from app.models.user_model import User as UserModel
-        
+        #Done to make sure the error "IntegrityError: (sqlite3.IntegrityError) FOREIGN KEY constraint failed" does not occur while deleting the user
+        from app.models.otp_model import OTP  # adjust import path if different
+        db.query(OTP).filter(OTP.user_id == user.user_id).delete()
+        db.commit()
+
         db.query(UserModel).filter(UserModel.branch_id == branch.branch_id).delete()
         db.commit()
 
