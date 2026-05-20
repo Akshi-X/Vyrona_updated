@@ -311,25 +311,6 @@ def validate_reject_user_request(user_id: str, db: Session) -> User:
 
     return user
 
-
-def validate_email_format(email: str) -> str:
-    """
-    Validates that a string matches a proper email format.
-    Throws an HTTP 422 exception if validation fails to match FastAPI's default style.
-    """
-
-    class EmailModel(BaseModel):
-        email: EmailStr
-
-    try:
-        EmailModel(email=email)
-        return email
-    except ValidationError as e:
-        raise HTTPException(
-            status_code=422, detail=e.errors(include_url=False, include_context=False)
-        )
-
-
 # ============================================
 # WebSocket Authentication
 # ============================================
