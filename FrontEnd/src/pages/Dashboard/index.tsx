@@ -993,33 +993,42 @@ export default function Dashboard({ }: DashboardProps) {
   );
 
   const dashboardActionIconsWithId = (
-    <div id="onboarding-dashboard-alerts" className="flex items-center gap-4">
-      <div id="onboarding-dashboard-critical-alerts-icon" className="relative cursor-pointer"
+    <div id="onboarding-dashboard-alerts" className="flex items-center gap-6">
+      <div id="onboarding-dashboard-critical-alerts-icon" className="flex flex-col items-center gap-1 cursor-pointer"
         onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
-        <img className="w-[22px] h-[22px]" alt="Critical Alerts" src={CriticalAlertsIcon} />
-        {criticalAlertsCount > 0 && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
-            <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
-          </div>
-        )}
+        <div className="relative">
+          <img className="w-[28px] h-[28px]" alt="Critical Alerts" src={CriticalAlertsIcon} />
+          {criticalAlertsCount > 0 && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
+              <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+            </div>
+          )}
+        </div>
+        <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Alerts</span>
       </div>
-      <div id="onboarding-dashboard-stakeholder-icon" className="relative cursor-pointer"
+      <div id="onboarding-dashboard-stakeholder-icon" className="flex flex-col items-center gap-1 cursor-pointer"
         onClick={() => { refreshUnread(); fetchStakeholderChats(); setShowStakeholderChats(true); }}>
-        <img className="w-[22px] h-[22px]" alt="Stakeholder Chats" src={StakeholderChatsIcon} />
-        {stakeholderChatCount > 0 && (
-          <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-full border border-white flex items-center justify-center ${stakeholderChatCount > 9 ? 'px-1 min-w-4' : 'w-4 h-4'}`}>
-            <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
-          </div>
-        )}
+        <div className="relative">
+          <img className="w-[28px] h-[28px]" alt="Stakeholder Chats" src={StakeholderChatsIcon} />
+          {stakeholderChatCount > 0 && (
+            <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-full border border-white flex items-center justify-center ${stakeholderChatCount > 9 ? 'px-1 min-w-4' : 'w-4 h-4'}`}>
+              <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
+            </div>
+          )}
+        </div>
+        <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Messages</span>
       </div>
-      <div id="onboarding-dashboard-mytasks-icon" className="relative cursor-pointer"
+      <div id="onboarding-dashboard-mytasks-icon" className="flex flex-col items-center gap-1 cursor-pointer"
         onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
-        <img className="w-[22px] h-[22px]" alt="My Tasks" src={MyTasksIcon} />
-        {myTasksCount > 0 && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
-            <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
-          </div>
-        )}
+        <div className="relative">
+          <img className="w-[28px] h-[28px]" alt="My Tasks" src={MyTasksIcon} />
+          {myTasksCount > 0 && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
+              <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
+            </div>
+          )}
+        </div>
+        <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Tasks</span>
       </div>
     </div>
   );

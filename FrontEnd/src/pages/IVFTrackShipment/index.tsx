@@ -35,6 +35,7 @@ export default function IVFTrackShipmentPage() {
     const navigate = useNavigate();
     const [headerTankCode, setHeaderTankCode] = useState<string>("-");
     const [headerBranchName, setHeaderBranchName] = useState<string>("-");
+    const [headerTankId, setHeaderTankId] = useState<number | undefined>(undefined);
     const [tankMaxCapacity, setTankMaxCapacity] = useState<number | null>(null);
     const [tankMinCapacity, setTankMinCapacity] = useState<number | null>(null);
     const [ln2L2Threshold, setLn2L2Threshold] = useState<number | null>(null);
@@ -238,6 +239,7 @@ export default function IVFTrackShipmentPage() {
         if (!tankId) {
             setHeaderTankCode("-");
             setHeaderBranchName("-");
+            setHeaderTankId(undefined);
             setTankMaxCapacity(null);
             setTankMinCapacity(null);
             setLn2L2Threshold(null);
@@ -250,6 +252,7 @@ export default function IVFTrackShipmentPage() {
 
             setHeaderTankCode(kpiConfigResponse?.tank_code || "-");
             setHeaderBranchName(kpiConfigResponse?.branch_name || "-");
+            setHeaderTankId(kpiConfigResponse?.tank_id ?? undefined);
             setTankMaxCapacity(kpiConfigResponse?.tank_max_capacity_reading ?? null);
             setTankMinCapacity(kpiConfigResponse?.tank_min_capacity_reading ?? null);
             setLn2L2Threshold(thresholds.l2);
@@ -601,6 +604,7 @@ export default function IVFTrackShipmentPage() {
                                         externalTempAlert={externalTempAlert}
                                         internalTempAlert={internalTempAlert}
                                         tankCode={headerTankCode !== "-" ? headerTankCode : undefined}
+                                        tankId={headerTankId ?? routeTankId}
                                         branchName={headerBranchName !== "-" ? headerBranchName : undefined}
                                         selectedSensorId={selectedSensorId}
                                         onSensorSelect={(id) => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { History, FlaskConical, Activity, Sun, Tag, Server, Thermometer, Star } from 'lucide-react';
+import { History, FlaskConical, Activity, Sun, Tag, Server, Star } from 'lucide-react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { ivfService, type IvfCycle, type IvfCycleLog, type IvfCycleWithLogs, type IvfLogUpsert, type ChamberLatestItem } from '../../services/ivfService';
