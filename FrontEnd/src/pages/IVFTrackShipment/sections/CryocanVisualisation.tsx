@@ -3888,7 +3888,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                       const lockHex   = GOBLET_COLOR_MAP[item.cryolockColor?.toLowerCase() ?? ""] ?? null;
                       const isEditing = editingCryolockIdx === ci;
                       return (
-                        <div key={ci} style={{ border: selectedStraw === localFlatIndices[ci] ? "1px solid var(--color-primary)" : "1px solid #ede5f5", borderRadius: 12, overflow: "hidden", background: selectedStraw === localFlatIndices[ci] ? "#fdf4ff" : "#fdfbfe", transition: "all 0.2s" }}>
+                        <div key={ci} style={{ border: selectedStraw === localFlatIndices[ci] ? "1px solid var(--color-primary)" : "1px solid #ede5f5", borderRadius: 12, background: selectedStraw === localFlatIndices[ci] ? "#fdf4ff" : "#fdfbfe", transition: "all 0.2s" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 9px 5px", borderBottom: "1px solid #f0e8f4" }}>
                             {gobletHex && <div style={{ width: 10, height: 10, borderRadius: 2, background: gobletHex, flexShrink: 0 }} />}
                             <span className="cryo-mono" style={{ fontSize: 10, fontWeight: 700, color: "#401153", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
