@@ -22,6 +22,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.auth.auth import verify_websocket_token
@@ -854,6 +855,38 @@ def create_kpi_config(
     if branch_id is not None and branch_id_val != branch_id:
         raise HTTPException(status_code=403, detail="Cannot create config for another branch")
 
+    # ── KPI-specific validation ──────────────────────────────────
+    kpi_name = str(body["kpi_name"])
+    min_val = body.get("min")
+    max_val = body.get("max")
+    # Validate numeric conversion first
+    try:
+        min_val = float(min_val) if min_val is not None else None
+        max_val = float(max_val) if max_val is not None else None
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Min and max must be valid numbers"}
+        )
+
+    
+    if kpi_name in (
+        "external_temperature",
+        "internal_temperature",
+        "evaporation_rate_ln2",
+        "shock_detection"
+    ):
+        if (min_val is None) != (max_val is None):
+            raise HTTPException(status_code=400, detail={"error": "Both min and max are required"})
+        if min_val is not None and max_val is not None and float(min_val) > float(max_val):
+            raise HTTPException(status_code=400, detail={"error": "Min must be ≤ Max"})
+    elif kpi_name in ("ln2_level", "battery_level"):
+        if min_val is not None and float(min_val) < 0:
+            raise HTTPException(status_code=400, detail={"error": "Min cannot be negative"})
+        if kpi_name == "battery_level" and min_val is not None and float(min_val) > 100:
+            raise HTTPException(status_code=400, detail={"error": "Min cannot exceed 100"})
+    # ─────────────────────────────────────────────────────────────
+
     quality_service = QualityService(db)
     row = quality_service.create_kpi_config(
         hospital_id=hospital_id,
@@ -885,7 +918,7 @@ def create_kpi_config(
         },
         audit_log_disabled=is_audit_log_disabled_for_user(current_user),
     )
-    return {
+    return JSONResponse(status_code=201, content={
         "id": row.id,
         "hospital_id": row.hospital_id,
         "branch_id": row.branch_id,
@@ -900,8 +933,8 @@ def create_kpi_config(
         if row.cooldown_minutes is not None
         else 60,
         "unack_escalation_threshold": row.unack_escalation_threshold,
-        "status": bool(row.status),
-    }
+        "status": bool(row.status)
+    })
 
 
 @router.post("/kpi-config/bulk")

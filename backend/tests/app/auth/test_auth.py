@@ -478,9 +478,17 @@ def test_multiple_uses_of_same_invite_link(setup_hospital_user):
 
     # Generate token directly using the verified 'user_id' field
     token_payload = {
-        "sub": str(admin_user.user_id),
-        "email": admin_user.email,
-        "role": "Admin",
+    "sub": str(admin_user.user_id),
+    "id": str(admin_user.user_id),
+    "user_id": str(admin_user.user_id),
+    "email": admin_user.email,
+    "role": "Admin",
+    "user_role": "Admin",
+    "type": "hospital_user",
+    "user_type": "hospital_user",
+    "hospital_id": str(admin_user.hospital_id),
+    "branch_id": str(admin_user.branch_id),
+    "department": "IVF",
     }
     token = create_access_token(data=token_payload)
     headers = {"Authorization": f"Bearer {token}"}
@@ -567,9 +575,17 @@ def test_email_injection_in_invite_link(setup_hospital_user):
     data = setup_hospital_user(role="Admin")
     admin_user = data["user"]
     token_payload = {
-        "sub": str(admin_user.user_id),
-        "email": admin_user.email,
-        "role": "Admin",
+    "sub": str(admin_user.user_id),
+    "id": str(admin_user.user_id),
+    "user_id": str(admin_user.user_id),
+    "email": admin_user.email,
+    "role": "Admin",
+    "user_role": "Admin",
+    "type": "hospital_user",
+    "user_type": "hospital_user",
+    "hospital_id": str(admin_user.hospital_id),
+    "branch_id": str(admin_user.branch_id),
+    "department": "IVF"
     }
     token = create_access_token(data=token_payload)
     headers = {"Authorization": f"Bearer {token}"}

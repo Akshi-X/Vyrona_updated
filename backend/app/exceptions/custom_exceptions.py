@@ -411,7 +411,7 @@ class TokenException(AppException):
 class InvalidTokenException(TokenException):
     """Invalid or malformed token"""
     
-    def __init__(self):
+    def __init__(self,message=None):
         super().__init__(
             message=ErrorMessages.INVALID_TOKEN,
             error_code=ERROR_CODES["TOKEN_INVALID"],
