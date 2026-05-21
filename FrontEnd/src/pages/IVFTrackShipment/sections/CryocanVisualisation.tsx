@@ -2714,6 +2714,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       cans.forEach((c) => {
         if (c.group.parent !== grp) {
           grp.attach(c.group);
+          c.group.rotation.set(0, 0, 0);
         }
         c.handleGroup.visible = true;
         // Stop orbit and reset strawGroup rotation + lift
@@ -2929,6 +2930,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       can.group.getWorldPosition(startWorld);
       if (can.group.parent !== scene) {
         scene.attach(can.group);
+        can.group.rotation.y = ((can.group.rotation.y % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
       }
       anime({
         targets: can.group.position,
@@ -2941,7 +2943,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         delay: 1500,
       });
 
-      // Tilt canister to a fixed inspection angle.
+      // Tilt canister to fixed inspection angle.
       anime.remove(can.group.rotation);
       anime({
         targets: can.group.rotation,
@@ -3013,6 +3015,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         if (ci === selectedCanister) return;
         if (c.group.parent !== grp) {
           grp.attach(c.group);
+          c.group.rotation.set(0, 0, 0);
           c.handleGroup.visible = true;
           // Stop orbit and return straws
           anime.remove(c.strawGroup.rotation);
@@ -3114,6 +3117,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         can.group.getWorldPosition(startWorld);
         if (can.group.parent !== scene) {
           scene.attach(can.group);
+          // Normalize accumulated Y to [0, 2π) so the upcoming tilt animation
+          // travels ≤ π — no spinning, no visual snap during the rise.
+          can.group.rotation.x = 0;
+          can.group.rotation.z = 0;
+          can.group.rotation.y = ((can.group.rotation.y % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
         }
         anime({
           targets: can.group.position,
@@ -3146,7 +3154,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           delay: 1700,
         });
 
-        // Tilt so opening faces camera: Euler XYZ (Rx −4°, Ry 2°, Rz −4° roll).
+        // Tilt so opening faces camera.
         anime.remove(can.group.rotation);
         anime({
           targets: can.group.rotation,
@@ -3162,6 +3170,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
       if (!comingFromIdle) {
         if (can.group.parent !== scene) {
           scene.attach(can.group);
+          can.group.rotation.x = 0;
+          can.group.rotation.z = 0;
+          can.group.rotation.y = ((can.group.rotation.y % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
         }
         anime.remove(can.group.position);
         anime({
@@ -3203,9 +3214,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         anime({ targets: s.group.rotation, x: 0, y: angle, z: 0, duration: 700, easing: "easeOutQuad", delay: EXTRACT_DELAY + 400 });
       });
 
-      // 3) Camera shifts to stage 2 framing
-      anime({ targets: cam.position, x: STAGE2_CAM.x, y: STAGE2_CAM.y, z: STAGE2_CAM.z, duration: comingFromIdle ? 3000 : 1400, easing: "easeInOutCubic" });
-      anime({ targets: target, x: STAGE2_TARGET.x, y: STAGE2_TARGET.y, z: STAGE2_TARGET.z, duration: comingFromIdle ? 3000 : 1400, easing: "easeInOutCubic" });
+      // 3) Camera shifts to stage 2 framing (comingFromIdle handles its own camera sweep above)
+      if (!comingFromIdle) {
+        anime({ targets: cam.position, x: STAGE2_CAM.x, y: STAGE2_CAM.y, z: STAGE2_CAM.z, duration: 1400, easing: "easeInOutCubic" });
+        anime({ targets: target, x: STAGE2_TARGET.x, y: STAGE2_TARGET.y, z: STAGE2_TARGET.z, duration: 1400, easing: "easeInOutCubic" });
+      }
 
       // 4) Light moves to illuminate canister area (LEFT side)
       anime({ targets: interior.position, x: fixedInspectPos.x, y: fixedInspectPos.y + 1.0, z: fixedInspectPos.z, duration: 1400, easing: "easeInOutCubic", delay: EXTRACT_DELAY + 800 });
@@ -5089,12 +5102,13 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   const canSampleCount =
                     c.sampleCount ?? effectiveContents[c.id]?.length ?? 0;
                   const hasContents = canSampleCount > 0;
-                  const cursor = !isSelected && hasContents ? "pointer" : "default";
+                  const canSwitch = inspectionReady || viewStage === "idle";
+                  const cursor = !isSelected && hasContents && canSwitch ? "pointer" : "default";
                   return (
                     <div
                       key={c.id}
                       onClick={() => {
-                        if (!isSelected && hasContents) {
+                        if (!isSelected && hasContents && canSwitch) {
                           setSelectedStraw(null);
                           setSelectedCanister(i);
                           setViewStage("inspecting");
