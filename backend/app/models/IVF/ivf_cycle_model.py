@@ -30,4 +30,5 @@ class IvfCycle(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    logs = relationship("IvfCycleLog", back_populates="cycle", cascade="all, delete-orphan")
+    logs    = relationship("IvfCycleLog",    back_populates="cycle", cascade="all, delete-orphan")
+    reports = relationship("IvfCycleReport", back_populates="cycle", cascade="all, delete-orphan")
