@@ -665,23 +665,39 @@ export class IvfService extends BaseApiService {
         );
     }
 
-    /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank. */
-    async getKpiConfigList(id: number, type: "tank" | "incubator" = "tank", chamberId?: string | null): Promise<{
+    /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank/incubator/refrigerator. */
+    async getKpiConfigList(
+        id: number,
+        type: "tank" | "incubator" | "refrigerator" = "tank",
+        scopeId?: string | null,
+    ): Promise<{
         tank_id?: number;
         incubator_id?: number;
+        refrigerator_id?: number;
         tank_code?: string;
         incubator_code?: string;
+        refrigerator_code?: string;
         branch_id: number;
         hospital_id: number | null;
         config: Array<KpiConfigRow>;
     }> {
-        let param = type === "incubator" ? `incubator_id=${encodeURIComponent(id)}` : `tank_id=${encodeURIComponent(id)}`;
+        let param: string;
         if (type === "incubator") {
-            if (chamberId) {
-                param += `&chamber_id=${encodeURIComponent(chamberId)}`;
-            } else if (chamberId === null) {
+            param = `incubator_id=${encodeURIComponent(id)}`;
+            if (scopeId) {
+                param += `&chamber_id=${encodeURIComponent(scopeId)}`;
+            } else if (scopeId === null) {
                 param += `&chamber_id=null`;
             }
+        } else if (type === "refrigerator") {
+            param = `refrigerator_id=${encodeURIComponent(id)}`;
+            if (scopeId) {
+                param += `&zone_id=${encodeURIComponent(scopeId)}`;
+            } else if (scopeId === null) {
+                param += `&zone_id=null`;
+            }
+        } else {
+            param = `tank_id=${encodeURIComponent(id)}`;
         }
         return await this.request(
             `/api/ivf/quality/kpi-config/list?${param}`,
@@ -775,6 +791,72 @@ export class IvfService extends BaseApiService {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ incubator_id: incubatorId, chamber_id: chamberId, configs }),
         });
+    }
+
+    async bulkUpsertKpiConfigForRefrigerator(
+        refrigeratorId: number,
+        zoneId: string | null,
+        configs: Array<{
+            kpi_name: string;
+            alert_name?: string | null;
+            min?: number | null;
+            max?: number | null;
+            unit?: string | null;
+            alert_type?: string | null;
+            cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
+            status?: boolean;
+        }>,
+    ): Promise<{ updated: number; created: number }> {
+        return await this.request("/api/ivf/quality/kpi-config/bulk-refrigerator", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refrigerator_id: refrigeratorId, zone_id: zoneId, configs }),
+        });
+    }
+
+    async getRefrigeratorKpiHistory(
+        refrigeratorId: number,
+        zoneId?: string,
+        durationMinutes?: number,
+    ): Promise<{
+        refrigerator_id: number;
+        refrigerator_code: string;
+        zone_id: string;
+        kpi_series: Record<string, Array<{
+            timestamp: string;
+            value: number;
+            avg?: number;
+            min?: number;
+            max?: number;
+            count?: number;
+            unit: string;
+        }>>;
+    }> {
+        const params = new URLSearchParams();
+        if (zoneId != null) params.set("zone_id", zoneId);
+        if (durationMinutes != null && durationMinutes > 0) params.set("duration_minutes", String(durationMinutes));
+        const qs = params.toString();
+        return await this.request(
+            `/api/ivf/quality/refrigerators/${encodeURIComponent(refrigeratorId)}/kpi-history${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+        );
+    }
+
+    /** Latest single reading for freezer_temperature and refrigerator_temperature. */
+    async getRefrigeratorZoneLatest(refrigeratorId: number, zoneId?: string): Promise<Array<{
+        kpi_name: string;
+        label: string;
+        value: number | null;
+        unit: string;
+    }>> {
+        const params = new URLSearchParams();
+        if (zoneId != null) params.set("zone_id", zoneId);
+        const qs = params.toString();
+        return this.request(
+            `/api/ivf/quality/refrigerators/${encodeURIComponent(refrigeratorId)}/zone-latest${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+        );
     }
 
     async checkTankInTransitStatus(

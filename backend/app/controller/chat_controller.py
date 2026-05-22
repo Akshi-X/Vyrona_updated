@@ -10,15 +10,17 @@ from app.config import database
 from app.config.database import SessionLocal
 from app.schemas.chat_schema import (
     ChatMessageCreateRequest, ChatMessageCreateResponse,
-    PatientMessagesResponse, IncubatorMessagesResponse, UnreadMessagesResponse,
-    ChatErrorResponse
+    PatientMessagesResponse, IncubatorMessagesResponse, RefrigeratorMessagesResponse,
+    UnreadMessagesResponse, ChatErrorResponse
 )
 from app.service.chat_service import (
     create_chat_message, get_patient_messages, get_canister_messages, get_incubator_messages,
+    get_refrigerator_messages,
     get_unread_messages, broadcast_new_message, broadcast_unread_messages_update,
     handle_websocket_connection, handle_websocket_message_loop,
     mark_canister_as_read, get_canister_unread_count,
     mark_incubator_as_read, get_incubator_unread_count,
+    mark_refrigerator_as_read, get_refrigerator_unread_count,
     mark_patient_as_read, get_patient_unread_count
 )
 from app.dependencies.auth_dependencies import (
@@ -438,6 +440,69 @@ async def mark_incubator_messages_as_read(
             "message": f"Messages for incubator {incubator_id} marked as read",
             "incubator_id": incubator_id,
             "chamber_id": chamber_id or None,
+            "last_read_message_id": latest_message_id,
+            "unread_count": unread_count,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={
+            "error_code": "CHAT_INTERNAL_ERROR",
+            "message": "Internal server error",
+            "details": str(e)
+        })
+
+
+@router.get("/refrigerators/{refrigerator_id}/messages",
+    response_model=RefrigeratorMessagesResponse,
+    summary="Get refrigerator messages")
+async def get_refrigerator_chat_messages(
+    refrigerator_id: int = Path(..., description="Refrigerator ID"),
+    zone_id: str = Query(None, description="Filter by zone: 'freezer' / 'fridge' (omit for all zones)"),
+    db: Session = Depends(database.get_db),
+    current_user: user_model.User = Depends(get_current_user),
+    http_request: Request = None
+):
+    """Get all messages for a specific refrigerator (does NOT mark as read)."""
+    try:
+        hospital_id = None
+        if http_request and hasattr(http_request.state, "hospital_id") and http_request.state.hospital_id is not None:
+            hospital_id = http_request.state.hospital_id
+
+        result = await get_refrigerator_messages(
+            refrigerator_id,
+            current_user.user_id,
+            hospital_id,
+            db,
+            zone_id=zone_id or None,
+            mark_as_read=False,
+        )
+        return result
+    except ChatPatientNotFoundException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.to_dict())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={
+            "error_code": "CHAT_INTERNAL_ERROR",
+            "message": "Internal server error",
+            "details": str(e)
+        })
+
+
+@router.post("/refrigerators/{refrigerator_id}/mark-read",
+    summary="Mark refrigerator messages as read")
+async def mark_refrigerator_messages_as_read(
+    refrigerator_id: int = Path(..., description="Refrigerator ID"),
+    zone_id: str = Query(None),
+    db: Session = Depends(database.get_db),
+    current_user: user_model.User = Depends(get_current_user),
+):
+    """Mark all messages for a refrigerator (and optional zone) as read."""
+    try:
+        latest_message_id = mark_refrigerator_as_read(current_user.user_id, refrigerator_id, zone_id or None, db)
+        unread_count = get_refrigerator_unread_count(current_user.user_id, refrigerator_id, zone_id or None, db)
+        return {
+            "success": True,
+            "message": f"Messages for refrigerator {refrigerator_id} marked as read",
+            "refrigerator_id": refrigerator_id,
+            "zone_id": zone_id or None,
             "last_read_message_id": latest_message_id,
             "unread_count": unread_count,
         }

@@ -37,6 +37,7 @@ from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.incubator_model import Incubator
+from ...models.IVF.refrigerator_model import Refrigerator
 from ...models.user_model import User
 from ...schemas.IVF.critical_alert_schema import (
     AcknowledgeAlertResponse,
@@ -45,6 +46,7 @@ from ...schemas.IVF.critical_alert_schema import (
     CriticalAlertResponse,
     HospitalAlertsResponse,
     IncubatorAlertsResponse,
+    RefrigeratorAlertsResponse,
     TankAlertsResponse,
 )
 from ...service.email_service import send_email
@@ -2277,6 +2279,46 @@ class CriticalAlertService:
             incubator_id=incubator_id,
             incubator_code=incubator_code,
             chamber_id=chamber_id,
+            alerts=alert_responses,
+            total_count=len(alert_responses),
+        )
+
+    def get_refrigerator_alerts(
+        self,
+        refrigerator_id: int,
+        zone_id: Optional[str] = None,
+        branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
+    ) -> RefrigeratorAlertsResponse:
+        """Get all alerts for a specific refrigerator, optionally filtered by zone."""
+        refrigerator_query = self.db.query(Refrigerator).filter(Refrigerator.refrigerator_id == refrigerator_id)
+        if hospital_id is not None:
+            refrigerator_query = refrigerator_query.filter(Refrigerator.hospital_id == hospital_id)
+        if branch_id is not None:
+            refrigerator_query = refrigerator_query.filter(Refrigerator.branch_id == branch_id)
+        refrigerator = refrigerator_query.first()
+        if not refrigerator:
+            raise ValueError(f"Refrigerator {refrigerator_id} not found")
+
+        alert_query = (
+            self.db.query(CriticalAlert)
+            .filter(CriticalAlert.refrigerator_id == refrigerator_id)
+            .order_by(desc(CriticalAlert.occurred_at))
+        )
+        if zone_id:
+            alert_query = alert_query.filter(CriticalAlert.zone_id == zone_id)
+        alerts = alert_query.all()
+
+        refrigerator_code = refrigerator.refrigerator_code or f"Refrigerator-{refrigerator_id}"
+        alert_responses = []
+        for alert in alerts:
+            alert_dict = {**alert.__dict__, "refrigerator_code": refrigerator_code}
+            alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
+
+        return RefrigeratorAlertsResponse(
+            refrigerator_id=refrigerator_id,
+            refrigerator_code=refrigerator_code,
+            zone_id=zone_id,
             alerts=alert_responses,
             total_count=len(alert_responses),
         )
