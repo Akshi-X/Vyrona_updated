@@ -276,6 +276,7 @@ export default function OutboundQualityTrackingPage() {
                     message: a.message,
                     timestamp: new Date(a.occurred_at+"Z")+"",
                     status: a.status === 'Active' ? 'Active' : 'Acknowledged',
+                    acknowledgementReason: a.acknowledgment_reason,
                 }))}
                 loading={loadingAlerts}
                 patientIdLabel="Tank Code"
