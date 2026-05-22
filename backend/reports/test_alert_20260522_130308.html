@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Alert Config Test Report</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; }
+        .header { background: #0f172a; padding: 24px 40px; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { color: #f8fafc; font-size: 20px; font-weight: 600; }
+        .header .meta { color: #64748b; font-size: 12px; text-align: right; line-height: 1.8; }
+        .summary { display: flex; gap: 16px; padding: 20px 40px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+        .summary-card { flex: 1; background: #f8fafc; border-radius: 8px; padding: 14px 18px; border: 1px solid #e2e8f0; }
+        .summary-card .num { font-size: 28px; font-weight: 700; }
+        .summary-card .lbl { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+        .num-total { color: #334155; } .num-passed { color: #16a34a; } .num-failed { color: #dc2626; } .num-skipped { color: #d97706; }
+        .container { padding: 28px 40px; display: flex; flex-direction: column; gap: 20px; }
+        .class-block { background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
+        .class-header { background: #1e293b; padding: 14px 20px; }
+        .class-header h2 { color: #f1f5f9; font-size: 15px; font-weight: 600; }
+        .class-doc { color: #94a3b8; font-size: 12px; margin-top: 5px; line-height: 1.6; }
+        .class-stats { display: flex; gap: 8px; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        thead tr { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+        th { color: #64748b; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 16px; text-align: left; }
+        td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: top; font-size: 13px; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: #fafafa; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .passed  { background: #dcfce7; color: #15803d; }
+        .failed  { background: #fee2e2; color: #b91c1c; }
+        .skipped { background: #fef3c7; color: #b45309; }
+        .test-name { font-weight: 500; color: #1e293b; font-size: 13px; }
+        .test-desc { color: #64748b; font-size: 12px; margin-top: 4px; line-height: 1.6; font-style: italic; }
+        .dur { color: #94a3b8; font-size: 12px; white-space: nowrap; }
+        .expand-btn { cursor: pointer; font-size: 11px; color: #3b82f6; background: none; border: none; padding: 0; margin-top: 8px; display: inline-block; }
+        .expand-btn:hover { text-decoration: underline; }
+        .drawer { display: none; margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 10px; }
+        .drawer.open { display: block; }
+        .log-section { margin-bottom: 10px; }
+        .log-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 4px; }
+        .log-box { background: #0f172a; color: #94a3b8; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; padding: 12px 14px; border-radius: 6px; white-space: pre-wrap; line-height: 1.7; max-height: 250px; overflow-y: auto; }
+        .log-error { color: #fca5a5; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Alert Config — Test Report</h1>
+      <div class="meta">
+        <p>Generated: 2026-05-22 13:03:08</p>
+        <p>Classes: 7</p>
+      </div>
+    </div>
+    <div class="summary">
+      <div class="summary-card">
+        <div class="num num-total">39</div>
+        <div class="lbl">Total</div>
+      </div>
+      <div class="summary-card">
+        <div class="num num-passed">39</div>
+        <div class="lbl">Passed</div>
+      </div>
+      <div class="summary-card">
+        <div class="num num-failed">0</div>
+        <div class="lbl">Failed</div>
+      </div>
+      <div class="summary-card">
+        <div class="num num-skipped">0</div>
+        <div class="lbl">Skipped</div>
+      </div>
+    </div>
+    <div class="container">
+      <div class="class-block">
+        <div class="class-header">
+          <h2>TestScenario_ExternalTemperature</h2>
+          <div class="class-doc">Scenario: External Temperature (both min and max required).</div>
+          <div class="class-stats">
+            <span class="badge passed">✓ 5 passed</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:100px">Result</th>
+              <th>Test / Description</th>
+              <th style="width:90px">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step2_min_provided_max_empty_returns_400</div>
+                <div class="test-desc">Arrange: provide `min` but leave `max` empty.
+
+Act: attempt to POST the KPI config.
+
+Assert: API rejects the request with 400 and the error message
+&quot;Both min and max are required&quot;.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_ExternalTemperature-0" onclick="toggleDrawer('d-TestScenario_ExternalTemperature-0')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_ExternalTemperature-0">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:50,337 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+2026-05-22 13:02:50,347 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '10d29f12-2842-4b3d-a5cc-6f77f384b99b', 'id': '10d29f12-2842-4b3d-a5cc-6f77f384b99b', 'user_id': '10d29f12-2842-4b3d-a5cc-6f77f384b99b', 'email': '2b752538-661f-430f-a266-cfe9e11f03e1@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1486', 'branch_id': '1490', 'department': 'IVF', 'token_type': 'access', 'identity': '10d29f12-2842-4b3d-a5cc-6f77f384b99b', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 49, 675058, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 49, 675065, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.27s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step3_max_provided_min_empty_returns_400</div>
+                <div class="test-desc">Arrange: provide `max` but leave `min` empty.
+
+Act: attempt to POST the KPI config.
+
+Assert: API rejects the request with 400 and the same required-field
+error as above.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_ExternalTemperature-1" onclick="toggleDrawer('d-TestScenario_ExternalTemperature-1')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_ExternalTemperature-1">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:50,990 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+2026-05-22 13:02:50,997 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'd4c8bee8-ef14-4b87-8aec-50bd6f6e1b8d', 'id': 'd4c8bee8-ef14-4b87-8aec-50bd6f6e1b8d', 'user_id': 'd4c8bee8-ef14-4b87-8aec-50bd6f6e1b8d', 'email': '7cf1241d-dc09-44de-abdc-4b8487f13e72@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1487', 'branch_id': '1491', 'department': 'IVF', 'token_type': 'access', 'identity': 'd4c8bee8-ef14-4b87-8aec-50bd6f6e1b8d', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 50, 977316, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 50, 977325, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_valid_min_max_saves_successfully</div>
+                <div class="test-desc">Arrange: provide a valid `min` and `max` range.
+
+Act: POST the KPI config.
+
+Assert: API creates the resource and returns 201 (Created).</div>
+                <div class="expand-btn" id="btn-d-TestScenario_ExternalTemperature-2" onclick="toggleDrawer('d-TestScenario_ExternalTemperature-2')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_ExternalTemperature-2">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:51,549 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '14688d6d-f1d4-442c-8e2f-0e3f81c70514', 'id': '14688d6d-f1d4-442c-8e2f-0e3f81c70514', 'user_id': '14688d6d-f1d4-442c-8e2f-0e3f81c70514', 'email': '0fc1b041-548a-481d-855e-bdbbc2adb405@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1488', 'branch_id': '1492', 'department': 'IVF', 'token_type': 'access', 'identity': '14688d6d-f1d4-442c-8e2f-0e3f81c70514', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 51, 512990, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 51, 512998, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.04s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_config_persists_on_reopen</div>
+                <div class="test-desc">Arrange: save a valid config, Act: read it back using the lookup
+
+Assert: the persisted entry matches the saved `min` and `max` values.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_ExternalTemperature-3" onclick="toggleDrawer('d-TestScenario_ExternalTemperature-3')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_ExternalTemperature-3">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:51,956 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+2026-05-22 13:02:51,979 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1139 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1139 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '91ae3898-1457-4a25-9325-1ffc816fee9b', 'id': '91ae3898-1457-4a25-9325-1ffc816fee9b', 'user_id': '91ae3898-1457-4a25-9325-1ffc816fee9b', 'email': 'e95c4e46-539a-48d2-8b6b-297e9a7fa179@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1489', 'branch_id': '1493', 'department': 'IVF', 'token_type': 'access', 'identity': '91ae3898-1457-4a25-9325-1ffc816fee9b', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 51, 937164, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 51, 937172, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.04s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step5_min_greater_than_max_returns_400</div>
+                <div class="test-desc">Arrange: provide an inverted range where `min` &gt; `max`.
+
+Act: attempt to POST the KPI config.
+
+Assert: API rejects with 400 and the message &quot;Min must be ≤ Max&quot;.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_ExternalTemperature-4" onclick="toggleDrawer('d-TestScenario_ExternalTemperature-4')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_ExternalTemperature-4">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:52,467 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min must be ≤ Max'}
+2026-05-22 13:02:52,471 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min must be ≤ Max'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '625d15b3-4e96-48ec-bb18-0adb104437b7', 'id': '625d15b3-4e96-48ec-bb18-0adb104437b7', 'user_id': '625d15b3-4e96-48ec-bb18-0adb104437b7', 'email': '018ae834-6562-4904-a49e-5d7911ed91f5@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1490', 'branch_id': '1494', 'department': 'IVF', 'token_type': 'access', 'identity': '625d15b3-4e96-48ec-bb18-0adb104437b7', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 52, 437480, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 52, 437492, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.04s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="class-block">
+        <div class="class-header">
+          <h2>TestScenario_LN2Level</h2>
+          <div class="class-doc">Scenario: LN2 Level (min-only, non-negative bound).</div>
+          <div class="class-stats">
+            <span class="badge passed">✓ 4 passed</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:100px">Result</th>
+              <th>Test / Description</th>
+              <th style="width:90px">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step1_max_is_null_in_response</div>
+                <div class="test-desc">Arrange: read the LN2 level config if present.
+
+Assert: when a LN2 entry exists, `max` is returned as None.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_LN2Level-0" onclick="toggleDrawer('d-TestScenario_LN2Level-0')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_LN2Level-0">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:52,956 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1141 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1141 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '51c8af7b-75e9-4867-8e4b-2ceb57ab53ec', 'id': '51c8af7b-75e9-4867-8e4b-2ceb57ab53ec', 'user_id': '51c8af7b-75e9-4867-8e4b-2ceb57ab53ec', 'email': '8c08c68b-ff1e-4ad1-ab77-110539a4da3d@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1491', 'branch_id': '1495', 'department': 'IVF', 'token_type': 'access', 'identity': '51c8af7b-75e9-4867-8e4b-2ceb57ab53ec', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 52, 937745, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 52, 937754, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step2_negative_min_returns_400</div>
+                <div class="test-desc">Arrange: set `min` to a negative value.
+
+Act: attempt to save; Assert: API returns 400 with
+&quot;Min cannot be negative&quot;.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_LN2Level-1" onclick="toggleDrawer('d-TestScenario_LN2Level-1')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_LN2Level-1">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:53,365 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min cannot be negative'}
+2026-05-22 13:02:53,368 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min cannot be negative'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'e24bc07f-3066-49ac-80f2-325388ec85ab', 'id': 'e24bc07f-3066-49ac-80f2-325388ec85ab', 'user_id': 'e24bc07f-3066-49ac-80f2-325388ec85ab', 'email': '7712bfe6-7ef4-4d0f-89af-9c54bfce8bd3@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1492', 'branch_id': '1496', 'department': 'IVF', 'token_type': 'access', 'identity': 'e24bc07f-3066-49ac-80f2-325388ec85ab', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 53, 352837, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 53, 352845, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step3_min_zero_is_valid</div>
+                <div class="test-desc">Arrange: set `min` to zero (valid lower bound).
+
+Act: save the config; Assert: API responds with 201.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_LN2Level-2" onclick="toggleDrawer('d-TestScenario_LN2Level-2')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_LN2Level-2">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:53,770 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'a67a755c-5c7d-48a6-aebf-24bcd608d450', 'id': 'a67a755c-5c7d-48a6-aebf-24bcd608d450', 'user_id': 'a67a755c-5c7d-48a6-aebf-24bcd608d450', 'email': '8916f27a-39c4-42d7-80ab-f3f000a2d861@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1493', 'branch_id': '1497', 'department': 'IVF', 'token_type': 'access', 'identity': 'a67a755c-5c7d-48a6-aebf-24bcd608d450', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 53, 755428, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 53, 755434, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_min_50_saves_successfully</div>
+                <div class="test-desc">Arrange: set `min` to a positive value and save.
+
+Act &amp; Assert: API creates the resource and returns 201.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_LN2Level-3" onclick="toggleDrawer('d-TestScenario_LN2Level-3')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_LN2Level-3">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:54,131 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '9664b7ef-3af1-43a3-8b40-92b5f7a3657b', 'id': '9664b7ef-3af1-43a3-8b40-92b5f7a3657b', 'user_id': '9664b7ef-3af1-43a3-8b40-92b5f7a3657b', 'email': 'a711b9de-6854-49ff-8785-54c43786ccee@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1494', 'branch_id': '1498', 'department': 'IVF', 'token_type': 'access', 'identity': '9664b7ef-3af1-43a3-8b40-92b5f7a3657b', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 54, 112663, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 54, 112673, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="class-block">
+        <div class="class-header">
+          <h2>TestScenario_BatteryLevel</h2>
+          <div class="class-doc">Scenario: Battery Level (percentage with 0–100 bounds).</div>
+          <div class="class-stats">
+            <span class="badge passed">✓ 4 passed</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:100px">Result</th>
+              <th>Test / Description</th>
+              <th style="width:90px">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step1_max_is_null_in_response</div>
+                <div class="test-desc">Assert that a stored battery-level config (if present) has
+
+`max` set to None (min-only semantics).</div>
+                <div class="expand-btn" id="btn-d-TestScenario_BatteryLevel-0" onclick="toggleDrawer('d-TestScenario_BatteryLevel-0')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_BatteryLevel-0">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:54,538 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1145 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1145 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'b549167e-729a-43a9-aec7-daea3a46a013', 'id': 'b549167e-729a-43a9-aec7-daea3a46a013', 'user_id': 'b549167e-729a-43a9-aec7-daea3a46a013', 'email': '54b0b3e7-e046-463a-827a-79873c8b8e88@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1495', 'branch_id': '1499', 'department': 'IVF', 'token_type': 'access', 'identity': 'b549167e-729a-43a9-aec7-daea3a46a013', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 54, 505792, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 54, 505804, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.03s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step2_negative_min_returns_400</div>
+                <div class="test-desc">Negative percentages should be rejected.
+
+Act: save with min=-5; Assert: 400 with &quot;Min cannot be negative&quot;.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_BatteryLevel-1" onclick="toggleDrawer('d-TestScenario_BatteryLevel-1')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_BatteryLevel-1">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:55,074 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min cannot be negative'}
+2026-05-22 13:02:55,090 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min cannot be negative'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '9e1071cd-d2d2-4fbd-8d21-cac5d2c25c78', 'id': '9e1071cd-d2d2-4fbd-8d21-cac5d2c25c78', 'user_id': '9e1071cd-d2d2-4fbd-8d21-cac5d2c25c78', 'email': '035ea4a2-9957-427a-a391-45b31ea51aa4@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1496', 'branch_id': '1500', 'department': 'IVF', 'token_type': 'access', 'identity': '9e1071cd-d2d2-4fbd-8d21-cac5d2c25c78', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 55, 28979, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 55, 28994, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.06s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step3_min_exceeds_100_returns_400</div>
+                <div class="test-desc">Percentages above 100 should be rejected.
+
+Act: save with min=101; Assert: 400 with &quot;Min cannot exceed 100&quot;.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_BatteryLevel-2" onclick="toggleDrawer('d-TestScenario_BatteryLevel-2')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_BatteryLevel-2">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:55,747 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min cannot exceed 100'}
+2026-05-22 13:02:55,751 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min cannot exceed 100'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'fb838f20-1409-47a0-9945-e426cd61a396', 'id': 'fb838f20-1409-47a0-9945-e426cd61a396', 'user_id': 'fb838f20-1409-47a0-9945-e426cd61a396', 'email': '4fc06c7f-4a3d-4ac6-ba3c-a96ef3812c6a@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1497', 'branch_id': '1501', 'department': 'IVF', 'token_type': 'access', 'identity': 'fb838f20-1409-47a0-9945-e426cd61a396', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 55, 722710, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 55, 722725, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.03s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_valid_min_saves_successfully</div>
+                <div class="test-desc">Valid percentage within bounds should save successfully.
+
+Act &amp; Assert: POST with min=20 returns 201.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_BatteryLevel-3" onclick="toggleDrawer('d-TestScenario_BatteryLevel-3')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_BatteryLevel-3">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:56,275 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'a385615f-4889-4079-bf36-6507026ad62b', 'id': 'a385615f-4889-4079-bf36-6507026ad62b', 'user_id': 'a385615f-4889-4079-bf36-6507026ad62b', 'email': 'f02ee893-89fc-4c20-9ed3-821e945b3a07@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1498', 'branch_id': '1502', 'department': 'IVF', 'token_type': 'access', 'identity': 'a385615f-4889-4079-bf36-6507026ad62b', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 56, 232330, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 56, 232340, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.05s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="class-block">
+        <div class="class-header">
+          <h2>TestScenario_InternalTemperature</h2>
+          <div class="class-doc">Scenario: Internal Temperature (both min and max required; negatives allowed).</div>
+          <div class="class-stats">
+            <span class="badge passed">✓ 8 passed</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:100px">Result</th>
+              <th>Test / Description</th>
+              <th style="width:90px">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step2_min_provided_max_empty_returns_400</div>
+                <div class="test-desc">Provide `min` without `max` — expect required-field error.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_InternalTemperature-0" onclick="toggleDrawer('d-TestScenario_InternalTemperature-0')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_InternalTemperature-0">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:56,951 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+2026-05-22 13:02:56,956 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '21c699bb-18d8-465c-bb27-626e13027c9f', 'id': '21c699bb-18d8-465c-bb27-626e13027c9f', 'user_id': '21c699bb-18d8-465c-bb27-626e13027c9f', 'email': 'a7dcc311-9439-4e0e-b10b-931fd889a376@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1499', 'branch_id': '1503', 'department': 'IVF', 'token_type': 'access', 'identity': '21c699bb-18d8-465c-bb27-626e13027c9f', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 56, 921245, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 56, 921256, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.04s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step3_max_provided_min_empty_returns_400</div>
+                <div class="test-desc">Provide `max` without `min` — expect required-field error.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_InternalTemperature-1" onclick="toggleDrawer('d-TestScenario_InternalTemperature-1')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_InternalTemperature-1">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:57,701 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+2026-05-22 13:02:57,703 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '8486b340-907b-4b12-b8e6-f0bf8e41118b', 'id': '8486b340-907b-4b12-b8e6-f0bf8e41118b', 'user_id': '8486b340-907b-4b12-b8e6-f0bf8e41118b', 'email': 'b01a3637-808b-43ed-9067-d6dd8fbc6493@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1500', 'branch_id': '1504', 'department': 'IVF', 'token_type': 'access', 'identity': '8486b340-907b-4b12-b8e6-f0bf8e41118b', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 57, 685985, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 57, 685993, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_valid_min_max_saves_successfully[36-38]</div>
+                <div class="test-desc">Parametrized: valid ranges (positive, negative, cross-zero) should
+
+be accepted and return 201.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_InternalTemperature-2" onclick="toggleDrawer('d-TestScenario_InternalTemperature-2')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_InternalTemperature-2">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:58,254 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '73ded609-feb6-4be5-b333-18a0f53fc056', 'id': '73ded609-feb6-4be5-b333-18a0f53fc056', 'user_id': '73ded609-feb6-4be5-b333-18a0f53fc056', 'email': '6cc3d744-30e4-45cd-9b5b-95a7601bdbb1@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1501', 'branch_id': '1505', 'department': 'IVF', 'token_type': 'access', 'identity': '73ded609-feb6-4be5-b333-18a0f53fc056', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 58, 225801, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 58, 225883, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.03s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_valid_min_max_saves_successfully[-20--5]</div>
+                <div class="test-desc">Parametrized: valid ranges (positive, negative, cross-zero) should
+
+be accepted and return 201.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_InternalTemperature-3" onclick="toggleDrawer('d-TestScenario_InternalTemperature-3')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_InternalTemperature-3">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:58,811 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'ff367cb2-e38d-41f9-b1ad-5bf20f7b3fec', 'id': 'ff367cb2-e38d-41f9-b1ad-5bf20f7b3fec', 'user_id': 'ff367cb2-e38d-41f9-b1ad-5bf20f7b3fec', 'email': 'd6ac8721-c7ae-4711-b7b2-0d0c8dcd9747@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1502', 'branch_id': '1506', 'department': 'IVF', 'token_type': 'access', 'identity': 'ff367cb2-e38d-41f9-b1ad-5bf20f7b3fec', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 58, 769028, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 58, 769039, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.04s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_valid_min_max_saves_successfully[-10-10]</div>
+                <div class="test-desc">Parametrized: valid ranges (positive, negative, cross-zero) should
+
+be accepted and return 201.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_InternalTemperature-4" onclick="toggleDrawer('d-TestScenario_InternalTemperature-4')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_InternalTemperature-4">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:02:59,489 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '2d2dea44-f0f0-494a-addf-78cb2df19ca0', 'id': '2d2dea44-f0f0-494a-addf-78cb2df19ca0', 'user_id': '2d2dea44-f0f0-494a-addf-78cb2df19ca0', 'email': '0e0bdf28-b498-4643-81bb-c2693a8a915f@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1503', 'branch_id': '1507', 'department': 'IVF', 'token_type': 'access', 'identity': '2d2dea44-f0f0-494a-addf-78cb2df19ca0', 'exp': datetime.datetime(2026, 5, 23, 13, 2, 59, 430294, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 2, 59, 430307, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.06s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_config_persists_on_reopen</div>
+                <div class="test-desc">Save a valid internal-temp config and verify it persists on lookup.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_InternalTemperature-5" onclick="toggleDrawer('d-TestScenario_InternalTemperature-5')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_InternalTemperature-5">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:00,025 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+2026-05-22 13:03:00,044 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1154 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1154 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '5937d2a7-3535-49b6-8494-9288d780107f', 'id': '5937d2a7-3535-49b6-8494-9288d780107f', 'user_id': '5937d2a7-3535-49b6-8494-9288d780107f', 'email': '986f8114-7f3a-454d-a43a-8f9e25f74cde@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1504', 'branch_id': '1508', 'department': 'IVF', 'token_type': 'access', 'identity': '5937d2a7-3535-49b6-8494-9288d780107f', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 0, 5796, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 0, 5817, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.04s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step5_min_greater_than_max_returns_400[38-36]</div>
+                <div class="test-desc">Parametrized: inverted ranges should be rejected with the
+
+message &quot;Min must be ≤ Max&quot;.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_InternalTemperature-6" onclick="toggleDrawer('d-TestScenario_InternalTemperature-6')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_InternalTemperature-6">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:00,472 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min must be ≤ Max'}
+2026-05-22 13:03:00,475 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min must be ≤ Max'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'ced6c444-a248-4fc2-ba42-0f6bc99e1a73', 'id': 'ced6c444-a248-4fc2-ba42-0f6bc99e1a73', 'user_id': 'ced6c444-a248-4fc2-ba42-0f6bc99e1a73', 'email': 'dec3db63-8c2c-4924-8d6b-015e2176cb21@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1505', 'branch_id': '1509', 'department': 'IVF', 'token_type': 'access', 'identity': 'ced6c444-a248-4fc2-ba42-0f6bc99e1a73', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 0, 464542, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 0, 464549, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step5_min_greater_than_max_returns_400[-5--20]</div>
+                <div class="test-desc">Parametrized: inverted ranges should be rejected with the
+
+message &quot;Min must be ≤ Max&quot;.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_InternalTemperature-7" onclick="toggleDrawer('d-TestScenario_InternalTemperature-7')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_InternalTemperature-7">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:00,870 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min must be ≤ Max'}
+2026-05-22 13:03:00,874 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min must be ≤ Max'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'fdaba3d5-9ebc-4be1-9421-52cdfb122066', 'id': 'fdaba3d5-9ebc-4be1-9421-52cdfb122066', 'user_id': 'fdaba3d5-9ebc-4be1-9421-52cdfb122066', 'email': '725924a8-5fda-4fa5-8307-7de93f2c93d0@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1506', 'branch_id': '1510', 'department': 'IVF', 'token_type': 'access', 'identity': 'fdaba3d5-9ebc-4be1-9421-52cdfb122066', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 0, 861056, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 0, 861065, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="class-block">
+        <div class="class-header">
+          <h2>TestScenario_EvaporationRateLN2</h2>
+          <div class="class-doc">Scenario: Evaporation Rate of LN2 (both min and max required).</div>
+          <div class="class-stats">
+            <span class="badge passed">✓ 5 passed</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:100px">Result</th>
+              <th>Test / Description</th>
+              <th style="width:90px">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step2_min_provided_max_empty_returns_400</div>
+                <div class="test-desc">Provide only `min` for evaporation rate — expect required-field error.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_EvaporationRateLN2-0" onclick="toggleDrawer('d-TestScenario_EvaporationRateLN2-0')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_EvaporationRateLN2-0">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:01,258 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+2026-05-22 13:03:01,260 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '75cf806a-881a-4526-a9a6-614aab051d42', 'id': '75cf806a-881a-4526-a9a6-614aab051d42', 'user_id': '75cf806a-881a-4526-a9a6-614aab051d42', 'email': 'ac1cfe1a-3372-4eb4-8929-6c0bb7bb5028@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1507', 'branch_id': '1511', 'department': 'IVF', 'token_type': 'access', 'identity': '75cf806a-881a-4526-a9a6-614aab051d42', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 1, 249595, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 1, 249601, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step3_max_provided_min_empty_returns_400</div>
+                <div class="test-desc">Provide only `max` for evaporation rate — expect required-field error.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_EvaporationRateLN2-1" onclick="toggleDrawer('d-TestScenario_EvaporationRateLN2-1')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_EvaporationRateLN2-1">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:01,627 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+2026-05-22 13:03:01,630 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '98fd4c4a-1d03-4988-9584-2c9c7bc06551', 'id': '98fd4c4a-1d03-4988-9584-2c9c7bc06551', 'user_id': '98fd4c4a-1d03-4988-9584-2c9c7bc06551', 'email': '552b64ad-b3e8-4ff6-ba36-8d55d32ab5d9@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1508', 'branch_id': '1512', 'department': 'IVF', 'token_type': 'access', 'identity': '98fd4c4a-1d03-4988-9584-2c9c7bc06551', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 1, 620279, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 1, 620285, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_valid_min_max_saves_successfully</div>
+                <div class="test-desc">Valid float range should be accepted and return 201.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_EvaporationRateLN2-2" onclick="toggleDrawer('d-TestScenario_EvaporationRateLN2-2')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_EvaporationRateLN2-2">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:01,998 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '8496b43b-cc83-494c-8f21-ed001c9808dc', 'id': '8496b43b-cc83-494c-8f21-ed001c9808dc', 'user_id': '8496b43b-cc83-494c-8f21-ed001c9808dc', 'email': '873a4cc0-0def-4484-9d3d-8268f0a606ea@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1509', 'branch_id': '1513', 'department': 'IVF', 'token_type': 'access', 'identity': '8496b43b-cc83-494c-8f21-ed001c9808dc', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 1, 983199, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 1, 983205, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_config_persists_on_reopen</div>
+                <div class="test-desc">Save an evaporation-rate config and verify persistence on lookup.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_EvaporationRateLN2-3" onclick="toggleDrawer('d-TestScenario_EvaporationRateLN2-3')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_EvaporationRateLN2-3">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:02,383 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+2026-05-22 13:03:02,398 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1160 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1160 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '9d8ed772-91ad-4a12-a959-cd911b9c391c', 'id': '9d8ed772-91ad-4a12-a959-cd911b9c391c', 'user_id': '9d8ed772-91ad-4a12-a959-cd911b9c391c', 'email': '691b0b6c-fa3b-4c1c-b839-05f5f7b9ca21@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1510', 'branch_id': '1514', 'department': 'IVF', 'token_type': 'access', 'identity': '9d8ed772-91ad-4a12-a959-cd911b9c391c', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 2, 365077, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 2, 365083, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.03s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step5_min_greater_than_max_returns_400</div>
+                <div class="test-desc">Inverted float range should be rejected with ordering error.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_EvaporationRateLN2-4" onclick="toggleDrawer('d-TestScenario_EvaporationRateLN2-4')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_EvaporationRateLN2-4">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:02,787 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min must be ≤ Max'}
+2026-05-22 13:03:02,791 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min must be ≤ Max'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '4fb2695b-c45f-4ddc-b942-3f62e9c906fe', 'id': '4fb2695b-c45f-4ddc-b942-3f62e9c906fe', 'user_id': '4fb2695b-c45f-4ddc-b942-3f62e9c906fe', 'email': '6be40e4e-2828-4818-b612-5cdbc5a18c41@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1511', 'branch_id': '1515', 'department': 'IVF', 'token_type': 'access', 'identity': '4fb2695b-c45f-4ddc-b942-3f62e9c906fe', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 2, 779615, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 2, 779622, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="class-block">
+        <div class="class-header">
+          <h2>TestScenario_ShockDetection</h2>
+          <div class="class-doc">Scenario: Shock Detection (both min and max required).</div>
+          <div class="class-stats">
+            <span class="badge passed">✓ 5 passed</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:100px">Result</th>
+              <th>Test / Description</th>
+              <th style="width:90px">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step2_min_provided_max_empty_returns_400</div>
+                <div class="test-desc">Provide only `min` — expect required-field error for shock detection.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_ShockDetection-0" onclick="toggleDrawer('d-TestScenario_ShockDetection-0')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_ShockDetection-0">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:03,145 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+2026-05-22 13:03:03,148 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '566cd286-e279-4207-8c23-486af77f10f4', 'id': '566cd286-e279-4207-8c23-486af77f10f4', 'user_id': '566cd286-e279-4207-8c23-486af77f10f4', 'email': 'a6d9cc13-dfa0-4886-b4c0-df15472be704@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1512', 'branch_id': '1516', 'department': 'IVF', 'token_type': 'access', 'identity': '566cd286-e279-4207-8c23-486af77f10f4', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 3, 138020, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 3, 138026, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step3_max_provided_min_empty_returns_400</div>
+                <div class="test-desc">Provide only `max` — expect required-field error for shock detection.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_ShockDetection-1" onclick="toggleDrawer('d-TestScenario_ShockDetection-1')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_ShockDetection-1">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:03,510 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+2026-05-22 13:03:03,516 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Both min and max are required'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '8d247033-235f-4ed3-b45f-260b2a581548', 'id': '8d247033-235f-4ed3-b45f-260b2a581548', 'user_id': '8d247033-235f-4ed3-b45f-260b2a581548', 'email': '1940ed18-5415-4cd4-9de5-20def96ceb6c@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1513', 'branch_id': '1517', 'department': 'IVF', 'token_type': 'access', 'identity': '8d247033-235f-4ed3-b45f-260b2a581548', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 3, 499710, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 3, 499720, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_valid_min_max_saves_successfully</div>
+                <div class="test-desc">Valid shock-detection range should save successfully (201).</div>
+                <div class="expand-btn" id="btn-d-TestScenario_ShockDetection-2" onclick="toggleDrawer('d-TestScenario_ShockDetection-2')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_ShockDetection-2">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:04,021 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'ae09b5fc-1f98-4d28-a1fe-f1021a5a238b', 'id': 'ae09b5fc-1f98-4d28-a1fe-f1021a5a238b', 'user_id': 'ae09b5fc-1f98-4d28-a1fe-f1021a5a238b', 'email': '32842d06-38b1-4285-badb-509c5ae67d64@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1514', 'branch_id': '1518', 'department': 'IVF', 'token_type': 'access', 'identity': 'ae09b5fc-1f98-4d28-a1fe-f1021a5a238b', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 3, 997934, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 3, 997941, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step4_config_persists_on_reopen</div>
+                <div class="test-desc">Save a shock-detection config and verify it persists on lookup.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_ShockDetection-3" onclick="toggleDrawer('d-TestScenario_ShockDetection-3')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_ShockDetection-3">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:04,556 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+2026-05-22 13:03:04,586 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1165 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/quality/kpi-config/list?tank_id=1165 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '52bef2b5-56ab-40c6-9fad-66e3b4c69ca9', 'id': '52bef2b5-56ab-40c6-9fad-66e3b4c69ca9', 'user_id': '52bef2b5-56ab-40c6-9fad-66e3b4c69ca9', 'email': '69d50ed4-71b6-413f-8476-0bf520ea290c@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1515', 'branch_id': '1519', 'department': 'IVF', 'token_type': 'access', 'identity': '52bef2b5-56ab-40c6-9fad-66e3b4c69ca9', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 4, 521240, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 4, 521253, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.06s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_step5_min_greater_than_max_returns_400</div>
+                <div class="test-desc">Inverted shock-detection range should be rejected with ordering error.</div>
+                <div class="expand-btn" id="btn-d-TestScenario_ShockDetection-4" onclick="toggleDrawer('d-TestScenario_ShockDetection-4')">▶ show logs</div>
+                <div class="drawer" id="d-TestScenario_ShockDetection-4">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:05,021 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min must be ≤ Max'}
+2026-05-22 13:03:05,027 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min must be ≤ Max'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'f6945dcc-1dd5-43b4-a91c-3b937ea954f6', 'id': 'f6945dcc-1dd5-43b4-a91c-3b937ea954f6', 'user_id': 'f6945dcc-1dd5-43b4-a91c-3b937ea954f6', 'email': 'f8a1e3a1-0a7d-4952-bd10-95e8bf458627@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1516', 'branch_id': '1520', 'department': 'IVF', 'token_type': 'access', 'identity': 'f6945dcc-1dd5-43b4-a91c-3b937ea954f6', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 5, 10716, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 5, 10731, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="class-block">
+        <div class="class-header">
+          <h2>TestKpiConfigValidation</h2>
+          <div class="class-doc">Cross-KPI validation checks and boundary cases.</div>
+          <div class="class-stats">
+            <span class="badge passed">✓ 8 passed</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:100px">Result</th>
+              <th>Test / Description</th>
+              <th style="width:90px">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_min_equal_to_max_is_valid[external_temperature-Ext Temp Warning-\xb0C-36-38]</div>
+                <div class="test-desc">Equal min and max should be accepted (boundary case).
+
+Act: POST where `min == max`; Assert: API creates the config (201).</div>
+                <div class="expand-btn" id="btn-d-TestKpiConfigValidation-0" onclick="toggleDrawer('d-TestKpiConfigValidation-0')">▶ show logs</div>
+                <div class="drawer" id="d-TestKpiConfigValidation-0">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:05,442 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '73dcfee0-bb40-4fc5-a236-b51fe76f6446', 'id': '73dcfee0-bb40-4fc5-a236-b51fe76f6446', 'user_id': '73dcfee0-bb40-4fc5-a236-b51fe76f6446', 'email': 'd68ca460-8245-46ce-860a-604b219ba208@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1517', 'branch_id': '1521', 'department': 'IVF', 'token_type': 'access', 'identity': '73dcfee0-bb40-4fc5-a236-b51fe76f6446', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 5, 421646, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 5, 421653, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_min_equal_to_max_is_valid[internal_temperature-Int Temp Warning-\xb0C-36-38]</div>
+                <div class="test-desc">Equal min and max should be accepted (boundary case).
+
+Act: POST where `min == max`; Assert: API creates the config (201).</div>
+                <div class="expand-btn" id="btn-d-TestKpiConfigValidation-1" onclick="toggleDrawer('d-TestKpiConfigValidation-1')">▶ show logs</div>
+                <div class="drawer" id="d-TestKpiConfigValidation-1">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:05,839 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '38c4f5ec-dc9c-46ae-aac8-4b7f8cca2f2f', 'id': '38c4f5ec-dc9c-46ae-aac8-4b7f8cca2f2f', 'user_id': '38c4f5ec-dc9c-46ae-aac8-4b7f8cca2f2f', 'email': '6e05f56d-3e48-4afd-84b8-a78c1c7b44b8@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1518', 'branch_id': '1522', 'department': 'IVF', 'token_type': 'access', 'identity': '38c4f5ec-dc9c-46ae-aac8-4b7f8cca2f2f', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 5, 819204, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 5, 819211, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_min_equal_to_max_is_valid[evaporation_rate_ln2-Evap Rate Warning-kg/hr-0.1-0.5]</div>
+                <div class="test-desc">Equal min and max should be accepted (boundary case).
+
+Act: POST where `min == max`; Assert: API creates the config (201).</div>
+                <div class="expand-btn" id="btn-d-TestKpiConfigValidation-2" onclick="toggleDrawer('d-TestKpiConfigValidation-2')">▶ show logs</div>
+                <div class="drawer" id="d-TestKpiConfigValidation-2">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:06,242 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'dc562ce6-1385-425b-9c0f-252baf0fc55a', 'id': 'dc562ce6-1385-425b-9c0f-252baf0fc55a', 'user_id': 'dc562ce6-1385-425b-9c0f-252baf0fc55a', 'email': '700d25a5-9ade-4e65-b016-1ac5ba859179@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1519', 'branch_id': '1523', 'department': 'IVF', 'token_type': 'access', 'identity': 'dc562ce6-1385-425b-9c0f-252baf0fc55a', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 6, 222860, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 6, 222867, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_min_equal_to_max_is_valid[shock_detection-Shock Detection Warning-g-1-5]</div>
+                <div class="test-desc">Equal min and max should be accepted (boundary case).
+
+Act: POST where `min == max`; Assert: API creates the config (201).</div>
+                <div class="expand-btn" id="btn-d-TestKpiConfigValidation-3" onclick="toggleDrawer('d-TestKpiConfigValidation-3')">▶ show logs</div>
+                <div class="drawer" id="d-TestKpiConfigValidation-3">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:06,635 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 201 Created&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'ac4b9678-0dc9-46ba-a2c7-bbd510565c1f', 'id': 'ac4b9678-0dc9-46ba-a2c7-bbd510565c1f', 'user_id': 'ac4b9678-0dc9-46ba-a2c7-bbd510565c1f', 'email': '880c6788-48da-4836-a4ce-8b5a2da84dfa@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1520', 'branch_id': '1524', 'department': 'IVF', 'token_type': 'access', 'identity': 'ac4b9678-0dc9-46ba-a2c7-bbd510565c1f', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 6, 618449, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 6, 618457, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_symbols_in_min_returns_400[external_temperature-Ext Temp Warning-\xb0C-36-38]</div>
+                <div class="test-desc">Non-numeric symbols in `min` should be rejected with 400.
+
+This guards against clients sending invalid string payloads for
+numeric fields.</div>
+                <div class="expand-btn" id="btn-d-TestKpiConfigValidation-4" onclick="toggleDrawer('d-TestKpiConfigValidation-4')">▶ show logs</div>
+                <div class="drawer" id="d-TestKpiConfigValidation-4">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">400
+{&quot;error_code&quot;:&quot;HTTP_400&quot;,&quot;message&quot;:{&quot;error&quot;:&quot;Min and max must be valid numbers&quot;},&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-22T13:03:07.021405&quot;}
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:07,020 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min and max must be valid numbers'}
+2026-05-22 13:03:07,023 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min and max must be valid numbers'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '1046db70-b6b5-466e-ab5f-6e2e35338e0d', 'id': '1046db70-b6b5-466e-ab5f-6e2e35338e0d', 'user_id': '1046db70-b6b5-466e-ab5f-6e2e35338e0d', 'email': '68e024d8-31fd-43eb-b458-2ee1fd728b4d@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1521', 'branch_id': '1525', 'department': 'IVF', 'token_type': 'access', 'identity': '1046db70-b6b5-466e-ab5f-6e2e35338e0d', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 7, 12138, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 7, 12145, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_symbols_in_min_returns_400[internal_temperature-Int Temp Warning-\xb0C-36-38]</div>
+                <div class="test-desc">Non-numeric symbols in `min` should be rejected with 400.
+
+This guards against clients sending invalid string payloads for
+numeric fields.</div>
+                <div class="expand-btn" id="btn-d-TestKpiConfigValidation-5" onclick="toggleDrawer('d-TestKpiConfigValidation-5')">▶ show logs</div>
+                <div class="drawer" id="d-TestKpiConfigValidation-5">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">400
+{&quot;error_code&quot;:&quot;HTTP_400&quot;,&quot;message&quot;:{&quot;error&quot;:&quot;Min and max must be valid numbers&quot;},&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-22T13:03:07.391581&quot;}
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:07,391 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min and max must be valid numbers'}
+2026-05-22 13:03:07,393 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min and max must be valid numbers'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '26949a96-96d6-49cf-b99b-486bd6981c6b', 'id': '26949a96-96d6-49cf-b99b-486bd6981c6b', 'user_id': '26949a96-96d6-49cf-b99b-486bd6981c6b', 'email': 'f23027eb-a20a-4625-ba56-2a22e76a9f11@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1522', 'branch_id': '1526', 'department': 'IVF', 'token_type': 'access', 'identity': '26949a96-96d6-49cf-b99b-486bd6981c6b', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 7, 382746, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 7, 382752, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_symbols_in_min_returns_400[evaporation_rate_ln2-Evap Rate Warning-kg/hr-0.1-0.5]</div>
+                <div class="test-desc">Non-numeric symbols in `min` should be rejected with 400.
+
+This guards against clients sending invalid string payloads for
+numeric fields.</div>
+                <div class="expand-btn" id="btn-d-TestKpiConfigValidation-6" onclick="toggleDrawer('d-TestKpiConfigValidation-6')">▶ show logs</div>
+                <div class="drawer" id="d-TestKpiConfigValidation-6">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">400
+{&quot;error_code&quot;:&quot;HTTP_400&quot;,&quot;message&quot;:{&quot;error&quot;:&quot;Min and max must be valid numbers&quot;},&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-22T13:03:07.750567&quot;}
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:07,750 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min and max must be valid numbers'}
+2026-05-22 13:03:07,752 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min and max must be valid numbers'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '6eb74927-d068-475f-a0b0-f34ea92fc636', 'id': '6eb74927-d068-475f-a0b0-f34ea92fc636', 'user_id': '6eb74927-d068-475f-a0b0-f34ea92fc636', 'email': 'c1753a53-b7d4-4632-9dd7-04f3e33d57e9@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1523', 'branch_id': '1527', 'department': 'IVF', 'token_type': 'access', 'identity': '6eb74927-d068-475f-a0b0-f34ea92fc636', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 7, 741469, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 7, 741475, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_symbols_in_min_returns_400[shock_detection-Shock Detection Warning-g-1-5]</div>
+                <div class="test-desc">Non-numeric symbols in `min` should be rejected with 400.
+
+This guards against clients sending invalid string payloads for
+numeric fields.</div>
+                <div class="expand-btn" id="btn-d-TestKpiConfigValidation-7" onclick="toggleDrawer('d-TestKpiConfigValidation-7')">▶ show logs</div>
+                <div class="drawer" id="d-TestKpiConfigValidation-7">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">400
+{&quot;error_code&quot;:&quot;HTTP_400&quot;,&quot;message&quot;:{&quot;error&quot;:&quot;Min and max must be valid numbers&quot;},&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-22T13:03:08.120368&quot;}
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-22 13:03:08,119 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min and max must be valid numbers'}
+2026-05-22 13:03:08,127 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/quality/kpi-config: {'error': 'Min and max must be valid numbers'}
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/quality/kpi-config &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '18711e8c-8930-4242-a9e6-2f23634f18fe', 'id': '18711e8c-8930-4242-a9e6-2f23634f18fe', 'user_id': '18711e8c-8930-4242-a9e6-2f23634f18fe', 'email': '4408b2a4-e3c8-4b70-886d-d92a19d7ac52@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '1524', 'branch_id': '1528', 'department': 'IVF', 'token_type': 'access', 'identity': '18711e8c-8930-4242-a9e6-2f23634f18fe', 'exp': datetime.datetime(2026, 5, 23, 13, 3, 8, 105968, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 22, 13, 3, 8, 105977, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <script>
+            function toggleDrawer(id) {
+                const drawer = document.getElementById(id);
+                const btn = document.getElementById('btn-' + id);
+                const isOpen = drawer.classList.contains('open');
+                drawer.classList.toggle('open');
+                btn.textContent = isOpen ? '▶ show logs' : '▼ hide logs';
+            }
+        </script>
+  </body>
+</html>
