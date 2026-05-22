@@ -1,23 +1,79 @@
 import { useState } from 'react';
 import { X, Trophy, GitCompare, Star, Search } from 'lucide-react';
+import type { BlastocystMorphology } from '../../types/embryo';
 
 interface LeaderboardEmbryo {
-  id: string; time: string; aiScore: number; grade: string; quality: string; rank: number;
-  icm: string; te: string; expansion: string; src: string;
-  blastocystStage: string; icmDesc: string; teDesc: string; expansionDesc: string;
-  fragPct: string; fragBars: number; symText: string; symBars: number;
-  zonaText: string; zonaBars: number; blastoText: string; blastoBars: number;
-  bridgeText: string; vacuoleText: string; vacuoleBars: number;
-  hatchText: string; multinucText: string; cytogranText: string;
+  id: string;
+  time: string;
+  aiScore: number;
+  grade: string;
+  quality: string;
+  rank: number;
+  src: string;
+  morphology: BlastocystMorphology;
 }
 
 const LEADERBOARD_EMBRYOS: LeaderboardEmbryo[] = [
-  { id: 'EID 1.2', time: '17.57 h', aiScore: 9.2, grade: '5AA', quality: 'High Quality',   rank: 1, icm: 'A', te: 'A', expansion: '5', src: '/embryo/list/emb2.png', blastocystStage: 'Expanded Blastocyst', icmDesc: 'A - Many Cells',    teDesc: 'A - Many Cells',     expansionDesc: '5 - Expanded',        fragPct: '< 5%',     fragBars: 4, symText: 'Excellent', symBars: 4, zonaText: 'Intact',   zonaBars: 2, blastoText: 'Excellent', blastoBars: 4, bridgeText: 'None',    vacuoleText: 'None',     vacuoleBars: 4, hatchText: 'Not Hatching', multinucText: 'None',    cytogranText: 'Fine'   },
-  { id: 'EID 1.1', time: '17.32 h', aiScore: 8.7, grade: '4AA', quality: 'High Quality',   rank: 2, icm: 'A', te: 'A', expansion: '4', src: '/embryo/list/em1.png', blastocystStage: 'Expanded Blastocyst', icmDesc: 'A - Many Cells',    teDesc: 'A - Many Cells',     expansionDesc: '4 - Expanded',        fragPct: '5 - 10%',  fragBars: 3, symText: 'Excellent', symBars: 4, zonaText: 'Intact',   zonaBars: 3, blastoText: 'Excellent', blastoBars: 4, bridgeText: 'None',    vacuoleText: 'Minimal',  vacuoleBars: 3, hatchText: 'Not Hatching', multinucText: 'None',    cytogranText: 'Fine'   },
-  { id: 'EID 1.3', time: '18.41 h', aiScore: 7.9, grade: '4AB', quality: 'Good Quality',   rank: 3, icm: 'A', te: 'B', expansion: '4', src: '/embryo/list/emb3.png', blastocystStage: 'Expanded Blastocyst', icmDesc: 'A - Many Cells',    teDesc: 'B - Few Cells',      expansionDesc: '4 - Expanded',        fragPct: '10 - 15%', fragBars: 2, symText: 'Good',      symBars: 3, zonaText: 'Good',    zonaBars: 3, blastoText: 'Good',      blastoBars: 3, bridgeText: 'Minimal', vacuoleText: 'Minimal',  vacuoleBars: 3, hatchText: 'Not Hatching', multinucText: 'None',    cytogranText: 'Fine'   },
-  { id: 'EID 1.4', time: '17.20 h', aiScore: 6.5, grade: '3BB', quality: 'Medium Quality', rank: 4, icm: 'B', te: 'B', expansion: '3', src: '/embryo/list/em4.png', blastocystStage: 'Early Blastocyst',    icmDesc: 'B - Several Cells', teDesc: 'B - Few Cells',      expansionDesc: '3 - Full Blastocyst', fragPct: '15 - 20%', fragBars: 1, symText: 'Fair',      symBars: 2, zonaText: 'Intact',  zonaBars: 4, blastoText: 'Fair',      blastoBars: 2, bridgeText: 'Present', vacuoleText: 'Mild',     vacuoleBars: 2, hatchText: 'Not Hatching', multinucText: 'Minimal', cytogranText: 'Coarse' },
-  { id: 'EID 1.5', time: '16.50 h', aiScore: 5.3, grade: '3BC', quality: 'Low Quality',    rank: 5, icm: 'B', te: 'C', expansion: '3', src: '/embryo/list/emb5.png', blastocystStage: 'Full Blastocyst',     icmDesc: 'B - Several Cells', teDesc: 'C - Very Few Cells', expansionDesc: '3 - Full Blastocyst', fragPct: '20 - 25%', fragBars: 1, symText: 'Fair',      symBars: 2, zonaText: 'Thinning', zonaBars: 2, blastoText: 'Fair',      blastoBars: 2, bridgeText: 'Present', vacuoleText: 'Moderate', vacuoleBars: 1, hatchText: 'Not Hatching', multinucText: 'Present', cytogranText: 'Coarse' },
-  { id: 'EID 1.6', time: '17.10 h', aiScore: 4.1, grade: '2BC', quality: 'Low Quality',    rank: 6, icm: 'B', te: 'C', expansion: '2', src: '/embryo/list/emb6.png', blastocystStage: 'Blastocyst',          icmDesc: 'B - Several Cells', teDesc: 'C - Very Few Cells', expansionDesc: '2 - Forming',          fragPct: '25 - 30%', fragBars: 0, symText: 'Poor',      symBars: 1, zonaText: 'Thinning', zonaBars: 1, blastoText: 'Poor',      blastoBars: 1, bridgeText: 'Present', vacuoleText: 'Moderate', vacuoleBars: 1, hatchText: 'Not Hatching', multinucText: 'Present', cytogranText: 'Coarse' },
+  {
+    id: 'EID 1.2', time: '17.57 h', aiScore: 9.2, grade: '5AA', quality: 'High Quality', rank: 1,
+    src: '/embryo/list/emb2.png',
+    morphology: {
+      expansion: 5, icm: 'A', te: 'A',
+      hatching: 'Not Hatching', vacuolization: 'None', multinucleation: 'None',
+      fragmentation: '< 5%', symmetry: 'Excellent',
+      zonaPellucida: 'Intact', blastocoelQuality: 'Excellent', cytoplasmicGranularity: 'Fine', bridge: 'None',
+    },
+  },
+  {
+    id: 'EID 1.1', time: '17.32 h', aiScore: 8.7, grade: '4AA', quality: 'High Quality', rank: 2,
+    src: '/embryo/list/em1.png',
+    morphology: {
+      expansion: 4, icm: 'A', te: 'A',
+      hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None',
+      fragmentation: '5 - 10%', symmetry: 'Excellent',
+      zonaPellucida: 'Intact', blastocoelQuality: 'Excellent', cytoplasmicGranularity: 'Fine', bridge: 'None',
+    },
+  },
+  {
+    id: 'EID 1.3', time: '18.41 h', aiScore: 7.9, grade: '4AB', quality: 'Good Quality', rank: 3,
+    src: '/embryo/list/emb3.png',
+    morphology: {
+      expansion: 4, icm: 'A', te: 'B',
+      hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None',
+      fragmentation: '10 - 15%', symmetry: 'Good',
+      zonaPellucida: 'Good', blastocoelQuality: 'Good', cytoplasmicGranularity: 'Fine', bridge: 'Minimal',
+    },
+  },
+  {
+    id: 'EID 1.4', time: '17.20 h', aiScore: 6.5, grade: '3BB', quality: 'Medium Quality', rank: 4,
+    src: '/embryo/list/em4.png',
+    morphology: {
+      expansion: 3, icm: 'B', te: 'B',
+      hatching: 'Not Hatching', vacuolization: 'Mild', multinucleation: 'Minimal',
+      fragmentation: '15 - 20%', symmetry: 'Fair',
+      zonaPellucida: 'Intact', blastocoelQuality: 'Fair', cytoplasmicGranularity: 'Coarse', bridge: 'Present',
+    },
+  },
+  {
+    id: 'EID 1.5', time: '16.50 h', aiScore: 5.3, grade: '3BC', quality: 'Low Quality', rank: 5,
+    src: '/embryo/list/emb5.png',
+    morphology: {
+      expansion: 3, icm: 'B', te: 'C',
+      hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present',
+      fragmentation: '20 - 25%', symmetry: 'Fair',
+      zonaPellucida: 'Thinning', blastocoelQuality: 'Fair', cytoplasmicGranularity: 'Coarse', bridge: 'Present',
+    },
+  },
+  {
+    id: 'EID 1.6', time: '17.10 h', aiScore: 4.1, grade: '2BC', quality: 'Low Quality', rank: 6,
+    src: '/embryo/list/emb6.png',
+    morphology: {
+      expansion: 2, icm: 'B', te: 'C',
+      hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present',
+      fragmentation: '25 - 30%', symmetry: 'Poor',
+      zonaPellucida: 'Thinning', blastocoelQuality: 'Poor', cytoplasmicGranularity: 'Coarse', bridge: 'Present',
+    },
+  },
 ];
 
 const SLOT_COLORS = [
@@ -33,12 +89,12 @@ const eidToLabel = (id: string) => {
 };
 
 function gradeCls(grade: string) {
-  if (!grade || grade.length < 2) return { bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200', dot: '#9ca3af' };
+  if (!grade || grade.length < 2) return { bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200' };
   const icmTe = grade.slice(1);
-  if (icmTe === 'AA') return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: '#10b981' };
-  if (icmTe === 'AB' || icmTe === 'BA') return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: '#f59e0b' };
-  if (icmTe === 'BB') return { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', dot: '#eab308' };
-  return { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-200', dot: '#f43f5e' };
+  if (icmTe === 'AA') return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
+  if (icmTe === 'AB' || icmTe === 'BA') return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
+  if (icmTe === 'BB') return { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' };
+  return { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-200' };
 }
 
 function scoreColor(score: number): string {
@@ -51,6 +107,16 @@ function scoreTextCls(score: number): string {
   if (score >= 8) return 'text-emerald-600';
   if (score >= 6) return 'text-amber-600';
   return 'text-rose-500';
+}
+
+function criticalStyle(val: string): { borderColor: string; background: string; color: string } {
+  const v = val.toLowerCase();
+  if (v === 'none' || v === 'not hatching') return { borderColor: '#10b981', background: '#f0fdf4', color: '#065f46' };
+  if (v === 'minimal')                      return { borderColor: '#eab308', background: '#fefce8', color: '#713f12' };
+  if (v === 'mild' || v === 'hatching')     return { borderColor: '#f59e0b', background: '#fffbeb', color: '#92400e' };
+  if (v === 'moderate' || v === 'present')  return { borderColor: '#f97316', background: '#fff7ed', color: '#9a3412' };
+  if (v === 'severe' || v === 'hatched')    return { borderColor: '#f43f5e', background: '#fff1f2', color: '#9f1239' };
+  return { borderColor: '#d1d5db', background: '#f9fafb', color: '#374151' };
 }
 
 function RankBadge({ rank }: { rank: number }) {
@@ -98,7 +164,6 @@ export default function EmbryoComparePage() {
       {/* ── Leaderboard ── */}
       <div className="w-[290px] shrink-0 flex flex-col overflow-hidden bg-white border border-gray-200 rounded-2xl">
 
-        {/* Panel header */}
         <div className="shrink-0 px-4 py-3 flex items-center gap-2.5 border-b border-gray-100" style={{ background: 'linear-gradient(135deg,#f9f4ff 0%,#ffffff 100%)' }}>
           <div className="w-7 h-7 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
             <Trophy size={14} className="text-primary" />
@@ -112,7 +177,6 @@ export default function EmbryoComparePage() {
           </span>
         </div>
 
-        {/* Embryo list */}
         <div className="flex-1 overflow-y-auto flex flex-col gap-1.5 p-2.5">
           {LEADERBOARD_EMBRYOS.map(emb => {
             const isSelected = selectedEmbryoIds.includes(emb.id);
@@ -131,22 +195,18 @@ export default function EmbryoComparePage() {
                 }}
                 onClick={() => toggleEmbryo(emb.id)}
               >
-                {/* Left accent */}
                 {isSelected && slot && (
                   <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full" style={{ background: slot.hex }} />
                 )}
 
-                {/* Rank */}
                 <div className="shrink-0 w-6 flex items-center justify-center">
                   <RankBadge rank={emb.rank} />
                 </div>
 
-                {/* Thumbnail */}
                 <div className="shrink-0 w-10 h-10 rounded-lg overflow-hidden bg-gray-100 ring-1 ring-gray-100">
                   <img src={emb.src} alt="" className="w-full h-full object-cover" />
                 </div>
 
-                {/* Name + score bar */}
                 <div className="flex-1 min-w-0">
                   <span className="text-xs font-bold text-gray-900 block truncate mb-1.5">{eidToLabel(emb.id)}</span>
                   <div className="flex items-center gap-1.5">
@@ -160,13 +220,11 @@ export default function EmbryoComparePage() {
                   </div>
                 </div>
 
-                {/* Grade chip */}
                 <div className={`shrink-0 rounded-lg px-2 py-1.5 border text-center min-w-[40px] ${gc.bg} ${gc.border}`}>
                   <div className="text-[7px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">Grade</div>
                   <div className={`text-sm font-black leading-none ${gc.text}`}>{emb.grade}</div>
                 </div>
 
-                {/* Select dot */}
                 <div
                   className="absolute top-1/2 -translate-y-1/2 right-2.5 w-[14px] h-[14px] rounded-full flex items-center justify-center transition-all"
                   style={isSelected && slot
@@ -217,7 +275,6 @@ export default function EmbryoComparePage() {
         {selectedEmbryoIds.length === 0 ? (
           <div className="flex flex-col flex-1 gap-3 min-h-0">
 
-            {/* 4 slot cards */}
             <div className="grid grid-cols-4 gap-3 flex-1 min-h-0">
               {[1, 2, 3, 4].map(i => (
                 <div
@@ -236,7 +293,6 @@ export default function EmbryoComparePage() {
               ))}
             </div>
 
-            {/* Info strip */}
             <div className="shrink-0 border border-gray-100 rounded-2xl bg-white px-4 py-3.5 flex items-center gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
@@ -258,7 +314,6 @@ export default function EmbryoComparePage() {
               </div>
             </div>
 
-            {/* Legend bar */}
             <div className="shrink-0 border border-gray-100 rounded-2xl bg-white px-4 py-3 flex items-start gap-6 flex-wrap">
               <div className="flex items-start gap-2">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="1.5" className="shrink-0 mt-0.5">
@@ -283,7 +338,7 @@ export default function EmbryoComparePage() {
                   ))}
                 </div>
                 <div>
-                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Morphology</div>
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Core Grade</div>
                   <div className="text-[10px] text-gray-600">
                     <span className="font-semibold">EXP</span> Expansion &nbsp;
                     <span className="font-semibold">ICM</span> Inner Cell Mass &nbsp;
@@ -295,7 +350,7 @@ export default function EmbryoComparePage() {
                 <Search size={15} className="text-primary shrink-0 mt-0.5" strokeWidth={1.5} />
                 <div>
                   <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Quality</div>
-                  <div className="text-[10px] text-gray-600">High / Good / Average / Low / Poor</div>
+                  <div className="text-[10px] text-gray-600">High / Good / Medium / Low</div>
                 </div>
               </div>
             </div>
@@ -321,14 +376,16 @@ export default function EmbryoComparePage() {
                     <p className="text-[11px] text-gray-300 mt-1">Choose from leaderboard</p>
                   </div>
                 );
+
                 const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
                 const hex = SLOT_COLORS[idx].hex;
                 const gc = gradeCls(emb.grade);
+                const m = emb.morphology;
 
                 return (
                   <div key={idx} className="flex flex-col min-h-0">
 
-                    {/* Fixed top: header + image + grade+score */}
+                    {/* Fixed top: header + image + grade + core breakdown */}
                     <div className="shrink-0 flex flex-col gap-2">
 
                       {/* Column header */}
@@ -351,10 +408,7 @@ export default function EmbryoComparePage() {
                       </div>
 
                       {/* Image */}
-                      <div
-                        className="rounded-xl overflow-hidden"
-                        style={{ border: `1px solid ${hex}40` }}
-                      >
+                      <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${hex}40` }}>
                         <div className="aspect-square bg-gray-100">
                           <img src={emb.src} alt="" className="w-full h-full object-cover" />
                         </div>
@@ -383,49 +437,64 @@ export default function EmbryoComparePage() {
                         </div>
                       </div>
 
+
                     </div>
 
-                    {/* Scrollable bottom: morphology + classification */}
-                    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 pt-2">
+                    {/* Scrollable bottom: critical + supplementary */}
+                    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 pt-2 pb-1">
 
-                      {/* Morphology section */}
-                      <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Morphology</div>
-                      {([
-                        { label: 'Fragmentation',  value: emb.fragPct,    bars: emb.fragBars    },
-                        { label: 'Symmetry',       value: emb.symText,    bars: emb.symBars     },
-                        { label: 'Zona Pellucida', value: emb.zonaText,   bars: emb.zonaBars    },
-                        { label: 'Blastocoel',     value: emb.blastoText, bars: emb.blastoBars  },
-                        { label: 'Vacuolization',  value: emb.vacuoleText,bars: emb.vacuoleBars },
-                      ]).map(m => (
-                        <div key={m.label} className="rounded-xl border border-gray-100 bg-white px-2.5 py-2 shrink-0">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">{m.label}</span>
-                            <span className="text-[10px] font-bold text-gray-800">{m.value}</span>
-                          </div>
-                          <div className="h-1 rounded-full bg-gray-100 overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{ width: `${(m.bars / 4) * 100}%`, background: hex }}
-                            />
-                          </div>
+                      {/* Tier 2 — Quality Flags */}
+                      <div className="shrink-0 rounded-xl overflow-hidden" style={{ border: '1px solid #e8d5f0' }}>
+                        <div className="flex items-center gap-2 px-3 py-2" style={{ background: '#faf4ff' }}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                          </svg>
+                          <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#6b1176' }}>Quality Flags</span>
                         </div>
-                      ))}
+                        <div className="divide-y divide-gray-50 bg-white">
+                          {([
+                            { label: 'Hatching',        value: m.hatching        },
+                            { label: 'Vacuolization',   value: m.vacuolization   },
+                            { label: 'Multinucleation', value: m.multinucleation },
+                          ]).map(item => {
+                            const s = criticalStyle(item.value);
+                            return (
+                              <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                                <span className="text-[10px] font-medium text-gray-500 leading-tight">{item.label}</span>
+                                <span
+                                  className="text-[9px] font-bold rounded-md px-2 py-0.5 shrink-0"
+                                  style={{ color: s.color, background: s.background }}
+                                >{item.value}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
 
-                      {/* Classification section */}
-                      <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest px-0.5 mt-1">Classification</div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {([
-                          { label: 'Blast. Stage', value: emb.blastocystStage },
-                          { label: 'Hatching',     value: emb.hatchText       },
-                          { label: 'Bridge',       value: emb.bridgeText      },
-                          { label: 'Multinuc.',    value: emb.multinucText    },
-                          { label: 'Cyto. Gran.',  value: emb.cytogranText    },
-                        ]).map(m => (
-                          <div key={m.label} className="rounded-xl bg-white border border-gray-100 px-2 py-2">
-                            <div className="text-[7px] font-bold text-gray-400 uppercase tracking-wide leading-none mb-1">{m.label}</div>
-                            <div className="text-[10px] font-bold text-gray-800 leading-tight">{m.value}</div>
-                          </div>
-                        ))}
+                      {/* Tier 3 — Morphology */}
+                      <div className="shrink-0 rounded-xl overflow-hidden border border-gray-100">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                          </svg>
+                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Morphology</span>
+                        </div>
+                        <div className="divide-y divide-gray-50 bg-white">
+                          {([
+                            { label: 'Fragmentation',  value: m.fragmentation          },
+                            { label: 'Symmetry',       value: m.symmetry               },
+                            { label: 'Zona Pellucida', value: m.zonaPellucida          },
+                            { label: 'Blastocoel',     value: m.blastocoelQuality      },
+                            { label: 'Cyto. Gran.',    value: m.cytoplasmicGranularity },
+                            { label: 'Bridge',         value: m.bridge                 },
+                          ]).map(item => (
+                            <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                              <span className="text-[10px] font-medium text-gray-400 leading-tight">{item.label}</span>
+                              <span className="text-[10px] font-bold text-gray-700 shrink-0">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
 
                     </div>

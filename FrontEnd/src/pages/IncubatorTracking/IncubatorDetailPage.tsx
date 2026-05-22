@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Thermometer } from 'lucide-react';
 import { ivfService } from '../../services/ivfService';
 import IncubatorQualityTrackingChart from './IncubatorQualityTrackingChart';
-import MockContainerDataTable from './MockContainerDataTable';
+import ContainerDataTable from './ContainerDataTable';
 import PageLayout from '../../components/PageLayout';
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -531,7 +531,7 @@ export default function IncubatorDetailPage() {
 
         {/* Row 2: Contents of the incubator */}
         {hasIncubatorId ? (
-          <MockContainerDataTable />
+          <ContainerDataTable incubatorId={incubatorId} chamberId={chamberId} />
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
             <div className="py-8 text-center text-gray-400">No incubator selected.</div>
