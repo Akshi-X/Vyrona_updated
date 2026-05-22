@@ -3,6 +3,42 @@ from typing import Any, Dict, List, Optional
 from datetime import date, datetime
 
 
+# ── Cycle Report ─────────────────────────────────────────────────────────────
+
+class ReportResponse(BaseModel):
+    report_id: int
+    cycle_id: int
+    report_type: Optional[str]
+    file_url: str
+    file_name: Optional[str]
+    file_size: Optional[int]
+    generated_by: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ── Oocyte Image ─────────────────────────────────────────────────────────────
+
+class ImageResponse(BaseModel):
+    image_id: int
+    grade_id: int
+    cycle_id: int
+    day: Optional[int]
+    upload_image_url: str
+    exp_img_url: Optional[str]
+    te_img_url: Optional[str]
+    icm_img_url: Optional[str]
+    file_name: Optional[str]
+    file_size: Optional[int]
+    uploaded_by: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # ── Cycle ────────────────────────────────────────────────────────────────────
 
 class CycleCreate(BaseModel):
@@ -78,13 +114,12 @@ class LogUpsert(BaseModel):
     d3_grade: Optional[str] = None
     d3_symmetry: Optional[str] = None
     d5_stage: Optional[str] = None
-    d5_grade: Optional[str] = None
     d6_stage: Optional[str] = None
-    d6_grade: Optional[str] = None
     d6_progression: Optional[str] = None
+    blast_grade: Optional[str] = None
     fate: Optional[str] = None
     freeze_no: Optional[str] = None
-    meta: Optional[Dict[str, Any]] = None   # {d0_notes, d1_notes, d3_notes, d5_notes, d6_notes, final_notes}
+    meta: Optional[Dict[str, Any]] = None
 
 
 class LogResponse(BaseModel):
@@ -100,13 +135,59 @@ class LogResponse(BaseModel):
     d3_grade: Optional[str]
     d3_symmetry: Optional[str]
     d5_stage: Optional[str]
-    d5_grade: Optional[str]
     d6_stage: Optional[str]
-    d6_grade: Optional[str]
     d6_progression: Optional[str]
+    blast_grade: Optional[str]
     fate: Optional[str]
     freeze_no: Optional[str]
     meta: Optional[Dict[str, Any]]
+    grade_count: int = 0
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+# ── Oocyte Grade ─────────────────────────────────────────────────────────────
+
+class GradeUpsert(BaseModel):
+    stage: Optional[int] = None
+    is_active: Optional[bool] = None
+    is_best: Optional[bool] = None
+    is_completed: Optional[bool] = None
+    grade: Optional[str] = None
+    ai_score: Optional[float] = None
+    hatching: Optional[str] = None
+    vacuolization: Optional[str] = None
+    multinucleation: Optional[str] = None
+    zona_pellucida: Optional[str] = None
+    blastocoel: Optional[str] = None
+    cytoplasmic_granularity: Optional[str] = None
+    bridge: Optional[str] = None
+    note: Optional[str] = None
+
+
+class GradeResponse(BaseModel):
+    grade_id: int
+    log_id: int
+    cycle_id: int
+    stage: Optional[int]
+    is_active: bool
+    is_best: bool
+    is_completed: bool
+    grade: Optional[str]
+    ai_score: Optional[float]
+    hatching: Optional[str]
+    vacuolization: Optional[str]
+    multinucleation: Optional[str]
+    zona_pellucida: Optional[str]
+    blastocoel: Optional[str]
+    cytoplasmic_granularity: Optional[str]
+    bridge: Optional[str]
+    note: Optional[str]
+    images: List[ImageResponse] = []
+    graded_by: Optional[str]
     created_at: datetime
     updated_at: Optional[datetime]
 
