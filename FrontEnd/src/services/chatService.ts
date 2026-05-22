@@ -54,6 +54,14 @@ export interface IncubatorMessagesResponse {
   unread_count: number;
 }
 
+export interface RefrigeratorMessagesResponse {
+  refrigerator_id: number;
+  zone_id?: string | null;
+  messages: ChatMessageResponse[];
+  total_messages: number;
+  unread_count: number;
+}
+
 export interface ChatMessageCreateRequest {
   message_content: string;
   patient_id?: string; // For CGT flow
@@ -61,6 +69,8 @@ export interface ChatMessageCreateRequest {
   tank_code?: string; // For IVF flow (alternative)
   incubator_id?: number; // For incubator flow
   chamber_id?: string; // For incubator flow (optional chamber)
+  refrigerator_id?: number; // For refrigerator flow
+  zone_id?: string; // For refrigerator flow (optional zone: 'freezer' / 'fridge')
   tagged_user_ids?: string[];
 }
 
@@ -172,6 +182,32 @@ export class ChatService extends BaseApiService {
   }> {
     const query = chamberId ? `?chamber_id=${encodeURIComponent(chamberId)}` : '';
     return await this.request(`/api/chat/incubators/${incubatorId}/mark-read${query}`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Get all messages for a specific refrigerator (optionally filtered by zone)
+   */
+  async getRefrigeratorMessages(refrigeratorId: number, zoneId?: string): Promise<RefrigeratorMessagesResponse> {
+    const query = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : '';
+    return await this.request<RefrigeratorMessagesResponse>(
+      `/api/chat/refrigerators/${refrigeratorId}/messages${query}`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * Mark refrigerator messages as read
+   */
+  async markRefrigeratorAsRead(refrigeratorId: number, zoneId?: string): Promise<{
+    success: boolean;
+    refrigerator_id: number;
+    last_read_message_id: number;
+    unread_count: number;
+  }> {
+    const query = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : '';
+    return await this.request(`/api/chat/refrigerators/${refrigeratorId}/mark-read${query}`, {
       method: 'POST',
     });
   }

@@ -27,6 +27,9 @@ export interface IVFAlert {
   acknowledgment_reason?: string;
   created_at: string;
   updated_at?: string;
+  refrigerator_id?: number | null;
+  refrigerator_code?: string | null;
+  zone_id?: string | null;
 }
 
 export interface CanisterAlertsResponse {
@@ -40,6 +43,14 @@ export interface IncubatorAlertsResponse {
   incubator_id: number;
   incubator_code?: string;
   chamber_id?: string | null;
+  alerts: IVFAlert[];
+  total_count: number;
+}
+
+export interface RefrigeratorAlertsResponse {
+  refrigerator_id: number;
+  refrigerator_code?: string;
+  zone_id?: string | null;
   alerts: IVFAlert[];
   total_count: number;
 }
@@ -134,6 +145,17 @@ export class IvfAlertsService extends BaseApiService {
     const query = chamberId ? `?chamber_id=${encodeURIComponent(chamberId)}` : '';
     return await this.request<IncubatorAlertsResponse>(
       `/api/ivf/alerts/incubator/${incubatorId}${query}`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * Get alerts for a specific refrigerator (optionally filtered by zone)
+   */
+  async getRefrigeratorAlerts(refrigeratorId: number, zoneId?: string): Promise<RefrigeratorAlertsResponse> {
+    const query = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : '';
+    return await this.request<RefrigeratorAlertsResponse>(
+      `/api/ivf/alerts/refrigerator/${refrigeratorId}${query}`,
       { method: 'GET' }
     );
   }

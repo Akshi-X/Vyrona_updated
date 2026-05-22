@@ -20,6 +20,8 @@ class CreateTaskRequest(BaseModel):
     tank_id: Optional[int] = None  # For IVF flow (internal tank ID)
     incubator_id: Optional[int] = None  # For incubator tracking
     chamber_id: Optional[str] = None  # Optional chamber within an incubator
+    refrigerator_id: Optional[int] = None  # For refrigerator tracking
+    zone_id: Optional[str] = None  # Optional zone within a refrigerator: 'freezer' / 'fridge'
     due_date: Optional[datetime] = None
     priority: TaskPriority
     status: Optional[TaskStatus] = TaskStatus.NOT_STARTED
@@ -44,22 +46,25 @@ class CreateTaskRequest(BaseModel):
 
     @model_validator(mode='after')
     def validate_patient_or_tank(self):
-        """Validate that exactly one of patient_id, tank_code, tank_id, incubator_id is provided."""
+        """Validate that exactly one of patient_id, tank_code, tank_id, incubator_id, refrigerator_id is provided."""
         patient_id = self.patient_id.strip() if self.patient_id and isinstance(self.patient_id, str) else self.patient_id
         tank_code = self.tank_code.strip() if self.tank_code and isinstance(self.tank_code, str) else self.tank_code
         tank_id = self.tank_id
         incubator_id = self.incubator_id
+        refrigerator_id = self.refrigerator_id
 
-        provided = [bool(patient_id), bool(tank_code), tank_id is not None, incubator_id is not None]
+        provided = [bool(patient_id), bool(tank_code), tank_id is not None, incubator_id is not None, refrigerator_id is not None]
         if sum(provided) > 1:
-            raise ValueError("Provide only one of patient_id, tank_code, tank_id, or incubator_id")
+            raise ValueError("Provide only one of patient_id, tank_code, tank_id, incubator_id, or refrigerator_id")
         if sum(provided) == 0:
-            raise ValueError("One of patient_id (CGT), tank_code/tank_id (IVF), or incubator_id must be provided")
+            raise ValueError("One of patient_id (CGT), tank_code/tank_id (IVF), incubator_id, or refrigerator_id must be provided")
 
         self.patient_id = patient_id if patient_id else None
         self.tank_code = tank_code if tank_code else None
         if self.chamber_id and not incubator_id:
             self.chamber_id = None
+        if self.zone_id and not refrigerator_id:
+            self.zone_id = None
         return self
 
 
@@ -164,6 +169,8 @@ class TaskResponse(BaseModel):
     tank_id: Optional[int]  # For IVF flow (internal tank ID)
     incubator_id: Optional[int] = None
     chamber_id: Optional[str] = None
+    refrigerator_id: Optional[int] = None
+    zone_id: Optional[str] = None
     due_date: Optional[datetime]
     priority: TaskPriority
     status: TaskStatus
@@ -207,12 +214,14 @@ class TaskListResponse(BaseModel):
 
 
 class PatientTaskListResponse(BaseModel):
-    """Response schema for tasks associated with a patient, tank, or incubator"""
+    """Response schema for tasks associated with a patient, tank, incubator, or refrigerator"""
     message: str
     patient_id: Optional[str] = None  # For CGT flow
     tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     incubator_id: Optional[int] = None
     chamber_id: Optional[str] = None
+    refrigerator_id: Optional[int] = None
+    zone_id: Optional[str] = None
     total: int
     page: int
     page_size: int

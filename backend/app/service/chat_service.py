@@ -13,7 +13,9 @@ from ..models.chat_model import ChatMessage
 from ..models.chat_read_status import ChatReadStatus
 from ..models.chat_read_status_canister import ChatReadStatusCanister
 from ..models.chat_read_status_incubator import ChatReadStatusIncubator
+from ..models.chat_read_status_refrigerator import ChatReadStatusRefrigerator
 from ..models.IVF.incubator_model import Incubator
+from ..models.IVF.refrigerator_model import Refrigerator
 from ..models.chat_message_tag import ChatMessageTag
 from ..models.user_model import User
 from ..models.patient_model import Patient
@@ -21,7 +23,8 @@ from ..models.pharma_model import Pharma
 from ..models.IVF.tank_model import Tank
 from ..schemas.chat_schema import (
     ChatMessageCreateRequest, ChatMessageCreateResponse, ChatMessageResponse,
-    PatientMessagesResponse, IncubatorMessagesResponse, UnreadMessageResponse, UnreadMessagesResponse
+    PatientMessagesResponse, IncubatorMessagesResponse, RefrigeratorMessagesResponse,
+    UnreadMessageResponse, UnreadMessagesResponse
 )
 from ..exceptions.custom_exceptions import (
     ChatMessageCreateFailedException, ChatMessageNotFoundException,
@@ -271,6 +274,58 @@ def mark_incubator_as_read(
     latest_message = query.scalar()
 
     read_status = get_or_create_read_status_incubator(user_id, incubator_id, chamber_id, db)
+    read_status.last_read_message_id = latest_message
+    read_status.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return latest_message or 0
+
+
+def get_or_create_read_status_refrigerator(
+    user_id: str, refrigerator_id: int, zone_id: Optional[str], db: Session
+) -> ChatReadStatusRefrigerator:
+    """Get or create read status for user-refrigerator-zone combination."""
+    read_status = db.query(ChatReadStatusRefrigerator).filter(
+        ChatReadStatusRefrigerator.user_id == user_id,
+        ChatReadStatusRefrigerator.refrigerator_id == refrigerator_id,
+        ChatReadStatusRefrigerator.zone_id == zone_id,
+    ).first()
+    if not read_status:
+        read_status = ChatReadStatusRefrigerator(
+            user_id=user_id,
+            refrigerator_id=refrigerator_id,
+            zone_id=zone_id,
+            last_read_message_id=None,
+        )
+        db.add(read_status)
+        db.flush()
+    return read_status
+
+
+def get_refrigerator_unread_count(
+    user_id: str, refrigerator_id: int, zone_id: Optional[str], db: Session
+) -> int:
+    """Count messages for this refrigerator (and optional zone) after last_read."""
+    read_status = get_or_create_read_status_refrigerator(user_id, refrigerator_id, zone_id, db)
+    last_read_id = read_status.last_read_message_id or 0
+    query = db.query(func.count(ChatMessage.id)).filter(
+        ChatMessage.refrigerator_id == refrigerator_id,
+        ChatMessage.id > last_read_id,
+    )
+    if zone_id:
+        query = query.filter(ChatMessage.zone_id == zone_id)
+    return query.scalar() or 0
+
+
+def mark_refrigerator_as_read(
+    user_id: str, refrigerator_id: int, zone_id: Optional[str], db: Session
+) -> int:
+    """Mark all messages for a refrigerator (and optional zone) as read."""
+    query = db.query(func.max(ChatMessage.id)).filter(ChatMessage.refrigerator_id == refrigerator_id)
+    if zone_id:
+        query = query.filter(ChatMessage.zone_id == zone_id)
+    latest_message = query.scalar()
+
+    read_status = get_or_create_read_status_refrigerator(user_id, refrigerator_id, zone_id, db)
     read_status.last_read_message_id = latest_message
     read_status.updated_at = datetime.now(timezone.utc)
     db.commit()
@@ -1207,6 +1262,106 @@ async def get_incubator_messages(
         if isinstance(e, ChatPatientNotFoundException):
             raise
         raise ChatMessageCreateFailedException(reason=f"Failed to get incubator messages: {str(e)}")
+    finally:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
+async def get_refrigerator_messages(
+    refrigerator_id: int,
+    current_user_id: str,
+    current_user_hospital_id: Optional[int],
+    db: Session,
+    zone_id: Optional[str] = None,
+    mark_as_read: bool = False
+) -> RefrigeratorMessagesResponse:
+    """Get all messages for a specific refrigerator (and optional zone)."""
+    try:
+        refrigerator_query = db.query(Refrigerator).filter(Refrigerator.refrigerator_id == refrigerator_id)
+        if current_user_hospital_id is not None:
+            refrigerator_query = refrigerator_query.filter(Refrigerator.hospital_id == current_user_hospital_id)
+        refrigerator = refrigerator_query.first()
+        if not refrigerator:
+            raise ChatPatientNotFoundException(f"Refrigerator with id '{refrigerator_id}' not found")
+
+        query = db.query(ChatMessage).filter(ChatMessage.refrigerator_id == refrigerator_id)
+        if zone_id:
+            query = query.filter(ChatMessage.zone_id == zone_id)
+        messages = query.order_by(ChatMessage.created_at.asc()).all()
+
+        message_ids: List[int] = [m.id for m in messages]
+        sender_ids: Set[str] = {m.sender_id for m in messages if m.sender_id}
+
+        tags = db.query(ChatMessageTag).filter(ChatMessageTag.message_id.in_(message_ids)).all()
+        parsed_tagged_user_ids: Dict[int, List[str]] = {mid: [] for mid in message_ids}
+        all_tagged_user_ids: Set[str] = set()
+        for tag in tags:
+            parsed_tagged_user_ids.setdefault(tag.message_id, []).append(tag.user_id)
+            all_tagged_user_ids.add(tag.user_id)
+
+        sender_map: Dict[str, Dict[str, Optional[str]]] = {}
+        if sender_ids:
+            senders = db.query(User).filter(User.user_id.in_(sender_ids)).all()
+            sender_map = {
+                u.user_id: {"name": f"{u.first_name} {u.last_name}", "role": u.role.value if u.role else None}
+                for u in senders
+            }
+
+        tagged_user_map: Dict[str, str] = {}
+        if all_tagged_user_ids:
+            tagged_users = db.query(User).filter(User.user_id.in_(all_tagged_user_ids)).all()
+            tagged_user_map = {u.user_id: f"{u.first_name} {u.last_name}" for u in tagged_users}
+
+        read_status = get_or_create_read_status_refrigerator(current_user_id, refrigerator_id, zone_id, db)
+        last_read_id = read_status.last_read_message_id or 0
+
+        if mark_as_read and messages:
+            latest_id = max(m.id for m in messages)
+            if latest_id > last_read_id:
+                read_status.last_read_message_id = latest_id
+                read_status.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                db.refresh(read_status)
+                last_read_id = read_status.last_read_message_id or 0
+
+        message_responses = []
+        for message in messages:
+            sender_info = sender_map.get(message.sender_id, {"name": "Unknown", "role": None})
+            is_read = message.id <= last_read_id
+            read_at = read_status.updated_at if is_read else None
+            tagged_ids = parsed_tagged_user_ids.get(message.id, [])
+            tagged_names = [tagged_user_map.get(uid, "Unknown") for uid in tagged_ids] if tagged_ids else []
+            message_responses.append(ChatMessageResponse(
+                id=message.id,
+                message_content=message.message_content,
+                refrigerator_id=message.refrigerator_id,
+                zone_id=message.zone_id,
+                sender_id=message.sender_id,
+                sender_name=sender_info["name"],
+                sender_role=sender_info["role"],
+                tagged_user_ids=tagged_ids,
+                tagged_user_names=tagged_names if tagged_names else None,
+                created_at=message.created_at,
+                is_read=is_read,
+                read_at=read_at,
+            ))
+
+        unread_count = get_refrigerator_unread_count(current_user_id, refrigerator_id, zone_id, db)
+        return RefrigeratorMessagesResponse(
+            refrigerator_id=refrigerator_id,
+            zone_id=zone_id,
+            messages=message_responses,
+            total_messages=len(message_responses),
+            unread_count=unread_count,
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get refrigerator messages: {str(e)}", exc_info=True)
+        if isinstance(e, ChatPatientNotFoundException):
+            raise
+        raise ChatMessageCreateFailedException(reason=f"Failed to get refrigerator messages: {str(e)}")
     finally:
         try:
             db.rollback()

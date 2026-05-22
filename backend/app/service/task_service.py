@@ -25,6 +25,7 @@ from app.models.task_model import Tasks
 from app.models.user_model import User
 from app.models.IVF.tank_model import Tank
 from app.models.IVF.incubator_model import Incubator
+from app.models.IVF.refrigerator_model import Refrigerator
 from app.schemas.task_schema import (
     CreateTaskRequest,
     UpdateTaskRequest,
@@ -615,6 +616,86 @@ def get_tasks_by_incubator(
         raise
     except Exception as e:
         raise DatabaseQueryException(operation="get incubator tasks", reason=str(e))
+
+
+def get_tasks_by_refrigerator(
+    refrigerator_id: int,
+    current_user: User,
+    db: Session,
+    *,
+    zone_id: Optional[str] = None,
+    status: Optional[TaskStatus] = None,
+    priority: Optional[TaskPriority] = None,
+    page: int = 1,
+    page_size: int = DEFAULT_PAGE_SIZE
+) -> PatientTaskListResponse:
+    """
+    Retrieve tasks associated with a specific refrigerator (and optionally a zone).
+    zone_id=None returns tasks for the whole refrigerator (all zones).
+    """
+    try:
+        is_hospital_user = is_hospital_department(current_user.department) if current_user.department else False
+        refrigerator_query = db.query(Refrigerator).filter(Refrigerator.refrigerator_id == refrigerator_id)
+        if is_hospital_user and current_user.hospital_id:
+            refrigerator_query = refrigerator_query.filter(Refrigerator.hospital_id == current_user.hospital_id)
+        refrigerator = refrigerator_query.first()
+        if not refrigerator:
+            raise TaskInvalidPatientException(patient_id=f"Refrigerator with id '{refrigerator_id}' not found")
+
+        sanitized_page = max(page, 1)
+        sanitized_page_size = max(1, min(page_size, MAX_PAGE_SIZE))
+
+        query = (
+            db.query(Tasks)
+            .options(
+                selectinload(Tasks.assignee),
+                selectinload(Tasks.created_by)
+            )
+            .filter(Tasks.refrigerator_id == refrigerator_id)
+        )
+
+        if zone_id:
+            query = query.filter(Tasks.zone_id == zone_id)
+
+        privileged_roles = {"manager", "pharma_admin", "admin", "mygrape_admin"}
+        if current_user.role.lower() not in privileged_roles:
+            query = query.filter(
+                or_(
+                    Tasks.created_by_id == current_user.user_id,
+                    Tasks.assignee_id == current_user.user_id
+                )
+            )
+
+        if status:
+            query = query.filter(Tasks.status == status)
+        if priority:
+            query = query.filter(Tasks.priority == priority)
+
+        total = query.count()
+        tasks = (
+            query.order_by(Tasks.created_at.desc())
+            .offset((sanitized_page - 1) * sanitized_page_size)
+            .limit(sanitized_page_size)
+            .all()
+        )
+
+        task_responses = [_build_task_response(task, current_user, db) for task in tasks]
+
+        return PatientTaskListResponse(
+            message=SuccessMessages.TASKS_RETRIEVED,
+            refrigerator_id=refrigerator_id,
+            zone_id=zone_id,
+            total=total,
+            page=sanitized_page,
+            page_size=sanitized_page_size,
+            has_next=((sanitized_page - 1) * sanitized_page_size + len(task_responses)) < total,
+            tasks=task_responses
+        )
+
+    except TaskInvalidPatientException:
+        raise
+    except Exception as e:
+        raise DatabaseQueryException(operation="get refrigerator tasks", reason=str(e))
 
 
 def get_task_by_id(task_id: int, current_user: User, db: Session) -> TaskResponse:

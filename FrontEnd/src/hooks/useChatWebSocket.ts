@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { chatService, type UnreadMessagesResponse, type PatientMessagesResponse, type IncubatorMessagesResponse } from '../services/chatService';
+import { chatService, type UnreadMessagesResponse, type PatientMessagesResponse, type IncubatorMessagesResponse, type RefrigeratorMessagesResponse } from '../services/chatService';
 
 /**
  * WebSocket hook for Dashboard - tracks unread tagged messages count
@@ -717,6 +717,152 @@ export function useIncubatorChatWebSocket(incubatorId: number | undefined, chamb
       disconnect();
     };
   }, [isAuthenticated, token, incubatorId, chamberId, connect, disconnect]);
+
+  return {
+    messages,
+    unreadCount,
+    isConnected,
+    markAsRead,
+    refreshMessages
+  };
+}
+
+/**
+ * WebSocket hook for Refrigerator page - tracks refrigerator-specific messages and unread count.
+ * Re-connects when zoneId changes so switching zones refreshes the chat.
+ */
+export function useRefrigeratorChatWebSocket(refrigeratorId: number | undefined, zoneId?: string) {
+  const { token, isAuthenticated } = useAuth();
+  const [messages, setMessages] = useState<RefrigeratorMessagesResponse['messages']>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [isConnected, setIsConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 5;
+  const reconnectDelay = 3000;
+
+  const getWebSocketUrl = useCallback(() => {
+    const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+    const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
+    const wsUrl = baseUrl.replace(/^http/, 'ws');
+    return `${wsUrl}/api/chat/ws`;
+  }, []);
+
+  const fetchMessages = useCallback(() => {
+    if (refrigeratorId == null) return;
+    chatService.getRefrigeratorMessages(refrigeratorId, zoneId).then((response) => {
+      setMessages(response.messages || []);
+      setUnreadCount(response.unread_count || 0);
+    }).catch((error) => {
+      console.error('[Refrigerator Chat WS] Error fetching messages:', error);
+    });
+  }, [refrigeratorId, zoneId]);
+
+  const connect = useCallback(() => {
+    if (!isAuthenticated || !token || refrigeratorId == null) return;
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    try {
+      const wsUrl = getWebSocketUrl();
+      const url = `${wsUrl}?token=${encodeURIComponent(token)}&refrigerator_id=${encodeURIComponent(refrigeratorId)}`;
+      const ws = new WebSocket(url);
+
+      ws.onopen = () => {
+        setIsConnected(true);
+        reconnectAttemptsRef.current = 0;
+        fetchMessages();
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.type === 'connection_confirmed') {
+            fetchMessages();
+            return;
+          }
+
+          if (data.type === 'new_message' && data.data) {
+            const newMsg = data.data;
+            if (newMsg.refrigerator_id === refrigeratorId) {
+              setMessages(prev => {
+                const exists = prev.some(m => m.id === newMsg.id);
+                if (exists) return prev;
+                return [...prev, newMsg];
+              });
+              fetchMessages();
+            }
+            return;
+          }
+
+          if (data.type === 'error') {
+            console.error('[Refrigerator Chat WS] Error:', data.message);
+          }
+        } catch (error) {
+          console.error('[Refrigerator Chat WS] Parse error:', error);
+        }
+      };
+
+      ws.onerror = () => {
+        setIsConnected(false);
+      };
+
+      ws.onclose = () => {
+        setIsConnected(false);
+        wsRef.current = null;
+
+        if (reconnectAttemptsRef.current < maxReconnectAttempts && isAuthenticated && refrigeratorId != null) {
+          reconnectAttemptsRef.current++;
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect();
+          }, reconnectDelay);
+        }
+      };
+
+      wsRef.current = ws;
+    } catch (error) {
+      console.error('[Refrigerator Chat WS] Connection error:', error);
+      setIsConnected(false);
+    }
+  }, [isAuthenticated, token, refrigeratorId, getWebSocketUrl, fetchMessages]);
+
+  const disconnect = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setIsConnected(false);
+  }, []);
+
+  const markAsRead = useCallback(() => {
+    if (refrigeratorId == null) return;
+    chatService.markRefrigeratorAsRead(refrigeratorId, zoneId).catch((error) => {
+      console.error('[Refrigerator Chat WS] Error marking as read:', error);
+    });
+  }, [refrigeratorId, zoneId]);
+
+  const refreshMessages = useCallback(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  useEffect(() => {
+    if (isAuthenticated && token && refrigeratorId != null) {
+      disconnect();
+      reconnectAttemptsRef.current = 0;
+      connect();
+    } else {
+      disconnect();
+    }
+
+    return () => {
+      disconnect();
+    };
+  }, [isAuthenticated, token, refrigeratorId, zoneId, connect, disconnect]);
 
   return {
     messages,

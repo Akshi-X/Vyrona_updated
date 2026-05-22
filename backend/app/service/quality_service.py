@@ -1018,6 +1018,102 @@ class QualityService:
                 created += 1
         return {"updated": updated, "created": created}
 
+    def bulk_upsert_kpi_config_for_refrigerator(
+        self,
+        refrigerator_id: int,
+        zone_id: Optional[str],
+        configs: List[Dict],
+        hospital_id: int,
+        branch_id: int,
+    ) -> Dict:
+        """
+        For each config: if a row exists for (refrigerator_id, zone_id, kpi_name, alert_name) update it;
+        otherwise create. Returns {"updated": count, "created": count}.
+        """
+        updated = 0
+        created = 0
+        for cfg in configs:
+            kpi_name = (cfg.get("kpi_name") or "").strip()
+            if not kpi_name:
+                continue
+            alert_name = cfg.get("alert_name")
+            if alert_name is not None and isinstance(alert_name, str):
+                alert_name = alert_name.strip() or None
+            def _to_float(v):
+                if v is None:
+                    return None
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return None
+            min_val = _to_float(cfg.get("min"))
+            max_val = _to_float(cfg.get("max"))
+            unit = (cfg.get("unit") or "").strip() or None
+            alert_type_val = (cfg.get("alert_type") or "").strip() or None
+            status_val = cfg.get("status")
+            if status_val is None:
+                status_val = alert_type_val in ("critical", "soft")
+            cooldown_val = cfg.get("cooldown_minutes")
+            try:
+                cooldown_val = int(cooldown_val) if cooldown_val is not None else None
+            except (TypeError, ValueError):
+                cooldown_val = None
+            escalation_threshold = cfg.get("unack_escalation_threshold")
+            try:
+                escalation_threshold = int(escalation_threshold) if escalation_threshold is not None else None
+            except (TypeError, ValueError):
+                escalation_threshold = None
+
+            query = self.db.query(KpiConfig).filter(
+                KpiConfig.refrigerator_id == refrigerator_id,
+                KpiConfig.kpi_name == kpi_name,
+            )
+            if zone_id is not None:
+                query = query.filter(KpiConfig.zone_id == zone_id)
+            else:
+                query = query.filter(KpiConfig.zone_id.is_(None))
+            if alert_name is None:
+                query = query.filter(KpiConfig.alert_name.is_(None))
+            else:
+                query = query.filter(KpiConfig.alert_name == alert_name)
+
+            existing = query.first()
+            if existing:
+                existing.min = min_val
+                existing.max = max_val
+                existing.alert_type = alert_type_val
+                existing.status = bool(status_val)
+                if unit is not None:
+                    existing.unit = unit
+                if cooldown_val is not None:
+                    existing.cooldown_minutes = cooldown_val
+                existing.unack_escalation_threshold = escalation_threshold
+                self.db.flush()
+                updated += 1
+            else:
+                row = KpiConfig(
+                    hospital_id=hospital_id,
+                    branch_id=branch_id,
+                    tank_id=None,
+                    incubator_id=None,
+                    chamber_id=None,
+                    refrigerator_id=refrigerator_id,
+                    zone_id=zone_id,
+                    kpi_name=kpi_name,
+                    alert_name=alert_name,
+                    min=min_val,
+                    max=max_val,
+                    unit=unit,
+                    alert_type=alert_type_val,
+                    cooldown_minutes=cooldown_val if cooldown_val is not None else 60,
+                    unack_escalation_threshold=escalation_threshold,
+                    status=bool(status_val),
+                )
+                self.db.add(row)
+                self.db.flush()
+                created += 1
+        return {"updated": updated, "created": created}
+
     def get_last_n_readings_per_kpi(self, tank_id: int, n: int):
         db = self.db
         row_number = (
