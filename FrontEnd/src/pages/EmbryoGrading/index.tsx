@@ -247,8 +247,8 @@ export default function EmbryoGradingPage() {
         setError(null);
         const data = await ivfService.listCycles();
         setCycles(data);
-      } catch (err: any) {
-        setError(err?.message || 'Failed to load cycles');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load cycles');
       } finally {
         setLoading(false);
       }
