@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
-import logging
+
+from app.utils import ivf_blob
 
 from app.config.database import get_db
 from app.service.IVF.ivf_cycle_service import IvfCycleService
@@ -12,7 +15,12 @@ from app.schemas.IVF.ivf_cycle_schema import (
     CycleWithLogsResponse,
     LogUpsert,
     LogResponse,
+    ImageResponse,
+    ReportResponse,
+    GradeUpsert,
+    GradeResponse,
 )
+
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.utils.ivf_helpers import get_branch_filter_info
 from app.utils.user_helpers import is_specific_department
@@ -53,9 +61,9 @@ def _hospital_id(request: Request, db: Session, user) -> int:
 def _log_action_for_payload(payload: LogUpsert) -> str:
     if payload.fate is not None:
         return "ivf_cycle.oocyte_log.fate_set"
-    if payload.d6_grade is not None or payload.d6_stage is not None or payload.d6_progression is not None:
+    if payload.d6_stage is not None or payload.d6_progression is not None:
         return "ivf_cycle.oocyte_log.d6_updated"
-    if payload.d5_grade is not None or payload.d5_stage is not None:
+    if payload.d5_stage is not None:
         return "ivf_cycle.oocyte_log.d5_updated"
     if payload.d3_grade is not None or payload.d3_symmetry is not None or payload.d3_drop_no is not None:
         return "ivf_cycle.oocyte_log.d3_updated"
@@ -74,10 +82,8 @@ def _log_metadata(cycle_id: int, his_id: Optional[str], payload: LogUpsert) -> d
         data["d1_zygote_status"] = payload.d1_zygote_status
     if payload.d3_grade is not None:
         data["d3_grade"] = payload.d3_grade
-    if payload.d5_grade is not None:
-        data["d5_grade"] = payload.d5_grade
-    if payload.d6_grade is not None:
-        data["d6_grade"] = payload.d6_grade
+    if payload.blast_grade is not None:
+        data["blast_grade"] = payload.blast_grade
     if payload.fate is not None:
         data["fate"] = payload.fate
     return data
@@ -125,6 +131,8 @@ def list_cycles(
     request: Request,
     his_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    incubator_id: Optional[int] = Query(None),
+    chamber_position: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -134,7 +142,16 @@ def list_cycles(
     branch_id, _ = get_branch_filter_info(request)
     try:
         svc = IvfCycleService(db)
-        return svc.list_cycles(hospital_id, branch_id=branch_id, his_id=his_id, status=status, skip=skip, limit=limit)
+        return svc.list_cycles(
+            hospital_id,
+            branch_id=branch_id,
+            his_id=his_id,
+            status=status,
+            incubator_id=incubator_id,
+            chamber_position=chamber_position,
+            skip=skip,
+            limit=limit,
+        )
     except Exception as e:
         logger.exception("list_cycles failed")
         raise HTTPException(status_code=500, detail=str(e))
@@ -245,3 +262,232 @@ def delete_log(
         raise HTTPException(status_code=404, detail="Cycle not found")
     if not svc.delete_log(log_id, cycle_id):
         raise HTTPException(status_code=404, detail="Log entry not found")
+
+
+# ── Grade endpoints ───────────────────────────────────────────────────────────
+
+@router.post("/cycles/{cycle_id}/logs/{log_id}/grades", response_model=GradeResponse, status_code=201)
+def create_grade(
+    cycle_id: int,
+    log_id: int,
+    payload: GradeUpsert,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.get_cycle(cycle_id, hospital_id):
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    return svc.create_grade(log_id, cycle_id, payload, user_id=str(user.user_id))
+
+
+@router.get("/cycles/{cycle_id}/logs/{log_id}/grades", response_model=List[GradeResponse])
+def list_grades(
+    cycle_id: int,
+    log_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.get_cycle(cycle_id, hospital_id):
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    return svc.list_grades(log_id)
+
+
+@router.post("/cycles/{cycle_id}/logs/{log_id}/grades/{grade_id}/select-best", response_model=GradeResponse)
+def select_best_grade(
+    cycle_id: int,
+    log_id: int,
+    grade_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.get_cycle(cycle_id, hospital_id):
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    record = svc.select_best_grade(log_id, grade_id, cycle_id, user_id=str(user.user_id))
+    if not record:
+        raise HTTPException(status_code=404, detail="Grade not found")
+    ActivityLogService(db).log_activity(
+        action="ivf_cycle.grade.best_selected",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(user),
+        target=build_target("ivf_cycle", str(cycle_id), None, hospital_id),
+        metadata={"cycle_id": cycle_id, "log_id": log_id, "grade_id": grade_id},
+        audit_log_disabled=is_audit_log_disabled_for_user(user),
+    )
+    return record
+
+
+@router.put("/cycles/{cycle_id}/grades/{grade_id}", response_model=GradeResponse)
+def update_grade(
+    cycle_id: int,
+    grade_id: int,
+    payload: GradeUpsert,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    record = svc.update_grade(grade_id, cycle_id, payload, user_id=str(user.user_id))
+    if not record:
+        raise HTTPException(status_code=404, detail="Grade not found")
+    return record
+
+
+@router.delete("/cycles/{cycle_id}/grades/{grade_id}", status_code=204)
+def delete_grade(
+    cycle_id: int,
+    grade_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.delete_grade(grade_id, cycle_id):
+        raise HTTPException(status_code=404, detail="Grade not found")
+
+
+# ── Image endpoints ───────────────────────────────────────────────────────────
+
+@router.post("/cycles/{cycle_id}/grades/{grade_id}/images", response_model=ImageResponse, status_code=201)
+def upload_image(
+    cycle_id: int,
+    grade_id: int,
+    upload_image: UploadFile = File(...),
+    exp_img: Optional[UploadFile] = File(None),
+    te_img: Optional[UploadFile] = File(None),
+    icm_img: Optional[UploadFile] = File(None),
+    day: Optional[int] = Form(None),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.get_grade_by_id(grade_id, cycle_id):
+        raise HTTPException(status_code=404, detail="Grade record not found")
+
+    # TODO: replace with real blob storage once provisioned
+    MOCK_IMAGE_URL = "http://dev.mygrape.org/embryo/embryo_01.jpg"
+    primary_data = upload_image.file.read()
+
+    return svc.add_image(
+        grade_id=grade_id,
+        cycle_id=cycle_id,
+        upload_image_url=MOCK_IMAGE_URL,
+        exp_img_url=MOCK_IMAGE_URL,
+        te_img_url=MOCK_IMAGE_URL,
+        icm_img_url=MOCK_IMAGE_URL,
+        file_name=upload_image.filename,
+        file_size=len(primary_data),
+        day=day,
+        user_id=str(user.user_id),
+    )
+
+
+@router.get("/cycles/{cycle_id}/grades/{grade_id}/images", response_model=List[ImageResponse])
+def list_images(
+    cycle_id: int,
+    grade_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.get_grade_by_id(grade_id, cycle_id):
+        raise HTTPException(status_code=404, detail="Grade record not found")
+    return svc.list_images(grade_id)
+
+
+@router.delete("/cycles/{cycle_id}/grades/{grade_id}/images/{image_id}", status_code=204)
+def delete_image(
+    cycle_id: int,
+    grade_id: int,
+    image_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.get_grade_by_id(grade_id, cycle_id):
+        raise HTTPException(status_code=404, detail="Grade record not found")
+    urls = svc.delete_image(image_id, cycle_id)
+    if urls is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    ivf_blob.delete_blobs_by_urls(urls)
+
+
+# ── Report endpoints ──────────────────────────────────────────────────────────
+
+@router.post("/cycles/{cycle_id}/reports", response_model=ReportResponse, status_code=201)
+def upload_report(
+    cycle_id: int,
+    file: UploadFile = File(...),
+    report_type: Optional[str] = Form(None),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.get_cycle(cycle_id, hospital_id):
+        raise HTTPException(status_code=404, detail="Cycle not found")
+
+    try:
+        data = file.file.read()
+        blob_path = ivf_blob.make_blob_path(f"ivf/reports/{cycle_id}", file.filename or "", "report")
+        file_url = ivf_blob.upload_bytes(data, blob_path, file.content_type or "application/octet-stream")
+    except Exception as e:
+        logger.exception("Blob upload failed for report cycle=%s", cycle_id)
+        raise HTTPException(status_code=500, detail=f"Storage error: {e}")
+
+    return svc.add_report(
+        cycle_id=cycle_id,
+        file_url=file_url,
+        file_name=file.filename,
+        file_size=len(data),
+        report_type=report_type,
+        user_id=str(user.user_id),
+    )
+
+
+@router.get("/cycles/{cycle_id}/reports", response_model=List[ReportResponse])
+def list_reports(
+    cycle_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.get_cycle(cycle_id, hospital_id):
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    return svc.list_reports(cycle_id)
+
+
+@router.delete("/cycles/{cycle_id}/reports/{report_id}", status_code=204)
+def delete_report(
+    cycle_id: int,
+    report_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _ivf_user(request)
+    hospital_id = _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.get_cycle(cycle_id, hospital_id):
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    file_url = svc.delete_report(report_id, cycle_id)
+    if file_url is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    ivf_blob.delete_blob_by_url(file_url)

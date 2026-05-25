@@ -12,6 +12,7 @@ interface CriticalAlert {
     message: string;
     timestamp: string;
     status: "Active" | "Acknowledged" | "Resolved" | "Escalated";
+    acknowledgementReason?: string;
 }
 
 interface CriticalAlertsModalProps {
@@ -601,6 +602,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                         activeGroupAlertIds.every((id) =>
                                             acknowledgingIds.has(id),
                                         );
+                                    const isLidStateGroup = isLidStateAlert(latestAlert);
                                     const isExpanded = expandedGroupKeys.has(
                                         group.groupKey,
                                     );
@@ -720,10 +722,18 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                                 )}
                                                             </div>
                                                         )}
+                                                        {activeGroupAlertIds.length === 0 &&
+                                                            isLidStateAlert(latestAlert) &&
+                                                            latestAlert.acknowledgementReason && (
+                                                                <div className="mt-2 flex flex-wrap items-start gap-x-1 text-xs text-gray-500">
+                                                                    <span className="font-semibold text-gray-600">Reason:</span>
+                                                                    <span>{latestAlert.acknowledgementReason}</span>
+                                                                </div>
+                                                            )}
                                                     </div>
                                                 </div>
 
-                                                {/* Acknowledge group — right on desktop */}
+                                                {/* Acknowledge — right on desktop */}
                                                 <div className="hidden md:flex items-center gap-2">
                                                     {hiddenCount > 0 && (
                                                         <div className="p-2" title={isExpanded ? "Collapse older alerts" : "Show older alerts"}>
@@ -733,23 +743,38 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                         </div>
                                                     )}
                                                     {(onAcknowledge || onAcknowledgeAll) && (
-                                                        activeGroupAlertIds.length > 0 ? (
-                                                            <button
-                                                                id={group.groupKey === firstActiveGroupKey ? "onboarding-critical-alert-ack-btn" : undefined}
-                                                                onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(activeGroupAlertIds); }}
-                                                                disabled={isAcknowledgingGroup}
-                                                                className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${isAcknowledgingGroup ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-primary text-white hover:bg-[#5a0f66]"}`}
-                                                            >
-                                                                {isAcknowledgingGroup ? "Acknowledging..." : "Acknowledge"}
-                                                            </button>
+                                                        isLidStateGroup ? (
+                                                            latestAlert.status === "Active" ? (
+                                                                <button
+                                                                    id={group.groupKey === firstActiveGroupKey ? "onboarding-critical-alert-ack-btn" : undefined}
+                                                                    onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(latestAlert.id); }}
+                                                                    disabled={acknowledgingIds.has(latestAlert.id)}
+                                                                    className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${acknowledgingIds.has(latestAlert.id) ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-primary text-white hover:bg-[#5a0f66]"}`}
+                                                                >
+                                                                    {acknowledgingIds.has(latestAlert.id) ? "Acknowledging..." : "Acknowledge"}
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-gray-400 text-xs">-</span>
+                                                            )
                                                         ) : (
-                                                            <span className="text-gray-400 text-xs">-</span>
+                                                            activeGroupAlertIds.length > 0 ? (
+                                                                <button
+                                                                    id={group.groupKey === firstActiveGroupKey ? "onboarding-critical-alert-ack-btn" : undefined}
+                                                                    onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(activeGroupAlertIds); }}
+                                                                    disabled={isAcknowledgingGroup}
+                                                                    className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${isAcknowledgingGroup ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-primary text-white hover:bg-[#5a0f66]"}`}
+                                                                >
+                                                                    {isAcknowledgingGroup ? "Acknowledging..." : "Acknowledge"}
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-gray-400 text-xs">-</span>
+                                                            )
                                                         )
                                                     )}
                                                 </div>
                                             </div>
 
-                                            {/* Acknowledge group — bottom on mobile */}
+                                            {/* Acknowledge — bottom on mobile */}
                                             {(onAcknowledge || onAcknowledgeAll) && (
                                                 <div className="md:hidden mt-3 flex items-center justify-between gap-2">
                                                     {hiddenCount > 0 && (
@@ -759,16 +784,30 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                             </svg>
                                                         </div>
                                                     )}
-                                                    {activeGroupAlertIds.length > 0 ? (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(activeGroupAlertIds); }}
-                                                            disabled={isAcknowledgingGroup}
-                                                            className={`w-full py-2 text-xs font-semibold rounded-lg transition-colors ${isAcknowledgingGroup ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-primary text-white hover:bg-[#5a0f66]"}`}
-                                                        >
-                                                            {isAcknowledgingGroup ? "Acknowledging..." : "Acknowledge"}
-                                                        </button>
+                                                    {isLidStateGroup ? (
+                                                        latestAlert.status === "Active" ? (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(latestAlert.id); }}
+                                                                disabled={acknowledgingIds.has(latestAlert.id)}
+                                                                className={`w-full py-2 text-xs font-semibold rounded-lg transition-colors ${acknowledgingIds.has(latestAlert.id) ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-primary text-white hover:bg-[#5a0f66]"}`}
+                                                            >
+                                                                {acknowledgingIds.has(latestAlert.id) ? "Acknowledging..." : "Acknowledge"}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400">Already acknowledged</span>
+                                                        )
                                                     ) : (
-                                                        <span className="text-xs text-gray-400">Already acknowledged</span>
+                                                        activeGroupAlertIds.length > 0 ? (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(activeGroupAlertIds); }}
+                                                                disabled={isAcknowledgingGroup}
+                                                                className={`w-full py-2 text-xs font-semibold rounded-lg transition-colors ${isAcknowledgingGroup ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-primary text-white hover:bg-[#5a0f66]"}`}
+                                                            >
+                                                                {isAcknowledgingGroup ? "Acknowledging..." : "Acknowledge"}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400">Already acknowledged</span>
+                                                        )
                                                     )}
                                                 </div>
                                             )}
@@ -783,16 +822,27 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                             >
                                                                 <div className="min-w-0 text-left">
                                                                     <div className="text-sm text-[#333333]">
-                                                                        {
-                                                                            alert.message
-                                                                        }
+                                                                        {alert.message}
                                                                     </div>
                                                                     <div className="mt-1 text-xs text-gray-500">
-                                                                        {formatAlertTime(
-                                                                            alert.timestamp,
-                                                                        )}
+                                                                        {formatAlertTime(alert.timestamp)}
                                                                     </div>
+                                                                    {isLidStateGroup && alert.status === "Acknowledged" && alert.acknowledgementReason && (
+                                                                        <div className="mt-1 flex flex-wrap items-start gap-x-1 text-xs text-gray-500">
+                                                                            <span className="font-semibold text-gray-600">Reason:</span>
+                                                                            <span>{alert.acknowledgementReason}</span>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
+                                                                {isLidStateGroup && alert.status === "Active" && (onAcknowledge || onAcknowledgeAll) && (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(alert.id); }}
+                                                                        disabled={acknowledgingIds.has(alert.id)}
+                                                                        className={`shrink-0 px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${acknowledgingIds.has(alert.id) ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-primary text-white hover:bg-[#5a0f66]"}`}
+                                                                    >
+                                                                        {acknowledgingIds.has(alert.id) ? "Acknowledging..." : "Acknowledge"}
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         ),
                                                     )}
