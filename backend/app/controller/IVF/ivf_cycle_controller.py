@@ -391,6 +391,7 @@ def get_image_presign(
     if not svc.get_grade_by_id(grade_id, cycle_id):
         raise HTTPException(status_code=404, detail="Grade record not found")
     try:
+        ivf_blob._ensure_cors()
         sas_url = ivf_blob.generate_container_write_sas_url(expiry_minutes=15)
     except Exception as exc:
         logger.warning("presign failed: %s", exc)

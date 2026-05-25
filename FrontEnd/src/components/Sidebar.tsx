@@ -225,7 +225,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     <img
                         src={MyGrapeLogo}
                         alt="myGrape logo"
-                        className="w-[110px] h-[75px] md:w-[150px] md:h-[100px]"
+                        className="w-[110px] h-[75px] md:w-[135px] md:h-[90px]"
                     />
                 </header>
 

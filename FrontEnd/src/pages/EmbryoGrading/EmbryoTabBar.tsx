@@ -28,7 +28,7 @@ export default function EmbryoTabBar({ his }: EmbryoTabBarProps) {
   ];
 
   return (
-    <div className="flex shrink-0 p-1 rounded-xl gap-0.5" style={{ background: '#ede5f4' }}>
+    <div className="flex flex-1 p-1 rounded-xl gap-0.5" style={{ background: '#ede5f4' }}>
       {tabs.map(tab => {
         const isActive = active === tab.id;
         return (
