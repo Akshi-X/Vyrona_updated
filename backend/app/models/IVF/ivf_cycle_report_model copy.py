@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text
-from sqlalchemy.orm import relationship
 
 from ...config.database import Base
 
@@ -16,5 +15,3 @@ class IvfCycleReport(Base):
     file_size = Column(Integer, nullable=True)
     generated_by = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-
-    cycle = relationship("IvfCycle", back_populates="reports")

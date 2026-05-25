@@ -31,5 +31,4 @@ class IvfOocyteGrade(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    log    = relationship("IvfCycleLog",    back_populates="grades")
     images = relationship("IvfOocyteImage", back_populates="grade", cascade="all, delete-orphan")
