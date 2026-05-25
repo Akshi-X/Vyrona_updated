@@ -4,7 +4,7 @@ import { Thermometer } from 'lucide-react';
 import { ivfService } from '../../services/ivfService';
 import IncubatorQualityTrackingChart from './IncubatorQualityTrackingChart';
 import IncubatorVisualisation, { type IncubatorSensorTile } from './IncubatorVisualisation';
-import MockContainerDataTable from './MockContainerDataTable';
+import MockContainerDataTable from './ContainerDataTable';
 import PageLayout from '../../components/PageLayout';
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -434,7 +434,7 @@ export default function IncubatorDetailPage() {
 
             {/* Container contents */}
             {hasIncubatorId ? (
-              <MockContainerDataTable />
+              <MockContainerDataTable incubatorId={incubatorId} chamberId={chamberId} />
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
                 <div className="py-8 text-center text-gray-400">No incubator selected.</div>
@@ -491,6 +491,7 @@ export default function IncubatorDetailPage() {
           message: a.message,
           timestamp: new Date(a.occurred_at + 'Z').toLocaleString(),
           status: a.status === 'Active' ? 'Active' : 'Acknowledged',
+          acknowledgementReason: a.acknowledgment_reason,
         }))}
         loading={loadingAlerts}
         patientIdLabel=""

@@ -837,7 +837,8 @@ export default function Dashboard({ }: DashboardProps) {
         dedupKey: (ivfAlert as IVFAlert & { dedup_key?: string }).dedup_key,
         message: ivfAlert.message,
         timestamp: new Date(ivfAlert.occurred_at+"Z")+"",
-        status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated'
+        status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated',
+        acknowledgementReason: ivfAlert.acknowledgment_reason
       };
     } else {
       const cgtAlert = alert as ServiceCriticalAlert;
