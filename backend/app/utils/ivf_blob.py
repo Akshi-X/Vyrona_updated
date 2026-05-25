@@ -37,10 +37,34 @@ def _get_client():
     return _client
 
 
+_cors_configured = False
+
+
+def _ensure_cors() -> None:
+    """Set permissive CORS on the storage account (needed for browser direct-upload via SAS)."""
+    global _cors_configured
+    if _cors_configured:
+        return
+    try:
+        from azure.storage.blob import CorsRule  # pyright: ignore[reportMissingImports]
+        rule = CorsRule(
+            allowed_origins=["*"],
+            allowed_methods=["GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"],
+            allowed_headers=["*"],
+            exposed_headers=["*"],
+            max_age_in_seconds=3600,
+        )
+        _get_client().set_service_properties(cors=[rule])
+        _cors_configured = True
+    except Exception as exc:
+        logger.warning("CORS configuration skipped: %s", exc)
+
+
 def _ensure_container(name: str) -> None:
     if name in _container_ready:
         return
     client = _get_client()
+    _ensure_cors()
     container = client.get_container_client(name)
     try:
         container.create_container()  # private — no public_access

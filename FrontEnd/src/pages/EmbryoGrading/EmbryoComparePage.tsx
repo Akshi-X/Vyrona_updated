@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Trophy, GitCompare, Star, Search } from 'lucide-react';
+import { X, Trophy, GitCompare, Star, Search, Info } from 'lucide-react';
 import type { BlastocystMorphology } from '../../types/embryo';
 
 interface LeaderboardEmbryo {
@@ -303,54 +303,77 @@ export default function EmbryoComparePage() {
                 </div>
                 <p className="text-[11px] text-gray-400">Choose up to 4 embryos from the leaderboard to compare their grades and metrics side by side.</p>
               </div>
-              <div className="flex gap-1.5 shrink-0 opacity-25">
+              <div className="flex gap-1.5 shrink-0 opacity-40">
                 {[1, 2, 3].map(i => (
-                  <div key={i} className="w-14 h-16 rounded-xl border border-gray-300 bg-gray-100 flex flex-col gap-1 p-1.5">
-                    <div className="h-2 rounded bg-gray-200 w-full" />
-                    <div className="h-2 rounded bg-gray-200 w-3/4" />
-                    <div className="h-2 rounded bg-gray-200 w-full mt-auto" />
+                  <div key={i} className="w-14 h-16 rounded-lg flex flex-col gap-1 p-1.5" style={{ border: '1px solid #e8d5f0', background: 'linear-gradient(160deg, #faf4ff 0%, #f3e8ff 100%)' }}>
+                    <div className="h-2 rounded w-full" style={{ background: '#e8d5f0' }} />
+                    <div className="h-2 rounded w-3/4" style={{ background: '#ddc6f0' }} />
+                    <div className="h-2 rounded w-full mt-auto" style={{ background: '#e8d5f0' }} />
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="shrink-0 border border-gray-100 rounded-2xl bg-white px-4 py-3 flex items-start gap-6 flex-wrap">
-              <div className="flex items-start gap-2">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="1.5" className="shrink-0 mt-0.5">
-                  <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="#6b1176"/>
-                </svg>
+            {/* Reading guide strip */}
+            <div className="rounded-xl overflow-hidden w-full flex items-stretch" style={{ border: '1px solid #e8d5f0', background: 'linear-gradient(135deg, #faf4ff 0%, #f5eeff 100%)' }}>
+              {/* Label */}
+              <div className="flex items-center gap-1.5 px-3 py-2.5 shrink-0 border-r" style={{ borderColor: '#e8d5f0' }}>
+                <Info size={11} className="text-primary shrink-0" />
+                <p className="text-[9px] font-black text-primary uppercase tracking-widest whitespace-nowrap">How to read</p>
+              </div>
+
+              {/* AI Score */}
+              <div className="flex flex-1 items-center gap-2 px-3 py-2 border-r" style={{ borderColor: '#e8d5f0' }}>
+                <div className="relative w-7 h-7 shrink-0">
+                  <svg viewBox="0 0 32 32" width="28" height="28" style={{ transform: 'rotate(-90deg)' }}>
+                    <circle cx="16" cy="16" r="11" fill="none" stroke="#e8d5f0" strokeWidth="4" />
+                    <circle cx="16" cy="16" r="11" fill="none" stroke="#7c3aed" strokeWidth="4"
+                      strokeDasharray={`${2 * Math.PI * 11 * 0.87} ${2 * Math.PI * 11}`} strokeLinecap="round" />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[7px] font-black text-primary leading-none">8.7</span>
+                  </div>
+                </div>
                 <div>
-                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">AI Score</div>
-                  <div className="text-[10px] text-gray-600">Overall prediction score</div>
+                  <p className="text-[9px] font-bold text-[#3b0764] leading-none">AI Score</p>
+                  <p className="text-[8px] mt-0.5" style={{ color: '#6b1176' }}>Ring shows 0–10 prediction score</p>
                 </div>
               </div>
-              <div className="flex items-start gap-2">
-                <Star size={15} className="text-primary shrink-0 mt-0.5" strokeWidth={1.5} />
+
+              {/* Gardner Grade */}
+              <div className="flex flex-1 items-center gap-2 px-3 py-2 border-r" style={{ borderColor: '#e8d5f0' }}>
+                <span className="text-lg font-black text-emerald-600 leading-none shrink-0">5AA</span>
                 <div>
-                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Grade</div>
-                  <div className="text-[10px] text-gray-600">Best grade prediction</div>
+                  <p className="text-[9px] font-bold text-[#3b0764] leading-none">Gardner Grade</p>
+                  <p className="text-[8px] mt-0.5" style={{ color: '#6b1176' }}>Expansion · ICM · TE combined</p>
                 </div>
               </div>
-              <div className="flex items-start gap-2">
-                <div className="flex gap-1 shrink-0 mt-0.5">
-                  {['EXP', 'ICM', 'TE'].map(tag => (
-                    <span key={tag} className="text-[8px] font-bold bg-primary/10 text-primary rounded px-1 py-0.5">{tag}</span>
+
+              {/* Quality flags */}
+              <div className="flex flex-1 items-center gap-2 px-3 py-2 border-r" style={{ borderColor: '#e8d5f0' }}>
+                <div className="flex flex-col gap-0.5 shrink-0">
+                  <span className="text-[7px] px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold leading-none">None</span>
+                  <span className="text-[7px] px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 font-bold leading-none">Minimal</span>
+                </div>
+                <div>
+                  <p className="text-[9px] font-bold text-[#3b0764] leading-none">Quality Flags</p>
+                  <p className="text-[8px] mt-0.5" style={{ color: '#6b1176' }}>Severity of morphology issues</p>
+                </div>
+              </div>
+
+              {/* Score color guide */}
+              <div className="flex flex-1 items-center gap-2 px-3 py-2">
+                <div className="flex flex-col gap-0.5 shrink-0">
+                  {([['bg-emerald-500', '≥ 8.5 High'], ['bg-amber-400', '≥ 7.0 Good'], ['bg-rose-400', '< 7.0 Low']] as const).map(([cls, label]) => (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cls}`} />
+                      <span className="text-[8px]" style={{ color: '#6b1176' }}>{label}</span>
+                    </div>
                   ))}
                 </div>
                 <div>
-                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Core Grade</div>
-                  <div className="text-[10px] text-gray-600">
-                    <span className="font-semibold">EXP</span> Expansion &nbsp;
-                    <span className="font-semibold">ICM</span> Inner Cell Mass &nbsp;
-                    <span className="font-semibold">TE</span> Trophectoderm
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Search size={15} className="text-primary shrink-0 mt-0.5" strokeWidth={1.5} />
-                <div>
-                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Quality</div>
-                  <div className="text-[10px] text-gray-600">High / Good / Medium / Low</div>
+                  <p className="text-[9px] font-bold text-[#3b0764] leading-none">Score Colour</p>
+                  <p className="text-[8px] mt-0.5" style={{ color: '#6b1176' }}>Bar colour reflects quality tier</p>
                 </div>
               </div>
             </div>
@@ -445,7 +468,7 @@ export default function EmbryoComparePage() {
 
                       {/* Tier 2 — Quality Flags */}
                       <div className="shrink-0 rounded-xl overflow-hidden" style={{ border: '1px solid #e8d5f0' }}>
-                        <div className="flex items-center gap-2 px-3 py-2" style={{ background: '#faf4ff' }}>
+                        <div className="flex flex-1 items-center gap-2 px-3 py-2" style={{ background: '#faf4ff' }}>
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                             <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>

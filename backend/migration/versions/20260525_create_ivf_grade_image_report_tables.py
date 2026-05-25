@@ -35,8 +35,6 @@ def upgrade():
         sa.Column('bridge', sa.String(50), nullable=True),
         sa.Column('note', sa.Text(), nullable=True),
         sa.Column('graded_by', sa.String(100), nullable=True),
-        sa.Column('created_by', sa.String(50), nullable=True),
-        sa.Column('updated_by', sa.String(50), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
     )

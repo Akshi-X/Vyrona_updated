@@ -1477,16 +1477,45 @@ export class IvfService extends BaseApiService {
     }
 
     async uploadImage(cycleId: number, gradeId: number, file: File, options?: { expFile?: File; teFile?: File; icmFile?: File; day?: number }): Promise<IvfImage> {
-        const form = new FormData();
-        form.append('upload_image', file);
-        if (options?.expFile) form.append('exp_img', options.expFile);
-        if (options?.teFile)  form.append('te_img',  options.teFile);
-        if (options?.icmFile) form.append('icm_img', options.icmFile);
-        if (options?.day != null) form.append('day', String(options.day));
-        return this.requestFormData<IvfImage>(
-            `/api/ivf/cycles/${cycleId}/grades/${gradeId}/images`,
-            form,
-            { method: 'POST' },
+        const presign = await this.request<{ container_sas_url: string; prefix: string }>(
+            `/api/ivf/cycles/${cycleId}/grades/${gradeId}/images/presign`,
+            { method: 'GET' },
+        );
+
+        const [baseUrl, sasQuery] = presign.container_sas_url.split('?');
+
+        const uploadBlob = async (f: File, label: string): Promise<string> => {
+            const ext = f.name.includes('.') ? '.' + f.name.split('.').pop() : '';
+            const blobName = `${presign.prefix}/${label}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+            const blobUrl = `${baseUrl}/${blobName}?${sasQuery}`;
+            await fetch(blobUrl, {
+                method: 'PUT',
+                headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': f.type || 'application/octet-stream' },
+                body: f,
+            });
+            return `${baseUrl}/${blobName}`;
+        };
+
+        const upload_image_url = await uploadBlob(file, 'upload');
+        const exp_img_url  = options?.expFile  ? await uploadBlob(options.expFile,  'exp')  : undefined;
+        const te_img_url   = options?.teFile   ? await uploadBlob(options.teFile,   'te')   : undefined;
+        const icm_img_url  = options?.icmFile  ? await uploadBlob(options.icmFile,  'icm')  : undefined;
+
+        return this.request<IvfImage>(
+            `/api/ivf/cycles/${cycleId}/grades/${gradeId}/images/register`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    upload_image_url,
+                    exp_img_url:  exp_img_url  ?? null,
+                    te_img_url:   te_img_url   ?? null,
+                    icm_img_url:  icm_img_url  ?? null,
+                    file_name:    file.name,
+                    file_size:    file.size,
+                    day:          options?.day ?? null,
+                }),
+            },
         );
     }
 
