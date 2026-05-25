@@ -14,7 +14,6 @@ class ChatMessageCreateRequest(BaseModel):
     incubator_id: Optional[int] = None  # For incubator tracking
     chamber_id: Optional[str] = None  # Optional chamber within an incubator
     refrigerator_id: Optional[int] = None  # For refrigerator tracking
-    zone_id: Optional[str] = None  # Optional zone within a refrigerator: 'freezer' / 'fridge'
     message_content: str
     tagged_user_ids: Optional[List[str]] = []
 
@@ -45,8 +44,6 @@ class ChatMessageCreateRequest(BaseModel):
         self.tank_code = tank_code if tank_code else None
         if self.chamber_id and not incubator_id:
             self.chamber_id = None
-        if self.zone_id and not refrigerator_id:
-            self.zone_id = None
         return self
     
     @field_validator('tagged_user_ids')
@@ -83,7 +80,6 @@ class ChatMessageResponse(BaseModel):
     incubator_id: Optional[int] = None
     chamber_id: Optional[str] = None
     refrigerator_id: Optional[int] = None
-    zone_id: Optional[str] = None
     sender_id: str
     sender_name: str
     sender_role: Optional[str] = None
@@ -105,7 +101,6 @@ class ChatMessageCreateResponse(BaseModel):
     incubator_id: Optional[int] = None
     chamber_id: Optional[str] = None
     refrigerator_id: Optional[int] = None
-    zone_id: Optional[str] = None
     message_content: str
     sender_id: str
     sender_name: str
@@ -150,7 +145,6 @@ class IncubatorMessagesResponse(BaseModel):
 class RefrigeratorMessagesResponse(BaseModel):
     """Schema for refrigerator messages response"""
     refrigerator_id: int
-    zone_id: Optional[str] = None
     messages: List[ChatMessageResponse]
     total_messages: int
     unread_count: int = 0

@@ -31,7 +31,6 @@ export interface Task {
   incubator_id?: number | null;
   chamber_id?: string | null;
   refrigerator_id?: number | null;
-  zone_id?: string | null;
   due_date?: string;
   priority: 'Low' | 'Medium' | 'High';
   status: TaskStatus;
@@ -107,11 +106,10 @@ export class TasksService extends BaseApiService {
   }
 
   /**
-   * Get tasks for a specific refrigerator (optionally filtered by zone)
+   * Get tasks for a specific refrigerator
    */
-  async getRefrigeratorTasks(refrigeratorId: number, zoneId?: string): Promise<ScopedTaskListResponse> {
-    const query = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : '';
-    return await this.request<ScopedTaskListResponse>(`/api/refrigerators/${refrigeratorId}/tasks${query}`, {
+  async getRefrigeratorTasks(refrigeratorId: number): Promise<ScopedTaskListResponse> {
+    return await this.request<ScopedTaskListResponse>(`/api/refrigerators/${refrigeratorId}/tasks`, {
       method: 'GET',
     });
   }
@@ -138,7 +136,6 @@ export class TasksService extends BaseApiService {
     incubator_id?: number;
     chamber_id?: string;
     refrigerator_id?: number;
-    zone_id?: string;
     due_date?: string;
     priority: 'Low' | 'Medium' | 'High';
     status?: TaskStatus;

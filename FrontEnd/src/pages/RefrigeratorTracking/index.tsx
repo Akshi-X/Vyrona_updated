@@ -3,15 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Snowflake } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
-import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
 import { shipmentService } from '../../services/shipmentService';
 import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { activityLogService, type ActivityLogRecord } from '../../services/activityLogService';
-import { useRefrigeratorChatWebSocket } from '../../hooks/useChatWebSocket';
-import RefrigeratorVisualisation, { type RefrigeratorZone } from './sections/RefrigeratorVisualisation';
+import { tasksService, type Task } from '../../services/tasksService';
+import { userService } from '../../services/userService';
+import RefrigeratorVisualisation from './sections/RefrigeratorVisualisation';
 import { useRefrigeratorKpiSnapshot } from './sections/useRefrigeratorKpiSnapshot';
-
-const ZONES: RefrigeratorZone[] = ['freezer', 'fridge'];
 
 type RefrigeratorListItem = {
   refrigerator_id: number;
@@ -28,12 +26,12 @@ export default function RefrigeratorTrackingPage() {
 
   const [refrigeratorCode, setRefrigeratorCode] = useState<string>('-');
   const [branchName, setBranchName] = useState<string>('-');
-  const [selectedZone, setSelectedZone] = useState<RefrigeratorZone | null>(null);
   const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
   const [criticalAlerts, setCriticalAlerts] = useState<IVFAlert[]>([]);
   const [systemActivity, setSystemActivity] = useState<ActivityLogRecord[]>([]);
-  const [, setShowCriticalAlerts] = useState(false);
-  const [, setShowStakeholderChats] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [currentUserName, setCurrentUserName] = useState('');
+  const [currentUserId, setCurrentUserId] = useState('');
 
   const [refrigeratorList, setRefrigeratorList] = useState<RefrigeratorListItem[] | null>(null);
   const [listLoading, setListLoading] = useState(false);
@@ -41,14 +39,15 @@ export default function RefrigeratorTrackingPage() {
 
   const { sensorTiles, freezerTemp, fridgeTemp } = useRefrigeratorKpiSnapshot({
     refrigeratorId: hasRefrigeratorId ? refrigeratorIdParam : undefined,
-    zoneId: selectedZone ?? undefined,
     enabled: hasRefrigeratorId,
   });
 
-  const { unreadCount: chatUnreadCount } = useRefrigeratorChatWebSocket(
-    hasRefrigeratorId ? refrigeratorIdNum : undefined,
-    selectedZone ?? undefined,
-  );
+  useEffect(() => {
+    userService.getProfile().then((p) => {
+      setCurrentUserName(`${p.first_name ?? ''} ${p.last_name ?? ''}`.trim());
+      setCurrentUserId(p.user_id ?? '');
+    }).catch(() => {});
+  }, []);
 
   // When no refrigerator id is in the URL, load the list. If there's exactly
   // one, redirect into it; otherwise show the picker grid.
@@ -93,10 +92,10 @@ export default function RefrigeratorTrackingPage() {
   useEffect(() => {
     if (!hasRefrigeratorId) return;
     ivfAlertsService
-      .getRefrigeratorAlerts(refrigeratorIdNum, selectedZone ?? undefined)
+      .getRefrigeratorAlerts(refrigeratorIdNum)
       .then((res) => setCriticalAlerts(res.alerts || []))
       .catch(() => setCriticalAlerts([]));
-  }, [refrigeratorIdNum, hasRefrigeratorId, selectedZone]);
+  }, [refrigeratorIdNum, hasRefrigeratorId]);
 
   useEffect(() => {
     if (!hasRefrigeratorId) return;
@@ -111,11 +110,21 @@ export default function RefrigeratorTrackingPage() {
       .catch(() => setSystemActivity([]));
   }, [refrigeratorIdNum, hasRefrigeratorId]);
 
+  useEffect(() => {
+    fetchTasks();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refrigeratorIdNum, hasRefrigeratorId]);
+
+  const fetchTasks = () => {
+    if (!hasRefrigeratorId) return;
+    tasksService
+      .getRefrigeratorTasks(refrigeratorIdNum)
+      .then((res) => setTasks(res.tasks || []))
+      .catch(() => setTasks([]));
+  };
+
   const criticalAlertsCount = criticalAlerts.filter((a) => a.acknowledged_at == null).length;
-  const freezerTempAlert = sensorTiles.find((t) => t.id === 'freezer_temperature')?.isMissing === false
-    && criticalAlerts.some((a) => a.zone_id === 'freezer' && a.acknowledged_at == null);
-  const fridgeTempAlert = sensorTiles.find((t) => t.id === 'refrigerator_temperature')?.isMissing === false
-    && criticalAlerts.some((a) => a.zone_id === 'fridge' && a.acknowledged_at == null);
+  const hasAlert = criticalAlertsCount > 0;
 
   const pageActions = (
     <div className="flex items-center gap-6">
@@ -124,24 +133,10 @@ export default function RefrigeratorTrackingPage() {
           className="w-[25px] h-[25px] cursor-pointer"
           alt="Critical Alerts"
           src={CriticalAlertsIcon}
-          onClick={() => setShowCriticalAlerts((v) => !v)}
         />
         {criticalAlertsCount > 0 && (
           <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-white flex items-center justify-center">
             <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
-          </div>
-        )}
-      </div>
-      <div className="relative group">
-        <img
-          className="w-[25px] h-[25px] cursor-pointer"
-          alt="Stakeholder Chats"
-          src={StakeholderChatsIcon}
-          onClick={() => setShowStakeholderChats((v) => !v)}
-        />
-        {chatUnreadCount > 0 && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-white flex items-center justify-center">
-            <span className="font-semibold text-white text-[10px]">{chatUnreadCount}</span>
           </div>
         )}
       </div>
@@ -229,47 +224,19 @@ export default function RefrigeratorTrackingPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap mt-2">
-        <span className="text-sm text-gray-500 font-medium">Zone:</span>
-        <button
-          type="button"
-          onClick={() => setSelectedZone(null)}
-          className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-            selectedZone === null
-              ? 'bg-primary text-white border-primary'
-              : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
-          }`}
-        >
-          All
-        </button>
-        {ZONES.map((zone) => (
-          <button
-            key={zone}
-            type="button"
-            onClick={() => setSelectedZone(zone)}
-            className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors capitalize ${
-              selectedZone === zone
-                ? 'bg-primary text-white border-primary'
-                : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
-            }`}
-          >
-            {zone}
-          </button>
-        ))}
-      </div>
-
       <div className="mt-4">
         <RefrigeratorVisualisation
           sensorTiles={sensorTiles}
           selectedSensorId={selectedSensorId}
           onSensorSelect={setSelectedSensorId}
-          selectedZone={selectedZone}
-          onZoneSelect={setSelectedZone}
           freezerTemp={freezerTemp}
           fridgeTemp={fridgeTemp}
-          freezerTempAlert={freezerTempAlert}
-          fridgeTempAlert={fridgeTempAlert}
+          hasAlert={hasAlert}
           systemActivity={systemActivity}
+          tasks={tasks}
+          onTaskCreated={fetchTasks}
+          currentUserName={currentUserName}
+          currentUserId={currentUserId}
           refrigeratorCode={refrigeratorCode !== '-' ? refrigeratorCode : undefined}
           refrigeratorId={hasRefrigeratorId ? refrigeratorIdNum : undefined}
           branchName={branchName !== '-' ? branchName : undefined}

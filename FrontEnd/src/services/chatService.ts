@@ -56,7 +56,6 @@ export interface IncubatorMessagesResponse {
 
 export interface RefrigeratorMessagesResponse {
   refrigerator_id: number;
-  zone_id?: string | null;
   messages: ChatMessageResponse[];
   total_messages: number;
   unread_count: number;
@@ -70,7 +69,6 @@ export interface ChatMessageCreateRequest {
   incubator_id?: number; // For incubator flow
   chamber_id?: string; // For incubator flow (optional chamber)
   refrigerator_id?: number; // For refrigerator flow
-  zone_id?: string; // For refrigerator flow (optional zone: 'freezer' / 'fridge')
   tagged_user_ids?: string[];
 }
 
@@ -187,12 +185,11 @@ export class ChatService extends BaseApiService {
   }
 
   /**
-   * Get all messages for a specific refrigerator (optionally filtered by zone)
+   * Get all messages for a specific refrigerator
    */
-  async getRefrigeratorMessages(refrigeratorId: number, zoneId?: string): Promise<RefrigeratorMessagesResponse> {
-    const query = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : '';
+  async getRefrigeratorMessages(refrigeratorId: number): Promise<RefrigeratorMessagesResponse> {
     return await this.request<RefrigeratorMessagesResponse>(
-      `/api/chat/refrigerators/${refrigeratorId}/messages${query}`,
+      `/api/chat/refrigerators/${refrigeratorId}/messages`,
       { method: 'GET' }
     );
   }
@@ -200,14 +197,13 @@ export class ChatService extends BaseApiService {
   /**
    * Mark refrigerator messages as read
    */
-  async markRefrigeratorAsRead(refrigeratorId: number, zoneId?: string): Promise<{
+  async markRefrigeratorAsRead(refrigeratorId: number): Promise<{
     success: boolean;
     refrigerator_id: number;
     last_read_message_id: number;
     unread_count: number;
   }> {
-    const query = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : '';
-    return await this.request(`/api/chat/refrigerators/${refrigeratorId}/mark-read${query}`, {
+    return await this.request(`/api/chat/refrigerators/${refrigeratorId}/mark-read`, {
       method: 'POST',
     });
   }

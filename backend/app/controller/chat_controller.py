@@ -456,7 +456,6 @@ async def mark_incubator_messages_as_read(
     summary="Get refrigerator messages")
 async def get_refrigerator_chat_messages(
     refrigerator_id: int = Path(..., description="Refrigerator ID"),
-    zone_id: str = Query(None, description="Filter by zone: 'freezer' / 'fridge' (omit for all zones)"),
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user),
     http_request: Request = None
@@ -472,7 +471,6 @@ async def get_refrigerator_chat_messages(
             current_user.user_id,
             hospital_id,
             db,
-            zone_id=zone_id or None,
             mark_as_read=False,
         )
         return result
@@ -490,19 +488,17 @@ async def get_refrigerator_chat_messages(
     summary="Mark refrigerator messages as read")
 async def mark_refrigerator_messages_as_read(
     refrigerator_id: int = Path(..., description="Refrigerator ID"),
-    zone_id: str = Query(None),
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user),
 ):
-    """Mark all messages for a refrigerator (and optional zone) as read."""
+    """Mark all messages for a refrigerator as read."""
     try:
-        latest_message_id = mark_refrigerator_as_read(current_user.user_id, refrigerator_id, zone_id or None, db)
-        unread_count = get_refrigerator_unread_count(current_user.user_id, refrigerator_id, zone_id or None, db)
+        latest_message_id = mark_refrigerator_as_read(current_user.user_id, refrigerator_id, db)
+        unread_count = get_refrigerator_unread_count(current_user.user_id, refrigerator_id, db)
         return {
             "success": True,
             "message": f"Messages for refrigerator {refrigerator_id} marked as read",
             "refrigerator_id": refrigerator_id,
-            "zone_id": zone_id or None,
             "last_read_message_id": latest_message_id,
             "unread_count": unread_count,
         }
@@ -539,7 +535,11 @@ async def websocket_chat_endpoint(
     websocket: WebSocket,
     token: str = Query(...),
     patient_id: str = Query(None),
-    tank_id: int = Query(None)
+    tank_id: int = Query(None),
+    incubator_id: int = Query(None),
+    refrigerator_id: int = Query(None),
+    zone_id: str = Query(None),
+    chamber_id: str = Query(None),
 ):
     """
     WebSocket endpoint for real-time chat messaging
@@ -575,16 +575,25 @@ async def websocket_chat_endpoint(
             patient_id,
             chat_connection_manager,
             authenticate_websocket,
-            tank_id
+            tank_id=tank_id,
+            incubator_id=incubator_id,
+            refrigerator_id=refrigerator_id,
+            zone_id=zone_id,
+            chamber_id=chamber_id,
         )
-        
+
         # Handle message loop via service
         await handle_websocket_message_loop(
             websocket,
             connection_id,
             current_user,
             pharma_id,
-            chat_connection_manager
+            tank_id,
+            chat_connection_manager,
+            incubator_id=incubator_id,
+            refrigerator_id=refrigerator_id,
+            zone_id=zone_id,
+            chamber_id=chamber_id,
         )
     
     except WebSocketDisconnect:

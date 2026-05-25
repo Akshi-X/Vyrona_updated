@@ -281,19 +281,17 @@ def mark_incubator_as_read(
 
 
 def get_or_create_read_status_refrigerator(
-    user_id: str, refrigerator_id: int, zone_id: Optional[str], db: Session
+    user_id: str, refrigerator_id: int, db: Session
 ) -> ChatReadStatusRefrigerator:
-    """Get or create read status for user-refrigerator-zone combination."""
+    """Get or create read status for a user-refrigerator combination."""
     read_status = db.query(ChatReadStatusRefrigerator).filter(
         ChatReadStatusRefrigerator.user_id == user_id,
         ChatReadStatusRefrigerator.refrigerator_id == refrigerator_id,
-        ChatReadStatusRefrigerator.zone_id == zone_id,
     ).first()
     if not read_status:
         read_status = ChatReadStatusRefrigerator(
             user_id=user_id,
             refrigerator_id=refrigerator_id,
-            zone_id=zone_id,
             last_read_message_id=None,
         )
         db.add(read_status)
@@ -302,30 +300,26 @@ def get_or_create_read_status_refrigerator(
 
 
 def get_refrigerator_unread_count(
-    user_id: str, refrigerator_id: int, zone_id: Optional[str], db: Session
+    user_id: str, refrigerator_id: int, db: Session
 ) -> int:
-    """Count messages for this refrigerator (and optional zone) after last_read."""
-    read_status = get_or_create_read_status_refrigerator(user_id, refrigerator_id, zone_id, db)
+    """Count messages for this refrigerator after last_read."""
+    read_status = get_or_create_read_status_refrigerator(user_id, refrigerator_id, db)
     last_read_id = read_status.last_read_message_id or 0
-    query = db.query(func.count(ChatMessage.id)).filter(
+    return db.query(func.count(ChatMessage.id)).filter(
         ChatMessage.refrigerator_id == refrigerator_id,
         ChatMessage.id > last_read_id,
-    )
-    if zone_id:
-        query = query.filter(ChatMessage.zone_id == zone_id)
-    return query.scalar() or 0
+    ).scalar() or 0
 
 
 def mark_refrigerator_as_read(
-    user_id: str, refrigerator_id: int, zone_id: Optional[str], db: Session
+    user_id: str, refrigerator_id: int, db: Session
 ) -> int:
-    """Mark all messages for a refrigerator (and optional zone) as read."""
-    query = db.query(func.max(ChatMessage.id)).filter(ChatMessage.refrigerator_id == refrigerator_id)
-    if zone_id:
-        query = query.filter(ChatMessage.zone_id == zone_id)
-    latest_message = query.scalar()
+    """Mark all messages for a refrigerator as read."""
+    latest_message = db.query(func.max(ChatMessage.id)).filter(
+        ChatMessage.refrigerator_id == refrigerator_id
+    ).scalar()
 
-    read_status = get_or_create_read_status_refrigerator(user_id, refrigerator_id, zone_id, db)
+    read_status = get_or_create_read_status_refrigerator(user_id, refrigerator_id, db)
     read_status.last_read_message_id = latest_message
     read_status.updated_at = datetime.now(timezone.utc)
     db.commit()
@@ -396,6 +390,9 @@ async def broadcast_new_message(
             message_content=result.message_content,
             patient_id=result.patient_id,
             tank_code=result.tank_code,
+            incubator_id=result.incubator_id,
+            chamber_id=result.chamber_id,
+            refrigerator_id=result.refrigerator_id,
             sender_id=result.sender_id,
             sender_name=result.sender_name,
             sender_role=result.sender_role,
@@ -411,7 +408,7 @@ async def broadcast_new_message(
             "data": message_broadcast.model_dump(mode='json', exclude_none=False, exclude_unset=False)
         }
         
-        # Broadcast to all users subscribed to this patient (CGT) or canister (IVF) or incubator
+        # Broadcast to all users subscribed to this patient (CGT) or canister (IVF) or incubator/refrigerator
         if result.patient_id:
             # CGT flow: broadcast to patient subscribers
             await connection_manager.broadcast_to_patient(
@@ -421,12 +418,24 @@ async def broadcast_new_message(
                 db
             )
         elif result.tank_code:
-            # IVF flow: broadcast to tank subscribers (handled via websocket manager)
-            pass  # Handled by existing tank subscription logic
+            # IVF tank flow: look up tank_id from tank_code and broadcast
+            from app.models.IVF.tank_model import Tank
+            tank = db.query(Tank).filter(Tank.tank_code == result.tank_code).first()
+            if tank:
+                await connection_manager.broadcast_to_tank(
+                    str(tank.tank_id),
+                    broadcast_payload
+                )
         elif result.incubator_id:
             # Incubator flow: broadcast to incubator subscribers
             await connection_manager.broadcast_to_incubator(
                 str(result.incubator_id),
+                broadcast_payload
+            )
+        elif result.refrigerator_id:
+            # Refrigerator flow: broadcast to refrigerator subscribers
+            await connection_manager.broadcast_to_refrigerator(
+                str(result.refrigerator_id),
                 broadcast_payload
             )
         
@@ -683,6 +692,7 @@ def create_chat_message(
             tank_id=tank_id,
             incubator_id=request.incubator_id,
             chamber_id=request.chamber_id if request.incubator_id else None,
+            refrigerator_id=request.refrigerator_id,
             sender_id=sender_id,
             tagged_user_ids=tagged_user_ids_json,
             created_by=sender_id
@@ -728,6 +738,13 @@ def create_chat_message(
             )
             sender_read_status.last_read_message_id = chat_message.id
             sender_read_status.updated_at = datetime.now(timezone.utc)
+        elif request.refrigerator_id:
+            # Refrigerator flow: use refrigerator read status
+            sender_read_status = get_or_create_read_status_refrigerator(
+                sender_id, request.refrigerator_id, db
+            )
+            sender_read_status.last_read_message_id = chat_message.id
+            sender_read_status.updated_at = datetime.now(timezone.utc)
         read_status_time = time.time() - read_status_start
         
         # Note: Tagged users don't get read status entries created here
@@ -753,6 +770,7 @@ def create_chat_message(
             tank_code=tank_code,
             incubator_id=chat_message.incubator_id,
             chamber_id=chat_message.chamber_id,
+            refrigerator_id=chat_message.refrigerator_id,
             message_content=chat_message.message_content,
             sender_id=chat_message.sender_id,
             sender_name=sender_name,
@@ -1274,10 +1292,9 @@ async def get_refrigerator_messages(
     current_user_id: str,
     current_user_hospital_id: Optional[int],
     db: Session,
-    zone_id: Optional[str] = None,
     mark_as_read: bool = False
 ) -> RefrigeratorMessagesResponse:
-    """Get all messages for a specific refrigerator (and optional zone)."""
+    """Get all messages for a specific refrigerator."""
     try:
         refrigerator_query = db.query(Refrigerator).filter(Refrigerator.refrigerator_id == refrigerator_id)
         if current_user_hospital_id is not None:
@@ -1286,10 +1303,12 @@ async def get_refrigerator_messages(
         if not refrigerator:
             raise ChatPatientNotFoundException(f"Refrigerator with id '{refrigerator_id}' not found")
 
-        query = db.query(ChatMessage).filter(ChatMessage.refrigerator_id == refrigerator_id)
-        if zone_id:
-            query = query.filter(ChatMessage.zone_id == zone_id)
-        messages = query.order_by(ChatMessage.created_at.asc()).all()
+        messages = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.refrigerator_id == refrigerator_id)
+            .order_by(ChatMessage.created_at.asc())
+            .all()
+        )
 
         message_ids: List[int] = [m.id for m in messages]
         sender_ids: Set[str] = {m.sender_id for m in messages if m.sender_id}
@@ -1314,7 +1333,7 @@ async def get_refrigerator_messages(
             tagged_users = db.query(User).filter(User.user_id.in_(all_tagged_user_ids)).all()
             tagged_user_map = {u.user_id: f"{u.first_name} {u.last_name}" for u in tagged_users}
 
-        read_status = get_or_create_read_status_refrigerator(current_user_id, refrigerator_id, zone_id, db)
+        read_status = get_or_create_read_status_refrigerator(current_user_id, refrigerator_id, db)
         last_read_id = read_status.last_read_message_id or 0
 
         if mark_as_read and messages:
@@ -1337,7 +1356,6 @@ async def get_refrigerator_messages(
                 id=message.id,
                 message_content=message.message_content,
                 refrigerator_id=message.refrigerator_id,
-                zone_id=message.zone_id,
                 sender_id=message.sender_id,
                 sender_name=sender_info["name"],
                 sender_role=sender_info["role"],
@@ -1348,10 +1366,9 @@ async def get_refrigerator_messages(
                 read_at=read_at,
             ))
 
-        unread_count = get_refrigerator_unread_count(current_user_id, refrigerator_id, zone_id, db)
+        unread_count = get_refrigerator_unread_count(current_user_id, refrigerator_id, db)
         return RefrigeratorMessagesResponse(
             refrigerator_id=refrigerator_id,
-            zone_id=zone_id,
             messages=message_responses,
             total_messages=len(message_responses),
             unread_count=unread_count,
@@ -1614,22 +1631,54 @@ async def handle_websocket_message(
     current_user: User,
     pharma_id: int,
     tank_id: Optional[int],
-    connection_manager: ChatConnectionManager
+    connection_manager: ChatConnectionManager,
+    incubator_id: Optional[int] = None,
+    refrigerator_id: Optional[int] = None,
+    zone_id: Optional[str] = None,
+    chamber_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Handle incoming WebSocket message and route to appropriate handler
-    
+
     Returns response dict to send back to client
     """
     message_type = message_data.get("type")
-    
+
     if not message_type:
         raise ChatWebSocketInvalidTypeException("Message type is required")
-    
+
     try:
         logger.debug(f"Handling WebSocket message: type={message_type}, connection_id={connection_id}")
-        
-        if tank_id:
+
+        if refrigerator_id:
+            logger.debug(f"Message is for refrigerator_id={refrigerator_id}")
+            if message_type == WS_MSG_TYPE_GET_PATIENT_MESSAGES:
+                response = await handle_get_refrigerator_messages_ws(
+                    refrigerator_id, zone_id, connection_id, current_user, connection_manager
+                )
+            elif message_type == WS_MSG_TYPE_GET_UNREAD_MESSAGES:
+                response = await handle_get_unread_messages_ws(current_user, pharma_id)
+            elif message_type == WS_MSG_TYPE_MARK_READ:
+                with SessionLocal() as db:
+                    mark_refrigerator_as_read(current_user.user_id, refrigerator_id, db)
+                response = {"type": WS_MSG_TYPE_SUCCESS, "data": {"refrigerator_id": refrigerator_id}}
+            else:
+                raise ChatWebSocketInvalidTypeException(message_type=message_type)
+        elif incubator_id:
+            logger.debug(f"Message is for incubator_id={incubator_id}")
+            if message_type == WS_MSG_TYPE_GET_PATIENT_MESSAGES:
+                response = await handle_get_incubator_messages_ws(
+                    incubator_id, chamber_id, connection_id, current_user, connection_manager
+                )
+            elif message_type == WS_MSG_TYPE_GET_UNREAD_MESSAGES:
+                response = await handle_get_unread_messages_ws(current_user, pharma_id)
+            elif message_type == WS_MSG_TYPE_MARK_READ:
+                with SessionLocal() as db:
+                    mark_incubator_as_read(current_user.user_id, incubator_id, chamber_id, db)
+                response = {"type": WS_MSG_TYPE_SUCCESS, "data": {"incubator_id": incubator_id}}
+            else:
+                raise ChatWebSocketInvalidTypeException(message_type=message_type)
+        elif tank_id:
             logger.debug(f"Message is for tank_id={tank_id}")
             if message_type == WS_MSG_TYPE_SUBSCRIBE_PATIENT:
                 response = await handle_subscribe_tank(
@@ -1830,6 +1879,55 @@ async def handle_get_tank_messages_ws(
         "data": result.model_dump(mode='json', exclude_none=False, exclude_unset=False)
     }
 
+async def handle_get_refrigerator_messages_ws(
+    refrigerator_id: int,
+    zone_id: Optional[str],
+    connection_id: str,
+    current_user: User,
+    connection_manager: ChatConnectionManager
+) -> Dict[str, Any]:
+    """Handle get refrigerator messages request via WebSocket - does NOT mark as read"""
+    connection_manager.subscribe_to_refrigerator(connection_id, str(refrigerator_id))
+    with SessionLocal() as db:
+        result = await get_refrigerator_messages(
+            refrigerator_id,
+            current_user.user_id,
+            current_user.hospital_id,
+            db,
+            mark_as_read=False
+        )
+    return {
+        "type": WS_MSG_TYPE_PATIENT_MESSAGES,
+        "success": True,
+        "data": result.model_dump(mode='json', exclude_none=False, exclude_unset=False)
+    }
+
+
+async def handle_get_incubator_messages_ws(
+    incubator_id: int,
+    chamber_id: Optional[str],
+    connection_id: str,
+    current_user: User,
+    connection_manager: ChatConnectionManager
+) -> Dict[str, Any]:
+    """Handle get incubator messages request via WebSocket - does NOT mark as read"""
+    connection_manager.subscribe_to_incubator(connection_id, str(incubator_id))
+    with SessionLocal() as db:
+        result = await get_incubator_messages(
+            incubator_id,
+            current_user.user_id,
+            current_user.hospital_id,
+            db,
+            chamber_id=chamber_id,
+            mark_as_read=False
+        )
+    return {
+        "type": WS_MSG_TYPE_PATIENT_MESSAGES,
+        "success": True,
+        "data": result.model_dump(mode='json', exclude_none=False, exclude_unset=False)
+    }
+
+
 async def handle_get_patient_messages_ws(
     message_data: Dict[str, Any],
     connection_id: str,
@@ -1947,7 +2045,11 @@ async def handle_websocket_connection(
     patient_id: Optional[str],
     connection_manager: ChatConnectionManager,
     authenticate_websocket_func,
-    tank_id:Optional[str]
+    tank_id: Optional[int] = None,
+    incubator_id: Optional[int] = None,
+    refrigerator_id: Optional[int] = None,
+    zone_id: Optional[str] = None,
+    chamber_id: Optional[str] = None,
 ):
     """Handle WebSocket connection lifecycle. Returns: (connection_id, current_user, pharma_id)"""
     connection_id = None
@@ -1974,10 +2076,47 @@ async def handle_websocket_connection(
             "pharma_id": pharma_id,
             "connection_id": connection_id,
             "patient_id": patient_id if patient_id else None,
-            "tank_id": tank_id if tank_id else None
+            "tank_id": tank_id if tank_id else None,
+            "incubator_id": incubator_id if incubator_id else None,
+            "refrigerator_id": refrigerator_id if refrigerator_id else None,
         }
 
-        if tank_id:
+        if refrigerator_id:
+            # Refrigerator flow: subscribe and send initial messages
+            connection_manager.subscribe_to_refrigerator(connection_id, str(refrigerator_id))
+            try:
+                with SessionLocal() as db:
+                    result = await get_refrigerator_messages(
+                        refrigerator_id,
+                        current_user.user_id,
+                        current_user.hospital_id,
+                        db,
+                        mark_as_read=False
+                    )
+                    payload = result.model_dump(mode='json', exclude_none=False, exclude_unset=False)
+                    connection_response["refrigerator_messages"] = payload
+                    connection_response["unread_count"] = payload.get("unread_count", 0)
+            except Exception as e:
+                logger.warning(f"Failed to fetch refrigerator messages: {e}")
+        elif incubator_id:
+            # Incubator flow: subscribe and send initial messages
+            connection_manager.subscribe_to_incubator(connection_id, str(incubator_id))
+            try:
+                with SessionLocal() as db:
+                    result = await get_incubator_messages(
+                        incubator_id,
+                        current_user.user_id,
+                        current_user.hospital_id,
+                        db,
+                        chamber_id=chamber_id,
+                        mark_as_read=False
+                    )
+                    payload = result.model_dump(mode='json', exclude_none=False, exclude_unset=False)
+                    connection_response["incubator_messages"] = payload
+                    connection_response["unread_count"] = payload.get("unread_count", 0)
+            except Exception as e:
+                logger.warning(f"Failed to fetch incubator messages: {e}")
+        elif tank_id:
             # With tank_id: send only tank messages
             with SessionLocal() as db:
                 tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
@@ -2081,7 +2220,11 @@ async def handle_websocket_message_loop(
     current_user: User,
     pharma_id: int,
     tank_id: int,
-    connection_manager: ChatConnectionManager
+    connection_manager: ChatConnectionManager,
+    incubator_id: Optional[int] = None,
+    refrigerator_id: Optional[int] = None,
+    zone_id: Optional[str] = None,
+    chamber_id: Optional[str] = None,
 ):
     """Handle WebSocket message loop"""
     while True:
@@ -2098,14 +2241,18 @@ async def handle_websocket_message_loop(
                     "details": {"reason": str(e)}
                 })
                 continue
-            
+
             response = await handle_websocket_message(
                 message_data,
                 connection_id,
                 current_user,
                 pharma_id,
                 tank_id,
-                connection_manager
+                connection_manager,
+                incubator_id=incubator_id,
+                refrigerator_id=refrigerator_id,
+                zone_id=zone_id,
+                chamber_id=chamber_id,
             )
             
             if response:

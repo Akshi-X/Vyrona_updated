@@ -21,7 +21,6 @@ class CreateTaskRequest(BaseModel):
     incubator_id: Optional[int] = None  # For incubator tracking
     chamber_id: Optional[str] = None  # Optional chamber within an incubator
     refrigerator_id: Optional[int] = None  # For refrigerator tracking
-    zone_id: Optional[str] = None  # Optional zone within a refrigerator: 'freezer' / 'fridge'
     due_date: Optional[datetime] = None
     priority: TaskPriority
     status: Optional[TaskStatus] = TaskStatus.NOT_STARTED
@@ -63,8 +62,6 @@ class CreateTaskRequest(BaseModel):
         self.tank_code = tank_code if tank_code else None
         if self.chamber_id and not incubator_id:
             self.chamber_id = None
-        if self.zone_id and not refrigerator_id:
-            self.zone_id = None
         return self
 
 
@@ -170,7 +167,6 @@ class TaskResponse(BaseModel):
     incubator_id: Optional[int] = None
     chamber_id: Optional[str] = None
     refrigerator_id: Optional[int] = None
-    zone_id: Optional[str] = None
     due_date: Optional[datetime]
     priority: TaskPriority
     status: TaskStatus
@@ -221,7 +217,6 @@ class PatientTaskListResponse(BaseModel):
     incubator_id: Optional[int] = None
     chamber_id: Optional[str] = None
     refrigerator_id: Optional[int] = None
-    zone_id: Optional[str] = None
     total: int
     page: int
     page_size: int
