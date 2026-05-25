@@ -1407,10 +1407,12 @@ export class IvfService extends BaseApiService {
     }
     // ── IVF Cycles ────────────────────────────────────────────────────────────
 
-    async listCycles(params?: { his_id?: string; status?: string; skip?: number; limit?: number }): Promise<IvfCycle[]> {
+    async listCycles(params?: { his_id?: string; status?: string; incubator_id?: number; chamber_position?: string; skip?: number; limit?: number }): Promise<IvfCycle[]> {
         const q = new URLSearchParams();
         if (params?.his_id) q.set('his_id', params.his_id);
         if (params?.status) q.set('status', params.status);
+        if (params?.incubator_id != null) q.set('incubator_id', String(params.incubator_id));
+        if (params?.chamber_position) q.set('chamber_position', params.chamber_position);
         if (params?.skip != null) q.set('skip', String(params.skip));
         if (params?.limit != null) q.set('limit', String(params.limit));
         const qs = q.toString();
@@ -1435,6 +1437,75 @@ export class IvfService extends BaseApiService {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
+    }
+
+    async listGrades(cycleId: number, logId: number): Promise<IvfGrade[]> {
+        return this.request<IvfGrade[]>(`/api/ivf/cycles/${cycleId}/logs/${logId}/grades`);
+    }
+
+    async selectBestGrade(cycleId: number, logId: number, gradeId: number): Promise<IvfGrade> {
+        return this.request<IvfGrade>(`/api/ivf/cycles/${cycleId}/logs/${logId}/grades/${gradeId}/select-best`, {
+            method: 'POST',
+        });
+    }
+
+    async updateGrade(cycleId: number, gradeId: number, data: Record<string, unknown>): Promise<IvfGrade> {
+        return this.request<IvfGrade>(`/api/ivf/cycles/${cycleId}/grades/${gradeId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+
+    async createGrade(cycleId: number, logId: number, data: Record<string, unknown> = {}): Promise<IvfGrade> {
+        return this.request<IvfGrade>(`/api/ivf/cycles/${cycleId}/logs/${logId}/grades`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+
+    async uploadImage(cycleId: number, gradeId: number, file: File, options?: { expFile?: File; teFile?: File; icmFile?: File; day?: number }): Promise<IvfImage> {
+        const presign = await this.request<{ container_sas_url: string; prefix: string }>(
+            `/api/ivf/cycles/${cycleId}/grades/${gradeId}/images/presign`,
+            { method: 'GET' },
+        );
+
+        const [baseUrl, sasQuery] = presign.container_sas_url.split('?');
+
+        const uploadBlob = async (f: File, label: string): Promise<string> => {
+            const ext = f.name.includes('.') ? '.' + f.name.split('.').pop() : '';
+            const blobName = `${presign.prefix}/${label}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+            const blobUrl = `${baseUrl}/${blobName}?${sasQuery}`;
+            await fetch(blobUrl, {
+                method: 'PUT',
+                headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': f.type || 'application/octet-stream' },
+                body: f,
+            });
+            return `${baseUrl}/${blobName}`;
+        };
+
+        const upload_image_url = await uploadBlob(file, 'upload');
+        const exp_img_url  = options?.expFile  ? await uploadBlob(options.expFile,  'exp')  : undefined;
+        const te_img_url   = options?.teFile   ? await uploadBlob(options.teFile,   'te')   : undefined;
+        const icm_img_url  = options?.icmFile  ? await uploadBlob(options.icmFile,  'icm')  : undefined;
+
+        return this.request<IvfImage>(
+            `/api/ivf/cycles/${cycleId}/grades/${gradeId}/images/register`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    upload_image_url,
+                    exp_img_url:  exp_img_url  ?? null,
+                    te_img_url:   te_img_url   ?? null,
+                    icm_img_url:  icm_img_url  ?? null,
+                    file_name:    file.name,
+                    file_size:    file.size,
+                    day:          options?.day ?? null,
+                }),
+            },
+        );
     }
 
     async upsertLog(cycleId: number, data: IvfLogUpsert): Promise<IvfCycleLog> {
@@ -1500,9 +1571,50 @@ export interface IvfCycleLog {
     d6_stage: string | null;
     d6_grade: string | null;
     d6_progression: string | null;
+    blast_grade: string | null;
     fate: string | null;
     freeze_no: string | null;
     meta: Record<string, string> | null;
+    grade_count: number;
+    created_at: string;
+    updated_at: string | null;
+}
+
+export interface IvfImage {
+    image_id: number;
+    grade_id: number;
+    cycle_id: number;
+    day: number | null;
+    upload_image_url: string;
+    exp_img_url: string | null;
+    te_img_url: string | null;
+    icm_img_url: string | null;
+    file_name: string | null;
+    file_size: number | null;
+    uploaded_by: string | null;
+    created_at: string;
+}
+
+export interface IvfGrade {
+    grade_id: number;
+    log_id: number;
+    cycle_id: number;
+    stage: number | null;
+    is_active: boolean;
+    is_best: boolean;
+    is_completed: boolean;
+    grade: string | null;
+    ai_score: number | null;
+    hatching: string | null;
+    vacuolization: string | null;
+    multinucleation: string | null;
+    zona_pellucida: string | null;
+    blastocoel: string | null;
+    cytoplasmic_granularity: string | null;
+    bridge: string | null;
+    note: string | null;
+    images: IvfImage[];
+    graded_by: string | null;
     created_at: string;
     updated_at: string | null;
 }
@@ -1540,10 +1652,9 @@ export interface IvfLogUpsert {
     d3_grade?: string;
     d3_symmetry?: string;
     d5_stage?: string;
-    d5_grade?: string;
     d6_stage?: string;
-    d6_grade?: string;
     d6_progression?: string;
+    blast_grade?: string;
     fate?: string;
     freeze_no?: string;
     meta?: Record<string, string>;
