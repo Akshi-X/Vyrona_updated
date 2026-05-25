@@ -885,7 +885,18 @@ def create_kpi_config(
             raise HTTPException(status_code=400, detail={"error": "Min cannot be negative"})
         if kpi_name == "battery_level" and min_val is not None and float(min_val) > 100:
             raise HTTPException(status_code=400, detail={"error": "Min cannot exceed 100"})
-    # ─────────────────────────────────────────────────────────────
+        if kpi_name == "battery_level":
+            if max_val is not None and float(max_val) < 0:
+                raise HTTPException(status_code=400, detail={"error": "Max cannot be negative"})
+            if max_val is not None and float(max_val) > 100:
+                raise HTTPException(status_code=400, detail={"error": "Max cannot exceed 100"})
+            if max_val is not None and float(max_val) == 0:
+                raise HTTPException(status_code=400, detail={"error": "Max cannot be zero"})
+            if min_val is not None and max_val is not None and float(min_val) == 0 and float(max_val) == 0:
+                raise HTTPException(status_code=400, detail={"error": "Max and Min cannot be zero"})
+            if min_val is not None and max_val is not None and float(max_val) < float(min_val):
+                raise HTTPException(status_code=400, detail={"error": "Max must be ≥ Min"})
+    # ────────────────────────────────────────────────────────────
 
     quality_service = QualityService(db)
     row = quality_service.create_kpi_config(

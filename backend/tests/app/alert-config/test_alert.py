@@ -217,6 +217,16 @@ class TestScenario_BatteryLevel:
         )
         if entry:
             assert entry["max"] is None
+    def test_step1_min_is_null_in_response(self, client, setup_kpi_environment, auth_headers):
+        """Assert that a stored battery-level config (if present) has
+
+        `min` set to None (min-only semantics).
+        """
+        entry = get_config_by_kpi(
+            client, setup_kpi_environment, self.KPI, auth_headers=auth_headers
+        )
+        if entry:
+            assert entry["min"] is None
 
     def test_step2_negative_min_returns_400(self, post_kpi_config):
         """Negative percentages should be rejected.
@@ -233,6 +243,21 @@ class TestScenario_BatteryLevel:
         assert resp.status_code == 400
         assert resp.json()["message"]["error"] == "Min cannot be negative"
 
+    def test_step2_negative_max_returns_400(self, post_kpi_config):
+        """Negative percentages should be rejected.
+
+        Act: save with max=-5; Assert: 400 with "Max cannot be negative".
+        """
+        resp = post_kpi_config({
+            "kpi_name": self.KPI,
+            "alert_name": "Battery Warning",
+            "unit": self.UNIT,
+            "min": None,
+            "max": -4
+        })
+        assert resp.status_code == 400
+        assert resp.json()["message"]["error"] == "Max cannot be negative"
+
     def test_step3_min_exceeds_100_returns_400(self, post_kpi_config):
         """Percentages above 100 should be rejected.
 
@@ -247,6 +272,20 @@ class TestScenario_BatteryLevel:
         })
         assert resp.status_code == 400
         assert resp.json()["message"]["error"] == "Min cannot exceed 100"
+    def test_step3_max_exceeds_100_returns_400(self, post_kpi_config):
+        """Percentages above 100 should be rejected.
+
+        Act: save with max=101; Assert: 400 with "Max cannot exceed 100".
+        """
+        resp = post_kpi_config({
+            "kpi_name": self.KPI,
+            "alert_name": "Battery Warning",
+            "unit": self.UNIT,
+            "min": None,
+            "max": 101,
+        })
+        assert resp.status_code == 400
+        assert resp.json()["message"]["error"] == "Max cannot exceed 100"
 
     def test_step4_valid_min_saves_successfully(self, post_kpi_config):
         """Valid percentage within bounds should save successfully.
@@ -262,6 +301,43 @@ class TestScenario_BatteryLevel:
         })
         assert resp.status_code == 201
 
+    def test_step5_max_zero_is_not_valid(self, post_kpi_config):
+        """Arrange: set `max` to zero (valid upper bound).
+
+        Act: save the config; Assert: API responds with 400.
+        """
+        resp = post_kpi_config({
+            "kpi_name": self.KPI,
+            "alert_name": "LN2 Level Warning",
+            "unit": self.UNIT,
+            "min": None,
+            "max": 0
+        })
+        assert resp.status_code == 400
+        assert resp.json()["message"]["error"] == "Max cannot be zero"
+
+    
+    @pytest.mark.parametrize(
+        "min_val,max_val",
+        [
+            (38, 36),  # both positive, inverted
+        ],
+    )
+    def test_step6_min_greater_than_max_returns_400(
+        self, post_kpi_config, min_val, max_val
+    ):
+        """Parametrized: inverted ranges should be rejected with the
+
+        message "Min must be ≤ Max".
+        """
+        resp = post_kpi_config({
+            "kpi_name": self.KPI,
+            "unit": self.UNIT,
+            "min": min_val,
+            "max": max_val
+        })
+        assert resp.status_code == 400
+        assert resp.json()["message"]["error"] == "Max must be ≥ Min"
 
 class TestScenario_InternalTemperature:
     """Scenario: Internal Temperature (both min and max required; negatives allowed).
