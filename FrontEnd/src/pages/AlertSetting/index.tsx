@@ -807,6 +807,31 @@ export default function AlertSetting() {
         return inputRefsMap.current.get(key)!;
     }, []);
 
+    // Dispatches refetchKpiConfig to the correct device type for the given
+    // container row. Refrigerator rows hold their id in both `refrigerator_id`
+    // and `tank_id` (for legacy UI plumbing) — without this helper, callers
+    // would fall through to the tank path and the backend would 403 on a
+    // cross-hospital "tank" lookup. Defined as a function so it can call the
+    // useCallback'd `refetchKpiConfig` declared below it.
+    function refetchForPrimary(
+        container: NonNullable<typeof primaryContainer>,
+        options?: { showLoading?: boolean; chamberId?: string | null; zoneId?: string | null },
+    ) {
+        if (container.is_refrigerator) {
+            return refetchKpiConfig(
+                container.refrigerator_id ?? container.tank_id,
+                { showLoading: options?.showLoading, isRefrigerator: true, zoneId: options?.zoneId ?? null },
+            );
+        }
+        if (container.is_incubator) {
+            return refetchKpiConfig(
+                container.incubator_id ?? container.tank_id,
+                { showLoading: options?.showLoading, isIncubator: true, chamberId: options?.chamberId ?? null },
+            );
+        }
+        return refetchKpiConfig(container.tank_id, { showLoading: options?.showLoading });
+    }
+
     const refetchKpiConfig = useCallback(
         async (
             id: number,
@@ -980,8 +1005,11 @@ export default function AlertSetting() {
             setConfigLoadedTankId(null);
             return;
         }
-        // Incubators are handled by the chamber effect below
-        if (primaryContainer.is_incubator) return;
+        // Incubators and refrigerators are handled by their own effects below.
+        // Without this guard, the cryotank fetch fires with tank_id=<incubator
+        // or refrigerator id>, triggering "tank does not belong to your
+        // hospital" 403s.
+        if (primaryContainer.is_incubator || primaryContainer.is_refrigerator) return;
         setConfigLoading(true);
         setConfigError(null);
         setConfigLoadedTankId(null);
@@ -991,7 +1019,7 @@ export default function AlertSetting() {
                 setConfigList([]);
             })
             .finally(() => setConfigLoading(false));
-    }, [primaryContainer?.tank_id, refetchKpiConfig]);
+    }, [primaryContainer?.tank_id, primaryContainer?.is_incubator, primaryContainer?.is_refrigerator, refetchKpiConfig]);
 
     useEffect(() => {
         setDraftConfig({});
@@ -1012,6 +1040,22 @@ export default function AlertSetting() {
     // primaryContainer?.tank_id ensures refetch when a new incubator is selected
     // even when selectedChamberId stays null (Common → Common)
     }, [primaryContainer?.tank_id, selectedChamberId, refetchKpiConfig]);
+
+    // Refrigerator KPI config fetch — refrigerator-level (zone_id=null) for
+    // now. When a future zone selector is added, swap `null` for the picked
+    // zone, mirroring the incubator chamber pattern above.
+    useEffect(() => {
+        if (!primaryContainer?.is_refrigerator) return;
+        setConfigLoading(true);
+        setConfigError(null);
+        refetchKpiConfig(
+            primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
+            { isRefrigerator: true, zoneId: null },
+        ).catch((e: any) => {
+            setConfigError(e?.message || "Failed to fetch KPI config");
+            setConfigList([]);
+        }).finally(() => setConfigLoading(false));
+    }, [primaryContainer?.tank_id, primaryContainer?.is_refrigerator, refetchKpiConfig]);
 
     useEffect(() => {
         if (primaryContainer) {
@@ -1298,9 +1342,17 @@ export default function AlertSetting() {
             const payload: KpiConfigPayload = {
                 hospital_id: tankContext.hospital_id,
                 branch_id: tankContext.branch_id,
-                tank_id: primaryContainer.is_incubator ? null : primaryContainer.tank_id,
-                incubator_id: primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? null) : null,
+                tank_id: primaryContainer.is_incubator || primaryContainer.is_refrigerator
+                    ? null
+                    : primaryContainer.tank_id,
+                incubator_id: primaryContainer.is_incubator
+                    ? (primaryContainer.incubator_id ?? null)
+                    : null,
                 chamber_id: primaryContainer.is_incubator ? (selectedChamberId ?? null) : null,
+                refrigerator_id: primaryContainer.is_refrigerator
+                    ? (primaryContainer.refrigerator_id ?? null)
+                    : null,
+                zone_id: primaryContainer.is_refrigerator ? null : null,
                 kpi_name: (formPayload.kpi_name ?? "").trim(),
                 alert_name: formPayload.alert_name ?? null,
                 min: formPayload.min ?? null,
@@ -1312,8 +1364,10 @@ export default function AlertSetting() {
             };
             await ivfService.createKpiConfig(payload);
             closeForm();
-            await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
+            await refetchForPrimary(primaryContainer, {
                 showLoading: true,
+                chamberId: selectedChamberId,
+                zoneId: null,
             });
         } catch (e: any) {
             setFormError(e?.message || "Create failed");
@@ -1338,8 +1392,10 @@ export default function AlertSetting() {
             });
             closeForm();
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
+                await refetchForPrimary(primaryContainer, {
                     showLoading: true,
+                    chamberId: selectedChamberId,
+                    zoneId: null,
                 });
             }
         } catch (e: any) {
@@ -1519,14 +1575,17 @@ export default function AlertSetting() {
                 setMultiDraftConfig({});
                 // For multi-container, deselect all. For single container, reload config.
                 if (selectedContainers.length > 1) {
-                    await refetchKpiConfig(
-                        selectedContainers[0].is_incubator ? (selectedContainers[0].incubator_id ?? selectedContainers[0].tank_id) : selectedContainers[0].tank_id,
-                        { showLoading: true, isIncubator: selectedContainers[0].is_incubator, chamberId: selectedChamberId },
-                    );
+                    await refetchForPrimary(selectedContainers[0], {
+                        showLoading: true,
+                        chamberId: selectedChamberId,
+                        zoneId: null,
+                    });
                     setSelectedContainers([]);
                 } else if (primaryContainer) {
-                    await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
+                    await refetchForPrimary(primaryContainer, {
                         showLoading: true,
+                        chamberId: selectedChamberId,
+                        zoneId: null,
                     });
                 }
                 toast.success("Changes saved successfully");
@@ -1639,7 +1698,13 @@ export default function AlertSetting() {
                 }
 
                 if (configsToApply.length > 0) {
-                    if (primaryContainer.is_incubator) {
+                    if (primaryContainer.is_refrigerator) {
+                        await ivfService.bulkUpsertKpiConfigForRefrigerator(
+                            primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
+                            null,
+                            configsToApply,
+                        );
+                    } else if (primaryContainer.is_incubator) {
                         await ivfService.bulkUpsertKpiConfigForIncubator(
                             primaryContainer.incubator_id ?? primaryContainer.tank_id,
                             selectedChamberId,
@@ -1653,8 +1718,10 @@ export default function AlertSetting() {
             setDraftConfig({});
             setMultiDraftConfig({});
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
+                await refetchForPrimary(primaryContainer, {
                     showLoading: true,
+                    chamberId: selectedChamberId,
+                    zoneId: null,
                 });
             }
             toast.success("Changes saved successfully");
@@ -1672,8 +1739,10 @@ export default function AlertSetting() {
             await ivfService.deleteKpiConfig(configToDeleteId);
             closeDeleteConfirm();
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
+                await refetchForPrimary(primaryContainer, {
                     showLoading: true,
+                    chamberId: selectedChamberId,
+                    zoneId: null,
                 });
             }
         } catch (e: any) {
@@ -3400,8 +3469,10 @@ export default function AlertSetting() {
                                                                                             }));
                                                                                             await ivfService.bulkUpsertKpiConfig(selectedTankIds, configsToApply);
                                                                                             if (primaryContainer) {
-                                                                                                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator, chamberId: selectedChamberId,
+                                                                                                await refetchForPrimary(primaryContainer, {
                                                                                                     showLoading: true,
+                                                                                                    chamberId: selectedChamberId,
+                                                                                                    zoneId: null,
                                                                                                 });
                                                                                             }
                                                                                             toast.success(`Copied to ${selectedTankIds.length} tank(s) successfully`);

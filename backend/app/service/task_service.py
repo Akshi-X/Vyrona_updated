@@ -290,6 +290,7 @@ def create_task(
             tank_id=tank_id,
             incubator_id=request.incubator_id,
             chamber_id=request.chamber_id,
+            refrigerator_id=request.refrigerator_id,
             due_date=request.due_date,
             priority=request.priority,
             status=request.status or TaskStatus.NOT_STARTED,
@@ -623,16 +624,12 @@ def get_tasks_by_refrigerator(
     current_user: User,
     db: Session,
     *,
-    zone_id: Optional[str] = None,
     status: Optional[TaskStatus] = None,
     priority: Optional[TaskPriority] = None,
     page: int = 1,
     page_size: int = DEFAULT_PAGE_SIZE
 ) -> PatientTaskListResponse:
-    """
-    Retrieve tasks associated with a specific refrigerator (and optionally a zone).
-    zone_id=None returns tasks for the whole refrigerator (all zones).
-    """
+    """Retrieve tasks associated with a specific refrigerator."""
     try:
         is_hospital_user = is_hospital_department(current_user.department) if current_user.department else False
         refrigerator_query = db.query(Refrigerator).filter(Refrigerator.refrigerator_id == refrigerator_id)
@@ -653,9 +650,6 @@ def get_tasks_by_refrigerator(
             )
             .filter(Tasks.refrigerator_id == refrigerator_id)
         )
-
-        if zone_id:
-            query = query.filter(Tasks.zone_id == zone_id)
 
         privileged_roles = {"manager", "pharma_admin", "admin", "mygrape_admin"}
         if current_user.role.lower() not in privileged_roles:
@@ -684,7 +678,6 @@ def get_tasks_by_refrigerator(
         return PatientTaskListResponse(
             message=SuccessMessages.TASKS_RETRIEVED,
             refrigerator_id=refrigerator_id,
-            zone_id=zone_id,
             total=total,
             page=sanitized_page,
             page_size=sanitized_page_size,

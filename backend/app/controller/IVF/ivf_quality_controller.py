@@ -780,7 +780,6 @@ def list_kpi_config(
     incubator_id: Optional[int] = Query(None, description="Incubator ID"),
     chamber_id: Optional[str] = Query(None, description="Chamber ID filter (incubator only)"),
     refrigerator_id: Optional[int] = Query(None, description="Refrigerator ID"),
-    zone_id: Optional[str] = Query(None, description="Zone ID filter (refrigerator only): 'freezer'/'fridge'/'null'"),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -796,11 +795,10 @@ def list_kpi_config(
         ).first()
         if not refrigerator:
             raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
-        q = db.query(KpiConfig).filter(KpiConfig.refrigerator_id == refrigerator_id)
-        if zone_id == "null":
-            q = q.filter(KpiConfig.zone_id.is_(None))
-        elif zone_id:
-            q = q.filter(KpiConfig.zone_id == zone_id)
+        q = db.query(KpiConfig).filter(
+            KpiConfig.refrigerator_id == refrigerator_id,
+            KpiConfig.zone_id.is_(None),
+        )
         rows = q.order_by(KpiConfig.kpi_name, KpiConfig.alert_name).all()
         return {
             "refrigerator_id": refrigerator_id,
@@ -860,21 +858,26 @@ def create_kpi_config(
     current_user: User = Depends(get_current_user),
     body: dict = Body(...),
 ):
-    """Create a KPI config row. Body: hospital_id, branch_id, kpi_name, and either tank_id or incubator_id."""
+    """Create a KPI config row. Body: hospital_id, branch_id, kpi_name, and either tank_id, incubator_id, or refrigerator_id."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     for k in ("hospital_id", "branch_id", "kpi_name"):
         if k not in body:
             raise HTTPException(status_code=400, detail=f"Missing required field: {k}")
-    if body.get("tank_id") is None and body.get("incubator_id") is None:
-        raise HTTPException(status_code=400, detail="Provide tank_id or incubator_id")
+    if (
+        body.get("tank_id") is None
+        and body.get("incubator_id") is None
+        and body.get("refrigerator_id") is None
+    ):
+        raise HTTPException(status_code=400, detail="Provide tank_id, incubator_id, or refrigerator_id")
     try:
         hospital_id = int(body["hospital_id"])
         branch_id_val = int(body["branch_id"])
         tank_id = int(body["tank_id"]) if body.get("tank_id") is not None else None
         incubator_id_val = int(body["incubator_id"]) if body.get("incubator_id") is not None else None
+        refrigerator_id_val = int(body["refrigerator_id"]) if body.get("refrigerator_id") is not None else None
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="hospital_id, branch_id, tank_id/incubator_id must be integers")
+        raise HTTPException(status_code=400, detail="hospital_id, branch_id, tank_id/incubator_id/refrigerator_id must be integers")
     if branch_id is not None and branch_id_val != branch_id:
         raise HTTPException(status_code=403, detail="Cannot create config for another branch")
 
@@ -885,6 +888,8 @@ def create_kpi_config(
         tank_id=tank_id,
         incubator_id=incubator_id_val,
         chamber_id=body.get("chamber_id"),
+        refrigerator_id=refrigerator_id_val,
+        zone_id=None if refrigerator_id_val else body.get("zone_id"),
         kpi_name=str(body["kpi_name"]),
         alert_name=body.get("alert_name"),
         min_val=body.get("min") if body.get("min") is not None else None,
@@ -1044,12 +1049,11 @@ def bulk_upsert_kpi_config_for_refrigerator(
     body: dict = Body(...),
 ):
     """
-    Bulk upsert KPI config for a single refrigerator + optional zone.
-    Body: refrigerator_id (int), zone_id (str | null), configs (list).
+    Bulk upsert KPI config for a single refrigerator.
+    Body: refrigerator_id (int), configs (list).
     """
     _require_alert_setting_role(current_user)
     refrigerator_id = body.get("refrigerator_id")
-    zone_id = body.get("zone_id")
     configs = body.get("configs")
     if not refrigerator_id:
         raise HTTPException(status_code=400, detail="refrigerator_id is required")
@@ -1070,7 +1074,6 @@ def bulk_upsert_kpi_config_for_refrigerator(
     quality_service = QualityService(db)
     result = quality_service.bulk_upsert_kpi_config_for_refrigerator(
         refrigerator_id=refrigerator_id,
-        zone_id=zone_id,
         configs=configs,
         hospital_id=refrigerator.hospital_id,
         branch_id=refrigerator.branch_id,
@@ -1084,7 +1087,6 @@ def bulk_upsert_kpi_config_for_refrigerator(
         target=build_target("refrigerator", str(refrigerator_id)),
         metadata={
             "refrigerator_id": refrigerator_id,
-            "zone_id": zone_id,
             "updated": result.get("updated"),
             "created": result.get("created"),
         },
@@ -2174,7 +2176,6 @@ def get_incubator_chamber_latest(
 @router.get("/refrigerators/{refrigerator_id}/zone-latest")
 def get_refrigerator_zone_latest(
     refrigerator_id: int = Path(..., description="Refrigerator ID"),
-    zone_id: Optional[str] = Query(None, description="Zone ID: 'freezer' / 'fridge' (omit = refrigerator-level)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -2189,8 +2190,6 @@ def get_refrigerator_zone_latest(
     )
     if not refrigerator:
         raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
-
-    effective_zone_id = zone_id or ""
 
     from sqlalchemy import func as sa_func
 
@@ -2209,7 +2208,6 @@ def get_refrigerator_zone_latest(
         .join(Readings, Readings.kpi_config_id == KpiConfig.id)
         .filter(
             Readings.refrigerator_id == refrigerator_id,
-            Readings.zone_id == effective_zone_id,
             KpiConfig.kpi_name.in_(list(_REFRIGERATOR_HEALTH_KPIS.keys())),
         )
         .subquery()
@@ -2229,6 +2227,59 @@ def get_refrigerator_zone_latest(
         })
 
     return result
+
+
+@router.get("/refrigerators/{refrigerator_id}/kpi-history")
+def get_refrigerator_kpi_history(
+    refrigerator_id: int = Path(..., description="Refrigerator ID"),
+    duration_minutes: Optional[int] = Query(
+        None,
+        description="LIVE=omit. Static: 60=1H, 1440=24H, 10080=7D.",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI history for a refrigerator (freezer_temperature + refrigerator_temperature)."""
+    refrigerator = db.query(Refrigerator).filter(
+        Refrigerator.refrigerator_id == refrigerator_id,
+        Refrigerator.hospital_id == current_user.hospital_id,
+    ).first()
+    if not refrigerator:
+        raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
+
+    refrigerator_code = refrigerator.refrigerator_code or f"R{refrigerator_id}"
+    quality_service = QualityService(db)
+
+    since = (
+        datetime.now(timezone.utc) - timedelta(minutes=duration_minutes)
+        if duration_minutes
+        else None
+    )
+
+    if duration_minutes is not None and duration_minutes > 0:
+        raw = quality_service.get_readings_per_kpi_since_refrigerator(refrigerator_id, since)
+    else:
+        raw = quality_service.get_last_n_readings_per_kpi_refrigerator(refrigerator_id, DEFAULT_LIVE_READINGS_CAP)
+
+    kpi_series: dict = {}
+    for item in (raw or {}).get("kpis") or []:
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        kpi_series.setdefault(name, []).append({
+            "timestamp": item.get("timestamp"),
+            "value": item.get("value"),
+            "unit": item.get("unit") or "",
+        })
+
+    for name in list(kpi_series.keys()):
+        kpi_series[name].reverse()
+
+    return {
+        "refrigerator_id": refrigerator_id,
+        "refrigerator_code": refrigerator_code,
+        "kpi_series": kpi_series,
+    }
 
 
 @router.post("/incubators/{incubator_code}/kpi-readings")

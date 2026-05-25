@@ -2286,11 +2286,10 @@ class CriticalAlertService:
     def get_refrigerator_alerts(
         self,
         refrigerator_id: int,
-        zone_id: Optional[str] = None,
         branch_id: Optional[int] = None,
         hospital_id: Optional[int] = None,
     ) -> RefrigeratorAlertsResponse:
-        """Get all alerts for a specific refrigerator, optionally filtered by zone."""
+        """Get all alerts for a specific refrigerator."""
         refrigerator_query = self.db.query(Refrigerator).filter(Refrigerator.refrigerator_id == refrigerator_id)
         if hospital_id is not None:
             refrigerator_query = refrigerator_query.filter(Refrigerator.hospital_id == hospital_id)
@@ -2300,14 +2299,12 @@ class CriticalAlertService:
         if not refrigerator:
             raise ValueError(f"Refrigerator {refrigerator_id} not found")
 
-        alert_query = (
+        alerts = (
             self.db.query(CriticalAlert)
             .filter(CriticalAlert.refrigerator_id == refrigerator_id)
             .order_by(desc(CriticalAlert.occurred_at))
+            .all()
         )
-        if zone_id:
-            alert_query = alert_query.filter(CriticalAlert.zone_id == zone_id)
-        alerts = alert_query.all()
 
         refrigerator_code = refrigerator.refrigerator_code or f"Refrigerator-{refrigerator_id}"
         alert_responses = []
@@ -2318,7 +2315,6 @@ class CriticalAlertService:
         return RefrigeratorAlertsResponse(
             refrigerator_id=refrigerator_id,
             refrigerator_code=refrigerator_code,
-            zone_id=zone_id,
             alerts=alert_responses,
             total_count=len(alert_responses),
         )

@@ -84,16 +84,15 @@ def get_incubator_alerts(
 @router.get("/refrigerator/{refrigerator_id}", response_model=RefrigeratorAlertsResponse)
 def get_refrigerator_alerts(
     refrigerator_id: int = Path(..., description="Refrigerator ID"),
-    zone_id: Optional[str] = Query(None, description="Filter by zone: 'freezer' / 'fridge' / None (all zones)"),
     request: Request = None,
     db: Session = Depends(get_db)
 ):
-    """Get all alerts for a specific refrigerator, optionally filtered by zone."""
+    """Get all alerts for a specific refrigerator."""
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         hospital_id = getattr(getattr(request.state, "current_user", None), "hospital_id", None) if request else None
         service = CriticalAlertService(db)
-        result = service.get_refrigerator_alerts(refrigerator_id, zone_id=zone_id, branch_id=branch_id, hospital_id=hospital_id)
+        result = service.get_refrigerator_alerts(refrigerator_id, branch_id=branch_id, hospital_id=hospital_id)
         return result
     except HTTPException:
         raise

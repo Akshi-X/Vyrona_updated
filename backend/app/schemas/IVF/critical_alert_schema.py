@@ -114,6 +114,5 @@ class RefrigeratorAlertsResponse(BaseModel):
     """Schema for refrigerator-specific alerts"""
     refrigerator_id: int = Field(..., description="Refrigerator ID")
     refrigerator_code: Optional[str] = Field(None, description="Refrigerator code")
-    zone_id: Optional[str] = Field(None, description="Zone filter applied: 'freezer'/'fridge'/None (all zones)")
     alerts: List[CriticalAlertResponse] = Field(..., description="List of alerts for this refrigerator")
     total_count: int = Field(..., description="Total number of alerts")

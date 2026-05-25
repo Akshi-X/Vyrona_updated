@@ -81,13 +81,11 @@ export type RefrigeratorKpiSnapshot = {
 
 type UseRefrigeratorKpiSnapshotOptions = {
   refrigeratorId?: string;
-  zoneId?: string;
   enabled?: boolean;
 };
 
 export function useRefrigeratorKpiSnapshot({
   refrigeratorId,
-  zoneId,
   enabled = true,
 }: UseRefrigeratorKpiSnapshotOptions): RefrigeratorKpiSnapshot {
   const normalizedRefrigeratorId = refrigeratorId != null ? String(refrigeratorId) : undefined;
@@ -146,7 +144,7 @@ export function useRefrigeratorKpiSnapshot({
     }
 
     ivfService
-      .getRefrigeratorZoneLatest(idNum, zoneId)
+      .getRefrigeratorZoneLatest(idNum)
       .then((rows) => {
         if (!isMountedRef.current) return;
         const now = Date.now();
@@ -165,7 +163,7 @@ export function useRefrigeratorKpiSnapshot({
       .finally(() => {
         if (isMountedRef.current) setIsInitialLoading(false);
       });
-  }, [normalizedRefrigeratorId, zoneId, enabled]);
+  }, [normalizedRefrigeratorId, enabled]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -180,7 +178,6 @@ export function useRefrigeratorKpiSnapshot({
       const idNum = Number(normalizedRefrigeratorId);
       ws.send(JSON.stringify({
         refrigerator_id: Number.isFinite(idNum) ? idNum : normalizedRefrigeratorId,
-        zone_id: zoneId ?? null,
       }));
     };
 
@@ -227,7 +224,7 @@ export function useRefrigeratorKpiSnapshot({
       } catch {}
       wsRef.current = null;
     };
-  }, [normalizedRefrigeratorId, zoneId, token, enabled]);
+  }, [normalizedRefrigeratorId, token, enabled]);
 
   const sensorTiles = useMemo<RefrigeratorSensorTile[]>(() => {
     return REFRIGERATOR_KPI_ORDER.map((id) => {

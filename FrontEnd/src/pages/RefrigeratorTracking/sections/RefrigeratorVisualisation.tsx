@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ACESFilmicToneMapping,
   AmbientLight,
@@ -18,56 +18,68 @@ import {
   MeshBasicMaterial,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
-  Object3D,
   PCFSoftShadowMap,
   PMREMGenerator,
   PerspectiveCamera,
   PlaneGeometry,
   PointLight,
-  Raycaster,
   Scene,
   ShadowMaterial,
   Texture,
-  Vector2,
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { Snowflake, Thermometer } from 'lucide-react';
+import { Snowflake, Thermometer, TrendingUp } from 'lucide-react';
 import type { ActivityLogRecord } from '../../../services/activityLogService';
+import { tasksService, type Task } from '../../../services/tasksService';
 import type { RefrigeratorSensorTile } from './useRefrigeratorKpiSnapshot';
+import StakeholderChatBox from '../../../components/StakeholderChatBox';
+import MyTasksModal, { type MyTask } from '../../../components/MyTasksModal';
+import RefrigeratorKpiChartModal from './RefrigeratorKpiChartModal';
 
 /**
- * Procedural 3D refrigerator. Two stacked glass-door compartments matching the
- * reference: top = refrigerator (lavender accent), bottom = freezer (blue
- * accent), charcoal anodised body, four legs, subtle ground grid. Click a door
- * to fire onZoneSelect; the selected zone gets a stronger interior light and a
- * highlight ring.
+ * Procedural 3D refrigerator. Two stacked glass-door compartments: top =
+ * refrigerator (lavender accent), bottom = freezer (blue accent), charcoal
+ * anodised body, four legs, subtle ground grid. Drag to rotate.
  *
  * Geometry/materials are procedural (no GLB), mirroring the cryocan/incubator
  * approach already in the codebase.
  */
-
-export type RefrigeratorZone = 'freezer' | 'fridge';
 
 export type RefrigeratorVisualisationProps = {
   sensorTiles?: RefrigeratorSensorTile[];
   selectedSensorId?: string | null;
   onSensorSelect?: (sensorId: string) => void;
 
-  selectedZone?: RefrigeratorZone | null;
-  onZoneSelect?: (zone: RefrigeratorZone) => void;
   freezerTemp?: number | null;
   fridgeTemp?: number | null;
-  freezerTempAlert?: boolean;
-  fridgeTempAlert?: boolean;
+  hasAlert?: boolean;
   doorStatus?: 'open' | 'closed';
 
   systemActivity?: ActivityLogRecord[];
+  tasks?: Task[];
+  onTaskCreated?: () => void;
+  onEditTask?: (task: MyTask) => Promise<void>;
+  currentUserName?: string;
+  currentUserId?: string;
 
   refrigeratorCode?: string;
   refrigeratorId?: number;
   branchName?: string;
 };
+
+const FRIDGE_TIPS = [
+  'Refrigerator compartment should be maintained between 2 °C and 8 °C for culture media and reagent storage.',
+  'Freezer compartment must remain at −20 °C or below to preserve cryoprotectants and enzymes.',
+  'Inspect door seals monthly — a compromised gasket can cause a measurable daily temperature drift.',
+  'Never place items directly against the rear wall; allow clearance for even air circulation.',
+  'Log any temperature excursion immediately and quarantine affected batches pending assessment.',
+  'Allow warm reagents to reach equilibrium before returning them to the refrigerator after use.',
+  'Perform a full inventory audit quarterly and remove expired or near-expiry items promptly.',
+  'Dedicate separate shelves for culture media, reagents, and cryoprotectants to prevent cross-contamination.',
+  'Avoid frequent door-opening cycles during active lab sessions to minimise thermal fluctuation.',
+  'Ensure the unit is not placed near heat sources or direct sunlight to reduce compressor workload.',
+];
 
 // ── Geometry constants ────────────────────────────────────────────────────────
 const BODY_W = 1.6;
@@ -116,7 +128,7 @@ function buildCompartment(
   height: number,
   depth: number,
   tint: Color,
-  zone: RefrigeratorZone,
+  isFridge: boolean,
   bodyMat: MeshStandardMaterial,
   trimMat: MeshStandardMaterial,
 ): {
@@ -163,8 +175,8 @@ function buildCompartment(
   bottomWall.rotation.x = -Math.PI / 2;
   group.add(bottomWall);
 
-  // Shelves — 3 for fridge, 2 for freezer
-  const shelfCount = zone === 'fridge' ? 3 : 2;
+  // Shelves — 3 for fridge (top), 2 for freezer (bottom)
+  const shelfCount = isFridge ? 3 : 2;
   const shelfGeom = new BoxGeometry(cavityW * 0.92, 0.018, cavityD * 0.78);
   const shelfMat = new MeshPhysicalMaterial({
     color: new Color('#dfe7f2'),
@@ -185,6 +197,54 @@ function buildCompartment(
     shelf.position.y = cavityH / 2 - shelfSpacing * (i + 1);
     shelf.position.z = 0.02;
     group.add(shelf);
+  }
+
+  // ── Shelf contents ────────────────────────────────────────────────────────
+  const vialPalette = isFridge
+    ? ['#c8a4d8', '#90b8e0', '#a8d4a0', '#e0c898', '#d4a0a8']
+    : ['#7ab8e0', '#5aa8d8', '#90c8f0', '#60a8d0', '#a0d0f0'];
+  const vR = isFridge ? 0.042 : 0.026;
+  const vH = isFridge ? 0.13  : 0.09;
+
+  for (let s = 0; s < shelfCount; s++) {
+    const sy  = cavityH / 2 - shelfSpacing * (s + 1);
+    const iy  = sy + 0.009 + vH / 2;
+    // First fridge shelf: 4 vials on the left half + 3 boxes on the right half.
+    // All other shelves: full-width row of vials.
+    const hasBoxes = isFridge && s === 0;
+    const vN    = hasBoxes ? 4 : (isFridge ? 6 : 7);
+    const xSpan = hasBoxes ? cavityW * 0.50 : cavityW * 0.82;
+    const vGap  = xSpan / vN;
+    const vX0   = hasBoxes ? -cavityW * 0.42 + vGap / 2 : -xSpan / 2 + vGap / 2;
+
+    for (let v = 0; v < vN; v++) {
+      const col  = new Color(vialPalette[(v + s) % vialPalette.length]);
+      const vMat = new MeshStandardMaterial({ color: col, roughness: 0.28, metalness: 0.08, transparent: true, opacity: 0.9 });
+      const vial = new Mesh(new CylinderGeometry(vR, vR * 0.92, vH, 10), vMat);
+      vial.position.set(vX0 + v * vGap, iy, 0.10);
+      group.add(vial);
+      const capMat = new MeshStandardMaterial({ color: col.clone().lerp(new Color('#ffffff'), 0.52), roughness: 0.35, metalness: 0.3 });
+      const cap = new Mesh(new CylinderGeometry(vR * 1.08, vR * 1.08, 0.02, 10), capMat);
+      cap.position.set(vX0 + v * vGap, iy + vH / 2 + 0.01, 0.10);
+      group.add(cap);
+    }
+
+    if (hasBoxes) {
+      const bW = 0.09, bH = 0.11, bD = 0.08;
+      const bX0 = cavityW * 0.10;
+      for (let b = 0; b < 3; b++) {
+        const bx  = bX0 + b * (bW + 0.04);
+        const box = new Mesh(new BoxGeometry(bW, bH, bD),
+          new MeshStandardMaterial({ color: new Color('#ccd8e4'), roughness: 0.45, metalness: 0.04 }));
+        box.position.set(bx, sy + 0.009 + bH / 2, 0.10);
+        group.add(box);
+        // Label strip on the front face of each box
+        const lbl = new Mesh(new BoxGeometry(bW * 0.72, 0.012, 0.001),
+          new MeshBasicMaterial({ color: new Color('#8090a4') }));
+        lbl.position.set(bx, sy + 0.009 + bH * 0.6, 0.10 + bD / 2 + 0.001);
+        group.add(lbl);
+      }
+    }
   }
 
   // Door frame (slim ring around the glass)
@@ -246,12 +306,10 @@ function buildCompartment(
   reflect.renderOrder = 6;
   hinge.add(reflect);
 
-  // Invisible hit mesh for click selection (covers whole door, sits in front
-  // of the glass so the raycaster hits it instead of the transparent pane)
+  // Invisible hit mesh (placeholder for future interaction)
   const hitMat = new MeshStandardMaterial({ transparent: true, opacity: 0, depthWrite: false });
   const doorHit = new Mesh(new PlaneGeometry(width, height), hitMat);
   doorHit.position.set(0, 0, depth / 2 + DOOR_THICK + 0.05);
-  doorHit.userData.zone = zone;
   group.add(doorHit);
 
   // Handle (vertical bar on the right side of the door)
@@ -319,18 +377,23 @@ function buildCompartment(
   return { group, doorHit, doorGroup, highlightRing, interiorLight, interiorBack: back };
 }
 
+
 export default function RefrigeratorVisualisation({
   sensorTiles = [],
   selectedSensorId,
   onSensorSelect,
-  selectedZone,
-  onZoneSelect,
   freezerTemp,
   fridgeTemp,
-  freezerTempAlert,
-  fridgeTempAlert,
+  hasAlert,
   systemActivity = [],
+  tasks = [],
+  onTaskCreated,
+  onEditTask,
+  currentUserName = '',
+  currentUserId = '',
   refrigeratorCode,
+  refrigeratorId,
+  branchName,
 }: RefrigeratorVisualisationProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<{
@@ -339,22 +402,9 @@ export default function RefrigeratorVisualisation({
     camera: PerspectiveCamera;
     rafId: number;
     onResize: () => void;
-    onClick: (e: MouseEvent) => void;
-    onMove: (e: MouseEvent) => void;
-    fridgeRing: MeshStandardMaterial;
-    freezerRing: MeshStandardMaterial;
     fridgeLight: PointLight;
     freezerLight: PointLight;
-    raycaster: Raycaster;
-    pointer: Vector2;
-    hitMeshes: Mesh[];
-    onZoneSelectRef: (z: RefrigeratorZone) => void;
   } | null>(null);
-
-  const onZoneSelectStable = useRef(onZoneSelect);
-  useEffect(() => {
-    onZoneSelectStable.current = onZoneSelect;
-  });
 
   // ── Set up the scene once on mount ─────────────────────────────────────────
   useEffect(() => {
@@ -647,12 +697,12 @@ export default function RefrigeratorVisualisation({
     cabinet.add(plinth);
 
     // Fridge compartment (top)
-    const fridge = buildCompartment(BODY_W, FRIDGE_H, BODY_D, FRIDGE_TINT, 'fridge', bodyMat, trimMat);
+    const fridge = buildCompartment(BODY_W, FRIDGE_H, BODY_D, FRIDGE_TINT, true, bodyMat, trimMat);
     fridge.group.position.y = FREEZER_H + FRIDGE_H / 2;
     cabinet.add(fridge.group);
 
     // Freezer compartment (bottom)
-    const freezer = buildCompartment(BODY_W, FREEZER_H, BODY_D, FREEZER_TINT, 'freezer', bodyMat, trimMat);
+    const freezer = buildCompartment(BODY_W, FREEZER_H, BODY_D, FREEZER_TINT, false, bodyMat, trimMat);
     freezer.group.position.y = FREEZER_H / 2;
     cabinet.add(freezer.group);
 
@@ -672,36 +722,13 @@ export default function RefrigeratorVisualisation({
       cabinet.add(leg);
     });
 
-    // ── Interaction: drag-to-rotate + click-to-select (cryocan pattern) ──
-    const raycaster = new Raycaster();
-    const pointer = new Vector2();
-    const hitMeshes: Mesh[] = [fridge.doorHit, freezer.doorHit];
-
+    // ── Interaction: drag-to-rotate ──
     let dragging = false;
-    let pressed = false;
-    let pressX = 0;
-    let pressY = 0;
     let lastX = 0;
-    let dragDist = 0;
-
-    const pickZone = (clientX: number, clientY: number): RefrigeratorZone | null => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(pointer, camera);
-      const intersects = raycaster.intersectObjects(hitMeshes, false);
-      if (intersects.length === 0) return null;
-      const obj = intersects[0].object as Object3D;
-      return (obj.userData?.zone as RefrigeratorZone | undefined) ?? null;
-    };
 
     const onDown = (e: PointerEvent) => {
-      pressed = true;
-      pressX = e.clientX;
-      pressY = e.clientY;
-      lastX = pressX;
-      dragDist = 0;
       dragging = true;
+      lastX = e.clientX;
       renderer.domElement.style.cursor = 'grabbing';
       try {
         renderer.domElement.setPointerCapture(e.pointerId);
@@ -710,42 +737,20 @@ export default function RefrigeratorVisualisation({
       }
     };
     const onUp = (e: PointerEvent) => {
-      const upX = e.clientX;
-      const upY = e.clientY;
-      const wasClick =
-        pressed &&
-        Math.abs(upX - pressX) < 5 &&
-        Math.abs(upY - pressY) < 5 &&
-        dragDist < 6;
       dragging = false;
-      pressed = false;
       renderer.domElement.style.cursor = 'grab';
       try {
         renderer.domElement.releasePointerCapture(e.pointerId);
       } catch {
         // Mirror onDown: capture release is best-effort.
       }
-      if (wasClick) {
-        const zone = pickZone(upX, upY);
-        if (zone && onZoneSelectStable.current) {
-          onZoneSelectStable.current(zone);
-        }
-      }
     };
     const onMove = (e: PointerEvent) => {
       const x = e.clientX;
-      const y = e.clientY;
-      if (pressed) {
-        dragDist += Math.abs(x - lastX);
-      }
       if (dragging) {
         cabinet.rotation.y += (x - lastX) * 0.01;
       }
       lastX = x;
-      if (!pressed) {
-        const zone = pickZone(x, y);
-        renderer.domElement.style.cursor = zone ? 'pointer' : 'grab';
-      }
     };
     renderer.domElement.addEventListener('pointerdown', onDown);
     window.addEventListener('pointerup', onUp);
@@ -770,18 +775,12 @@ export default function RefrigeratorVisualisation({
       const dt = (now - t0) / 1000;
       t0 = now;
       // Slow auto-rotate while idle, paused when the user drags (cryocan pattern)
-      if (!dragging && !pressed) {
+      if (!dragging) {
         cabinet.rotation.y += 0.0025;
       }
-      // Subtle pulse on the highlight rings of the selected zone
-      const pulse = 0.6 + Math.sin(now / 500) * 0.4;
-      const fridgeRingMat = fridge.highlightRing.material as MeshStandardMaterial;
-      const freezerRingMat = freezer.highlightRing.material as MeshStandardMaterial;
-      fridgeRingMat.emissiveIntensity = (fridgeRingMat.userData._target ?? 0) * pulse;
-      freezerRingMat.emissiveIntensity = (freezerRingMat.userData._target ?? 0) * pulse;
       // Smoothly tween light intensities toward their target values
       const lerpLight = (l: PointLight) => {
-        const target = (l.userData._target as number | undefined) ?? 0;
+        const target = (l.userData._target as number | undefined) ?? 1.0;
         l.intensity += (target - l.intensity) * Math.min(1, dt * 4);
       };
       lerpLight(fridge.interiorLight);
@@ -791,22 +790,18 @@ export default function RefrigeratorVisualisation({
     };
     rafId = requestAnimationFrame(animate);
 
+    // Set steady-state interior light targets (no zone selection)
+    fridge.interiorLight.userData._target = 1.0;
+    freezer.interiorLight.userData._target = 1.0;
+
     sceneRef.current = {
       renderer,
       scene,
       camera,
       rafId,
       onResize,
-      onClick: () => {},
-      onMove: () => {},
-      fridgeRing: fridge.highlightRing.material as MeshStandardMaterial,
-      freezerRing: freezer.highlightRing.material as MeshStandardMaterial,
       fridgeLight: fridge.interiorLight,
       freezerLight: freezer.interiorLight,
-      raycaster,
-      pointer,
-      hitMeshes,
-      onZoneSelectRef: () => {},
     };
 
     return () => {
@@ -829,80 +824,155 @@ export default function RefrigeratorVisualisation({
     };
   }, []);
 
-  // ── Update zone selection (lights + rings) ─────────────────────────────────
-  useEffect(() => {
-    const s = sceneRef.current;
-    if (!s) return;
-
-    const setRing = (mat: MeshStandardMaterial, on: boolean, tint: Color) => {
-      mat.color.copy(tint);
-      mat.emissive.copy(tint);
-      mat.userData._target = on ? 1.4 : 0;
-      mat.opacity = on ? 0.9 : 0.0;
-    };
-    setRing(s.fridgeRing, selectedZone === 'fridge', FRIDGE_TINT);
-    setRing(s.freezerRing, selectedZone === 'freezer', FREEZER_TINT);
-
-    // Light intensity targets: the selected zone glows brighter, the other one
-    // keeps a soft baseline so the cabinet doesn't go dark.
-    s.fridgeLight.color.copy(FRIDGE_TINT);
-    s.freezerLight.color.copy(FREEZER_TINT);
-    s.fridgeLight.userData._target = selectedZone === 'fridge' ? 2.6 : 1.0;
-    s.freezerLight.userData._target = selectedZone === 'freezer' ? 2.6 : 1.0;
-  }, [selectedZone]);
-
   // ── Alert glow override ────────────────────────────────────────────────────
   useEffect(() => {
     const s = sceneRef.current;
     if (!s) return;
-    if (fridgeTempAlert) {
+    if (hasAlert) {
       s.fridgeLight.color.set('#ff4d6d');
-      s.fridgeLight.userData._target = 3.0;
-    }
-    if (freezerTempAlert) {
       s.freezerLight.color.set('#ff4d6d');
+      s.fridgeLight.userData._target = 3.0;
       s.freezerLight.userData._target = 3.0;
+    } else {
+      s.fridgeLight.color.copy(FRIDGE_TINT);
+      s.freezerLight.color.copy(FREEZER_TINT);
+      s.fridgeLight.userData._target = 1.0;
+      s.freezerLight.userData._target = 1.0;
     }
-  }, [fridgeTempAlert, freezerTempAlert]);
+  }, [hasAlert]);
 
   // ── Activity dedup (stable list for the right panel) ───────────────────────
   const activity = useMemo(() => systemActivity.slice(0, 20), [systemActivity]);
 
+  const myTasks: MyTask[] = tasks.map((t) => ({
+    id: String(t.id),
+    patientId: t.patient_id ?? '',
+    canisterNumber: t.tank_code ?? '',
+    tankCode: t.tank_code ?? undefined,
+    tankId: t.tank_id ?? undefined,
+    assigneeId: t.assignee?.user_id ?? undefined,
+    taskName: t.task_name,
+    description: t.description ?? '',
+    assigneeBy: t.created_by_name ?? '',
+    assignedTo: t.assignee
+      ? `${t.assignee.first_name ?? ''} ${t.assignee.last_name ?? ''}`.trim()
+      : '',
+    dueDate: t.due_date ?? '',
+    priority: (t.priority as 'Low' | 'Medium' | 'High') ?? 'Medium',
+    status: (t.status as 'Not started' | 'In progress' | 'Done' | 'Cancelled') ?? 'Not started',
+  }));
+
+  const handleEditTask = async (task: MyTask) => {
+    const taskId = parseInt(task.id, 10);
+    if (!onEditTask) {
+      if (task.assigneeBy?.trim().toLowerCase() === currentUserName?.trim().toLowerCase()) {
+        await tasksService.updateTask(taskId, {
+          task_name: task.taskName,
+          description: task.description,
+          status: task.status as import('../../../services/tasksService').TaskStatus,
+        });
+      } else {
+        await tasksService.updateTaskStatus(taskId, task.status as import('../../../services/tasksService').TaskStatus);
+      }
+      onTaskCreated?.();
+      return;
+    }
+    await onEditTask(task);
+  };
+
+  const [kpiModalKey, setKpiModalKey] = useState<string | null>(null);
+
   return (
+    <>
     <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_320px] gap-4">
-      {/* Left KPI tiles */}
-      <aside className="flex flex-col gap-3">
-        {sensorTiles.map((tile) => {
-          const isSelected = selectedSensorId === tile.id;
-          const isAlert =
-            (tile.id === 'freezer_temperature' && freezerTempAlert) ||
-            (tile.id === 'refrigerator_temperature' && fridgeTempAlert);
-          return (
-            <button
-              key={tile.id}
-              type="button"
-              onClick={() => onSensorSelect?.(tile.id)}
-              className={[
-                'text-left rounded-xl border px-4 py-3 transition',
-                isSelected ? 'border-primary bg-primary/5' : 'border-line bg-surface hover:bg-primary/3',
-                isAlert ? 'ring-1 ring-red-300' : '',
-              ].join(' ')}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">
-                  {tile.label}
-                </span>
-                {tile.id === 'freezer_temperature' ? (
-                  <Snowflake size={14} className="text-sky-500" />
-                ) : (
-                  <Thermometer size={14} className="text-emerald-500" />
-                )}
-              </div>
-              <div className="mt-1 text-2xl font-black text-gray-900">{tile.value}</div>
-              <div className="text-xs text-gray-500">{tile.timestamp ?? '—'}</div>
-            </button>
-          );
-        })}
+
+      {/* Left: Live Conditions (top) + Tasks (bottom) */}
+      <aside className="flex flex-col gap-3 min-h-[560px]">
+
+        {/* Live Conditions card */}
+        <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
+          <div
+            className="flex items-center justify-between px-4 py-3 shrink-0"
+            style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}
+          >
+            <div>
+              <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>Live Conditions</span>
+              <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Click a tile to view trend</span>
+            </div>
+            <TrendingUp size={16} style={{ color: '#6b4a78' }} />
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2">
+            {sensorTiles.length === 0 ? (
+              <div className="text-xs text-gray-400 italic">No sensor data.</div>
+            ) : (
+              sensorTiles.map((tile) => {
+                const isSelected = selectedSensorId === tile.id;
+                const isAlert = hasAlert && !tile.isMissing;
+                const isFreezer = tile.id === 'freezer_temperature';
+                const accent = isAlert ? '#dc2626' : (isFreezer ? '#1a7abb' : '#7a22c8');
+                return (
+                  <button
+                    key={tile.id}
+                    type="button"
+                    onClick={() => { onSensorSelect?.(tile.id); setKpiModalKey(tile.id); }}
+                    className={[
+                      'text-left w-full rounded-2xl border transition',
+                      isSelected ? 'border-primary' : 'border-[#e6d6ee] hover:border-primary/50',
+                      isAlert ? 'ring-1 ring-red-300' : '',
+                    ].join(' ')}
+                    style={{
+                      padding: '12px 14px',
+                      background: '#fdfbfe',
+                      boxShadow: isSelected
+                        ? '0 6px 16px rgba(107,17,118,0.12)'
+                        : '0 4px 12px rgba(64,17,83,0.06)',
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div
+                          className="text-[10px] font-semibold uppercase tracking-wider"
+                          style={{ color: '#8b6c97' }}
+                        >
+                          {tile.label}
+                        </div>
+                        <div
+                          className="text-2xl font-bold mt-1"
+                          style={{ color: isAlert ? '#dc2626' : accent }}
+                        >
+                          {tile.value}
+                        </div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">{tile.timestamp ?? '—'}</div>
+                      </div>
+                      <div className="shrink-0 mt-1">
+                        {isFreezer
+                          ? <Snowflake size={18} style={{ color: accent }} />
+                          : <Thermometer size={18} style={{ color: accent }} />}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Tasks card — reuses MyTasksModal in embedded mode */}
+        <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
+          <MyTasksModal
+            embedded
+            isOpen={false}
+            onClose={() => {}}
+            variant="refrigerator"
+            tasks={myTasks}
+            defaultRefrigeratorId={refrigeratorId}
+            currentUserName={currentUserName}
+            currentUserId={currentUserId}
+            onAdd={() => {}}
+            onEdit={handleEditTask}
+            onTaskCreated={onTaskCreated}
+          />
+        </div>
       </aside>
 
       {/* Center 3D viewer */}
@@ -913,70 +983,143 @@ export default function RefrigeratorVisualisation({
       >
         <div ref={mountRef} className="absolute inset-0" />
 
-        {/* Overlay header */}
+        {/* Top-left: device code */}
         {refrigeratorCode && (
-          <div className="absolute top-3 left-4 text-xs font-bold tracking-widest text-gray-500 uppercase">
+          <div className="absolute top-3 left-4 text-xs font-bold tracking-widest text-gray-500 uppercase pointer-events-none">
             {refrigeratorCode}
           </div>
         )}
 
-        {/* Floating zone temperature chips, positioned beside the compartments */}
-        <div className="absolute right-4 top-12 flex flex-col gap-2 w-[210px]">
-          <button
-            type="button"
-            onClick={() => onZoneSelect?.('fridge')}
-            className={[
-              'rounded-xl border px-3 py-2 flex items-center justify-between transition bg-white/85 backdrop-blur',
-              selectedZone === 'fridge' ? 'border-primary shadow-lg' : 'border-line hover:border-primary/50',
-              fridgeTempAlert ? 'ring-1 ring-red-300' : '',
-            ].join(' ')}
-          >
-            <span className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-              <Thermometer size={14} className="text-purple-500" />
-              Refrigerator
-            </span>
-            <span className="text-sm font-black text-gray-900">
+        {/* Top-right: status badge */}
+        <div className="absolute top-3 right-3 pointer-events-none">
+          {hasAlert ? (
+            <div className="flex items-center gap-1.5 bg-red-50/90 backdrop-blur-sm border border-red-200 rounded-full px-3 py-1 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-[11px] font-semibold text-red-600">Alert active</span>
+            </div>
+          ) : sensorTiles.some((t) => !t.isMissing) ? (
+            <div className="flex items-center gap-1.5 bg-emerald-50/90 backdrop-blur-sm border border-emerald-200 rounded-full px-3 py-1 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="text-[11px] font-semibold text-emerald-700">Normal</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-gray-100/90 backdrop-blur-sm border border-gray-200 rounded-full px-3 py-1 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+              <span className="text-[11px] font-semibold text-gray-500">No signal</span>
+            </div>
+          )}
+        </div>
+
+        {/* Left side: fridge compartment card (upper area, matching the top compartment) */}
+        <div className="absolute left-2 pointer-events-none" style={{ top: '24%', zIndex: 2 }}>
+          <div className="bg-white/82 backdrop-blur-sm rounded-2xl border-l-2 border-[#b48cf7] border border-white/60 shadow-md px-3 py-2.5 w-[108px]">
+            <div className="text-[8px] font-bold tracking-widest uppercase mb-1" style={{ color: '#9b6bc7' }}>Refrigerator</div>
+            <div className="text-xl font-black leading-none" style={{ color: '#7a22c8' }}>
               {fridgeTemp != null ? `${fridgeTemp.toFixed(1)}°C` : '—'}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onZoneSelect?.('freezer')}
-            className={[
-              'rounded-xl border px-3 py-2 flex items-center justify-between transition bg-white/85 backdrop-blur',
-              selectedZone === 'freezer' ? 'border-primary shadow-lg' : 'border-line hover:border-primary/50',
-              freezerTempAlert ? 'ring-1 ring-red-300' : '',
-            ].join(' ')}
-          >
-            <span className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-              <Snowflake size={14} className="text-sky-500" />
-              Freezer
-            </span>
-            <span className="text-sm font-black text-gray-900">
+            </div>
+            <div className="text-[8px] mt-0.5" style={{ color: '#b48cf7' }}>2 – 8 °C</div>
+            <div className="w-full border-t border-purple-100 my-2" />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[8px] text-gray-500">· 3 shelves</span>
+              <span className="text-[8px] text-gray-500">· Culture media</span>
+              <span className="text-[8px] text-gray-500">· Buffers</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right side: freezer compartment card (lower area, matching the bottom compartment) */}
+        <div className="absolute right-2 pointer-events-none" style={{ top: '62%', zIndex: 2 }}>
+          <div className="bg-white/82 backdrop-blur-sm rounded-2xl border-l-2 border-[#5db4ff] border border-white/60 shadow-md px-3 py-2.5 w-[108px]">
+            <div className="text-[8px] font-bold tracking-widest uppercase mb-1" style={{ color: '#4a9fd0' }}>Freezer</div>
+            <div className="text-xl font-black leading-none" style={{ color: '#1a7abb' }}>
               {freezerTemp != null ? `${freezerTemp.toFixed(1)}°C` : '—'}
+            </div>
+            <div className="text-[8px] mt-0.5" style={{ color: '#5db4ff' }}>≤ −20 °C</div>
+            <div className="w-full border-t border-sky-100 my-2" />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[8px] text-gray-500">· 2 shelves</span>
+              <span className="text-[8px] text-gray-500">· Cryoprotectants</span>
+              <span className="text-[8px] text-gray-500">· Frozen samples</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom-left: branch + online status info cards */}
+        <div className="absolute bottom-10 left-3 flex flex-col gap-1.5 pointer-events-none">
+          {branchName && (
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-white/70 shadow-sm px-3 py-2">
+              <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase">Branch</div>
+              <div className="text-[11px] font-semibold text-gray-800">{branchName}</div>
+            </div>
+          )}
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-white/70 shadow-sm px-3 py-2 flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${sensorTiles.some((t) => !t.isMissing) ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+            <span className="text-[11px] font-semibold text-gray-700">
+              {sensorTiles.some((t) => !t.isMissing) ? 'Online' : 'No data'}
             </span>
-          </button>
+          </div>
+        </div>
+
+        {/* Bottom: scrolling tips strip */}
+        <style>{`@keyframes rfg-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
+        <div className="absolute bottom-0 inset-x-0 bg-white/65 backdrop-blur-sm border-t border-white/50 py-2 flex items-center gap-3 overflow-hidden">
+          <span className="shrink-0 text-[9px] font-bold tracking-widest text-primary/50 uppercase pl-3 pr-1">Tips</span>
+          <div className="overflow-hidden flex-1">
+            <div style={{ display: 'flex', gap: '2.5rem', whiteSpace: 'nowrap', animation: 'rfg-marquee 70s linear infinite' }}>
+              {[...FRIDGE_TIPS, ...FRIDGE_TIPS].map((tip, i) => (
+                <span key={i} className="text-[11px] text-gray-500 shrink-0">
+                  <span className="text-primary/30 mr-2">◆</span>{tip}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Right activity feed */}
-      <aside className="rounded-2xl border border-line bg-surface px-4 py-3 flex flex-col min-h-[560px]">
-        <h3 className="text-xs font-bold tracking-widest text-gray-400 uppercase">System Activity</h3>
-        <div className="mt-3 flex-1 min-h-0 overflow-y-auto pr-1">
-          {activity.length === 0 ? (
-            <div className="text-xs text-gray-400 italic">No recent activity.</div>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {activity.map((record) => (
-                <li key={record.id} className="rounded-lg border border-line bg-white px-3 py-2">
+      {/* Right: System Activity (top) + Messages (bottom) */}
+      <aside className="flex flex-col gap-3 min-h-[560px]">
+
+        {/* System Activity card */}
+        <div className="flex-1 min-h-0 rounded-2xl border border-line bg-surface overflow-hidden flex flex-col">
+          <div className="px-4 py-3 shrink-0">
+            <h3 className="text-xs font-bold tracking-widest text-gray-400 uppercase">System Activity</h3>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-3 flex flex-col gap-2">
+            {activity.length === 0 ? (
+              <div className="text-xs text-gray-400 italic">No recent activity.</div>
+            ) : (
+              activity.map((record) => (
+                <div key={record.id} className="rounded-lg border border-line bg-white px-3 py-2">
                   <div className="text-xs font-semibold text-gray-800">{record.action}</div>
                   <div className="text-[11px] text-gray-500">{record.created_at}</div>
-                </li>
-              ))}
-            </ul>
-          )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Messages card — reuses StakeholderChatBox in embedded mode */}
+        <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
+          <div className="px-4 py-3 shrink-0 border-b border-line bg-surface">
+            <h3 className="text-xs font-bold tracking-widest text-gray-400 uppercase">Messages</h3>
+          </div>
+          <StakeholderChatBox
+            embedded
+            isOpen={false}
+            onClose={() => {}}
+            refrigeratorId={refrigeratorId}
+          />
         </div>
       </aside>
     </div>
+
+    {kpiModalKey && refrigeratorId != null && (
+      <RefrigeratorKpiChartModal
+        refrigeratorId={refrigeratorId}
+        kpiKey={kpiModalKey}
+        onClose={() => setKpiModalKey(null)}
+      />
+    )}
+    </>
   );
 }
