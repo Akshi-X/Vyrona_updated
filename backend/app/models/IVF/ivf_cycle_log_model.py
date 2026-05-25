@@ -29,12 +29,13 @@ class IvfCycleLog(Base):
 
     # Day 5 — Blastocyst
     d5_stage = Column(String(30), nullable=True)          # Cleavage, Morula, Early Blast, Blastocyst
-    d5_grade = Column(String(10), nullable=True)          # e.g. 4AA
 
     # Day 6 — Late Blast
     d6_stage = Column(String(30), nullable=True)
-    d6_grade = Column(String(10), nullable=True)
     d6_progression = Column(String(50), nullable=True)
+
+    # Final blastocyst grade — updated whenever a grade is recorded (D5 or D6)
+    blast_grade = Column(String(10), nullable=True)       # e.g. 4AA
 
     # Final
     fate = Column(String(20), nullable=True)              # Freeze, Transfer, Discard
@@ -48,7 +49,8 @@ class IvfCycleLog(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    cycle = relationship("IvfCycle", back_populates="logs")
+    cycle      = relationship("IvfCycle",           back_populates="logs")
+    grades = relationship("IvfOocyteGrade", back_populates="log", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("cycle_id", "oocyte_no", name="uq_ivf_cycle_log_oocyte"),

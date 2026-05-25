@@ -16,6 +16,9 @@ from .reservoir_log_model import ReservoirLog
 from .ln2_refill_detection_model import Ln2RefillDetection
 from .ivf_cycle_model import IvfCycle
 from .ivf_cycle_log_model import IvfCycleLog
+from .ivf_oocyte_grade_model import IvfOocyteGrade
+from .ivf_oocyte_image_model import IvfOocyteImage
+from .ivf_cycle_report_model import IvfCycleReport
 
 # Register UIRouteVariant so Hospital.ui_variants relationship resolves (same Base registry).
 # Without this, any code that touches Hospital (e.g. CriticalAlert -> ... -> Hospital) fails with
