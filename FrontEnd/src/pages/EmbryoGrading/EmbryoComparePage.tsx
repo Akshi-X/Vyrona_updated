@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Trophy, GitCompare, Star, Search, Info, ChevronDown, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Trophy, GitCompare, Star, Search, Info, ChevronDown, Check } from 'lucide-react';
 import type { BlastocystMorphology } from '../../types/embryo';
 
 interface LeaderboardEmbryo {
@@ -181,7 +181,6 @@ type CompareMode = 'embryos' | 'images';
 
 export default function EmbryoComparePage() {
   const [selectedEmbryoIds, setSelectedEmbryoIds] = useState<string[]>([]);
-  const [viewIndex, setViewIndex] = useState(0);
   const [compareMode, setCompareMode] = useState<CompareMode>('embryos');
   const [selectedOocyteId, setSelectedOocyteId] = useState<string>(LEADERBOARD_EMBRYOS[0]?.id ?? '');
   const [oocyteDropdownOpen, setOocyteDropdownOpen] = useState(false);
@@ -196,10 +195,6 @@ export default function EmbryoComparePage() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  useEffect(() => {
-    setViewIndex(prev => Math.min(prev, Math.max(0, selectedEmbryoIds.length - 1)));
-  }, [selectedEmbryoIds]);
 
   const toggleEmbryo = (id: string) => {
     setSelectedEmbryoIds(prev => {
@@ -456,11 +451,11 @@ export default function EmbryoComparePage() {
           const sorted = [...(oocyte?.images ?? [])].sort((a, b) => b.score - a.score);
           return (
             <div className="flex-1 min-h-0 overflow-x-auto">
-              <div className="flex gap-3 h-full" style={{ width: `${sorted.length * 200}px`, minWidth: '100%' }}>
+              <div className="flex gap-3 h-full" style={{ width: 'fit-content', minWidth: '100%' }}>
                 {sorted.map((img, idx) => {
                   const gc = gradeCls(img.grade);
                   return (
-                    <div key={idx} className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden flex-1 min-w-[180px] min-h-0">
+                    <div key={idx} className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden w-[210px] shrink-0 min-h-0">
                       {/* Fixed top: rank + image + grade + score */}
                       <div className="shrink-0">
                         <div className="px-3 pt-3 pb-2 flex items-center gap-2">
@@ -641,143 +636,137 @@ export default function EmbryoComparePage() {
             </div>
 
           </div>
-        ) : (() => {
-          const eid = selectedEmbryoIds[viewIndex];
-          const emb = eid ? LEADERBOARD_EMBRYOS.find(e => e.id === eid) : undefined;
-          const gc = emb ? gradeCls(emb.grade) : null;
-          const m = emb?.morphology;
-          const total = selectedEmbryoIds.length;
-
-          return (
-            <div className="flex-1 min-h-0 flex flex-col gap-3">
-
-              {/* Nav bar */}
-              <div className="shrink-0 flex items-center border border-gray-200 rounded-2xl overflow-hidden bg-white">
-                <button
-                  type="button"
-                  onClick={() => setViewIndex(i => Math.max(0, i - 1))}
-                  disabled={viewIndex === 0}
-                  className="flex items-center justify-center w-14 h-12 text-gray-700 hover:bg-gray-50 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors border-r border-gray-200 shrink-0"
-                >
-                  <ChevronLeft size={22} strokeWidth={2.5} />
-                </button>
-                <div className="flex-1 flex items-center justify-center gap-3 px-4">
-                  <span className="text-base font-black text-gray-900 tabular-nums">{total > 0 ? viewIndex + 1 : 0} / {total}</span>
-                  {emb && (
-                    <span className="text-sm font-semibold text-gray-400">{eidToLabel(emb.id)}</span>
-                  )}
-                  {emb && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedEmbryoIds(prev => prev.filter(id => id !== eid))}
-                      className="ml-auto text-gray-400 hover:text-rose-500 transition-colors"
-                    >
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setViewIndex(i => Math.min(total - 1, i + 1))}
-                  disabled={viewIndex >= total - 1}
-                  className="flex items-center justify-center w-14 h-12 text-gray-700 hover:bg-gray-50 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors border-l border-gray-200 shrink-0"
-                >
-                  <ChevronRight size={22} strokeWidth={2.5} />
-                </button>
-              </div>
-
-              {/* Embryo detail */}
-              {emb && gc && m ? (
-                <div className="flex-1 min-h-0 overflow-y-auto flex gap-4">
-
-                  {/* Left: image */}
-                  <div className="shrink-0 w-64 flex flex-col gap-3">
-                    <div className="rounded-2xl overflow-hidden border border-gray-200 bg-black aspect-square">
-                      <img src={emb.src} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="flex-1 min-h-0 overflow-x-auto">
+            <div
+              className="grid gap-3 h-full"
+              style={{ gridTemplateColumns: `repeat(4, minmax(170px, 240px))` }}
+            >
+              {[0, 1, 2, 3].map(idx => {
+                const eid = selectedEmbryoIds[idx];
+                if (!eid) return (
+                  <div key={idx} className="border border-dashed border-primary/20 rounded-2xl bg-primary/[0.02] flex flex-col items-center justify-center relative p-5">
+                    <div className="absolute top-3 left-3 w-6 h-6 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
+                      <span className="text-[10px] font-bold text-gray-400">{idx + 1}</span>
                     </div>
-                    <div className={`rounded-2xl border px-4 py-3 ${gc.bg} ${gc.border}`}>
-                      <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-1">Gardner Grade</div>
-                      <div className={`text-4xl font-black leading-none ${gc.text}`}>{emb.grade}</div>
-                      <div className="text-[10px] text-gray-500 mt-1">{emb.quality}</div>
+                    <div className="w-11 h-11 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
+                      <span className="text-xl font-light text-gray-300 leading-none">+</span>
                     </div>
+                    <p className="text-sm font-medium text-gray-400">Select embryo</p>
+                    <p className="text-[11px] text-gray-300 mt-1">Choose from leaderboard</p>
                   </div>
+                );
 
-                  {/* Right: metrics */}
-                  <div className="flex-1 min-w-0 flex flex-col gap-3">
+                const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
+                const hex = SLOT_COLORS[idx].hex;
+                const gc = gradeCls(emb.grade);
+                const m = emb.morphology;
 
-                    {/* AI Score */}
-                    <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">AI Score</span>
-                        <span className="text-sm font-black tabular-nums px-2 py-0.5 rounded-lg" style={scorePillStyle(emb.aiScore)}>
-                          {emb.aiScore} <span className="font-medium opacity-60 text-xs">/ 10</span>
-                        </span>
-                      </div>
-                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${emb.aiScore * 10}%`, background: scoreBarGradient(emb.aiScore) }} />
-                      </div>
-                    </div>
+                return (
+                  <div key={idx} className="flex flex-col min-h-0">
 
-                    {/* Quality Flags */}
-                    <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #e8d5f0' }}>
-                      <div className="flex items-center gap-2 px-4 py-2.5" style={{ background: '#faf4ff' }}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                        </svg>
-                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: '#6b1176' }}>Quality Flags</span>
-                      </div>
-                      <div className="divide-y divide-gray-50 bg-white">
-                        {([
-                          { label: 'Hatching',        value: m.hatching        },
-                          { label: 'Vacuolization',   value: m.vacuolization   },
-                          { label: 'Multinucleation', value: m.multinucleation },
-                        ]).map(item => {
-                          const s = criticalStyle(item.value);
-                          return (
-                            <div key={item.label} className="flex items-center justify-between gap-2 px-4 py-2.5">
-                              <span className="text-[11px] font-medium text-gray-500">{item.label}</span>
-                              <span className="text-[10px] font-bold rounded-md px-2 py-0.5 shrink-0" style={{ color: s.color, background: s.background }}>{item.value}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <div className="shrink-0 flex flex-col gap-2">
 
-                    {/* Morphology */}
-                    <div className="rounded-2xl overflow-hidden border border-gray-100">
-                      <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-                        </svg>
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Morphology</span>
+                      <div className="rounded-xl flex items-center gap-1.5 px-2.5 py-2 border"
+                        style={{ borderColor: hex + '45', background: hex + '10' }}>
+                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0"
+                          style={{ background: hex }}>{idx + 1}</span>
+                        <span className="text-xs font-bold text-gray-800 flex-1 truncate">{eidToLabel(emb.id)}</span>
+                        <button type="button"
+                          onClick={() => setSelectedEmbryoIds(prev => prev.filter(id => id !== eid))}
+                          className="text-gray-500 hover:text-gray-900 transition-colors shrink-0">
+                          <X size={10} />
+                        </button>
                       </div>
-                      <div className="divide-y divide-gray-50 bg-white">
-                        {([
-                          { label: 'Fragmentation',  value: m.fragmentation          },
-                          { label: 'Symmetry',       value: m.symmetry               },
-                          { label: 'Zona Pellucida', value: m.zonaPellucida          },
-                          { label: 'Blastocoel',     value: m.blastocoelQuality      },
-                          { label: 'Cyto. Gran.',    value: m.cytoplasmicGranularity },
-                          { label: 'Bridge',         value: m.bridge                 },
-                        ]).map(item => (
-                          <div key={item.label} className="flex items-center justify-between gap-2 px-4 py-2.5">
-                            <span className="text-[11px] font-medium text-gray-400">{item.label}</span>
-                            <span className="text-[11px] font-bold text-gray-700 shrink-0">{item.value}</span>
+
+                      <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${hex}40` }}>
+                        <div className="aspect-square bg-gray-100">
+                          <img src={emb.src} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+
+                      <div className={`rounded-xl border px-3 py-2.5 flex items-center gap-3 ${gc.bg} ${gc.border}`}>
+                        <div className="shrink-0">
+                          <div className="text-[7px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Grade</div>
+                          <div className={`text-2xl font-black leading-none ${gc.text}`}>{emb.grade}</div>
+                        </div>
+                        <div className="w-px self-stretch bg-black/10 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest">AI Score</span>
+                            <span className="text-[10px] font-black tabular-nums px-1.5 py-0.5 rounded-md leading-none" style={scorePillStyle(emb.aiScore)}>
+                              {emb.aiScore}<span className="font-medium opacity-60"> / 10</span>
+                            </span>
                           </div>
-                        ))}
+                          <div className="h-1.5 rounded-full bg-black/10 overflow-hidden">
+                            <div className="h-full rounded-full transition-all"
+                              style={{ width: `${emb.aiScore * 10}%`, background: scoreBarGradient(emb.aiScore) }} />
+                          </div>
+                        </div>
                       </div>
+
+                    </div>
+
+                    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 pt-2 pb-1">
+
+                      <div className="shrink-0 rounded-xl overflow-hidden" style={{ border: '1px solid #e8d5f0' }}>
+                        <div className="flex items-center gap-2 px-3 py-2" style={{ background: '#faf4ff' }}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                          </svg>
+                          <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#6b1176' }}>Quality Flags</span>
+                        </div>
+                        <div className="divide-y divide-gray-50 bg-white">
+                          {([
+                            { label: 'Hatching',        value: m.hatching        },
+                            { label: 'Vacuolization',   value: m.vacuolization   },
+                            { label: 'Multinucleation', value: m.multinucleation },
+                          ]).map(item => {
+                            const s = criticalStyle(item.value);
+                            return (
+                              <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                                <span className="text-[10px] font-medium text-gray-500 leading-tight">{item.label}</span>
+                                <span className="text-[9px] font-bold rounded-md px-2 py-0.5 shrink-0"
+                                  style={{ color: s.color, background: s.background }}>{item.value}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 rounded-xl overflow-hidden border border-gray-100">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                          </svg>
+                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Morphology</span>
+                        </div>
+                        <div className="divide-y divide-gray-50 bg-white">
+                          {([
+                            { label: 'Fragmentation',  value: m.fragmentation          },
+                            { label: 'Symmetry',       value: m.symmetry               },
+                            { label: 'Zona Pellucida', value: m.zonaPellucida          },
+                            { label: 'Blastocoel',     value: m.blastocoelQuality      },
+                            { label: 'Cyto. Gran.',    value: m.cytoplasmicGranularity },
+                            { label: 'Bridge',         value: m.bridge                 },
+                          ]).map(item => (
+                            <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                              <span className="text-[10px] font-medium text-gray-400 leading-tight">{item.label}</span>
+                              <span className="text-[10px] font-bold text-gray-700 shrink-0">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
                     </div>
 
                   </div>
-                </div>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-sm text-gray-300">No embryo selected</div>
-              )}
-
+                );
+              })}
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
 
     </div>
