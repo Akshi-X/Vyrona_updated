@@ -326,7 +326,7 @@ export default function EmbryoReportsPage() {
         >
           <img src="/cover.png" alt="" className="w-full block" style={{ aspectRatio: '210 / 297', objectFit: 'cover' }} />
           <div className="absolute inset-0 flex flex-col justify-between px-10 py-10">
-            <div>
+            <div className="flex justify-end">
               {coverLogo && (
                 <img src={coverLogo} alt="Clinic logo" className="h-12 w-auto max-w-[160px] object-contain" />
               )}

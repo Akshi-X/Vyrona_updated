@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, ChevronRight, Check, Trash2, ImageIcon, Trophy, Lightbulb, Pencil, X, ShieldCheck, Shield, Minus, Sparkles, AlertCircle } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Check, Trash2, ImageIcon, Trophy, Lightbulb, Pencil, X, ShieldCheck, Shield, Minus, Sparkles, AlertCircle } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import type { IVFTreatment } from '../../types/ivf';
 import { ivfService, type IvfCycleLog, type IvfGrade } from '../../services/ivfService';
@@ -87,6 +87,7 @@ export default function AdvancedEmbryoGradingPage() {
 
   // Multiple image slots — each becomes its own IvfOocyteGrade
   const [imageSlots, setImageSlots] = useState<ImageSlot[]>([]);
+  const [slotIndex, setSlotIndex] = useState(0);
 
   // Select Best Grade step
   const [selectedImageIdx, setSelectedImageIdx] = useState<number | null>(null);
@@ -112,6 +113,10 @@ export default function AdvancedEmbryoGradingPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [noteDraft, setNoteDraft] = useState('');
+  const [activeSection, setActiveSection] = useState<'note' | null>(null);
+  const [approveModalOpen, setApproveModalOpen] = useState(false);
+  const [approveSelectedIdx, setApproveSelectedIdx] = useState<number | null>(null);
+  const [overrideModalOpen, setOverrideModalOpen] = useState(false);
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -201,6 +206,8 @@ export default function AdvancedEmbryoGradingPage() {
         if (targetLogId != null) {
           const target = full.logs.find(l => l.log_id === targetLogId);
           if (target) setSelectedOocyteNo(target.oocyte_no);
+        } else if (full.logs.length > 0) {
+          setSelectedOocyteNo(full.logs[0].oocyte_no);
         }
       }
     }).catch(() => { if (!cancelled) setLogsLoading(false); });
@@ -212,17 +219,21 @@ export default function AdvancedEmbryoGradingPage() {
   useEffect(() => {
     if (selectedOocyteNo == null || cycleId == null || !selectedLog) {
       setExistingGrades([]);
+      setSelectedImageIdx(null);
       setGradesLoading(false);
       setGradesError(null);
       return;
     }
+    setSelectedImageIdx(null);
     let cancelled = false;
     setGradesLoading(true);
     setGradesError(null);
     ivfService.listGrades(cycleId, selectedLog.log_id)
       .then(g => {
         if (cancelled) return;
-        setExistingGrades(g.filter(gr => gr.is_active !== false));
+        const active = g.filter(gr => gr.is_active !== false);
+        setExistingGrades(active);
+        if (active.length > 0) { setSelectedImageIdx(0); setSlotIndex(0); }
         setGradesLoading(false);
       })
       .catch((err) => {
@@ -304,9 +315,10 @@ export default function AdvancedEmbryoGradingPage() {
     }
   };
 
-  const handleConfirmSelection = async () => {
-    if (selectedImageIdx === null || cycleId == null || !selectedLog) return;
-    const gradeId = existingGrades[selectedImageIdx]?.grade_id ?? createdGradeIds[selectedImageIdx];
+  const handleConfirmSelection = async (overrideIdx?: number) => {
+    const idx = overrideIdx ?? selectedImageIdx;
+    if (idx === null || idx == null || cycleId == null || !selectedLog) return;
+    const gradeId = existingGrades[idx]?.grade_id ?? createdGradeIds[idx];
     if (gradeId != null) {
       try {
         await ivfService.selectBestGrade(cycleId, selectedLog.log_id, gradeId);
@@ -315,10 +327,10 @@ export default function AdvancedEmbryoGradingPage() {
       }
     }
     if (overrideVals && cycleId != null) {
-      const gradeId = selectedImageIdx != null ? createdGradeIds[selectedImageIdx] ?? existingGrades[selectedImageIdx]?.grade_id : undefined;
-      if (gradeId != null) {
+      const oid = createdGradeIds[idx] ?? existingGrades[idx]?.grade_id;
+      if (oid != null) {
         try {
-          await ivfService.updateGrade(cycleId, gradeId, {
+          await ivfService.updateGrade(cycleId, oid, {
             grade: overrideVals.grade,
             hatching: overrideVals.hatching,
             vacuolization: overrideVals.vacuolization,
@@ -340,6 +352,15 @@ export default function AdvancedEmbryoGradingPage() {
 
   const locked = step === 'processing';
 
+  const tileImg      = selectedGrade?.images[0] ?? null;
+  const tileGradeStr = selectedGrade?.grade ?? '';
+  const expDigit     = tileGradeStr[0] ?? '—';
+  const icmLetter    = tileGradeStr[1] ?? '—';
+  const teLetter     = tileGradeStr[2] ?? '—';
+  const expLabel     = expDigit === '1' ? 'Early Blastocyst' : expDigit === '2' ? 'Blastocyst' : expDigit === '3' ? 'Full Blastocyst' : expDigit === '4' ? 'Expanded' : (expDigit === '5' || expDigit === '6') ? 'Hatching' : null;
+  const icmLabel     = icmLetter === 'A' ? 'Many compact cells forming a well-defined mass.' : icmLetter === 'B' ? 'Few cells, loosely grouped inner cell mass.' : icmLetter === 'C' ? 'Very few cells, difficult to discern.' : null;
+  const teLabel      = teLetter === 'A' ? 'Many cells forming a cohesive epithelial layer.' : teLetter === 'B' ? 'Few cells, loose or uneven layer.' : teLetter === 'C' ? 'Very few cells, large or irregular.' : null;
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -358,25 +379,23 @@ export default function AdvancedEmbryoGradingPage() {
             locked={locked}
             onSelect={handleOocyteSelect}
           />
-          <div className="rounded-lg border border-line bg-white p-4">
-            <p className="text-[9px] font-semibold tracking-widest text-gray-500 uppercase mb-3">Embryo Details</p>
-            <table className="w-full text-[10px]">
-              <tbody className="divide-y divide-[#F8F4FD]">
-                {[
-                  { label: 'Patient ID',  value: embryo?.hisNumber || his || '—' },
-                  { label: 'Oocyte No.', value: selectedOocyteNo != null ? String(selectedOocyteNo) : '—' },
-                  { label: 'D0 Maturity', value: selectedLog?.d0_maturity || '—' },
-                  { label: 'D1 PN',      value: selectedLog?.d1_pn || '—' },
-                  { label: 'D3 Grade',   value: selectedLog?.d3_grade || '—' },
-                  { label: 'Fate',       value: selectedLog?.fate || '—' },
-                ].map(r => (
-                  <tr key={r.label}>
-                    <td className="py-1.5 text-gray-600 font-medium">{r.label}</td>
-                    <td className="py-1.5 text-gray-900 font-semibold text-right">{r.value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
+            <div className="px-4 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white">
+              <p className="text-[9px] font-semibold tracking-widest text-gray-500 uppercase">AI Justification</p>
+            </div>
+            {[
+              { label: 'Expansion', color: '#7c3aed', grade: expDigit,  text: expLabel  },
+              { label: 'ICM',       color: '#0891b2', grade: icmLetter, text: icmLabel  },
+              { label: 'TE',        color: '#059669', grade: teLetter,  text: teLabel   },
+            ].map((item, i, arr) => (
+              <div key={item.label} className={`px-4 py-3 flex flex-col gap-0.5${i < arr.length - 1 ? ' border-b border-line-light' : ''}`}>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: item.color }}>{item.label}</span>
+                  <span className="text-[11px] font-black" style={{ color: item.color }}>{item.grade}</span>
+                </div>
+                <p className="text-[9px] text-gray-500 leading-snug">{item.text ?? (selectedGrade ? 'No data available.' : 'Select an image to view.')}</p>
+              </div>
+            ))}
           </div>
         </aside>
 
@@ -426,14 +445,14 @@ export default function AdvancedEmbryoGradingPage() {
           const selGrade   = selectedImageIdx != null ? existingGrades[selectedImageIdx] ?? null : null;
           const mainImgUrl = selGrade?.images[0]?.upload_image_url ?? (selectedImageIdx == null && imageSlots[0]?.url) ?? null;
           return (
-            <div className="flex flex-col gap-3 min-h-0">
+            <div className="flex flex-col gap-3 h-full min-h-0">
               {/* Embryo Preview card */}
               <div className="rounded-xl border border-line bg-white overflow-hidden flex flex-col flex-1 min-h-0">
                 <div className="px-4 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0">
                   <p className="text-xs font-bold text-gray-800">Embryo Preview</p>
                   <p className="text-[9px] text-gray-400 mt-0.5">Select a graded image to preview it here. Click a slot below to switch.</p>
                 </div>
-                <div className={`relative flex-1 min-h-0 ${mainImgUrl ? 'bg-black' : 'bg-gray-50'}`} style={{ minHeight: 240 }}>
+                <div className={`relative flex-1 min-h-0 ${mainImgUrl ? 'bg-black' : 'bg-gray-50'}`}>
                   {mainImgUrl ? (
                     <img src={mainImgUrl} alt="Selected oocyte" className="w-full h-full object-contain absolute inset-0" />
                   ) : (
@@ -465,250 +484,280 @@ export default function AdvancedEmbryoGradingPage() {
 
               {/* Image Slots card */}
               <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
-                <div className="px-4 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-bold text-gray-800">Image Slots</p>
-                    <p className="text-[9px] text-gray-400 mt-0.5">Upload up to 4 embryo images per oocyte for AI analysis.</p>
-                  </div>
-                  <span className="text-[9px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{existingGrades.length + imageSlots.length} / 4</span>
-                </div>
                 <div className="p-2">
-                  {gradesLoading ? (
-                    <div className="h-20 flex items-center justify-center">
-                      <div className="w-6 h-6 rounded-full border-2 border-[#E8D5F5] border-t-primary animate-spin" />
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-4 gap-2">
-                      {/* Existing grade thumbnails */}
-                      {existingGrades.map((grade, idx) => {
-                        const imgUrl     = grade.images[0]?.upload_image_url;
-                        const isSelected = selectedImageIdx === idx;
-                        return (
-                          <div key={grade.grade_id} className="relative">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedImageIdx(idx)}
-                              className={`relative w-full rounded-xl overflow-hidden border-2 transition-all flex flex-col ${
-                                isSelected ? 'border-primary ring-2 ring-primary/20' : 'border-line hover:border-primary/40'
-                              }`}
-                            >
-                              <div className="aspect-square w-full bg-gray-50">
-                                {imgUrl ? (
-                                  <img src={imgUrl} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center"><ImageIcon size={14} className="text-gray-300" /></div>
-                                )}
-                              </div>
-                              <div className="px-2 py-1.5 flex items-center justify-between bg-white">
-                                <span className="text-[8px] font-bold text-gray-400">#{idx + 1}</span>
-                                {grade.grade ? (
-                                  <span className={`text-[8px] font-extrabold ${gradeTextCls(grade.grade)}`}>{grade.grade}</span>
-                                ) : (
-                                  <span className="text-[7px] text-gray-300">—</span>
-                                )}
-                              </div>
-                              {isSelected && (
-                                <div className="absolute inset-0 bg-primary/10 pointer-events-none rounded-xl" />
+                  {(() => {
+                    const total = existingGrades.length + imageSlots.length;
+                    const safeIdx = Math.min(slotIndex, Math.max(0, total - 1));
+                    const currentGrade = safeIdx < existingGrades.length ? existingGrades[safeIdx] : null;
+                    const isSelected   = selectedImageIdx === safeIdx && currentGrade != null;
+                    return (
+                      <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = Math.max(0, safeIdx - 1);
+                            setSlotIndex(next);
+                            setSelectedImageIdx(next < existingGrades.length ? next : null);
+                          }}
+                          disabled={safeIdx === 0}
+                          className="flex items-center justify-center w-10 h-10 text-gray-600 hover:bg-gray-50 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors border-r border-gray-200 shrink-0"
+                        >
+                          <ChevronLeft size={18} strokeWidth={2.5} />
+                        </button>
+                        <div className="flex-1 flex flex-col items-center justify-center py-1.5 gap-1">
+                          <span className="text-sm font-black text-gray-800 tabular-nums leading-none">
+                            {total > 0 ? safeIdx + 1 : 0} / {total}
+                          </span>
+                          {total > 0 && (
+                            <div className="flex items-center gap-1">
+                              {currentGrade?.grade && (
+                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md border ${gradeTextCls(currentGrade.grade)} bg-white border-current/20`}>
+                                  {currentGrade.grade}
+                                </span>
                               )}
-                            </button>
-                            <button type="button" onClick={() => setDeactivateGradeId(grade.grade_id)}
-                              className="absolute -top-1 -right-1 z-10 w-4 h-4 rounded-full bg-white border border-line text-gray-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors shadow-sm">
-                              <X size={7} />
-                            </button>
-                          </div>
-                        );
-                      })}
-
-                      {/* Pending upload slots */}
-                      {imageSlots.map((slot, idx) => (
-                        <div key={`slot-${idx}`} className="relative">
-                          <div className="w-full rounded-xl overflow-hidden border-2 border-amber-300 flex flex-col">
-                            <div className="aspect-square w-full bg-gray-50">
-                              <img src={slot.url} alt={`Pending ${idx + 1}`} className="w-full h-full object-cover" />
+                              {currentGrade?.is_best && (
+                                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                                  Best
+                                </span>
+                              )}
+                              {isSelected && (
+                                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Selected
+                                </span>
+                              )}
                             </div>
-                            <div className="px-2 py-1.5 flex items-center justify-between bg-white">
-                              <span className="text-[8px] font-bold text-amber-500">#{existingGrades.length + idx + 1}</span>
-                              <span className="text-[7px] text-amber-400 font-semibold">Pending</span>
-                            </div>
-                          </div>
-                          <button type="button" onClick={() => removeImageSlot(idx)}
-                            className="absolute -top-1 -right-1 z-10 w-4 h-4 rounded-full bg-white border border-line text-gray-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors shadow-sm">
-                            <X size={7} />
-                          </button>
+                          )}
                         </div>
-                      ))}
-
-                      {/* Empty drop slots */}
-                      {Array.from({ length: Math.max(0, 4 - existingGrades.length - imageSlots.length) }).map((_, i) => (
-                        <label key={`empty-${i}`} className="rounded-xl border-2 border-dashed border-line flex flex-col cursor-pointer bg-white hover:bg-primary-bg hover:border-primary/30 transition-all group overflow-hidden">
-                          <div className="aspect-square w-full flex flex-col items-center justify-center gap-1">
-                            <div className="w-7 h-7 rounded-full border border-dashed border-gray-200 flex items-center justify-center text-gray-300 group-hover:border-primary/40 group-hover:text-primary transition-colors">
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                              </svg>
-                            </div>
-                            <p className="text-[7px] font-semibold text-gray-300 group-hover:text-primary transition-colors">Add</p>
-                          </div>
-                          <div className="px-2 py-1.5 border-t border-line-light bg-gray-50">
-                            <span className="text-[8px] font-bold text-gray-300">#{existingGrades.length + imageSlots.length + i + 1}</span>
-                          </div>
-                          <input type="file" accept="image/*" className="hidden"
-                            onChange={e => { if (e.target.files?.[0]) addImageSlot(e.target.files[0]); e.target.value = ''; }} />
-                        </label>
-                      ))}
-                    </div>
-                  )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = Math.min(total - 1, safeIdx + 1);
+                            setSlotIndex(next);
+                            setSelectedImageIdx(next < existingGrades.length ? next : null);
+                          }}
+                          disabled={total === 0 || safeIdx >= total - 1}
+                          className="flex items-center justify-center w-10 h-10 text-gray-600 hover:bg-gray-50 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors border-l border-gray-200 shrink-0"
+                        >
+                          <ChevronRight size={18} strokeWidth={2.5} />
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
+              {(() => {
+                const tiles = [
+                  { label: 'Expansion', grade: expDigit,  src: tileImg?.exp_img_url, color: '#7c3aed' },
+                  { label: 'ICM',       grade: icmLetter, src: tileImg?.icm_img_url, color: '#0891b2' },
+                  { label: 'TE',        grade: teLetter,  src: tileImg?.te_img_url,  color: '#059669' },
+                ];
+                return (
+                  <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
+                    <div className="grid grid-cols-3 divide-x divide-line-light">
+                      {tiles.map(tile => (
+                        <div key={tile.label} className="relative bg-gray-50 overflow-hidden" style={{ height: 120 }}>
+                          {tile.src ? (
+                            <img src={tile.src} alt={tile.label} className="w-full h-full object-cover block" />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <ImageIcon size={14} className="text-gray-300" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)' }} />
+                          <div className="absolute bottom-0 left-0 right-0 px-2 pb-1.5">
+                            <p className="text-[7px] font-bold uppercase tracking-widest leading-none mb-0.5 text-white/70">{tile.label}</p>
+                            <p className="text-lg font-black text-white leading-none">{tile.grade}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}
 
-        {/* ── COL 3: sub-images + justifications paired + override + clinical note ── */}
+        {/* ── COL 3: action buttons + panels + embryo details ── */}
         {step === 'select-best' && (() => {
-          const g         = selectedImageIdx != null ? existingGrades[selectedImageIdx] ?? null : null;
-          const img       = g?.images[0] ?? null;
-          const gradeStr  = g?.grade ?? '';
-          const expDigit  = gradeStr[0] ?? '—';
-          const icmLetter = gradeStr[1] ?? '—';
-          const teLetter  = gradeStr[2] ?? '—';
-          const expLabel  = expDigit === '1' ? 'Early Blastocyst' : expDigit === '2' ? 'Blastocyst' : expDigit === '3' ? 'Full Blastocyst' : expDigit === '4' ? 'Expanded' : expDigit === '5' || expDigit === '6' ? 'Hatching' : null;
-          const icmLabel  = icmLetter === 'A' ? 'Many compact cells forming a well-defined mass.' : icmLetter === 'B' ? 'Few cells, loosely grouped inner cell mass.' : icmLetter === 'C' ? 'Very few cells, difficult to discern.' : null;
-          const teLabel   = teLetter  === 'A' ? 'Many cells forming a cohesive epithelial layer.' : teLetter  === 'B' ? 'Few cells, loose or uneven layer.' : teLetter  === 'C' ? 'Very few cells, large or irregular.' : null;
-          const tiles = [
-            { label: 'Expansion', grade: expDigit,  src: img?.exp_img_url, color: '#7c3aed', text: expLabel },
-            { label: 'ICM',       grade: icmLetter, src: img?.icm_img_url, color: '#0891b2', text: icmLabel },
-            { label: 'TE',        grade: teLetter,  src: img?.te_img_url,  color: '#059669', text: teLabel  },
-          ];
+          const panelBg = { background: 'linear-gradient(135deg, #f5f0ff 0%, #ede9fe 100%)' };
           return (
             <div className="overflow-y-auto flex flex-col gap-3 pr-0.5 h-full">
-              {/* Section title — AI assessment */}
-              <div className="rounded-xl border border-line bg-white px-4 py-2.5 bg-gradient-to-r from-surface to-white shrink-0">
-                <p className="text-xs font-bold text-gray-800">AI Assessment</p>
-                <p className="text-[9px] text-gray-400 mt-0.5">Morphology breakdown. Override if needed.</p>
-              </div>
-              {/* Each tile: wide card — image left flush, justification right */}
-              {tiles.map(tile => (
-                <div key={tile.label} className="rounded-xl border border-line flex bg-white shadow-sm hover:shadow-md transition-shadow">
-                  {/* Square image — fills left side completely */}
-                  <div className="relative bg-gray-50 shrink-0 overflow-hidden" style={{ width: 160, height: 160 }}>
-                    {tile.src ? (
-                      <img src={tile.src} alt={tile.label} className="w-full h-full object-cover block" />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <ImageIcon size={14} className="text-gray-300" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 55%)' }} />
-                    <div className="absolute bottom-0 left-0 right-0 px-2 pb-1.5">
-                      <p className="text-[7px] font-bold uppercase tracking-widest leading-none mb-0.5" style={{ color: `${tile.color}cc` }}>{tile.label}</p>
-                      <p className="text-xl font-black text-white leading-none">{tile.grade}</p>
-                    </div>
-                  </div>
-                  {/* Justification — colored left border as divider */}
-                  <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col justify-center bg-white" style={{ borderLeft: `3px solid ${tile.color}` }}>
-                    <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: tile.color }}>{tile.label}</p>
-                    <p className="text-[9px] text-gray-600 leading-snug">{tile.text ?? (g ? 'No data available.' : 'Select an image to view.')}</p>
-                  </div>
-                </div>
-              ))}
 
-              {/* Override AI Result */}
-              <div className="rounded-xl border border-line bg-white ">
-                <div className="px-3 py-2.5 border-b border-line-light flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Pencil size={10} className="text-primary" />
+              {/* Action buttons */}
+              <div className="flex flex-col gap-2 shrink-0">
+                <button type="button"
+                  onClick={() => setOverrideModalOpen(true)}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                  style={{ background: 'var(--gradient-primary)' }}>
+                  <Pencil size={13} />
+                  Override Grade
+                </button>
+                <button type="button"
+                  onClick={() => setActiveSection(prev => prev === 'note' ? null : 'note')}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                  style={{ background: 'var(--gradient-primary)', opacity: activeSection === 'note' ? 1 : 0.85 }}>
+                  <Lightbulb size={13} />
+                  Clinical Note
+                </button>
+                <button type="button"
+                  onClick={() => { setApproveSelectedIdx(selectedImageIdx); setApproveModalOpen(true); }}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                  style={{ background: 'var(--gradient-primary)' }}>
+                  <ShieldCheck size={13} />
+                  Approve Embryo Grading
+                </button>
+              </div>
+
+              {/* Clinical Note panel */}
+              {activeSection === 'note' && (
+                <div className="rounded-xl border border-primary/20 shrink-0" style={panelBg}>
+                  <div className="px-3 pt-3 pb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Lightbulb size={10} className="text-primary" />
+                      </div>
+                      <p className="text-[9px] font-bold text-primary uppercase tracking-widest">Clinical Note</p>
+                    </div>
+                    {noteDraft.trim() && (
+                      <span className="text-[8px] font-semibold text-emerald-600 flex items-center gap-1">
+                        <Check size={9} strokeWidth={3} /> Saved
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-primary leading-none">Override AI Result</p>
-                    <p className="text-[8px] text-gray-400 mt-0.5">Adjust grade and morphology fields</p>
+                  <div className="px-3 pb-3 flex flex-col gap-2">
+                    <textarea
+                      value={noteDraft}
+                      onChange={e => setNoteDraft(e.target.value)}
+                      placeholder="Add a clinical observation..."
+                      rows={3}
+                      className="w-full text-[9px] text-gray-700 bg-white/80 border border-primary/20 rounded-xl px-2.5 py-1.5 outline-none resize-none placeholder:text-gray-400 focus:border-primary/50 leading-relaxed"
+                    />
+                    <button type="button" disabled={!noteDraft.trim()}
+                      className="w-full py-1.5 rounded-xl text-[9px] font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-35 disabled:cursor-not-allowed"
+                      style={{ background: 'var(--gradient-primary)' }}>
+                      Update Note
+                    </button>
+                    <p className="text-[8px] text-gray-400 text-center leading-relaxed">
+                      AI assessment is for reference only and does not replace clinical judgment.
+                    </p>
                   </div>
                 </div>
-                {overrideVals ? (
-                  <div className="flex flex-col divide-y divide-line-light">
-                    <div className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-[9px] font-semibold tracking-widest text-gray-400 uppercase">Grade</span>
-                      <input value={overrideVals.grade}
-                        onChange={e => setOverrideVals(v => v ? { ...v, grade: e.target.value } : v)}
-                        className="text-sm font-extrabold text-right border-b-2 border-primary outline-none w-14 text-primary bg-transparent" />
-                    </div>
-                    <div className="px-3 py-2.5 flex flex-col gap-1.5">
-                      <p className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">Quality Flags</p>
-                      {([
-                        { label: 'Hatching',        key: 'hatching'        as keyof OverrideVals, opts: ['Not Hatching', 'Hatching', 'Partially Hatching'] },
-                        { label: 'Vacuolization',   key: 'vacuolization'   as keyof OverrideVals, opts: ['None', 'Mild', 'Moderate', 'Severe'] },
-                        { label: 'Multinucleation', key: 'multinucleation' as keyof OverrideVals, opts: ['None', 'Minimal', 'Present'] },
-                      ]).map(({ label, key, opts }) => (
-                        <div key={label} className="flex items-center justify-between">
-                          <span className="text-[9px] text-gray-500">{label}</span>
-                          <select value={overrideVals[key]}
-                            onChange={e => setOverrideVals(v => v ? { ...v, [key]: e.target.value } : v)}
-                            className="text-[9px] font-bold border border-primary/30 rounded-md px-1.5 py-0.5 outline-none text-primary bg-primary/[0.04] max-w-[120px]">
-                            {opts.map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
+              )}
+
+              {/* Embryo Details */}
+              <div className="rounded-xl border border-line bg-white p-4 shrink-0">
+                <p className="text-[9px] font-semibold tracking-widest text-gray-500 uppercase mb-3">Embryo Details</p>
+                <table className="w-full text-[10px]">
+                  <tbody className="divide-y divide-[#F8F4FD]">
+                    {[
+                      { label: 'Patient ID',   value: embryo?.hisNumber || his || '—' },
+                      { label: 'Oocyte No.',   value: selectedOocyteNo != null ? String(selectedOocyteNo) : '—' },
+                      { label: 'D0 Maturity',  value: selectedLog?.d0_maturity || '—' },
+                      { label: 'D1 PN',        value: selectedLog?.d1_pn || '—' },
+                      { label: 'D3 Grade',     value: selectedLog?.d3_grade || '—' },
+                      { label: 'Fate',         value: selectedLog?.fate || '—' },
+                    ].map(r => (
+                      <tr key={r.label}>
+                        <td className="py-1.5 text-gray-600 font-medium">{r.label}</td>
+                        <td className="py-1.5 text-gray-900 font-semibold text-right">{r.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Result Preview */}
+              <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
+                <div className="px-3 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white">
+                  <p className="text-[9px] font-semibold tracking-widest text-gray-400 uppercase">Result (Preview)</p>
+                </div>
+                {selectedGrade ? (() => {
+                  const g = selectedGrade;
+                  const thumb = g.images[0]?.upload_image_url ?? null;
+                  const score = g.ai_score ?? null;
+                  return (
+                    <div className="flex flex-col divide-y divide-[#F8F4FD]">
+                      {/* Identity row */}
+                      <div className="flex items-center gap-3 px-3 py-2.5">
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden shrink-0">
+                          {thumb
+                            ? <img src={thumb} alt="thumb" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={14} className="text-gray-300" /></div>
+                          }
                         </div>
-                      ))}
-                    </div>
-                    <div className="px-3 py-2.5 flex flex-col gap-1.5">
-                      <p className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">Morphology</p>
-                      {([
-                        { label: 'Fragmentation',  key: 'fragmentation'  as keyof OverrideVals, opts: ['< 5%', '< 10%', '< 15%', '< 20%', '> 20%'] },
-                        { label: 'Symmetry',       key: 'symmetry'       as keyof OverrideVals, opts: ['Excellent', 'Good', 'Fair', 'Poor'] },
-                        { label: 'Zona Pellucida', key: 'zona_pellucida' as keyof OverrideVals, opts: ['Intact', 'Good', 'Thinning'] },
-                        { label: 'Blastocoel',     key: 'blastocoel'     as keyof OverrideVals, opts: ['Excellent', 'Good', 'Fair', 'Poor'] },
-                        { label: 'Cyto. Gran.',    key: 'cyto_gran'      as keyof OverrideVals, opts: ['Fine', 'Coarse'] },
-                        { label: 'Bridge',         key: 'bridge'         as keyof OverrideVals, opts: ['None', 'Minimal', 'Present'] },
-                      ]).map(({ label, key, opts }) => (
-                        <div key={label} className="flex items-center justify-between">
-                          <span className="text-[9px] text-gray-500">{label}</span>
-                          <select value={overrideVals[key]}
-                            onChange={e => setOverrideVals(v => v ? { ...v, [key]: e.target.value } : v)}
-                            className="text-[9px] font-bold border border-primary/30 rounded-md px-1.5 py-0.5 outline-none text-primary bg-primary/[0.04] max-w-[120px]">
-                            {opts.map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <p className="text-[10px] font-bold text-gray-800">Oocyte #{selectedOocyteNo ?? '—'}</p>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                              Image #{(selectedImageIdx ?? 0) + 1}
+                            </span>
+                            {g.grade && (
+                              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md border border-current/20 ${gradeTextCls(g.grade)}`}>
+                                {g.grade}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      ))}
+                      </div>
+                      {/* Grade + Score */}
+                      <div className="px-3 py-2.5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase">Grade</span>
+                          <span className={`text-base font-black ${g.grade ? gradeTextCls(g.grade) : 'text-gray-400'}`}>{g.grade || '—'}</span>
+                        </div>
+                        {score != null && (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase">AI Score</span>
+                              <span className={`text-[10px] font-black ${scoreTextCls(score)}`}>{score} / 10</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                              <div className={`h-full rounded-full ${scoreBarCls(score)}`} style={{ width: `${(score / 10) * 100}%` }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {/* Quality Flags */}
+                      {(g.hatching || g.vacuolization || g.multinucleation) && (
+                        <div className="px-3 py-2.5 flex flex-col gap-1.5">
+                          <p className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">Quality Flags</p>
+                          {[
+                            { label: 'Hatching',        val: g.hatching },
+                            { label: 'Vacuolization',   val: g.vacuolization },
+                            { label: 'Multinucleation', val: g.multinucleation },
+                          ].filter(r => r.val).map(r => (
+                            <div key={r.label} className="flex items-center justify-between">
+                              <span className="text-[9px] text-gray-500">{r.label}</span>
+                              <span className={`text-[8px] font-semibold px-2 py-0.5 rounded-full ${flagBadgeCls(r.val!)}`}>{r.val}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Morphology */}
+                      {(g.zona_pellucida || g.blastocoel || g.cytoplasmic_granularity || g.bridge) && (
+                        <div className="px-3 py-2.5 flex flex-col gap-1.5">
+                          <p className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">Morphology</p>
+                          {[
+                            { label: 'Zona Pellucida', val: g.zona_pellucida },
+                            { label: 'Blastocoel',     val: g.blastocoel },
+                            { label: 'Cyto. Gran.',    val: g.cytoplasmic_granularity },
+                            { label: 'Bridge',         val: g.bridge },
+                          ].filter(r => r.val).map(r => (
+                            <div key={r.label} className="flex items-center justify-between">
+                              <span className="text-[9px] text-gray-500">{r.label}</span>
+                              <span className={`text-[8px] font-semibold px-2 py-0.5 rounded-full ${flagBadgeCls(r.val!)}`}>{r.val}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="px-3 py-5 text-center">
-                    <p className="text-[9px] text-gray-400">Select an image to override its grade.</p>
+                  );
+                })() : (
+                  <div className="px-3 py-6 text-center">
+                    <p className="text-[9px] text-gray-400">Select an image to see result preview.</p>
                   </div>
                 )}
-              </div>
-
-              {/* Clinical note */}
-              <div className="rounded-xl border border-primary/20 " style={{ background: 'linear-gradient(135deg, #f5f0ff 0%, #ede9fe 100%)' }}>
-                <div className="px-3 pt-3 pb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <Lightbulb size={10} className="text-primary" />
-                    </div>
-                    <p className="text-[9px] font-bold text-primary uppercase tracking-widest">Clinical Note</p>
-                  </div>
-                  {noteDraft.trim() && (
-                    <span className="text-[8px] font-semibold text-emerald-600 flex items-center gap-1">
-                      <Check size={9} strokeWidth={3} /> Saved
-                    </span>
-                  )}
-                </div>
-                <div className="px-3 pb-3 flex flex-col gap-2">
-                  <textarea
-                    value={noteDraft}
-                    onChange={e => setNoteDraft(e.target.value)}
-                    placeholder="Add a clinical observation..."
-                    rows={3}
-                    className="w-full text-[9px] text-gray-700 bg-white/80 border border-primary/20 rounded-xl px-2.5 py-1.5 outline-none resize-none placeholder:text-gray-400 focus:border-primary/50 leading-relaxed"
-                  />
-                  <button type="button" disabled={!noteDraft.trim()}
-                    className="w-full py-1.5 rounded-xl text-[9px] font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-35 disabled:cursor-not-allowed"
-                    style={{ background: 'var(--gradient-primary)' }}>
-                    Update Note
-                  </button>
-                  <p className="text-[8px] text-gray-400 text-center leading-relaxed">
-                    AI assessment is for reference only and does not replace clinical judgment.
-                  </p>
-                </div>
               </div>
 
             </div>
@@ -757,6 +806,278 @@ export default function AdvancedEmbryoGradingPage() {
           </>
         )}
       </div>
+
+      {/* ── Approve Embryo Grading Modal ── */}
+      {approveModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={e => { if (e.target === e.currentTarget) setApproveModalOpen(false); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-line flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <ShieldCheck size={15} className="text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">Approve Embryo Grading</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Select the best graded image to approve for the clinical record</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setApproveModalOpen(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Cards row */}
+            <div className="flex gap-4 overflow-x-auto p-5 min-h-0">
+              {existingGrades.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 py-12 text-center">
+                  <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                    <ImageIcon size={18} className="text-gray-300" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-400">No graded images yet</p>
+                  <p className="text-[10px] text-gray-300">Run AI analysis first to generate grades</p>
+                </div>
+              ) : existingGrades.map((grade, idx) => {
+                const isSelected = approveSelectedIdx === idx;
+                const mock = MOCK_PER_IMAGE[idx] ?? MOCK_PER_IMAGE[0];
+                const score = grade.ai_score ?? mock.score;
+                const gradeStr = grade.grade ?? mock.grade ?? '';
+                const hatching = grade.hatching ?? mock.hatching;
+                const vacuolization = grade.vacuolization ?? mock.vacuolization;
+                const multinucleation = grade.multinucleation ?? mock.multinucleation;
+                const imgUrl = grade.images[0]?.upload_image_url;
+                return (
+                  <div
+                    key={grade.grade_id}
+                    onClick={() => setApproveSelectedIdx(idx)}
+                    className={`relative flex-shrink-0 w-44 rounded-2xl border-2 cursor-pointer transition-all overflow-hidden bg-white flex flex-col ${
+                      isSelected ? 'border-primary shadow-xl shadow-primary/20' : 'border-gray-200 hover:border-primary/40 hover:shadow-md'
+                    }`}
+                  >
+                    {/* YOU SELECTED banner */}
+                    {isSelected && (
+                      <div className="bg-primary py-1.5 flex justify-center shrink-0">
+                        <span className="text-[8px] font-black text-white uppercase tracking-widest">You Selected</span>
+                      </div>
+                    )}
+                    {/* Image */}
+                    <div className="relative bg-gray-100 overflow-hidden shrink-0" style={{ height: 156 }}>
+                      {imgUrl ? (
+                        <img src={imgUrl} alt={`Grade ${idx + 1}`} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <ImageIcon size={20} className="text-gray-300" />
+                        </div>
+                      )}
+                      {/* Index badge */}
+                      <div className="absolute top-2 left-2 z-10 w-6 h-6 rounded-lg bg-primary flex items-center justify-center shadow-sm">
+                        <span className="text-[9px] font-black text-white">{idx + 1}</span>
+                      </div>
+                      {/* X button */}
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setApproveModalOpen(false); setDeactivateGradeId(grade.grade_id); }}
+                        className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-gray-500 hover:bg-red-50 hover:text-red-500 transition-colors shadow-sm"
+                      >
+                        <X size={9} />
+                      </button>
+                    </div>
+                    {/* Info */}
+                    <div className="flex-1 px-3 pt-2.5 pb-1 flex flex-col gap-2">
+                      {/* Image label */}
+                      <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-50 border border-gray-100 self-start">
+                        <ImageIcon size={8} className="text-gray-400" />
+                        <span className="text-[8px] font-semibold text-gray-500">Image #{idx + 1}</span>
+                      </div>
+                      {/* Grade + score */}
+                      <div>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[8px] font-semibold text-gray-400">Grade</span>
+                          <span className={`text-[8px] font-bold ${scoreTextCls(score)}`}>{score.toFixed(1)} / 10</span>
+                        </div>
+                        <p className={`text-2xl font-black leading-none ${gradeTextCls(gradeStr)}`}>{gradeStr || '—'}</p>
+                        <div className="mt-1.5 h-1 rounded-full bg-gray-100 overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${scoreBarCls(score)}`} style={{ width: `${(score / 10) * 100}%` }} />
+                        </div>
+                      </div>
+                      {/* Quality flags */}
+                      <div className="flex flex-col gap-1">
+                        <p className="text-[7px] font-black uppercase tracking-widest text-gray-400">Quality Flags</p>
+                        {[
+                          { label: 'Hatching',       value: hatching       },
+                          { label: 'Vacuolization',  value: vacuolization  },
+                          { label: 'Multinucleation',value: multinucleation },
+                        ].map(f => (
+                          <div key={f.label} className="flex items-center justify-between">
+                            <span className="text-[8px] text-gray-500">{f.label}</span>
+                            {f.value ? (
+                              <span className={`text-[7px] font-semibold px-1.5 py-0.5 rounded-md ${flagBadgeCls(f.value)}`}>{f.value}</span>
+                            ) : (
+                              <span className="text-[8px] text-gray-300">—</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Radio */}
+                    <div className="pb-3 flex justify-center shrink-0">
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                        isSelected ? 'border-primary bg-primary' : 'border-gray-300'
+                      }`}>
+                        {isSelected && <Check size={11} strokeWidth={3} className="text-white" />}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-line flex items-center justify-between shrink-0">
+              <p className="text-[10px] text-gray-400">
+                {approveSelectedIdx != null
+                  ? `Image #${approveSelectedIdx + 1} selected — grade ${existingGrades[approveSelectedIdx]?.grade ?? '—'}`
+                  : 'Select an image above to approve'}
+              </p>
+              <button
+                type="button"
+                disabled={approveSelectedIdx === null || completing}
+                onClick={() => {
+                  const idx = approveSelectedIdx!;
+                  setSelectedImageIdx(idx);
+                  setApproveModalOpen(false);
+                  handleConfirmSelection(idx);
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: 'var(--gradient-primary)' }}
+              >
+                <ShieldCheck size={13} />
+                {completing ? 'Saving…' : 'Confirm & Approve'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Override Grade Modal ── */}
+      {overrideModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={e => { if (e.target === e.currentTarget) setOverrideModalOpen(false); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-line flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Pencil size={14} className="text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">Override AI Grade</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Manually adjust grade and morphology fields</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setOverrideModalOpen(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">
+                <X size={15} />
+              </button>
+            </div>
+
+            {overrideVals ? (
+              <>
+                <div className="px-5 py-4 flex flex-col gap-5 overflow-y-auto">
+                  {/* Grade hero */}
+                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-primary/5 border border-primary/10">
+                    <div className="flex-1">
+                      <p className="text-[8px] font-bold uppercase tracking-widest text-primary/50 mb-1">Grade</p>
+                      <input
+                        value={overrideVals.grade}
+                        onChange={e => setOverrideVals(v => v ? { ...v, grade: e.target.value } : v)}
+                        className="text-2xl font-black text-primary bg-transparent outline-none border-b-2 border-primary w-24"
+                        placeholder="e.g. 4AA"
+                      />
+                      <p className="text-[8px] text-primary/40 mt-1">Type directly to edit</p>
+                    </div>
+                    <div className={`text-5xl font-black leading-none ${gradeTextCls(overrideVals.grade)}`}>
+                      {overrideVals.grade || '—'}
+                    </div>
+                  </div>
+
+                  {/* Quality Flags */}
+                  <div>
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-2.5">Quality Flags</p>
+                    <div className="flex flex-col gap-2">
+                      {([
+                        { label: 'Hatching',        key: 'hatching'        as keyof OverrideVals, opts: ['Not Hatching', 'Hatching', 'Partially Hatching'] },
+                        { label: 'Vacuolization',   key: 'vacuolization'   as keyof OverrideVals, opts: ['None', 'Mild', 'Moderate', 'Severe'] },
+                        { label: 'Multinucleation', key: 'multinucleation' as keyof OverrideVals, opts: ['None', 'Minimal', 'Present'] },
+                      ]).map(({ label, key, opts }) => (
+                        <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50">
+                          <span className="text-xs text-gray-600 font-medium">{label}</span>
+                          <select
+                            value={overrideVals[key]}
+                            onChange={e => setOverrideVals(v => v ? { ...v, [key]: e.target.value } : v)}
+                            className="text-xs font-semibold border border-primary/20 rounded-lg px-2.5 py-1 outline-none text-primary bg-primary/[0.04] hover:border-primary/40 transition-colors"
+                          >
+                            {opts.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Morphology */}
+                  <div>
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-2.5">Morphology</p>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+                      {([
+                        { label: 'Fragmentation',  key: 'fragmentation'  as keyof OverrideVals, opts: ['< 5%', '< 10%', '< 15%', '< 20%', '> 20%'] },
+                        { label: 'Symmetry',       key: 'symmetry'       as keyof OverrideVals, opts: ['Excellent', 'Good', 'Fair', 'Poor'] },
+                        { label: 'Zona Pellucida', key: 'zona_pellucida' as keyof OverrideVals, opts: ['Intact', 'Good', 'Thinning'] },
+                        { label: 'Blastocoel',     key: 'blastocoel'     as keyof OverrideVals, opts: ['Excellent', 'Good', 'Fair', 'Poor'] },
+                        { label: 'Cyto. Gran.',    key: 'cyto_gran'      as keyof OverrideVals, opts: ['Fine', 'Coarse'] },
+                        { label: 'Bridge',         key: 'bridge'         as keyof OverrideVals, opts: ['None', 'Minimal', 'Present'] },
+                      ]).map(({ label, key, opts }) => (
+                        <div key={label} className="flex flex-col gap-1 py-1.5">
+                          <span className="text-[9px] text-gray-500 font-medium">{label}</span>
+                          <select
+                            value={overrideVals[key]}
+                            onChange={e => setOverrideVals(v => v ? { ...v, [key]: e.target.value } : v)}
+                            className="text-[10px] font-semibold border border-gray-200 rounded-lg px-2 py-1 outline-none text-gray-700 bg-white hover:border-primary/40 focus:border-primary transition-colors"
+                          >
+                            {opts.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-4 border-t border-line shrink-0">
+                  <button type="button" onClick={() => setOverrideModalOpen(false)}
+                    className="w-full py-2.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity"
+                    style={{ background: 'var(--gradient-primary)' }}>
+                    Save Override
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="px-5 py-10 flex flex-col items-center gap-3 text-center">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                  <ImageIcon size={18} className="text-gray-300" />
+                </div>
+                <p className="text-sm font-semibold text-gray-400">No image selected</p>
+                <p className="text-[10px] text-gray-300">Select an image from the strip first to override its grade.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {deactivateGradeId !== null && (
         <ConfirmDialog
