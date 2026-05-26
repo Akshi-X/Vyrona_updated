@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, ChevronLeft, ChevronRight, Check, Trash2, ImageIcon, Trophy, Lightbulb, Pencil, X, ShieldCheck, Shield, Minus, Sparkles, AlertCircle } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Check, Trash2, ImageIcon, Lightbulb, Pencil, X, ShieldCheck } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import type { IVFTreatment } from '../../types/ivf';
 import { ivfService, type IvfCycleLog, type IvfGrade } from '../../services/ivfService';
@@ -57,16 +57,6 @@ const scoreTextCls = (score: number) => {
   return 'text-orange-400';
 };
 
-const assessmentValueIcon = (val: string) => {
-  const p = { size: 8, strokeWidth: 2.5 };
-  if (val === 'Not Hatching') return <ShieldCheck {...p} />;
-  if (val === 'Intact')       return <Shield {...p} />;
-  if (val === 'Excellent')    return <Sparkles {...p} />;
-  if (val === 'Fine')         return <Check {...p} />;
-  if (val === 'None')         return <Minus {...p} />;
-  if (val === 'Minimal' || val === 'Mild') return <AlertCircle {...p} />;
-  return null;
-};
 
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -91,7 +81,6 @@ export default function AdvancedEmbryoGradingPage() {
 
   // Select Best Grade step
   const [selectedImageIdx, setSelectedImageIdx] = useState<number | null>(null);
-  const [confidence, setConfidence] = useState<'Low' | 'Medium' | 'High' | null>(null);
   const [deactivateGradeId, setDeactivateGradeId] = useState<number | null>(null);
 
   // Grade IDs created during analysis (index matches imageSlots)
@@ -105,8 +94,8 @@ export default function AdvancedEmbryoGradingPage() {
 
   // Existing grades for selected oocyte
   const [existingGrades, setExistingGrades] = useState<IvfGrade[]>([]);
-  const [gradesLoading, setGradesLoading] = useState(false);
-  const [gradesError, setGradesError] = useState<string | null>(null);
+  const [, setGradesLoading] = useState(false);
+  const [, setGradesError] = useState<string | null>(null);
 
   // Upload state
   const [uploading, setUploading] = useState(false);
@@ -144,19 +133,6 @@ export default function AdvancedEmbryoGradingPage() {
   }, [selectedImageIdx, existingGrades]);
 
   // ── Image slot handlers ───────────────────────────────────────────────────
-
-  const addImageSlot = (file: File) => {
-    if (existingGrades.length + imageSlots.length >= 4) return;
-    setImageSlots(prev => [...prev, { file, url: URL.createObjectURL(file) }]);
-    setUploadError(null);
-  };
-
-  const removeImageSlot = (idx: number) => {
-    setImageSlots(prev => {
-      URL.revokeObjectURL(prev[idx].url);
-      return prev.filter((_, i) => i !== idx);
-    });
-  };
 
   const clearAll = () => {
     imageSlots.forEach(s => URL.revokeObjectURL(s.url));
@@ -791,7 +767,7 @@ export default function AdvancedEmbryoGradingPage() {
                   {!uploading && <ChevronRight size={14} />}
                 </button>
               )}
-              <button type="button" disabled={selectedImageIdx === null || completing} onClick={handleConfirmSelection}
+              <button type="button" disabled={selectedImageIdx === null || completing} onClick={() => handleConfirmSelection()}
                 className="inline-flex items-center gap-3 pl-4 pr-3 py-2 rounded-xl text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ background: 'var(--gradient-primary)' }}>
                 <div className="flex flex-col items-start">

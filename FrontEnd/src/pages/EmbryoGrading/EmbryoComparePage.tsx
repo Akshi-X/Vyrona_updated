@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Trophy, GitCompare, Star, Search, Info, ChevronDown, Check } from 'lucide-react';
+import { X, Trophy, GitCompare, Star, Info, ChevronDown, Check } from 'lucide-react';
 import type { BlastocystMorphology } from '../../types/embryo';
 
 interface LeaderboardEmbryo {
@@ -133,12 +133,6 @@ function scorePillStyle(score: number): React.CSSProperties {
   return { background: '#ffe4e6', color: '#9f1239' };
 }
 
-function scoreTextCls(score: number): string {
-  if (score >= 8) return 'text-emerald-700';
-  if (score >= 6) return 'text-orange-600';
-  return 'text-rose-600';
-}
-
 function criticalStyle(val: string): { borderColor: string; background: string; color: string } {
   const v = val.toLowerCase();
   if (v === 'none' || v === 'not hatching') return { borderColor: '#10b981', background: '#f0fdf4', color: '#065f46' };
@@ -244,7 +238,6 @@ export default function EmbryoComparePage() {
             </div>
 
             {compareMode === 'images' && (() => {
-              const oocyte = LEADERBOARD_EMBRYOS.find(e => e.id === selectedOocyteId);
               return (
                 <>
                   {/* Custom oocyte dropdown */}

@@ -1352,7 +1352,6 @@ export default function AlertSetting() {
                 refrigerator_id: primaryContainer.is_refrigerator
                     ? (primaryContainer.refrigerator_id ?? null)
                     : null,
-                zone_id: primaryContainer.is_refrigerator ? null : null,
                 kpi_name: (formPayload.kpi_name ?? "").trim(),
                 alert_name: formPayload.alert_name ?? null,
                 min: formPayload.min ?? null,
@@ -1559,7 +1558,6 @@ export default function AlertSetting() {
                 if (primaryContainer?.is_refrigerator) {
                     await ivfService.bulkUpsertKpiConfigForRefrigerator(
                         primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
-                        null,
                         configsToApply,
                     );
                 } else if (primaryContainer?.is_incubator) {
@@ -1701,7 +1699,6 @@ export default function AlertSetting() {
                     if (primaryContainer.is_refrigerator) {
                         await ivfService.bulkUpsertKpiConfigForRefrigerator(
                             primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
-                            null,
                             configsToApply,
                         );
                     } else if (primaryContainer.is_incubator) {
