@@ -66,7 +66,6 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     defaultIncubatorId,
     defaultChamberId,
     defaultRefrigeratorId,
-    defaultZoneId,
     id,
     embedded = false,
 }) => {

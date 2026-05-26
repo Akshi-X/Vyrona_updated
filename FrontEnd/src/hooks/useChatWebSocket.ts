@@ -751,7 +751,7 @@ export function useRefrigeratorChatWebSocket(refrigeratorId: number | undefined,
 
   const fetchMessages = useCallback(() => {
     if (refrigeratorId == null) return;
-    chatService.getRefrigeratorMessages(refrigeratorId, zoneId).then((response) => {
+    chatService.getRefrigeratorMessages(refrigeratorId).then((response) => {
       setMessages(response.messages || []);
       setUnreadCount(response.unread_count || 0);
     }).catch((error) => {
@@ -841,7 +841,7 @@ export function useRefrigeratorChatWebSocket(refrigeratorId: number | undefined,
 
   const markAsRead = useCallback(() => {
     if (refrigeratorId == null) return;
-    chatService.markRefrigeratorAsRead(refrigeratorId, zoneId).catch((error) => {
+    chatService.markRefrigeratorAsRead(refrigeratorId).catch((error) => {
       console.error('[Refrigerator Chat WS] Error marking as read:', error);
     });
   }, [refrigeratorId, zoneId]);

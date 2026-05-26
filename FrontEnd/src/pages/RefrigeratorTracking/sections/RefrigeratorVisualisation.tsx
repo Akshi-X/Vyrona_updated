@@ -539,9 +539,7 @@ export default function RefrigeratorVisualisation({
   onEditTask,
   currentUserName = '',
   currentUserId = '',
-  refrigeratorCode,
   refrigeratorId,
-  branchName,
 }: RefrigeratorVisualisationProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<{

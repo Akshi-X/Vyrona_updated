@@ -468,7 +468,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         } else if (isIncubatorFlow && incubatorId != null) {
           chatService.markIncubatorAsRead(incubatorId, chamberId).catch(() => {});
         } else if (isRefrigeratorFlow && refrigeratorId != null) {
-          chatService.markRefrigeratorAsRead(refrigeratorId, zoneId).catch(() => {});
+          chatService.markRefrigeratorAsRead(refrigeratorId).catch(() => {});
         }
       }
       hasMarkedAsReadRef.current = true;
@@ -537,7 +537,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         } else if (isIncubatorFlow && incubatorId != null) {
           chatService.markIncubatorAsRead(incubatorId, chamberId).catch(() => {});
         } else if (isRefrigeratorFlow && refrigeratorId != null) {
-          chatService.markRefrigeratorAsRead(refrigeratorId, zoneId).catch(() => {});
+          chatService.markRefrigeratorAsRead(refrigeratorId).catch(() => {});
         }
       }
       hasMarkedAsReadRef.current = true;
