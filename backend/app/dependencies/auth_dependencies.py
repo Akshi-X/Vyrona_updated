@@ -49,7 +49,7 @@ from ..exceptions import TokenExpiredException
 from ..models.user_model import User
 from ..schemas.user_schema import UserRegister
 from ..auth.auth import verify_token
-from ..utils.user_helpers import get_hospital_by_email_domain
+from ..utils.user_helpers import get_hospital_by_email_domain, is_specific_department
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,13 @@ def get_current_user(request: Request) -> User:
         raise InvalidCredentialsException(email="unknown")
 
     return request.state.current_user
+
+
+def require_ivf_department(current_user: User = Depends(get_current_user)) -> User:
+    """Require the authenticated user to belong to the IVF department."""
+    if not is_specific_department(current_user.department, "IVF"):
+        raise HTTPException(status_code=403, detail="Access denied: This endpoint is for IVF users only")
+    return current_user
 
 
 def get_current_user_pharma_id(request: Request) -> int:

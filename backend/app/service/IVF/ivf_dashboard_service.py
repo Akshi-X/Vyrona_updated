@@ -15,6 +15,7 @@ from ...models.IVF.tank_model import Tank
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.ivf_shipment_model import IVFShipment
+from ...models.IVF.critical_alert_model import CriticalAlert
 
 
 class IVFDashboardService:
@@ -30,7 +31,7 @@ class IVFDashboardService:
     ) -> Dict[str, int]:
             """
             Get count of KPI deviation alerts grouped by KpiConfig.alert_name.
-            Optionally filtered by created_at range (from_dt, to_dt).
+            Optionally filtered by occurred_at range (from_dt, to_dt).
             """
             filter_branch_id = self._get_branch_filter(branch_id, role)
 
@@ -49,8 +50,8 @@ class IVFDashboardService:
                                 c.hospital_id = :hospital_id
                                 AND c.source = 'KPI'
                                 AND (:branch_id IS NULL OR c.branch_id = :branch_id)
-                                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
-                                AND (:to_dt IS NULL OR c.created_at < :to_dt)
+                                AND (:from_dt IS NULL OR c.occurred_at >= :from_dt)
+                                AND (:to_dt IS NULL OR c.occurred_at < :to_dt)
                             GROUP BY
                                 COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown');""")
 
@@ -225,15 +226,12 @@ class IVFDashboardService:
     
     def get_quality_deviations_flagged(self, branch_id: Optional[int] = None, hospital_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
-        Get count of quality deviations flagged.
+        Get count of quality deviations flagged for current month.
         
         Metric 3: # Quality Deviations Flagged (For all Sites)
         
-        Quality deviations are telemetry-driven and based on `ivf_quality_log`:
-        - Any entry with `quality_loss > 0`, or any KPI loss flag set:
-          `is_temp_internal_loss`, `is_temp_external_loss`, `is_shock_loss`
-        
-        KPIs monitored: Internal Temperature, External Temperature, Shock
+        Quality deviations are KPI-sourced critical alerts for the current month.
+        Counts CriticalAlert entries with source='KPI' and occurred_at in current month.
         
         Args:
             branch_id: Optional branch ID to filter by
@@ -241,37 +239,31 @@ class IVFDashboardService:
             role: User's role to determine filtering
             
         Returns:
-            Dictionary with total_quality_deviations count and breakdown counts
+            Dictionary with total_quality_deviations count
         """
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        # Base query: count deviations in ivf_quality_log
-        # A deviation is defined as any KPI loss flag or quality_loss > 0
-        base_filter = or_(
-            and_(IVFQualityLog.quality_loss.isnot(None), IVFQualityLog.quality_loss > 0),
-            IVFQualityLog.is_temp_internal_loss == True,
-            IVFQualityLog.is_temp_external_loss == True,
-            IVFQualityLog.is_shock_loss == True,
+        # Get current month bounds
+        current_month_start, next_month_start = self._get_current_month_bounds()
+        
+        # Query critical_alerts for KPI deviations in current month
+        # Filter on occurred_at (actual event time), not created_at (insertion time)
+        q = self.db.query(
+            func.count(CriticalAlert.alert_id).label("total_quality_deviations"),
+        ).filter(
+            CriticalAlert.source == "KPI",
+            CriticalAlert.occurred_at >= current_month_start,
+            CriticalAlert.occurred_at < next_month_start,
         )
         
-        q = self.db.query(
-            func.count(IVFQualityLog.id).label("total_quality_deviations"),
-        ).filter(base_filter)
+        # Apply hospital_id filter (required)
+        if hospital_id is not None:
+            q = q.filter(CriticalAlert.hospital_id == hospital_id)
         
-        # Apply branch or hospital filtering if needed (ivf_quality_log is tank-level monitoring)
+        # Apply branch filtering if needed
         if filter_branch_id is not None:
-            q = (
-                q.join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
-                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                 .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
-        elif hospital_id is not None:
-            q = (
-                q.join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
-                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                 .filter(HospitalBranch.hospital_id == hospital_id)
-            )
+            q = q.filter(CriticalAlert.branch_id == filter_branch_id)
         
         row = q.first()
         total_deviations = int(row.total_quality_deviations or 0)
@@ -310,62 +302,37 @@ class IVFDashboardService:
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        # Helper function to build query with optional branch/hospital filtering
-        # Join through: IVFQualityLog -> Tank -> Branch (tank-level monitoring)
-        def build_query(deviation_filter):
-            query = (
-                self.db.query(func.count(IVFQualityLog.id))
-                .filter(deviation_filter)
+        # Get current month bounds
+        current_month_start, next_month_start = self._get_current_month_bounds()
+        
+        # Get KPI deviation counts for current month
+        if hospital_id is not None:
+            deviations = self.get_deviation_counts_by_kpi(
+                hospital_id=hospital_id,
+                branch_id=filter_branch_id,
+                role=role,
+                from_dt=current_month_start,
+                to_dt=next_month_start,
             )
-            
-            if filter_branch_id is not None:
-                query = (
-                    query
-                    .join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(HospitalBranch.branch_id == filter_branch_id)
-                )
-            elif hospital_id is not None:
-                query = (
-                    query
-                    .join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(HospitalBranch.hospital_id == hospital_id)
-                )
-            
-            return query
+        else:
+            deviations = {}
         
-        # Count internal temperature deviations
-        temp_internal_count = build_query(IVFQualityLog.is_temp_internal_loss == True).scalar() or 0
-        
-        # Count external temperature deviations
-        temp_external_count = build_query(IVFQualityLog.is_temp_external_loss == True).scalar() or 0
-        
-        # Count shock deviations
-        shock_count = build_query(IVFQualityLog.is_shock_loss == True).scalar() or 0
-        
-        # Determine top driver
-        drivers = {
-            "Internal Temperature": temp_internal_count,
-            "External Temperature": temp_external_count,
-            "Shock": shock_count
-        }
-        
-        # Find top driver
-        if not any(drivers.values()):
+        # If no deviations, return N/A
+        if not deviations or sum(deviations.values()) == 0:
             return {
                 "driver_name": "N/A",
                 "count": 0,
-                "all_drivers": drivers
+                "all_drivers": deviations or {}
             }
         
-        top_driver = max(drivers.items(), key=lambda x: x[1])
+        # Find top driver
+        top_driver = max(deviations.items(), key=lambda x: x[1])
         driver_name, driver_count = top_driver
         
         return {
             "driver_name": driver_name,
             "count": driver_count,
-            "all_drivers": drivers
+            "all_drivers": deviations
         }
     
     def get_total_deviations(
@@ -487,6 +454,10 @@ class IVFDashboardService:
     ) -> Dict:
         filter_branch_id = self._get_branch_filter(branch_id, role)
         role_normalized = role.title() if role else None
+        
+        # Default to current month if no time range provided
+        if from_dt is None and to_dt is None:
+            from_dt, to_dt = self._get_current_month_bounds()
 
         if role_normalized == "User":
             query = text("""
@@ -511,8 +482,8 @@ class IVFDashboardService:
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
                 AND (:branch_id IS NULL OR b.branch_id = :branch_id)
-                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
-                AND (:to_dt IS NULL OR c.created_at < :to_dt)
+                AND (:from_dt IS NULL OR c.occurred_at >= :from_dt)
+                AND (:to_dt IS NULL OR c.occurred_at < :to_dt)
             GROUP BY
                 b.branch_name,
                 t.tank_code,
@@ -544,8 +515,8 @@ class IVFDashboardService:
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
                 AND (:branch_id IS NULL OR b.branch_id = :branch_id)
-                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
-                AND (:to_dt IS NULL OR c.created_at < :to_dt)
+                AND (:from_dt IS NULL OR c.occurred_at >= :from_dt)
+                AND (:to_dt IS NULL OR c.occurred_at < :to_dt)
             GROUP BY
                 b.branch_name, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
             ORDER BY
@@ -600,6 +571,10 @@ class IVFDashboardService:
         from_dt: Optional[datetime] = None,
         to_dt: Optional[datetime] = None,
     ) -> Dict:
+        # Default to current month if no time range provided
+        if from_dt is None and to_dt is None:
+            from_dt, to_dt = self._get_current_month_bounds()
+            
         query = text("""
         WITH branch_list AS (
             SELECT
@@ -612,12 +587,13 @@ class IVFDashboardService:
         ),
         alert_list AS (
             SELECT DISTINCT
-                COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown') AS alert_name
+                c.alert_type AS alert_name
             FROM
-                kpi_config k
+                critical_alerts c
             WHERE
-                k.hospital_id = :hospital_id
-                AND (k.alert_name IS NOT NULL OR k.kpi_name IS NOT NULL)
+                c.hospital_id = :hospital_id
+                AND c.source = 'KPI'
+                AND (c.alert_type IS NOT NULL)
         ),
         deviation_counts AS (
             SELECT
@@ -635,8 +611,8 @@ class IVFDashboardService:
             WHERE
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
-                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
-                AND (:to_dt IS NULL OR c.created_at < :to_dt)
+                AND (:from_dt IS NULL OR c.occurred_at >= :from_dt)
+                AND (:to_dt IS NULL OR c.occurred_at < :to_dt)
             GROUP BY
                 c.branch_id, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
         )

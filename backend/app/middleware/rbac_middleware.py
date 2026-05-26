@@ -19,8 +19,13 @@ from ..config.permissions import (
     USER_ONLY_ENDPOINTS,
     AUTHENTICATED_ENDPOINTS
 )
-from ..exceptions import AdminRoleRequiredException, ManagerRoleRequiredException, UserRoleRequiredException
-from ..utils.user_helpers import is_hospital_department
+from ..exceptions import (
+    AdminRoleRequiredException,
+    ManagerRoleRequiredException,
+    UserRoleRequiredException,
+    IVFDepartmentRequiredException,
+)
+from ..utils.user_helpers import is_hospital_department, is_specific_department
 
 
 class RBACMiddleware(BaseHTTPMiddleware):
@@ -57,12 +62,21 @@ class RBACMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         
         current_user = request.state.current_user
+        # Prefer department from the validated token payload when available,
+        # otherwise fall back to the user record.
+        current_department = getattr(request.state, "department", None) or current_user.department
+
         # Get role as string (handle enum)
         user_role_str = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
         user_role = user_role_str.lower()
+
+        # Enforce IVF department access for all /api/ivf routes
+        if path.startswith("/api/ivf"):
+            if not is_specific_department(current_department, "IVF"):
+                raise IVFDepartmentRequiredException(department=current_department)
         
         # Check if user is hospital user (IVF) - they have different permission rules
-        is_hospital_user = is_hospital_department(current_user.department) if current_user.department else False
+        is_hospital_user = is_hospital_department(current_department) if current_department else False
         
         # Check if endpoint requires specific role
         # Note: Check overlapping permissions first (endpoints in multiple sets)

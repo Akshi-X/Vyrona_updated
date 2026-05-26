@@ -173,7 +173,9 @@ def acknowledge_alert(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        message = str(e)
+        status_code = 404 if "not found" in message.lower() else 400
+        raise HTTPException(status_code=status_code, detail=message)
     except Exception as e:
         # Check if it's an AppException
         if isinstance(e, AppException):

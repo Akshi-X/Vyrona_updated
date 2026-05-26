@@ -149,6 +149,11 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
                         db.close()
                         raise InvalidTokenException("Token type mismatch: expected hospital user")
                     
+                    # Hospital user tokens must carry both hospital_id and branch_id
+                    if payload.get("hospital_id") is None or payload.get("branch_id") is None:
+                        db.close()
+                        raise InvalidTokenException("Token missing required hospital or branch claims")
+
                     # Inject hospital-specific fields
                     request.state.hospital_id = payload.get("hospital_id")
                     request.state.branch_id = payload.get("branch_id")

@@ -646,6 +646,18 @@ class UserRoleRequiredException(AuthorizationException):
         )
 
 
+class IVFDepartmentRequiredException(AuthorizationException):
+    """IVF department is required for this endpoint"""
+    
+    def __init__(self, department: str | None = None):
+        super().__init__(
+            message=ErrorMessages.IVF_ACCESS_DENIED,
+            error_code=ERROR_CODES["ACCESS_FORBIDDEN"],
+            department=department,
+            required_department="IVF"
+        )
+
+
 class InsufficientPermissionsException(AuthorizationException):
     """User doesn't have required permissions"""
     

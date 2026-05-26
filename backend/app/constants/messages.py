@@ -115,7 +115,7 @@ class ErrorMessages:
     
     # IVF / Quality Tracking
     CRYOLOCK_ACTIVE_SHIPMENT_EXISTS = "The cryolock '{cryolock_number}' already has an active shipment"
-    
+    IVF_ACCESS_DENIED = "Access denied - IVF department required"
     # General
     INTERNAL_ERROR = "An internal server error occurred"
     NOT_FOUND = "Resource not found"

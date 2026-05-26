@@ -38,12 +38,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         raise ValueError("data must be a dict")
     
     to_encode = data.copy()
-    if expires_delta:
+
+    if expires_delta is not None:
         expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    to_encode.update({"exp": expire})
+        to_encode["exp"] = expire
+    elif "exp" not in to_encode:
+        to_encode["exp"] = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
