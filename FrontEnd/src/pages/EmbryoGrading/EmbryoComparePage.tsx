@@ -1,22 +1,28 @@
-import { useState } from 'react';
-import { X, Trophy, GitCompare, Star, Search, Info } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, Trophy, GitCompare, Star, Search, Info, ChevronDown, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { BlastocystMorphology } from '../../types/embryo';
 
 interface LeaderboardEmbryo {
   id: string;
+  oocyteNo: number;
   time: string;
   aiScore: number;
   grade: string;
   quality: string;
   rank: number;
   src: string;
+  images: { url: string; grade: string; score: number; morphology: BlastocystMorphology }[];
   morphology: BlastocystMorphology;
 }
 
 const LEADERBOARD_EMBRYOS: LeaderboardEmbryo[] = [
   {
-    id: 'EID 1.2', time: '17.57 h', aiScore: 9.2, grade: '5AA', quality: 'High Quality', rank: 1,
+    id: 'EID 1.2', oocyteNo: 2, time: '17.57 h', aiScore: 9.2, grade: '5AA', quality: 'High Quality', rank: 1,
     src: '/embryo/list/emb2.png',
+    images: [
+      { url: '/embryo/list/emb2.png', grade: '5AA', score: 9.2, morphology: { expansion: 5, icm: 'A', te: 'A', hatching: 'Not Hatching', vacuolization: 'None', multinucleation: 'None', fragmentation: '< 5%', symmetry: 'Excellent', zonaPellucida: 'Intact', blastocoelQuality: 'Excellent', cytoplasmicGranularity: 'Fine', bridge: 'None' } },
+      { url: '/embryo/list/em1.png',  grade: '5AB', score: 8.4, morphology: { expansion: 5, icm: 'A', te: 'B', hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None', fragmentation: '5 - 10%', symmetry: 'Good', zonaPellucida: 'Intact', blastocoelQuality: 'Good', cytoplasmicGranularity: 'Fine', bridge: 'None' } },
+    ],
     morphology: {
       expansion: 5, icm: 'A', te: 'A',
       hatching: 'Not Hatching', vacuolization: 'None', multinucleation: 'None',
@@ -25,8 +31,13 @@ const LEADERBOARD_EMBRYOS: LeaderboardEmbryo[] = [
     },
   },
   {
-    id: 'EID 1.1', time: '17.32 h', aiScore: 8.7, grade: '4AA', quality: 'High Quality', rank: 2,
+    id: 'EID 1.1', oocyteNo: 1, time: '17.32 h', aiScore: 8.7, grade: '4AA', quality: 'High Quality', rank: 2,
     src: '/embryo/list/em1.png',
+    images: [
+      { url: '/embryo/list/em1.png',  grade: '4AA', score: 8.7, morphology: { expansion: 4, icm: 'A', te: 'A', hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None', fragmentation: '5 - 10%', symmetry: 'Excellent', zonaPellucida: 'Intact', blastocoelQuality: 'Excellent', cytoplasmicGranularity: 'Fine', bridge: 'None' } },
+      { url: '/embryo/list/emb2.png', grade: '4AA', score: 8.1, morphology: { expansion: 4, icm: 'A', te: 'A', hatching: 'Not Hatching', vacuolization: 'None', multinucleation: 'None', fragmentation: '< 5%', symmetry: 'Good', zonaPellucida: 'Intact', blastocoelQuality: 'Good', cytoplasmicGranularity: 'Fine', bridge: 'None' } },
+      { url: '/embryo/list/emb3.png', grade: '4AB', score: 7.5, morphology: { expansion: 4, icm: 'A', te: 'B', hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None', fragmentation: '10 - 15%', symmetry: 'Good', zonaPellucida: 'Good', blastocoelQuality: 'Good', cytoplasmicGranularity: 'Coarse', bridge: 'Minimal' } },
+    ],
     morphology: {
       expansion: 4, icm: 'A', te: 'A',
       hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None',
@@ -35,8 +46,11 @@ const LEADERBOARD_EMBRYOS: LeaderboardEmbryo[] = [
     },
   },
   {
-    id: 'EID 1.3', time: '18.41 h', aiScore: 7.9, grade: '4AB', quality: 'Good Quality', rank: 3,
+    id: 'EID 1.3', oocyteNo: 3, time: '18.41 h', aiScore: 7.9, grade: '4AB', quality: 'Good Quality', rank: 3,
     src: '/embryo/list/emb3.png',
+    images: [
+      { url: '/embryo/list/emb3.png', grade: '4AB', score: 7.9, morphology: { expansion: 4, icm: 'A', te: 'B', hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None', fragmentation: '10 - 15%', symmetry: 'Good', zonaPellucida: 'Good', blastocoelQuality: 'Good', cytoplasmicGranularity: 'Fine', bridge: 'Minimal' } },
+    ],
     morphology: {
       expansion: 4, icm: 'A', te: 'B',
       hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None',
@@ -45,8 +59,12 @@ const LEADERBOARD_EMBRYOS: LeaderboardEmbryo[] = [
     },
   },
   {
-    id: 'EID 1.4', time: '17.20 h', aiScore: 6.5, grade: '3BB', quality: 'Medium Quality', rank: 4,
+    id: 'EID 1.4', oocyteNo: 4, time: '17.20 h', aiScore: 6.5, grade: '3BB', quality: 'Medium Quality', rank: 4,
     src: '/embryo/list/em4.png',
+    images: [
+      { url: '/embryo/list/em4.png',  grade: '3BB', score: 6.5, morphology: { expansion: 3, icm: 'B', te: 'B', hatching: 'Not Hatching', vacuolization: 'Mild', multinucleation: 'Minimal', fragmentation: '15 - 20%', symmetry: 'Fair', zonaPellucida: 'Intact', blastocoelQuality: 'Fair', cytoplasmicGranularity: 'Coarse', bridge: 'Present' } },
+      { url: '/embryo/list/emb5.png', grade: '3BC', score: 5.8, morphology: { expansion: 3, icm: 'B', te: 'C', hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present', fragmentation: '20 - 25%', symmetry: 'Fair', zonaPellucida: 'Thinning', blastocoelQuality: 'Fair', cytoplasmicGranularity: 'Coarse', bridge: 'Present' } },
+    ],
     morphology: {
       expansion: 3, icm: 'B', te: 'B',
       hatching: 'Not Hatching', vacuolization: 'Mild', multinucleation: 'Minimal',
@@ -55,8 +73,11 @@ const LEADERBOARD_EMBRYOS: LeaderboardEmbryo[] = [
     },
   },
   {
-    id: 'EID 1.5', time: '16.50 h', aiScore: 5.3, grade: '3BC', quality: 'Low Quality', rank: 5,
+    id: 'EID 1.5', oocyteNo: 5, time: '16.50 h', aiScore: 5.3, grade: '3BC', quality: 'Low Quality', rank: 5,
     src: '/embryo/list/emb5.png',
+    images: [
+      { url: '/embryo/list/emb5.png', grade: '3BC', score: 5.3, morphology: { expansion: 3, icm: 'B', te: 'C', hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present', fragmentation: '20 - 25%', symmetry: 'Fair', zonaPellucida: 'Thinning', blastocoelQuality: 'Fair', cytoplasmicGranularity: 'Coarse', bridge: 'Present' } },
+    ],
     morphology: {
       expansion: 3, icm: 'B', te: 'C',
       hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present',
@@ -65,8 +86,11 @@ const LEADERBOARD_EMBRYOS: LeaderboardEmbryo[] = [
     },
   },
   {
-    id: 'EID 1.6', time: '17.10 h', aiScore: 4.1, grade: '2BC', quality: 'Low Quality', rank: 6,
+    id: 'EID 1.6', oocyteNo: 6, time: '17.10 h', aiScore: 4.1, grade: '2BC', quality: 'Low Quality', rank: 6,
     src: '/embryo/list/emb6.png',
+    images: [
+      { url: '/embryo/list/emb6.png', grade: '2BC', score: 4.1, morphology: { expansion: 2, icm: 'B', te: 'C', hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present', fragmentation: '25 - 30%', symmetry: 'Poor', zonaPellucida: 'Thinning', blastocoelQuality: 'Poor', cytoplasmicGranularity: 'Coarse', bridge: 'Present' } },
+    ],
     morphology: {
       expansion: 2, icm: 'B', te: 'C',
       hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present',
@@ -97,16 +121,22 @@ function gradeCls(grade: string) {
   return { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-200' };
 }
 
-function scoreColor(score: number): string {
-  if (score >= 8) return '#10b981';
-  if (score >= 6) return '#f59e0b';
-  return '#f43f5e';
+function scoreBarGradient(score: number): string {
+  if (score >= 8) return 'linear-gradient(90deg,#34d399,#059669)';
+  if (score >= 6) return 'linear-gradient(90deg,#fb923c,#ea580c)';
+  return 'linear-gradient(90deg,#fb7185,#e11d48)';
+}
+
+function scorePillStyle(score: number): React.CSSProperties {
+  if (score >= 8) return { background: '#dcfce7', color: '#166534' };
+  if (score >= 6) return { background: '#ffedd5', color: '#9a3412' };
+  return { background: '#ffe4e6', color: '#9f1239' };
 }
 
 function scoreTextCls(score: number): string {
-  if (score >= 8) return 'text-emerald-600';
-  if (score >= 6) return 'text-amber-600';
-  return 'text-rose-500';
+  if (score >= 8) return 'text-emerald-700';
+  if (score >= 6) return 'text-orange-600';
+  return 'text-rose-600';
 }
 
 function criticalStyle(val: string): { borderColor: string; background: string; color: string } {
@@ -147,8 +177,29 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
+type CompareMode = 'embryos' | 'images';
+
 export default function EmbryoComparePage() {
   const [selectedEmbryoIds, setSelectedEmbryoIds] = useState<string[]>([]);
+  const [viewIndex, setViewIndex] = useState(0);
+  const [compareMode, setCompareMode] = useState<CompareMode>('embryos');
+  const [selectedOocyteId, setSelectedOocyteId] = useState<string>(LEADERBOARD_EMBRYOS[0]?.id ?? '');
+  const [oocyteDropdownOpen, setOocyteDropdownOpen] = useState(false);
+  const oocyteDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (oocyteDropdownRef.current && !oocyteDropdownRef.current.contains(e.target as Node)) {
+        setOocyteDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => {
+    setViewIndex(prev => Math.min(prev, Math.max(0, selectedEmbryoIds.length - 1)));
+  }, [selectedEmbryoIds]);
 
   const toggleEmbryo = (id: string) => {
     setSelectedEmbryoIds(prev => {
@@ -164,21 +215,141 @@ export default function EmbryoComparePage() {
       {/* ── Leaderboard ── */}
       <div className="w-[290px] shrink-0 flex flex-col overflow-hidden bg-white border border-gray-200 rounded-2xl">
 
-        <div className="shrink-0 px-4 py-3 flex items-center gap-2.5 border-b border-gray-100" style={{ background: 'linear-gradient(135deg,#f9f4ff 0%,#ffffff 100%)' }}>
-          <div className="w-7 h-7 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
-            <Trophy size={14} className="text-primary" />
+        <div className="shrink-0 border-b border-gray-100" style={{ background: 'linear-gradient(135deg,#f9f4ff 0%,#ffffff 100%)' }}>
+          <div className="px-4 py-3 flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
+              <Trophy size={14} className="text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-gray-900">Leaderboard</h3>
+              <p className="text-[10px] text-gray-400 mt-0.5">Ranked by AI Score</p>
+            </div>
+            <span className="text-[10px] font-bold text-primary bg-primary-bg border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
+              {LEADERBOARD_EMBRYOS.length} embryos
+            </span>
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-gray-900">Leaderboard</h3>
-            <p className="text-[10px] text-gray-400 mt-0.5">Ranked by AI Score</p>
+          {/* Compare mode toggle */}
+          <div className="px-3 pb-3 flex flex-col gap-2">
+            <div className="flex p-0.5 rounded-lg gap-0.5" style={{ background: '#ede5f4' }}>
+              {(['embryos', 'images'] as CompareMode[]).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => { setCompareMode(mode); setSelectedEmbryoIds([]); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[10px] font-semibold transition-all ${
+                    compareMode === mode
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : 'text-[#6b1176]/50 hover:text-[#6b1176]/80'
+                  }`}
+                >
+                  {mode === 'embryos' ? <GitCompare size={10} /> : <Star size={10} />}
+                  {mode === 'embryos' ? 'Embryos' : 'Oocyte Images'}
+                </button>
+              ))}
+            </div>
+
+            {compareMode === 'images' && (() => {
+              const oocyte = LEADERBOARD_EMBRYOS.find(e => e.id === selectedOocyteId);
+              return (
+                <>
+                  {/* Custom oocyte dropdown */}
+                  <div className="relative" ref={oocyteDropdownRef}>
+                    {(() => {
+                      const sel = LEADERBOARD_EMBRYOS.find(e => e.id === selectedOocyteId);
+                      const gc = sel ? gradeCls(sel.grade) : null;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setOocyteDropdownOpen(v => !v)}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white text-left transition-all"
+                          style={{ border: '1px solid #e8d5f0' }}
+                        >
+                          <div className="flex-1 min-w-0 flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-[#3b0764] truncate">
+                              Oocyte #{sel?.oocyteNo ?? '—'}
+                            </span>
+                            {sel && gc && (
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${gc.bg} ${gc.border} ${gc.text}`}>
+                                {sel.grade}
+                              </span>
+                            )}
+                            {sel && (
+                              <span className="text-[9px] text-gray-400 font-semibold ml-auto shrink-0">{sel.aiScore.toFixed(1)}</span>
+                            )}
+                          </div>
+                          <ChevronDown size={10} className={`text-primary shrink-0 transition-transform ${oocyteDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                      );
+                    })()}
+
+                    {oocyteDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-1 z-20 rounded-xl overflow-hidden shadow-lg"
+                        style={{ border: '1px solid #e8d5f0', background: 'white' }}>
+                        {LEADERBOARD_EMBRYOS.map(emb => {
+                          const gc = gradeCls(emb.grade);
+                          const isActive = emb.id === selectedOocyteId;
+                          return (
+                            <button
+                              key={emb.id}
+                              type="button"
+                              onClick={() => { setSelectedOocyteId(emb.id); setOocyteDropdownOpen(false); }}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${isActive ? 'bg-primary/[0.04]' : 'hover:bg-gray-50'}`}
+                            >
+                              <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
+                                style={{ background: isActive ? '#6b1176' : 'transparent', border: isActive ? 'none' : '1.5px solid #d1d5db' }}>
+                                {isActive && <Check size={8} className="text-white" strokeWidth={3} />}
+                              </div>
+                              <span className="text-[10px] font-semibold text-gray-700 flex-1">Oocyte #{emb.oocyteNo}</span>
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${gc.bg} ${gc.border} ${gc.text}`}>{emb.grade}</span>
+                              <span className="text-[9px] text-gray-400 font-semibold shrink-0">{emb.aiScore.toFixed(1)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                </>
+              );
+            })()}
           </div>
-          <span className="text-[10px] font-bold text-primary bg-primary-bg border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
-            {LEADERBOARD_EMBRYOS.length} embryos
-          </span>
         </div>
 
         <div className="flex-1 overflow-y-auto flex flex-col gap-1.5 p-2.5">
-          {LEADERBOARD_EMBRYOS.map(emb => {
+          {compareMode === 'images'
+            ? (() => {
+                const oocyte = LEADERBOARD_EMBRYOS.find(e => e.id === selectedOocyteId);
+                const sorted = [...(oocyte?.images ?? [])].sort((a, b) => b.score - a.score);
+                return sorted.map((img, idx) => {
+                  const rank = idx + 1;
+                  const gc = gradeCls(img.grade);
+                  return (
+                    <div key={idx} className="relative flex items-center gap-2.5 pl-3 pr-4 py-2.5 rounded-xl transition-all"
+                      style={{ border: '1px solid #EEE8F8', background: 'white', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <div className="shrink-0 w-6 flex items-center justify-center">
+                        <RankBadge rank={rank} />
+                      </div>
+                      <div className="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-gray-100 ring-1 ring-gray-100">
+                        <img src={img.url} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[10px] font-bold text-gray-700 block mb-1">Image #{rank}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-md leading-none shrink-0" style={scorePillStyle(img.score)}>{img.score}</span>
+                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${img.score * 10}%`, background: scoreBarGradient(img.score) }} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`shrink-0 rounded-lg px-2 py-1.5 border text-center min-w-[40px] ${gc.bg} ${gc.border}`}>
+                        <div className="text-[7px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">Grade</div>
+                        <div className={`text-sm font-black leading-none ${gc.text}`}>{img.grade}</div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()
+            : LEADERBOARD_EMBRYOS.map(emb => {
             const isSelected = selectedEmbryoIds.includes(emb.id);
             const slotIdx = selectedEmbryoIds.indexOf(emb.id);
             const slot = slotIdx >= 0 ? SLOT_COLORS[slotIdx] : null;
@@ -210,11 +381,11 @@ export default function EmbryoComparePage() {
                 <div className="flex-1 min-w-0">
                   <span className="text-xs font-bold text-gray-900 block truncate mb-1.5">{eidToLabel(emb.id)}</span>
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-[11px] font-black tabular-nums ${scoreTextCls(emb.aiScore)}`}>{emb.aiScore}</span>
-                    <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                    <span className="text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-md leading-none shrink-0" style={scorePillStyle(emb.aiScore)}>{emb.aiScore}</span>
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${emb.aiScore * 10}%`, background: scoreColor(emb.aiScore) }}
+                        style={{ width: `${emb.aiScore * 10}%`, background: scoreBarGradient(emb.aiScore) }}
                       />
                     </div>
                   </div>
@@ -250,29 +421,120 @@ export default function EmbryoComparePage() {
         <div className="flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-white border border-gray-100 flex items-center justify-center shrink-0 shadow-sm">
-              <GitCompare size={14} className="text-primary" />
+              {compareMode === 'images' ? <Star size={14} className="text-primary" /> : <GitCompare size={14} className="text-primary" />}
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-900">Compare Embryos</h3>
-              <p className="text-[10px] text-gray-400 mt-0.5">Select up to 4 embryos to compare</p>
+              <h3 className="text-sm font-bold text-gray-900">
+                {compareMode === 'images' ? 'Compare Oocyte Images' : 'Compare Embryos'}
+              </h3>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {compareMode === 'images'
+                  ? `All images for Oocyte #${LEADERBOARD_EMBRYOS.find(e => e.id === selectedOocyteId)?.oocyteNo ?? '—'} ranked by AI score`
+                  : 'Select up to 4 embryos to compare'}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setSelectedEmbryoIds([])}
-              disabled={selectedEmbryoIds.length === 0}
-              className={`flex items-center gap-1 text-[11px] transition-colors ${selectedEmbryoIds.length > 0 ? 'text-gray-500 hover:text-rose-500 cursor-pointer' : 'text-gray-300 cursor-not-allowed'}`}
-            >
-              <X size={10} />
-              Clear All
-            </button>
-            <span className="text-[11px] text-gray-400 font-medium">{selectedEmbryoIds.length} / 4 selected</span>
-          </div>
+          {compareMode === 'embryos' && (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedEmbryoIds([])}
+                disabled={selectedEmbryoIds.length === 0}
+                className={`flex items-center gap-1 text-[11px] transition-colors ${selectedEmbryoIds.length > 0 ? 'text-gray-500 hover:text-rose-500 cursor-pointer' : 'text-gray-300 cursor-not-allowed'}`}
+              >
+                <X size={10} />
+                Clear All
+              </button>
+              <span className="text-[11px] text-gray-400 font-medium">{selectedEmbryoIds.length} / 4 selected</span>
+            </div>
+          )}
         </div>
 
-        {/* Empty state */}
-        {selectedEmbryoIds.length === 0 ? (
+        {/* Images compare panel */}
+        {compareMode === 'images' ? (() => {
+          const oocyte = LEADERBOARD_EMBRYOS.find(e => e.id === selectedOocyteId);
+          const sorted = [...(oocyte?.images ?? [])].sort((a, b) => b.score - a.score);
+          return (
+            <div className="flex-1 min-h-0 overflow-x-auto">
+              <div className="flex gap-3 h-full" style={{ width: `${sorted.length * 200}px`, minWidth: '100%' }}>
+                {sorted.map((img, idx) => {
+                  const gc = gradeCls(img.grade);
+                  return (
+                    <div key={idx} className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden flex-1 min-w-[180px] min-h-0">
+                      {/* Fixed top: rank + image + grade + score */}
+                      <div className="shrink-0">
+                        <div className="px-3 pt-3 pb-2 flex items-center gap-2">
+                          <RankBadge rank={idx + 1} />
+                          <span className="text-[10px] font-bold text-gray-600">Image #{idx + 1}</span>
+                        </div>
+                        <div className="mx-3 rounded-xl overflow-hidden bg-black aspect-[4/3]">
+                          <img src={img.url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="px-3 pt-2.5 pb-2 flex flex-col gap-2">
+                          <div className={`rounded-xl px-3 py-2 border text-center ${gc.bg} ${gc.border}`}>
+                            <div className="text-[7px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Gardner Grade</div>
+                            <div className={`text-2xl font-black leading-none ${gc.text}`}>{img.grade}</div>
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">AI Score</span>
+                              <span className="text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-md leading-none" style={scorePillStyle(img.score)}>{img.score}</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${img.score * 10}%`, background: scoreBarGradient(img.score) }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Scrollable detail */}
+                      <div className="flex-1 min-h-0 overflow-y-auto border-t border-gray-100">
+                        {/* Quality Flags */}
+                        <div className="px-3 py-2 text-[8px] font-black uppercase tracking-widest border-b border-gray-100" style={{ background: '#faf4ff', color: '#6b1176' }}>
+                          Quality Flags
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                          {([
+                            { label: 'Hatching',        value: img.morphology.hatching        },
+                            { label: 'Vacuolization',   value: img.morphology.vacuolization   },
+                            { label: 'Multinucleation', value: img.morphology.multinucleation },
+                          ]).map(item => {
+                            const s = criticalStyle(item.value);
+                            return (
+                              <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                                <span className="text-[10px] font-medium text-gray-400 leading-tight">{item.label}</span>
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 leading-none" style={s}>{item.value}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Morphology */}
+                        <div className="px-3 py-2 text-[8px] font-black uppercase tracking-widest border-y border-gray-100 bg-gray-50 text-gray-500">
+                          Morphology
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                          {([
+                            { label: 'Fragmentation',  value: img.morphology.fragmentation          },
+                            { label: 'Symmetry',       value: img.morphology.symmetry               },
+                            { label: 'Zona Pellucida', value: img.morphology.zonaPellucida          },
+                            { label: 'Blastocoel',     value: img.morphology.blastocoelQuality      },
+                            { label: 'Cyto. Gran.',    value: img.morphology.cytoplasmicGranularity },
+                            { label: 'Bridge',         value: img.morphology.bridge                 },
+                          ]).map(item => (
+                            <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                              <span className="text-[10px] font-medium text-gray-400 leading-tight">{item.label}</span>
+                              <span className="text-[10px] font-bold text-gray-700 shrink-0">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })() : selectedEmbryoIds.length === 0 ? (
           <div className="flex flex-col flex-1 gap-3 min-h-0">
 
             <div className="grid grid-cols-4 gap-3 flex-1 min-h-0">
@@ -364,7 +626,7 @@ export default function EmbryoComparePage() {
               {/* Score color guide */}
               <div className="flex flex-1 items-center gap-2 px-3 py-2">
                 <div className="flex flex-col gap-0.5 shrink-0">
-                  {([['bg-emerald-500', '≥ 8.5 High'], ['bg-amber-400', '≥ 7.0 Good'], ['bg-rose-400', '< 7.0 Low']] as const).map(([cls, label]) => (
+                  {([['bg-emerald-500', '≥ 8.0 High'], ['bg-orange-500', '≥ 6.0 Good'], ['bg-rose-500', '< 6.0 Low']] as const).map(([cls, label]) => (
                     <div key={label} className="flex items-center gap-1.5">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cls}`} />
                       <span className="text-[8px]" style={{ color: '#6b1176' }}>{label}</span>
@@ -379,155 +641,143 @@ export default function EmbryoComparePage() {
             </div>
 
           </div>
-        ) : (
-          <div className="flex-1 min-h-0 overflow-x-auto">
-            <div
-              className="grid gap-3 h-full"
-              style={{ gridTemplateColumns: `repeat(4, minmax(170px, 240px))` }}
-            >
-              {[0, 1, 2, 3].map(idx => {
-                const eid = selectedEmbryoIds[idx];
-                if (!eid) return (
-                  <div key={idx} className="border border-dashed border-primary/20 rounded-2xl bg-primary/[0.02] flex flex-col items-center justify-center relative p-5">
-                    <div className="absolute top-3 left-3 w-6 h-6 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
-                      <span className="text-[10px] font-bold text-gray-400">{idx + 1}</span>
+        ) : (() => {
+          const eid = selectedEmbryoIds[viewIndex];
+          const emb = eid ? LEADERBOARD_EMBRYOS.find(e => e.id === eid) : undefined;
+          const gc = emb ? gradeCls(emb.grade) : null;
+          const m = emb?.morphology;
+          const total = selectedEmbryoIds.length;
+
+          return (
+            <div className="flex-1 min-h-0 flex flex-col gap-3">
+
+              {/* Nav bar */}
+              <div className="shrink-0 flex items-center border border-gray-200 rounded-2xl overflow-hidden bg-white">
+                <button
+                  type="button"
+                  onClick={() => setViewIndex(i => Math.max(0, i - 1))}
+                  disabled={viewIndex === 0}
+                  className="flex items-center justify-center w-14 h-12 text-gray-700 hover:bg-gray-50 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors border-r border-gray-200 shrink-0"
+                >
+                  <ChevronLeft size={22} strokeWidth={2.5} />
+                </button>
+                <div className="flex-1 flex items-center justify-center gap-3 px-4">
+                  <span className="text-base font-black text-gray-900 tabular-nums">{total > 0 ? viewIndex + 1 : 0} / {total}</span>
+                  {emb && (
+                    <span className="text-sm font-semibold text-gray-400">{eidToLabel(emb.id)}</span>
+                  )}
+                  {emb && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEmbryoIds(prev => prev.filter(id => id !== eid))}
+                      className="ml-auto text-gray-400 hover:text-rose-500 transition-colors"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setViewIndex(i => Math.min(total - 1, i + 1))}
+                  disabled={viewIndex >= total - 1}
+                  className="flex items-center justify-center w-14 h-12 text-gray-700 hover:bg-gray-50 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors border-l border-gray-200 shrink-0"
+                >
+                  <ChevronRight size={22} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              {/* Embryo detail */}
+              {emb && gc && m ? (
+                <div className="flex-1 min-h-0 overflow-y-auto flex gap-4">
+
+                  {/* Left: image */}
+                  <div className="shrink-0 w-64 flex flex-col gap-3">
+                    <div className="rounded-2xl overflow-hidden border border-gray-200 bg-black aspect-square">
+                      <img src={emb.src} alt="" className="w-full h-full object-cover" />
                     </div>
-                    <div className="w-11 h-11 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
-                      <span className="text-xl font-light text-gray-300 leading-none">+</span>
+                    <div className={`rounded-2xl border px-4 py-3 ${gc.bg} ${gc.border}`}>
+                      <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-1">Gardner Grade</div>
+                      <div className={`text-4xl font-black leading-none ${gc.text}`}>{emb.grade}</div>
+                      <div className="text-[10px] text-gray-500 mt-1">{emb.quality}</div>
                     </div>
-                    <p className="text-sm font-medium text-gray-400">Select embryo</p>
-                    <p className="text-[11px] text-gray-300 mt-1">Choose from leaderboard</p>
                   </div>
-                );
 
-                const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
-                const hex = SLOT_COLORS[idx].hex;
-                const gc = gradeCls(emb.grade);
-                const m = emb.morphology;
+                  {/* Right: metrics */}
+                  <div className="flex-1 min-w-0 flex flex-col gap-3">
 
-                return (
-                  <div key={idx} className="flex flex-col min-h-0">
-
-                    {/* Fixed top: header + image + grade + core breakdown */}
-                    <div className="shrink-0 flex flex-col gap-2">
-
-                      {/* Column header */}
-                      <div
-                        className="rounded-xl flex items-center gap-1.5 px-2.5 py-2 border"
-                        style={{ borderColor: hex + '45', background: hex + '10' }}
-                      >
-                        <span
-                          className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0"
-                          style={{ background: hex }}
-                        >{idx + 1}</span>
-                        <span className="text-xs font-bold text-gray-800 flex-1 truncate">{eidToLabel(emb.id)}</span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedEmbryoIds(prev => prev.filter(id => id !== eid))}
-                          className="text-gray-500 hover:text-gray-900 transition-colors shrink-0"
-                        >
-                          <X size={10} />
-                        </button>
+                    {/* AI Score */}
+                    <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">AI Score</span>
+                        <span className="text-sm font-black tabular-nums px-2 py-0.5 rounded-lg" style={scorePillStyle(emb.aiScore)}>
+                          {emb.aiScore} <span className="font-medium opacity-60 text-xs">/ 10</span>
+                        </span>
                       </div>
-
-                      {/* Image */}
-                      <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${hex}40` }}>
-                        <div className="aspect-square bg-gray-100">
-                          <img src={emb.src} alt="" className="w-full h-full object-cover" />
-                        </div>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${emb.aiScore * 10}%`, background: scoreBarGradient(emb.aiScore) }} />
                       </div>
-
-                      {/* Grade + AI Score */}
-                      <div className={`rounded-xl border px-3 py-2.5 flex items-center gap-3 ${gc.bg} ${gc.border}`}>
-                        <div className="shrink-0">
-                          <div className="text-[7px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Grade</div>
-                          <div className={`text-2xl font-black leading-none ${gc.text}`}>{emb.grade}</div>
-                        </div>
-                        <div className="w-px self-stretch bg-black/10 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest">AI Score</span>
-                            <span className={`text-sm font-black tabular-nums ${scoreTextCls(emb.aiScore)}`}>
-                              {emb.aiScore}<span className="text-[10px] font-medium text-gray-400"> / 10</span>
-                            </span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-black/10 overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{ width: `${emb.aiScore * 10}%`, background: scoreColor(emb.aiScore) }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-
                     </div>
 
-                    {/* Scrollable bottom: critical + supplementary */}
-                    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 pt-2 pb-1">
-
-                      {/* Tier 2 — Quality Flags */}
-                      <div className="shrink-0 rounded-xl overflow-hidden" style={{ border: '1px solid #e8d5f0' }}>
-                        <div className="flex flex-1 items-center gap-2 px-3 py-2" style={{ background: '#faf4ff' }}>
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                          </svg>
-                          <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#6b1176' }}>Quality Flags</span>
-                        </div>
-                        <div className="divide-y divide-gray-50 bg-white">
-                          {([
-                            { label: 'Hatching',        value: m.hatching        },
-                            { label: 'Vacuolization',   value: m.vacuolization   },
-                            { label: 'Multinucleation', value: m.multinucleation },
-                          ]).map(item => {
-                            const s = criticalStyle(item.value);
-                            return (
-                              <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
-                                <span className="text-[10px] font-medium text-gray-500 leading-tight">{item.label}</span>
-                                <span
-                                  className="text-[9px] font-bold rounded-md px-2 py-0.5 shrink-0"
-                                  style={{ color: s.color, background: s.background }}
-                                >{item.value}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                    {/* Quality Flags */}
+                    <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #e8d5f0' }}>
+                      <div className="flex items-center gap-2 px-4 py-2.5" style={{ background: '#faf4ff' }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6b1176" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: '#6b1176' }}>Quality Flags</span>
                       </div>
-
-                      {/* Tier 3 — Morphology */}
-                      <div className="shrink-0 rounded-xl overflow-hidden border border-gray-100">
-                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50">
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-                          </svg>
-                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Morphology</span>
-                        </div>
-                        <div className="divide-y divide-gray-50 bg-white">
-                          {([
-                            { label: 'Fragmentation',  value: m.fragmentation          },
-                            { label: 'Symmetry',       value: m.symmetry               },
-                            { label: 'Zona Pellucida', value: m.zonaPellucida          },
-                            { label: 'Blastocoel',     value: m.blastocoelQuality      },
-                            { label: 'Cyto. Gran.',    value: m.cytoplasmicGranularity },
-                            { label: 'Bridge',         value: m.bridge                 },
-                          ]).map(item => (
-                            <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
-                              <span className="text-[10px] font-medium text-gray-400 leading-tight">{item.label}</span>
-                              <span className="text-[10px] font-bold text-gray-700 shrink-0">{item.value}</span>
+                      <div className="divide-y divide-gray-50 bg-white">
+                        {([
+                          { label: 'Hatching',        value: m.hatching        },
+                          { label: 'Vacuolization',   value: m.vacuolization   },
+                          { label: 'Multinucleation', value: m.multinucleation },
+                        ]).map(item => {
+                          const s = criticalStyle(item.value);
+                          return (
+                            <div key={item.label} className="flex items-center justify-between gap-2 px-4 py-2.5">
+                              <span className="text-[11px] font-medium text-gray-500">{item.label}</span>
+                              <span className="text-[10px] font-bold rounded-md px-2 py-0.5 shrink-0" style={{ color: s.color, background: s.background }}>{item.value}</span>
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })}
                       </div>
+                    </div>
 
+                    {/* Morphology */}
+                    <div className="rounded-2xl overflow-hidden border border-gray-100">
+                      <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Morphology</span>
+                      </div>
+                      <div className="divide-y divide-gray-50 bg-white">
+                        {([
+                          { label: 'Fragmentation',  value: m.fragmentation          },
+                          { label: 'Symmetry',       value: m.symmetry               },
+                          { label: 'Zona Pellucida', value: m.zonaPellucida          },
+                          { label: 'Blastocoel',     value: m.blastocoelQuality      },
+                          { label: 'Cyto. Gran.',    value: m.cytoplasmicGranularity },
+                          { label: 'Bridge',         value: m.bridge                 },
+                        ]).map(item => (
+                          <div key={item.label} className="flex items-center justify-between gap-2 px-4 py-2.5">
+                            <span className="text-[11px] font-medium text-gray-400">{item.label}</span>
+                            <span className="text-[11px] font-bold text-gray-700 shrink-0">{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                   </div>
-                );
-              })}
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-300">No embryo selected</div>
+              )}
+
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
     </div>

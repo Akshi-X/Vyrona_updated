@@ -22,9 +22,9 @@ export default function EmbryoTabBar({ his }: EmbryoTabBarProps) {
 
   const tabs: { id: Tab; label: string; to: string; icon: React.ReactNode }[] = [
     { id: 'logsheet', label: 'Development Tracker', to: `/embryo-console/${his}`,          icon: <ClipboardList size={12} /> },
-    { id: 'grading',  label: 'Grading',            to: `/embryo-console/${his}/advanced`, icon: <Star size={12} /> },
-    { id: 'compare',  label: 'Compare',            to: `/embryo-console/${his}/compare`,  icon: <ArrowLeftRight size={12} /> },
-    { id: 'reports',  label: 'Reports',            to: `/embryo-console/${his}/reports`,  icon: <BarChart2 size={12} /> },
+    { id: 'grading',  label: 'AI Grading',         to: `/embryo-console/${his}/advanced`, icon: <Star size={12} /> },
+    { id: 'compare',  label: 'Compare & Select',   to: `/embryo-console/${his}/compare`,  icon: <ArrowLeftRight size={12} /> },
+    { id: 'reports',  label: 'Client Report',      to: `/embryo-console/${his}/reports`,  icon: <BarChart2 size={12} /> },
   ];
 
   return (
