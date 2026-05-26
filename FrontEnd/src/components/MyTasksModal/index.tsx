@@ -545,8 +545,11 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             <>
             <div className="flex flex-col h-full overflow-hidden">
                 {/* Header with ADD button */}
-                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50 shrink-0">
-                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{taskTitle}</span>
+                <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}>
+                    <div>
+                        <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>{taskTitle}</span>
+                        <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Assign and track work items</span>
+                    </div>
                     {onAdd && (
                         <button
                             onClick={(e) => { e.stopPropagation(); handleAddClick(); }}

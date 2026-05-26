@@ -29,7 +29,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { Snowflake, Thermometer, TrendingUp } from 'lucide-react';
+import { MessageSquare, Snowflake, Thermometer, TrendingUp } from 'lucide-react';
 import type { ActivityLogRecord } from '../../../services/activityLogService';
 import { tasksService, type Task } from '../../../services/tasksService';
 import type { RefrigeratorSensorTile } from './useRefrigeratorKpiSnapshot';
@@ -67,6 +67,125 @@ export type RefrigeratorVisualisationProps = {
   refrigeratorId?: number;
   branchName?: string;
 };
+
+// ── Activity log helpers (mirrored from CryocanVisualisation) ─────────────────
+
+const ACTIVITY_ACTION_LABELS: Record<string, string> = {
+  'alert.acknowledged': 'Alert Acknowledged',
+  'alert.acknowledged_all': 'All Alerts Acknowledged',
+  'alert.created': 'Critical Alert Created',
+  'alert_configuration.kpi_config_bulk_upserted': 'Alert Configuration Bulk Updated',
+  'alert_configuration.kpi_config_created': 'Alert Configuration Created',
+  'alert_configuration.kpi_config_deleted': 'Alert Configuration Deleted',
+  'alert_configuration.kpi_config_updated': 'Alert Configuration Updated',
+  'alert_configuration.notification_settings_updated': 'Alert Notification Settings Updated',
+  'email.critical_alert_sent': 'Critical Alert Email Sent',
+  'email.escalation_sent': 'Escalation Email Sent',
+  'email.otp_sent': 'OTP Email Sent',
+  'email.password_reset_sent': 'Password Reset Email Sent',
+  'email.support_ticket_comment_sent': 'Support Ticket Comment Sent',
+  'email.support_ticket_created': 'Support Ticket Email Sent',
+  'email.user_approval_requested': 'Approval Email Sent',
+  'email.user_approved_sent': 'Approval Confirmation Sent',
+  'integration.auth.login': 'Integration Login',
+  'integration.auth.token_revoked': 'Integration Token Revoked',
+  'refill_detection.created': 'Refill Detection Created',
+  'refill_detection.reviewed': 'Refill Detection Reviewed',
+  'report.activity_logs.downloaded': 'Activity Logs Downloaded',
+  'report.ivf.critical_alerts.downloaded': 'Critical Alerts Downloaded',
+  'report.ivf.monthly_summary.downloaded': 'Monthly Summary Downloaded',
+  'support_ticket.comment_added': 'Support Ticket Commented',
+  'support_ticket.created': 'Support Ticket Created',
+  'support_ticket.status_updated': 'Support Ticket Status Updated',
+  'task.created': 'Task Created',
+  'task.deleted': 'Task Deleted',
+  'task.status_updated': 'Task Status Updated',
+  'task.updated': 'Task Updated',
+  'user.approved': 'User Approved',
+  'user.invite_registered': 'User Registered via Invite',
+  'user.invited': 'User Invited',
+  'user.login': 'Login Successful',
+  'user.login_requested': 'Login Requested',
+  'user.logout': 'Logged Out',
+  'user.password_reset_completed': 'Password Reset Completed',
+  'user.profile_updated': 'Profile Updated',
+  'user.registered': 'User Registered',
+  'user.rejected': 'User Rejected',
+};
+
+function formatActivityActionLabel(action: string) {
+  if (ACTIVITY_ACTION_LABELS[action]) return ACTIVITY_ACTION_LABELS[action];
+  return action.replace(/_/g, ' ').replace(/\./g, ' · ').split(' ').filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function getActivityMetadataLines(action: string, metadata?: Record<string, any> | null): string[] {
+  if (!metadata) return [];
+  const lines: string[] = [];
+  const val = (v: any) => (v === null || v === undefined || v === '' ? null : String(v));
+  if (action.startsWith('task.')) {
+    if (val(metadata.status)) lines.push(`Status: ${metadata.status}`);
+    if (val(metadata.priority)) lines.push(`Priority: ${metadata.priority}`);
+    return lines;
+  }
+  if (action.startsWith('alert.')) {
+    if (val(metadata.message)) lines.push(String(metadata.message).slice(0, 70));
+    else if (val(metadata.alert_type)) lines.push(`KPI: ${metadata.alert_type}`);
+    if (val(metadata.severity)) lines.push(`Severity: ${metadata.severity}`);
+    return lines;
+  }
+  if (action.startsWith('user.')) {
+    if (val(metadata.role)) lines.push(`Role: ${metadata.role}`);
+    if (val(metadata.branch_name)) lines.push(`Branch: ${metadata.branch_name}`);
+    return lines;
+  }
+  return [];
+}
+
+type ActivityIconType = 'alert' | 'config' | 'task' | 'email' | 'user' | 'report' | 'default';
+
+function getActivityIconType(action: string): ActivityIconType {
+  if (action.startsWith('alert.') || action.startsWith('email.critical_alert')) return 'alert';
+  if (action.startsWith('alert_configuration.')) return 'config';
+  if (action.startsWith('task.')) return 'task';
+  if (action.startsWith('email.')) return 'email';
+  if (action.startsWith('user.')) return 'user';
+  if (action.startsWith('report.')) return 'report';
+  return 'default';
+}
+
+const ACTIVITY_BADGE_STYLE: Record<ActivityIconType, { bg: string; color: string; label: string }> = {
+  alert:   { bg: '#f3e8fd', color: '#7a22c8', label: 'Alert'  },
+  config:  { bg: '#ede5f7', color: '#6b4a78', label: 'Config' },
+  task:    { bg: '#f3e8fd', color: '#7a22c8', label: 'Task'   },
+  email:   { bg: '#ede5f7', color: '#6b4a78', label: 'Email'  },
+  user:    { bg: '#f3e8fd', color: '#7a22c8', label: 'User'   },
+  report:  { bg: '#ede5f7', color: '#6b4a78', label: 'Export' },
+  default: { bg: '#f3e8fd', color: '#7a22c8', label: 'System' },
+};
+
+const ACTIVITY_ICON_INNER: Record<ActivityIconType, React.ReactNode> = {
+  alert: (
+    <><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>
+  ),
+  config: (
+    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+  ),
+  task: (
+    <><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></>
+  ),
+  email: (
+    <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></>
+  ),
+  user: (
+    <><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></>
+  ),
+  report: (
+    <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></>
+  ),
+  default: <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
+};
+
+// ── End activity log helpers ───────────────────────────────────────────────────
 
 const FRIDGE_TIPS = [
   'Refrigerator compartment should be maintained between 2 °C and 8 °C for culture media and reagent storage.',
@@ -138,6 +257,7 @@ function buildCompartment(
   highlightRing: Mesh;
   interiorLight: PointLight;
   interiorBack: Mesh;
+  mistMeshes: Mesh[];
 } {
   const group = new Group();
 
@@ -245,6 +365,36 @@ function buildCompartment(
         group.add(lbl);
       }
     }
+  }
+
+  // Freezer mist — layered semi-transparent planes that breathe opacity for a cold-fog look.
+  // Only added for the freezer compartment; planes are positioned at varying depths and heights
+  // so the thickest haze sits at the back wall and thins toward the glass door.
+  const mistMeshes: Mesh[] = [];
+  if (!isFridge) {
+    const mistData: Array<{ z: number; yOff: number; hScale: number; baseOpacity: number }> = [
+      { z: -cavityD * 0.38, yOff: 0,              hScale: 0.85, baseOpacity: 0.10 },
+      { z: -cavityD * 0.18, yOff: -cavityH * 0.10, hScale: 0.70, baseOpacity: 0.08 },
+      { z:  0,              yOff: -cavityH * 0.20,  hScale: 0.55, baseOpacity: 0.07 },
+      { z:  cavityD * 0.14, yOff: -cavityH * 0.28,  hScale: 0.42, baseOpacity: 0.05 },
+      { z:  cavityD * 0.25, yOff: -cavityH * 0.32,  hScale: 0.30, baseOpacity: 0.04 },
+    ];
+    mistData.forEach(({ z, yOff, hScale, baseOpacity }, i) => {
+      const mistMat = new MeshBasicMaterial({
+        color: new Color('#b8d8f8'),
+        transparent: true,
+        opacity: baseOpacity,
+        depthWrite: false,
+        side: DoubleSide,
+      });
+      const mist = new Mesh(new PlaneGeometry(cavityW * 0.88, cavityH * hScale), mistMat);
+      mist.position.set(0, yOff, z);
+      mist.renderOrder = 3;
+      mist.userData._mistPhase = i * (Math.PI * 2 / 5);
+      mist.userData._mistBaseOpacity = baseOpacity;
+      group.add(mist);
+      mistMeshes.push(mist);
+    });
   }
 
   // Door frame (slim ring around the glass)
@@ -374,7 +524,7 @@ function buildCompartment(
   // when the compartment is composed into the cabinet).
   void bodyMat;
 
-  return { group, doorHit, doorGroup, highlightRing, interiorLight, interiorBack: back };
+  return { group, doorHit, doorGroup, highlightRing, interiorLight, interiorBack: back, mistMeshes };
 }
 
 
@@ -382,8 +532,6 @@ export default function RefrigeratorVisualisation({
   sensorTiles = [],
   selectedSensorId,
   onSensorSelect,
-  freezerTemp,
-  fridgeTemp,
   hasAlert,
   systemActivity = [],
   tasks = [],
@@ -774,9 +922,12 @@ export default function RefrigeratorVisualisation({
       const now = performance.now();
       const dt = (now - t0) / 1000;
       t0 = now;
-      // Slow auto-rotate while idle, paused when the user drags (cryocan pattern)
+      // Adaptive auto-rotate: slow at front (interior visible), fast at sides/back
       if (!dragging) {
-        cabinet.rotation.y += 0.0025;
+        // frontness → 1 when front faces camera, 0 at sides/back
+        const frontness = Math.max(0, Math.cos(cabinet.rotation.y));
+        const rotSpeed = 0.0007 + (1 - frontness) * 0.0093;
+        cabinet.rotation.y += rotSpeed;
       }
       // Smoothly tween light intensities toward their target values
       const lerpLight = (l: PointLight) => {
@@ -785,6 +936,12 @@ export default function RefrigeratorVisualisation({
       };
       lerpLight(fridge.interiorLight);
       lerpLight(freezer.interiorLight);
+      // Animate freezer mist — slow breathing opacity simulates cold fog wisps
+      freezer.mistMeshes.forEach((m) => {
+        const phase = (m.userData._mistPhase as number) + now * 0.00035;
+        const base = m.userData._mistBaseOpacity as number;
+        (m.material as MeshBasicMaterial).opacity = base + Math.sin(phase) * base * 0.4;
+      });
       renderer.render(scene, camera);
       rafId = requestAnimationFrame(animate);
     };
@@ -853,7 +1010,7 @@ export default function RefrigeratorVisualisation({
     assigneeId: t.assignee?.user_id ?? undefined,
     taskName: t.task_name,
     description: t.description ?? '',
-    assigneeBy: t.created_by_name ?? '',
+    assigneeBy: t.created_by ? `${t.created_by.first_name ?? ''} ${t.created_by.last_name ?? ''}`.trim() : '',
     assignedTo: t.assignee
       ? `${t.assignee.first_name ?? ''} ${t.assignee.last_name ?? ''}`.trim()
       : '',
@@ -881,13 +1038,14 @@ export default function RefrigeratorVisualisation({
   };
 
   const [kpiModalKey, setKpiModalKey] = useState<string | null>(null);
+  const [activityScrollPaused, setActivityScrollPaused] = useState(false);
 
   return (
     <>
-    <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_320px] gap-4">
+    <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_320px] gap-4 h-full min-h-0">
 
-      {/* Left: Live Conditions (top) + Tasks (bottom) */}
-      <aside className="flex flex-col gap-3 min-h-[560px]">
+      {/* Left: Live Conditions (top) + Messages (bottom) */}
+      <aside className="flex flex-col gap-3 min-h-0">
 
         {/* Live Conditions card */}
         <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
@@ -910,46 +1068,45 @@ export default function RefrigeratorVisualisation({
                 const isAlert = hasAlert && !tile.isMissing;
                 const isFreezer = tile.id === 'freezer_temperature';
                 const accent = isAlert ? '#dc2626' : (isFreezer ? '#1a7abb' : '#7a22c8');
+                const ring = isAlert ? 'rgba(220,38,38,0.12)' : (isFreezer ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)');
                 return (
                   <button
                     key={tile.id}
                     type="button"
                     onClick={() => { onSensorSelect?.(tile.id); setKpiModalKey(tile.id); }}
-                    className={[
-                      'text-left w-full rounded-2xl border transition',
-                      isSelected ? 'border-primary' : 'border-[#e6d6ee] hover:border-primary/50',
-                      isAlert ? 'ring-1 ring-red-300' : '',
-                    ].join(' ')}
+                    className={['text-left w-full rfg-kpi-card', isAlert ? 'ring-1 ring-red-300' : ''].join(' ')}
                     style={{
+                      borderRadius: 16,
                       padding: '12px 14px',
+                      border: `1px solid ${isSelected ? accent : '#e6d6ee'}`,
                       background: '#fdfbfe',
-                      boxShadow: isSelected
-                        ? '0 6px 16px rgba(107,17,118,0.12)'
-                        : '0 4px 12px rgba(64,17,83,0.06)',
+                      boxShadow: isSelected ? `0 6px 16px ${ring}` : '0 4px 12px rgba(64,17,83,0.06)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      flexShrink: 0,
                     }}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div
-                          className="text-[10px] font-semibold uppercase tracking-wider"
-                          style={{ color: '#8b6c97' }}
-                        >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, position: 'relative', zIndex: 1 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: '#8b6c97', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                           {tile.label}
                         </div>
-                        <div
-                          className="text-2xl font-bold mt-1"
-                          style={{ color: isAlert ? '#dc2626' : accent }}
-                        >
+                        <div style={{ fontSize: 24, fontWeight: 700, color: isAlert ? '#dc2626' : accent, marginTop: 4 }}>
                           {tile.value}
                         </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">{tile.timestamp ?? '—'}</div>
+                        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
+                          {tile.timestamp ?? '—'}
+                        </div>
                       </div>
-                      <div className="shrink-0 mt-1">
-                        {isFreezer
-                          ? <Snowflake size={18} style={{ color: accent }} />
-                          : <Thermometer size={18} style={{ color: accent }} />}
+                      <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', border: '1px solid #e6d6ee', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `inset 0 0 0 6px ${ring}`, color: accent, flexShrink: 0 }}>
+                        {isFreezer ? <Snowflake size={18} /> : <Thermometer size={18} />}
                       </div>
                     </div>
+                    <div className="rfg-kpi-orb" style={{ position: 'absolute', right: -20, bottom: -18, width: 140, height: 70, borderRadius: '50%', border: '1px solid rgba(170,140,190,0.35)', opacity: 0.7 }} />
+                    <div className="rfg-kpi-glow" style={{ position: 'absolute', left: -30, top: -24, width: 110, height: 110, borderRadius: '50%', background: 'radial-gradient(circle, rgba(123,92,139,0.12) 0%, rgba(123,92,139,0) 70%)', opacity: 0.6 }} />
+                    <div className="rfg-kpi-sheen" style={{ position: 'absolute', inset: '12px 12px auto auto', width: 46, height: 46, borderRadius: 10, border: '1px solid rgba(230,214,238,0.9)', opacity: 0.45, transform: 'rotate(12deg)' }} />
+                    <div className="rfg-kpi-curve" style={{ position: 'absolute', left: -18, bottom: -22, width: 160, height: 90, borderRadius: '100%', border: '1px solid rgba(214,198,228,0.5)', transform: 'rotate(-8deg)', opacity: 0.55 }} />
+                    <div className="rfg-kpi-wave" style={{ position: 'absolute', right: -40, top: 28, width: 180, height: 80, borderRadius: '100%', border: '1px dashed rgba(214,198,228,0.45)', transform: 'rotate(10deg)', opacity: 0.5 }} />
                   </button>
                 );
               })
@@ -957,7 +1114,214 @@ export default function RefrigeratorVisualisation({
           </div>
         </div>
 
-        {/* Tasks card — reuses MyTasksModal in embedded mode */}
+        {/* Messages card */}
+        <div className="shrink-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ height: 220 }}>
+          <div
+            className="flex items-center justify-between px-4 py-3 shrink-0"
+            style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}
+          >
+            <div>
+              <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>Messages</span>
+              <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Stakeholder communications</span>
+            </div>
+            <MessageSquare size={16} style={{ color: '#6b4a78' }} />
+          </div>
+          <StakeholderChatBox
+            embedded
+            isOpen={false}
+            onClose={() => {}}
+            refrigeratorId={refrigeratorId}
+          />
+        </div>
+      </aside>
+
+      {/* Center 3D viewer */}
+      <section
+        data-refrigerator-3d-mount
+        className="relative min-h-0 overflow-hidden"
+        style={{ borderRadius: 20, border: '1px solid #d8c6e8', background: 'linear-gradient(160deg, #f3eaf9 0%, #ede0f5 40%, #e4d4f0 100%)', boxShadow: '0 8px 20px -12px #4011531f, 0 2px 6px #4011530a' }}
+        aria-label="Refrigerator 3D visualisation"
+      >
+        {/* Radial vignette — brighter centre, darker corners */}
+        <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 70% 65% at 50% 50%, rgba(255,255,255,0.62) 0%, transparent 72%)' }} />
+        {/* Floor gradient */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%', zIndex: 0, pointerEvents: 'none', background: 'linear-gradient(0deg, rgba(220,195,240,0.4) 0%, transparent 100%)' }} />
+        <div ref={mountRef} className="absolute inset-0" />
+
+        {/* Top-left: live status + meta info */}
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none" style={{ zIndex: 2 }}>
+          {/* Connected status */}
+          <div className="flex items-center gap-2 bg-white/85 backdrop-blur-sm rounded-xl border border-white/70 shadow-sm px-3 py-2">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${sensorTiles.some((t) => !t.isMissing) ? 'bg-emerald-400 animate-pulse' : 'bg-gray-300'}`} />
+            <span className="text-[11px] font-bold text-gray-700">
+              {sensorTiles.some((t) => !t.isMissing) ? 'Connected Live' : 'No Signal'}
+            </span>
+          </div>
+        </div>
+
+        {/* Top-right: status badge */}
+        <div className="absolute top-3 right-3 pointer-events-none">
+          {hasAlert ? (
+            <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-red-200 rounded-xl px-2.5 py-1.5 shadow-sm">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L3 7v6c0 5.25 3.75 10.15 9 11.35C17.25 23.15 21 18.25 21 13V7L12 2z" fill="#ef4444" />
+                <line x1="12" y1="8" x2="12" y2="12" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="15.5" r="0.8" fill="white" />
+              </svg>
+              <span className="text-[11px] font-semibold text-red-600">Alert active</span>
+            </div>
+          ) : sensorTiles.some((t) => !t.isMissing) ? (
+            <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-emerald-200 rounded-xl px-2.5 py-1.5 shadow-sm">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L3 7v6c0 5.25 3.75 10.15 9 11.35C17.25 23.15 21 18.25 21 13V7L12 2z" fill="#22c55e" />
+                <polyline points="8 12 11 15 16 9" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-[11px] font-semibold text-gray-700">Normal</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl px-2.5 py-1.5 shadow-sm">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L3 7v6c0 5.25 3.75 10.15 9 11.35C17.25 23.15 21 18.25 21 13V7L12 2z" fill="#9ca3af" />
+              </svg>
+              <span className="text-[11px] font-semibold text-gray-500">No signal</span>
+            </div>
+          )}
+        </div>
+
+        {/* Mid-left: Storage Guidelines card */}
+        <div className="absolute left-3 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
+          <div className="bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]">
+            <div className="text-[8px] font-bold tracking-widest uppercase mb-1.5" style={{ color: '#5f3b73' }}>Storage Guidelines</div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[9px] text-gray-500">Fridge</span>
+                <span className="text-[9px] font-bold" style={{ color: '#7a22c8' }}>2 – 8 °C</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[9px] text-gray-500">Freezer</span>
+                <span className="text-[9px] font-bold" style={{ color: '#1a7abb' }}>≤ −20 °C</span>
+              </div>
+              <div className="w-full border-t border-gray-100 my-1" />
+              {['Separate shelf zones', 'No rear-wall contact', 'Quarterly inventory audit'].map((t) => (
+                <div key={t} className="flex items-start gap-1">
+                  <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
+                    <circle cx="12" cy="12" r="12" fill="#22c55e" />
+                    <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-[9px] text-gray-600 leading-tight">{t}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Mid-right: Daily SOP card */}
+        <div className="absolute right-3 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
+          <div className="bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]">
+            <div className="text-[8px] font-bold tracking-widest uppercase mb-1.5" style={{ color: '#1a4d7a' }}>Daily SOP</div>
+            <div className="flex flex-col gap-1">
+              {['Log temp morning and evening', 'Record any excursions', 'Minimise door-open cycles', 'Check door seals monthly', 'Allow items to equilibrate'].map((t) => (
+                <div key={t} className="flex items-start gap-1">
+                  <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
+                    <circle cx="12" cy="12" r="12" fill="#22c55e" />
+                    <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-[9px] text-gray-600 leading-tight">{t}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom: scrolling tips strip */}
+        <style>{`
+@keyframes rfg-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes rfgKpiFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes rfgKpiSheen { 0% { transform: translateX(0) rotate(12deg); opacity: 0.3; } 50% { transform: translateX(8px) rotate(12deg); opacity: 0.6; } 100% { transform: translateX(0) rotate(12deg); opacity: 0.3; } }
+@keyframes rfgScrollActivity { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
+.rfg-kpi-card .rfg-kpi-glow  { animation: rfgKpiFloat 4.8s ease-in-out infinite; }
+.rfg-kpi-card .rfg-kpi-orb   { animation: rfgKpiFloat 5.6s ease-in-out infinite reverse; }
+.rfg-kpi-card .rfg-kpi-sheen { animation: rfgKpiSheen 6.2s ease-in-out infinite; }
+.rfg-kpi-card .rfg-kpi-curve { animation: rfgKpiFloat 7.4s ease-in-out infinite; }
+.rfg-kpi-card .rfg-kpi-wave  { animation: rfgKpiFloat 8.2s ease-in-out infinite reverse; }
+`}</style>
+        <div className="absolute bottom-0 inset-x-0 bg-white/65 backdrop-blur-sm border-t border-white py-2 flex items-center gap-3 overflow-hidden">
+          <span className="shrink-0 text-[9px] font-bold tracking-widest bg-primary text-white uppercase pl-3 pr-1">Tips</span>
+          <div className="overflow-hidden flex-1">
+            <div style={{ display: 'flex', gap: '2.5rem', whiteSpace: 'nowrap', animation: 'rfg-marquee 70s linear infinite' }}>
+              {[...FRIDGE_TIPS, ...FRIDGE_TIPS].map((tip, i) => (
+                <span key={i} className="text-[11px] text-gray-500 shrink-0">
+                  <span className="text-primary/30 mr-2">◆</span>{tip}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Right: System Activity (top) + Tasks (bottom) */}
+      <aside className="flex flex-col gap-3 min-h-0">
+
+        {/* System Activity card */}
+        <div
+          className="flex-1 min-h-0 flex flex-col"
+          style={{ border: '1px solid #e6d6ee', borderRadius: 18, overflow: 'hidden', boxShadow: '0 6px 16px #40115308', background: '#fff' }}
+        >
+          <div style={{ fontWeight: 600, fontSize: 14, color: '#5f3b73', padding: '12px 16px 10px', background: '#f7f2fa', flexShrink: 0, borderBottom: '1px solid #efe5f4' }}>
+            System Activity
+            <div style={{ fontSize: 10, fontWeight: 400, color: '#a07ab8', marginTop: 2 }}>Recent system events</div>
+          </div>
+          <div
+            style={{ flex: 1, overflow: 'hidden', position: 'relative', padding: '8px 10px 0' }}
+            onMouseEnter={() => setActivityScrollPaused(true)}
+            onMouseLeave={() => setActivityScrollPaused(false)}
+          >
+            {activity.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', padding: '16px 0' }}>No recent activity</div>
+            ) : (
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: 8,
+                animation: `rfgScrollActivity ${Math.max(activity.length * 3, 8)}s linear infinite`,
+                animationPlayState: activityScrollPaused ? 'paused' : 'running',
+              }}>
+                {[...activity, ...activity].flatMap((log, idx) => {
+                  const key = `${log.id}-${idx}`;
+                  const action = log.action ?? '';
+                  const iconType = getActivityIconType(action);
+                  const badge = ACTIVITY_BADGE_STYLE[iconType];
+                  const timeStr = log.created_at ? new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                  const title = formatActivityActionLabel(action);
+                  const metaLines = getActivityMetadataLines(action, log.metadata).slice(0, 2);
+                  const actorName = log.actor_label || (log.actor_details ? `${String(log.actor_details['first_name'] ?? '')} ${String(log.actor_details['last_name'] ?? '')}`.trim() : '');
+                  const card = (
+                    <div key={key} style={{ display: 'flex', gap: 10, padding: '8px 10px', borderRadius: 10, border: '1px solid #f0e8f4', background: '#fdfbfe', flexShrink: 0 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: badge.bg, color: badge.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          {ACTIVITY_ICON_INNER[iconType]}
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <span style={{ fontSize: 9, color: '#6b7280', fontWeight: 500 }}>{timeStr}</span>
+                          <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 999, background: badge.bg, color: badge.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{badge.label}</span>
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: '#1a0a1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+                        {actorName && <div style={{ fontSize: 10, color: '#6b5a70', marginTop: 1 }}>{actorName}</div>}
+                        {metaLines.map((line, i) => (
+                          <div key={i} style={{ fontSize: 10, color: '#6b5a70', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{line}</div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                  const isCopyEnd = idx === activity.length - 1 || idx === activity.length * 2 - 1;
+                  return isCopyEnd ? [card, <div key={`gap-${idx}`} style={{ height: 52, flexShrink: 0 }} />] : [card];
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tasks card */}
         <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
           <MyTasksModal
             embedded
@@ -971,143 +1335,6 @@ export default function RefrigeratorVisualisation({
             onAdd={() => {}}
             onEdit={handleEditTask}
             onTaskCreated={onTaskCreated}
-          />
-        </div>
-      </aside>
-
-      {/* Center 3D viewer */}
-      <section
-        data-refrigerator-3d-mount
-        className="relative min-h-[560px] rounded-2xl border border-line bg-linear-to-br from-white to-gray-50 overflow-hidden"
-        aria-label="Refrigerator 3D visualisation"
-      >
-        <div ref={mountRef} className="absolute inset-0" />
-
-        {/* Top-left: device code */}
-        {refrigeratorCode && (
-          <div className="absolute top-3 left-4 text-xs font-bold tracking-widest text-gray-500 uppercase pointer-events-none">
-            {refrigeratorCode}
-          </div>
-        )}
-
-        {/* Top-right: status badge */}
-        <div className="absolute top-3 right-3 pointer-events-none">
-          {hasAlert ? (
-            <div className="flex items-center gap-1.5 bg-red-50/90 backdrop-blur-sm border border-red-200 rounded-full px-3 py-1 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[11px] font-semibold text-red-600">Alert active</span>
-            </div>
-          ) : sensorTiles.some((t) => !t.isMissing) ? (
-            <div className="flex items-center gap-1.5 bg-emerald-50/90 backdrop-blur-sm border border-emerald-200 rounded-full px-3 py-1 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="text-[11px] font-semibold text-emerald-700">Normal</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 bg-gray-100/90 backdrop-blur-sm border border-gray-200 rounded-full px-3 py-1 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-              <span className="text-[11px] font-semibold text-gray-500">No signal</span>
-            </div>
-          )}
-        </div>
-
-        {/* Left side: fridge compartment card (upper area, matching the top compartment) */}
-        <div className="absolute left-2 pointer-events-none" style={{ top: '24%', zIndex: 2 }}>
-          <div className="bg-white/82 backdrop-blur-sm rounded-2xl border-l-2 border-[#b48cf7] border border-white/60 shadow-md px-3 py-2.5 w-[108px]">
-            <div className="text-[8px] font-bold tracking-widest uppercase mb-1" style={{ color: '#9b6bc7' }}>Refrigerator</div>
-            <div className="text-xl font-black leading-none" style={{ color: '#7a22c8' }}>
-              {fridgeTemp != null ? `${fridgeTemp.toFixed(1)}°C` : '—'}
-            </div>
-            <div className="text-[8px] mt-0.5" style={{ color: '#b48cf7' }}>2 – 8 °C</div>
-            <div className="w-full border-t border-purple-100 my-2" />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[8px] text-gray-500">· 3 shelves</span>
-              <span className="text-[8px] text-gray-500">· Culture media</span>
-              <span className="text-[8px] text-gray-500">· Buffers</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right side: freezer compartment card (lower area, matching the bottom compartment) */}
-        <div className="absolute right-2 pointer-events-none" style={{ top: '62%', zIndex: 2 }}>
-          <div className="bg-white/82 backdrop-blur-sm rounded-2xl border-l-2 border-[#5db4ff] border border-white/60 shadow-md px-3 py-2.5 w-[108px]">
-            <div className="text-[8px] font-bold tracking-widest uppercase mb-1" style={{ color: '#4a9fd0' }}>Freezer</div>
-            <div className="text-xl font-black leading-none" style={{ color: '#1a7abb' }}>
-              {freezerTemp != null ? `${freezerTemp.toFixed(1)}°C` : '—'}
-            </div>
-            <div className="text-[8px] mt-0.5" style={{ color: '#5db4ff' }}>≤ −20 °C</div>
-            <div className="w-full border-t border-sky-100 my-2" />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[8px] text-gray-500">· 2 shelves</span>
-              <span className="text-[8px] text-gray-500">· Cryoprotectants</span>
-              <span className="text-[8px] text-gray-500">· Frozen samples</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom-left: branch + online status info cards */}
-        <div className="absolute bottom-10 left-3 flex flex-col gap-1.5 pointer-events-none">
-          {branchName && (
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-white/70 shadow-sm px-3 py-2">
-              <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase">Branch</div>
-              <div className="text-[11px] font-semibold text-gray-800">{branchName}</div>
-            </div>
-          )}
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-white/70 shadow-sm px-3 py-2 flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${sensorTiles.some((t) => !t.isMissing) ? 'bg-emerald-400' : 'bg-gray-300'}`} />
-            <span className="text-[11px] font-semibold text-gray-700">
-              {sensorTiles.some((t) => !t.isMissing) ? 'Online' : 'No data'}
-            </span>
-          </div>
-        </div>
-
-        {/* Bottom: scrolling tips strip */}
-        <style>{`@keyframes rfg-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
-        <div className="absolute bottom-0 inset-x-0 bg-white/65 backdrop-blur-sm border-t border-white/50 py-2 flex items-center gap-3 overflow-hidden">
-          <span className="shrink-0 text-[9px] font-bold tracking-widest text-primary/50 uppercase pl-3 pr-1">Tips</span>
-          <div className="overflow-hidden flex-1">
-            <div style={{ display: 'flex', gap: '2.5rem', whiteSpace: 'nowrap', animation: 'rfg-marquee 70s linear infinite' }}>
-              {[...FRIDGE_TIPS, ...FRIDGE_TIPS].map((tip, i) => (
-                <span key={i} className="text-[11px] text-gray-500 shrink-0">
-                  <span className="text-primary/30 mr-2">◆</span>{tip}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Right: System Activity (top) + Messages (bottom) */}
-      <aside className="flex flex-col gap-3 min-h-[560px]">
-
-        {/* System Activity card */}
-        <div className="flex-1 min-h-0 rounded-2xl border border-line bg-surface overflow-hidden flex flex-col">
-          <div className="px-4 py-3 shrink-0">
-            <h3 className="text-xs font-bold tracking-widest text-gray-400 uppercase">System Activity</h3>
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-3 flex flex-col gap-2">
-            {activity.length === 0 ? (
-              <div className="text-xs text-gray-400 italic">No recent activity.</div>
-            ) : (
-              activity.map((record) => (
-                <div key={record.id} className="rounded-lg border border-line bg-white px-3 py-2">
-                  <div className="text-xs font-semibold text-gray-800">{record.action}</div>
-                  <div className="text-[11px] text-gray-500">{record.created_at}</div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Messages card — reuses StakeholderChatBox in embedded mode */}
-        <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
-          <div className="px-4 py-3 shrink-0 border-b border-line bg-surface">
-            <h3 className="text-xs font-bold tracking-widest text-gray-400 uppercase">Messages</h3>
-          </div>
-          <StakeholderChatBox
-            embedded
-            isOpen={false}
-            onClose={() => {}}
-            refrigeratorId={refrigeratorId}
           />
         </div>
       </aside>

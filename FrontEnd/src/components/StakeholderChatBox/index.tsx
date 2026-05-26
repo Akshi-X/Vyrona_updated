@@ -760,8 +760,8 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
           </div>
           
           {/* Composer */}
-          <div className="px-6 py-4 border-t bg-gray-50 relative">
-            <div className="flex items-end gap-3">
+          <div className={embedded ? 'px-3 py-2 border-t bg-gray-50 relative' : 'px-6 py-4 border-t bg-gray-50 relative'}>
+            <div className={embedded ? 'flex items-end gap-2' : 'flex items-end gap-3'}>
               <div className="flex-1 relative">
                 <input
                   id="onboarding-chat-input"
@@ -772,7 +772,10 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                   onChange={(e) => handleMessageChange(e.target.value)}
                   onKeyDown={handleKeyDown}
                   disabled={!chatIdentifier}
-                  className="w-full min-h-[44px] max-h-32 py-2.5 px-4 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white shadow-sm"
+                  className={embedded
+                    ? 'w-full min-h-[30px] py-1 px-3 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white shadow-sm'
+                    : 'w-full min-h-[44px] max-h-32 py-2.5 px-4 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white shadow-sm'
+                  }
                 />
                 {/* Mention dropdown */}
                 {showMentionDropdown && mentionSuggestions.length > 0 && (
@@ -814,13 +817,13 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                 id="onboarding-chat-send-btn"
                 disabled={!chatIdentifier || !draftMessage.trim()}
                 onClick={handleSendDraft}
-                className={`min-w-[44px] h-[44px] rounded-lg flex items-center justify-center transition-all duration-200 shadow-sm ${
-                  (!chatIdentifier || !draftMessage.trim()) 
-                    ? 'bg-gray-300 cursor-not-allowed' 
+                className={`${embedded ? 'min-w-[30px] h-[30px]' : 'min-w-[44px] h-[44px]'} rounded-lg flex items-center justify-center transition-all duration-200 shadow-sm ${
+                  (!chatIdentifier || !draftMessage.trim())
+                    ? 'bg-gray-300 cursor-not-allowed'
                     : 'bg-[#8d2b8f] hover:bg-[#7a2473] active:bg-[#6a1f64] cursor-pointer'
                 }`}
               >
-                <svg className="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                <svg className={embedded ? 'w-3.5 h-3.5 text-white' : 'w-5 h-5 text-white'} viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14A1 1 0 003 18h14a1 1 0 00.894-1.447l-7-14z"/>
                 </svg>
               </button>
