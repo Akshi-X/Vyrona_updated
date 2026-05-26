@@ -128,7 +128,7 @@ export default function RefrigeratorTrackingPage() {
 
   const pageActions = (
     <div className="flex items-center gap-6">
-      <div className="relative group">
+      <div className="relative group flex flex-col items-center">
         <img
           className="w-[25px] h-[25px] cursor-pointer"
           alt="Critical Alerts"
@@ -139,6 +139,7 @@ export default function RefrigeratorTrackingPage() {
             <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
           </div>
         )}
+        <span className="text-[9px] font-semibold text-gray-500 mt-0.5 leading-none">Critical Alerts</span>
       </div>
     </div>
   );
@@ -146,7 +147,7 @@ export default function RefrigeratorTrackingPage() {
   // ── No id in URL: show the picker (or wait while we redirect to the only one) ──
   if (!hasRefrigeratorId) {
     return (
-      <PageLayout title="Refrigerator Tracking" lucideIcon={Snowflake} actions={pageActions}>
+      <PageLayout title="Refrigerator Tracking" description="Monitor temperature, alerts and tasks for Refridgerator storage units" lucideIcon={Snowflake} actions={pageActions}>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
           <div className="flex items-center gap-1 text-sm">
             <button
@@ -198,7 +199,7 @@ export default function RefrigeratorTrackingPage() {
   }
 
   return (
-    <PageLayout title="Refrigerator Tracking" lucideIcon={Snowflake} actions={pageActions}>
+    <PageLayout title="Refrigerator Tracking" description="Monitor temperature, alerts and tasks for IVF storage units" lucideIcon={Snowflake} actions={pageActions}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
         <div className="flex items-center gap-1 text-sm">
           <button
@@ -224,7 +225,7 @@ export default function RefrigeratorTrackingPage() {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="flex-1 min-h-0">
         <RefrigeratorVisualisation
           sensorTiles={sensorTiles}
           selectedSensorId={selectedSensorId}
