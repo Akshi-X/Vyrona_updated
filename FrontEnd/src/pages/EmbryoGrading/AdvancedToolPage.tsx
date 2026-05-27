@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, ChevronLeft, ChevronRight, Check, Trash2, ImageIcon, Lightbulb, Pencil, X, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ChevronRight, ChevronLeft, Check, Trash2, ImageIcon, Lightbulb, Pencil, X, ShieldCheck, Upload, User, Hash, FlaskConical, Dna, Award, Flag } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import type { IVFTreatment } from '../../types/ivf';
 import { ivfService, type IvfCycleLog, type IvfGrade } from '../../services/ivfService';
@@ -59,6 +59,96 @@ const scoreTextCls = (score: number) => {
 
 
 
+// ── Canvas embryo animations ──────────────────────────────────────────────────
+
+const _2PI = Math.PI * 2;
+const _PRP = { te: '#8b2a96', teStroke: '#6b1176', icm: '#6b1176', icmHi: '#9c3aa6', cavFill: 'rgba(247,236,255,0.45)', blasto: '#9c3aa6', blastoStroke: '#7c1f8a', zona: '#b05cc0' };
+function _lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
+function _ease(t: number) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+function _zona(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, alpha = 1) {
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.beginPath(); ctx.ellipse(cx, cy, r, r, 0, 0, _2PI);
+  ctx.strokeStyle = _PRP.zona; ctx.lineWidth = 1.5; ctx.setLineDash([5, 3]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.restore();
+}
+function _cell(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string, stroke: string, alpha = 1) {
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, _2PI);
+  ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke();
+  ctx.restore();
+}
+function _nucleus(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  ctx.beginPath(); ctx.arc(x, y, r * 0.38, 0, _2PI);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill();
+}
+function _tePos(cx: number, cy: number, r: number) {
+  return Array.from({ length: 12 }, (_, i) => {
+    const a = (i / 12) * _2PI - Math.PI / 2;
+    return [cx + Math.cos(a) * r, cy + Math.sin(a) * r] as [number, number];
+  });
+}
+function _icmPos(cx: number, cy: number, s: number): [number, number][] {
+  return [[cx-s*.5,cy-s*.5],[cx+s*.3,cy-s*.6],[cx-s*.2,cy+s*.1],[cx+s*.55,cy+s*.2],[cx-s*.55,cy+s*.45],[cx+s*.1,cy+s*.55],[cx,cy-s*.05]];
+}
+function _drawICM(ctx: CanvasRenderingContext2D, t: number) {
+  ctx.clearRect(0, 0, 180, 180);
+  const cx = 90, cy = 90, pulse = Math.sin(t * _2PI) * 0.03;
+  ctx.beginPath(); ctx.ellipse(cx, cy, 78+78*pulse, 78+78*pulse, 0, 0, _2PI); ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
+  _tePos(cx, cy, 62).forEach(([x, y]) => _cell(ctx, x, y, 10, '#9c3aa6', '#6b1176', 0.5));
+  const cb = 1 + Math.sin(t * _2PI) * 0.02;
+  ctx.beginPath(); ctx.ellipse(cx, cy+4, 52*cb, 46*cb, 0, 0, _2PI); ctx.fillStyle = _PRP.cavFill; ctx.strokeStyle = '#AFA9EC'; ctx.lineWidth = 0.5; ctx.fill(); ctx.stroke();
+  const ip = 1 + Math.sin(t * _2PI * 0.7) * 0.07;
+  _icmPos(cx-14, cy-8, 14).forEach(([x, y], i) => { const r = (i===6?6:i<3?9:8)*ip; _cell(ctx, x, y, r, _PRP.icm, _PRP.icmHi); _nucleus(ctx, x, y, r); });
+  ctx.beginPath(); ctx.ellipse(cx-14, cy-8, 26*ip, 22*ip, 0, 0, _2PI); ctx.strokeStyle = '#9c3aa6'; ctx.lineWidth = 0.8; ctx.setLineDash([3,2]); ctx.stroke(); ctx.setLineDash([]);
+  _zona(ctx, cx, cy, 78+78*pulse);
+}
+function _drawTE(ctx: CanvasRenderingContext2D, t: number) {
+  ctx.clearRect(0, 0, 180, 180);
+  const cx = 90, cy = 90, pulse = Math.sin(t * _2PI) * 0.025;
+  ctx.beginPath(); ctx.ellipse(cx, cy, 78+78*pulse, 78+78*pulse, 0, 0, _2PI); ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx, cy+4, 50, 44, 0, 0, _2PI); ctx.fillStyle = _PRP.cavFill; ctx.strokeStyle = '#AFA9EC'; ctx.lineWidth = 0.5; ctx.fill(); ctx.stroke();
+  _icmPos(cx-14, cy-8, 14).forEach(([x, y], i) => _cell(ctx, x, y, i===6?6:i<3?9:8, 'rgba(107,17,118,0.3)', 'rgba(156,58,166,0.4)', 0.5));
+  for (let i = 0; i < 12; i++) {
+    const glow = (Math.sin(((i / 12) + t * 0.6) * _2PI) + 1) / 2;
+    const a = (i / 12) * _2PI - Math.PI / 2;
+    const [x, y] = [cx + Math.cos(a)*(62+62*pulse), cy + Math.sin(a)*(62+62*pulse)];
+    const r = 10 + glow * 2.5;
+    const fill = `rgb(${Math.round(_lerp(0x9c,0x6b,glow))},${Math.round(_lerp(0x3a,0x11,glow))},${Math.round(_lerp(0xa6,0x76,glow))})`;
+    _cell(ctx, x, y, r, fill, '#6b1176'); _nucleus(ctx, x, y, r);
+  }
+  _zona(ctx, cx, cy, 78+78*pulse);
+}
+function _drawExpansion(ctx: CanvasRenderingContext2D, t: number) {
+  ctx.clearRect(0, 0, 180, 180);
+  const cx = 90, cy = 90;
+  const cycle = (t % 4) / 4;
+  let phase: number, zonaAlpha: number;
+  if (cycle < 0.6)      { phase = _ease(cycle / 0.6); zonaAlpha = 1; }
+  else if (cycle < 0.75){ phase = 1; zonaAlpha = 1 - (cycle - 0.6) / 0.15; }
+  else if (cycle < 0.85){ phase = 1; zonaAlpha = 0; }
+  else                  { phase = 1 - _ease((cycle - 0.85) / 0.15); zonaAlpha = 0; }
+  const blastoR = _lerp(42, 72, phase), zonaR = blastoR + _lerp(14, 7, phase);
+  ctx.beginPath(); ctx.ellipse(cx, cy, zonaR+2, zonaR+2, 0, 0, _2PI); ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx, cy, blastoR, blastoR, 0, 0, _2PI); ctx.fillStyle = _PRP.cavFill; ctx.strokeStyle = '#AFA9EC'; ctx.lineWidth = 0.5; ctx.fill(); ctx.stroke();
+  const n = Math.round(_lerp(8, 14, phase));
+  for (let i = 0; i < n; i++) {
+    const a = (i/n)*_2PI - Math.PI/2;
+    _cell(ctx, cx+Math.cos(a)*blastoR, cy+Math.sin(a)*blastoR, _lerp(8,10,phase), '#8b2a96', '#6b1176');
+    _nucleus(ctx, cx+Math.cos(a)*blastoR, cy+Math.sin(a)*blastoR, _lerp(8,10,phase));
+  }
+  const ispr = _lerp(10, 15, phase), icx = cx - ispr*0.8, icy = cy - ispr*0.5;
+  _icmPos(icx, icy, ispr).forEach(([x, y], i) => { const r = _lerp(6,9,phase)*(i===6?.7:i<3?1:.88); _cell(ctx, x, y, r, _PRP.icm, _PRP.icmHi); _nucleus(ctx, x, y, r); });
+  if (zonaAlpha > 0) {
+    ctx.save(); ctx.globalAlpha = zonaAlpha;
+    ctx.beginPath(); ctx.ellipse(cx, cy, zonaR, zonaR, 0, 0, _2PI);
+    ctx.strokeStyle = '#8b2a96'; ctx.lineWidth = _lerp(2.5, 1, phase); ctx.setLineDash([5,3]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+  }
+  if (zonaAlpha === 0 && phase === 1) {
+    ctx.save(); ctx.font = '600 10px sans-serif'; ctx.fillStyle = '#6b1176'; ctx.textAlign = 'center'; ctx.fillText('hatching', cx, cy+blastoR+16); ctx.restore();
+  }
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AdvancedEmbryoGradingPage() {
@@ -77,8 +167,6 @@ export default function AdvancedEmbryoGradingPage() {
 
   // Multiple image slots — each becomes its own IvfOocyteGrade
   const [imageSlots, setImageSlots] = useState<ImageSlot[]>([]);
-  const [slotIndex, setSlotIndex] = useState(0);
-
   // Select Best Grade step
   const [selectedImageIdx, setSelectedImageIdx] = useState<number | null>(null);
   const [deactivateGradeId, setDeactivateGradeId] = useState<number | null>(null);
@@ -94,7 +182,7 @@ export default function AdvancedEmbryoGradingPage() {
 
   // Existing grades for selected oocyte
   const [existingGrades, setExistingGrades] = useState<IvfGrade[]>([]);
-  const [, setGradesLoading] = useState(false);
+  const [gradesLoading, setGradesLoading] = useState(false);
   const [, setGradesError] = useState<string | null>(null);
 
   // Upload state
@@ -106,6 +194,31 @@ export default function AdvancedEmbryoGradingPage() {
   const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [approveSelectedIdx, setApproveSelectedIdx] = useState<number | null>(null);
   const [overrideModalOpen, setOverrideModalOpen] = useState(false);
+  const [stagedViewIdx, setStagedViewIdx] = useState(0);
+
+  const icmCanvasRef  = useRef<HTMLCanvasElement>(null);
+  const teCanvasRef   = useRef<HTMLCanvasElement>(null);
+  const expCanvasRef  = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    let rafId: number;
+    let t1 = 0, t2 = 0, t3 = 0;
+    const S = 400 / 180;
+    const draw = (ref: React.RefObject<HTMLCanvasElement | null>, fn: (ctx: CanvasRenderingContext2D, t: number) => void, t: number) => {
+      const canvas = ref.current; if (!canvas) return;
+      const ctx = canvas.getContext('2d'); if (!ctx) return;
+      ctx.save(); ctx.scale(S, S); fn(ctx, t); ctx.restore();
+    };
+    const tick = () => {
+      t1 += 0.004; t2 += 0.004; t3 += 0.0028;
+      draw(icmCanvasRef, _drawICM, t1);
+      draw(teCanvasRef,  _drawTE,  t2);
+      draw(expCanvasRef, _drawExpansion, t3);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -134,9 +247,16 @@ export default function AdvancedEmbryoGradingPage() {
 
   // ── Image slot handlers ───────────────────────────────────────────────────
 
+  const addImageSlot = (file: File) => {
+    if (existingGrades.length + imageSlots.length >= 4) return;
+    setImageSlots(prev => [...prev, { file, url: URL.createObjectURL(file) }]);
+    setUploadError(null);
+  };
+
   const clearAll = () => {
     imageSlots.forEach(s => URL.revokeObjectURL(s.url));
     setImageSlots([]);
+    setStagedViewIdx(0);
     setUploadError(null);
   };
 
@@ -182,8 +302,6 @@ export default function AdvancedEmbryoGradingPage() {
         if (targetLogId != null) {
           const target = full.logs.find(l => l.log_id === targetLogId);
           if (target) setSelectedOocyteNo(target.oocyte_no);
-        } else if (full.logs.length > 0) {
-          setSelectedOocyteNo(full.logs[0].oocyte_no);
         }
       }
     }).catch(() => { if (!cancelled) setLogsLoading(false); });
@@ -209,7 +327,6 @@ export default function AdvancedEmbryoGradingPage() {
         if (cancelled) return;
         const active = g.filter(gr => gr.is_active !== false);
         setExistingGrades(active);
-        if (active.length > 0) { setSelectedImageIdx(0); setSlotIndex(0); }
         setGradesLoading(false);
       })
       .catch((err) => {
@@ -328,7 +445,6 @@ export default function AdvancedEmbryoGradingPage() {
 
   const locked = step === 'processing';
 
-  const tileImg      = selectedGrade?.images[0] ?? null;
   const tileGradeStr = selectedGrade?.grade ?? '';
   const expDigit     = tileGradeStr[0] ?? '—';
   const icmLetter    = tileGradeStr[1] ?? '—';
@@ -359,19 +475,11 @@ export default function AdvancedEmbryoGradingPage() {
             <div className="px-4 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white">
               <p className="text-[9px] font-semibold tracking-widest text-gray-500 uppercase">AI Justification</p>
             </div>
-            {[
-              { label: 'Expansion', color: '#7c3aed', grade: expDigit,  text: expLabel  },
-              { label: 'ICM',       color: '#0891b2', grade: icmLetter, text: icmLabel  },
-              { label: 'TE',        color: '#059669', grade: teLetter,  text: teLabel   },
-            ].map((item, i, arr) => (
-              <div key={item.label} className={`px-4 py-3 flex flex-col gap-0.5${i < arr.length - 1 ? ' border-b border-line-light' : ''}`}>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: item.color }}>{item.label}</span>
-                  <span className="text-[11px] font-black" style={{ color: item.color }}>{item.grade}</span>
-                </div>
-                <p className="text-[9px] text-gray-500 leading-snug">{item.text ?? (selectedGrade ? 'No data available.' : 'Select an image to view.')}</p>
-              </div>
-            ))}
+            <div className="px-4 py-3">
+              <p className="text-[9px] text-gray-500 leading-snug">
+                {[expLabel, icmLabel, teLabel].filter(Boolean).join(' ') || (selectedGrade ? 'No morphology data available for this grade.' : 'Each embryo holds a morphological story. Select a graded image and the AI will narrate it — expansion stage, inner cell mass density, and trophectoderm cohesion — distilled into a single clinical read.')}
+              </p>
+            </div>
           </div>
         </aside>
 
@@ -419,7 +527,7 @@ export default function AdvancedEmbryoGradingPage() {
         {/* ── COL 2: Large image + image strip ── */}
         {step === 'select-best' && (() => {
           const selGrade   = selectedImageIdx != null ? existingGrades[selectedImageIdx] ?? null : null;
-          const mainImgUrl = selGrade?.images[0]?.upload_image_url ?? (selectedImageIdx == null && imageSlots[0]?.url) ?? null;
+          const mainImgUrl = selGrade?.images[0]?.upload_image_url ?? null;
           return (
             <div className="flex flex-col gap-3 h-full min-h-0">
               {/* Embryo Preview card */}
@@ -428,17 +536,73 @@ export default function AdvancedEmbryoGradingPage() {
                   <p className="text-xs font-bold text-gray-800">Embryo Preview</p>
                   <p className="text-[9px] text-gray-400 mt-0.5">Select a graded image to preview it here. Click a slot below to switch.</p>
                 </div>
-                <div className={`relative flex-1 min-h-0 ${mainImgUrl ? 'bg-black' : 'bg-gray-50'}`}>
+                <div className={`relative flex-1 min-h-0 ${(mainImgUrl || imageSlots.length > 0) ? 'bg-black' : 'bg-gray-50'}`}>
                   {mainImgUrl ? (
                     <img src={mainImgUrl} alt="Selected oocyte" className="w-full h-full object-contain absolute inset-0" />
-                  ) : (
+                  ) : existingGrades.length >= 4 ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-4">
                       <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
                         <ImageIcon size={20} className="text-gray-300" />
                       </div>
-                      <p className="text-[10px] font-semibold text-gray-400">No image selected</p>
-                      <p className="text-[9px] text-gray-300">Upload images below or select from the strip</p>
+                      <p className="text-[10px] font-semibold text-gray-400">Maximum reached</p>
+                      <p className="text-[9px] text-gray-300">4 images already graded for this oocyte</p>
                     </div>
+                  ) : imageSlots.length > 0 ? (() => {
+                    const si = Math.min(stagedViewIdx, imageSlots.length - 1);
+                    return (
+                      <>
+                        <img src={imageSlots[si].url} alt={`Staged ${si + 1}`} className="w-full h-full object-contain absolute inset-0" />
+                        {/* Badge */}
+                        <div className="absolute top-2.5 left-2.5 z-10">
+                          <span className="px-2 py-0.5 rounded-lg bg-black/60 text-white text-[9px] font-bold backdrop-blur-sm">
+                            Image {si + 1}/{imageSlots.length}
+                          </span>
+                        </div>
+                        {/* Nav arrows */}
+                        {imageSlots.length > 1 && (
+                          <>
+                            <button type="button" disabled={si === 0}
+                              onClick={() => setStagedViewIdx(p => Math.max(0, p - 1))}
+                              className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/90 shadow-lg flex items-center justify-center disabled:opacity-25 hover:bg-white transition-all">
+                              <ChevronLeft size={16} className="text-gray-700" />
+                            </button>
+                            <button type="button" disabled={si === imageSlots.length - 1}
+                              onClick={() => setStagedViewIdx(p => Math.min(imageSlots.length - 1, p + 1))}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/90 shadow-lg flex items-center justify-center disabled:opacity-25 hover:bg-white transition-all">
+                              <ChevronRight size={16} className="text-gray-700" />
+                            </button>
+                          </>
+                        )}
+                        {/* Bottom info bar */}
+                        <div className="absolute bottom-0 left-0 right-0 z-10 bg-white/95 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between border-t border-line-light">
+                          <div>
+                            <p className="text-[10px] font-semibold text-gray-700">{imageSlots.length} image{imageSlots.length !== 1 ? 's' : ''} ready to be graded</p>
+                            <p className="text-[9px] text-gray-400 mt-0.5">Click &apos;Start AI Analysis&apos; or add another image.</p>
+                          </div>
+                          {existingGrades.length + imageSlots.length < 4 && (
+                            <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/40 text-primary text-[10px] font-bold cursor-pointer hover:bg-primary-bg transition-colors shrink-0">
+                              <Upload size={11} />
+                              Add Another Image
+                              <input type="file" accept="image/*" className="hidden"
+                                onChange={e => { if (e.target.files?.[0]) { addImageSlot(e.target.files[0]); setStagedViewIdx(imageSlots.length); } e.target.value = ''; }} />
+                            </label>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })() : (
+                    <label className="absolute inset-0 flex flex-col items-center justify-center gap-3 cursor-pointer group">
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-gray-700">No image uploaded</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Upload an embryo image to begin grading.</p>
+                      </div>
+                      <div className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-white text-xs font-semibold group-hover:opacity-90 transition-opacity shadow-sm">
+                        <Upload size={13} />
+                        Upload Image
+                      </div>
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={e => { if (e.target.files?.[0]) addImageSlot(e.target.files[0]); e.target.value = ''; }} />
+                    </label>
                   )}
                   {selGrade && (
                     <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
@@ -458,98 +622,78 @@ export default function AdvancedEmbryoGradingPage() {
                 </div>
               </div>
 
-              {/* Image Slots card */}
-              <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
-                <div className="p-2">
-                  {(() => {
-                    const total = existingGrades.length + imageSlots.length;
-                    const safeIdx = Math.min(slotIndex, Math.max(0, total - 1));
-                    const currentGrade = safeIdx < existingGrades.length ? existingGrades[safeIdx] : null;
-                    const isSelected   = selectedImageIdx === safeIdx && currentGrade != null;
-                    return (
-                      <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = Math.max(0, safeIdx - 1);
-                            setSlotIndex(next);
-                            setSelectedImageIdx(next < existingGrades.length ? next : null);
-                          }}
-                          disabled={safeIdx === 0}
-                          className="flex items-center justify-center w-10 h-10 text-gray-600 hover:bg-gray-50 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors border-r border-gray-200 shrink-0"
-                        >
-                          <ChevronLeft size={18} strokeWidth={2.5} />
-                        </button>
-                        <div className="flex-1 flex flex-col items-center justify-center py-1.5 gap-1">
-                          <span className="text-sm font-black text-gray-800 tabular-nums leading-none">
-                            {total > 0 ? safeIdx + 1 : 0} / {total}
-                          </span>
-                          {total > 0 && (
-                            <div className="flex items-center gap-1">
-                              {currentGrade?.grade && (
-                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md border ${gradeTextCls(currentGrade.grade)} bg-white border-current/20`}>
-                                  {currentGrade.grade}
-                                </span>
-                              )}
-                              {currentGrade?.is_best && (
-                                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
-                                  Best
-                                </span>
-                              )}
-                              {isSelected && (
-                                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  Selected
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = Math.min(total - 1, safeIdx + 1);
-                            setSlotIndex(next);
-                            setSelectedImageIdx(next < existingGrades.length ? next : null);
-                          }}
-                          disabled={total === 0 || safeIdx >= total - 1}
-                          className="flex items-center justify-center w-10 h-10 text-gray-600 hover:bg-gray-50 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors border-l border-gray-200 shrink-0"
-                        >
-                          <ChevronRight size={18} strokeWidth={2.5} />
-                        </button>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-              {(() => {
-                const tiles = [
-                  { label: 'Expansion', grade: expDigit,  src: tileImg?.exp_img_url, color: '#7c3aed' },
-                  { label: 'ICM',       grade: icmLetter, src: tileImg?.icm_img_url, color: '#0891b2' },
-                  { label: 'TE',        grade: teLetter,  src: tileImg?.te_img_url,  color: '#059669' },
-                ];
-                return (
-                  <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
-                    <div className="grid grid-cols-3 divide-x divide-line-light">
-                      {tiles.map(tile => (
-                        <div key={tile.label} className="relative bg-gray-50 overflow-hidden" style={{ height: 120 }}>
-                          {tile.src ? (
-                            <img src={tile.src} alt={tile.label} className="w-full h-full object-cover block" />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <ImageIcon size={14} className="text-gray-300" />
-                            </div>
-                          )}
-                          <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)' }} />
-                          <div className="absolute bottom-0 left-0 right-0 px-2 pb-1.5">
-                            <p className="text-[7px] font-bold uppercase tracking-widest leading-none mb-0.5 text-white/70">{tile.label}</p>
-                            <p className="text-lg font-black text-white leading-none">{tile.grade}</p>
+              {/* Previously graded info banner */}
+              {(existingGrades.length > 0 || gradesLoading) && (
+                <div className="rounded-xl border border-line bg-white px-4 py-3 shrink-0">
+                  <div className="flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <ImageIcon size={12} className="text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {gradesLoading ? (
+                        <>
+                          <div className="h-2.5 w-48 rounded bg-gray-200 animate-pulse mb-2" />
+                          <div className="flex gap-1">
+                            {[1, 2].map(n => (
+                              <div key={n} className="h-4 w-12 rounded-full bg-gray-200 animate-pulse" />
+                            ))}
                           </div>
-                        </div>
-                      ))}
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[10px] font-semibold text-gray-700 leading-snug">
+                            {existingGrades.length === 4
+                              ? `4 images for this oocyte have been previously graded. Upload an image to grade one more.`
+                              : `${existingGrades.length} image${existingGrades.length !== 1 ? 's' : ''} for this oocyte have been previously graded. Upload an image to grade one more.`}
+                          </p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {existingGrades.map((g, i) => (
+                              <button key={g.grade_id} type="button"
+                                onClick={() => setSelectedImageIdx(i)}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold border transition-all ${
+                                  selectedImageIdx === i
+                                    ? 'bg-primary text-white border-primary'
+                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40 hover:text-primary'
+                                }`}>
+                                #{i + 1}{g.grade ? ` · ${g.grade}` : ''}{g.is_best ? ' ★' : ''}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
-                );
-              })()}
+                </div>
+              )}
+              {/* Expansion / ICM / TE sub-image tiles row */}
+              <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
+                <div className="grid grid-cols-3 divide-x divide-line-light">
+                  {[
+                    { label: 'Expansion', grade: expDigit,  src: selectedGrade?.images[0]?.exp_img_url, canvasRef: expCanvasRef },
+                    { label: 'ICM',       grade: icmLetter, src: selectedGrade?.images[0]?.icm_img_url, canvasRef: icmCanvasRef },
+                    { label: 'TE',        grade: teLetter,  src: selectedGrade?.images[0]?.te_img_url,  canvasRef: teCanvasRef  },
+                  ].map(tile => (
+                    <div key={tile.label} className="relative bg-gray-50 overflow-hidden">
+                      {tile.src ? (
+                        <img src={tile.src} alt={tile.label} className="block w-full h-auto" />
+                      ) : (
+                        <div className="p-3">
+                          <canvas ref={tile.canvasRef} width={400} height={400} style={{ display: 'block', width: '100%', height: 'auto' }} />
+                        </div>
+                      )}
+                      <div className="absolute top-0 left-0 right-0 px-2.5 pt-2 flex items-start justify-between">
+                        <div>
+                          <p className="text-[7px] font-black uppercase tracking-[0.14em] text-gray-500 leading-none">{tile.label}</p>
+                          <div className="mt-1 w-4 h-[1.5px] rounded-full bg-primary/30" />
+                        </div>
+                        {tile.grade && tile.grade !== '—' && (
+                          <span className="text-[10px] font-black text-primary leading-none bg-primary/8 px-1.5 py-0.5 rounded-md border border-primary/15">{tile.grade}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           );
         })()}
@@ -622,25 +766,30 @@ export default function AdvancedEmbryoGradingPage() {
               )}
 
               {/* Embryo Details */}
-              <div className="rounded-xl border border-line bg-white p-4 shrink-0">
-                <p className="text-[9px] font-semibold tracking-widest text-gray-500 uppercase mb-3">Embryo Details</p>
-                <table className="w-full text-[10px]">
-                  <tbody className="divide-y divide-[#F8F4FD]">
-                    {[
-                      { label: 'Patient ID',   value: embryo?.hisNumber || his || '—' },
-                      { label: 'Oocyte No.',   value: selectedOocyteNo != null ? String(selectedOocyteNo) : '—' },
-                      { label: 'D0 Maturity',  value: selectedLog?.d0_maturity || '—' },
-                      { label: 'D1 PN',        value: selectedLog?.d1_pn || '—' },
-                      { label: 'D3 Grade',     value: selectedLog?.d3_grade || '—' },
-                      { label: 'Fate',         value: selectedLog?.fate || '—' },
-                    ].map(r => (
-                      <tr key={r.label}>
-                        <td className="py-1.5 text-gray-600 font-medium">{r.label}</td>
-                        <td className="py-1.5 text-gray-900 font-semibold text-right">{r.value}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
+                <div className="px-3 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white">
+                  <p className="text-[9px] font-semibold tracking-widest text-gray-400 uppercase">Embryo Details</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 p-3">
+                  {[
+                    { icon: User,         label: 'Patient ID',  value: embryo?.hisNumber || his || '—',                           color: 'text-violet-500',  bg: 'bg-violet-50'  },
+                    { icon: Hash,         label: 'Oocyte No.',  value: selectedOocyteNo != null ? String(selectedOocyteNo) : '—', color: 'text-primary',     bg: 'bg-primary/10' },
+                    { icon: FlaskConical, label: 'D0 Maturity', value: selectedLog?.d0_maturity || '—',                           color: 'text-cyan-600',    bg: 'bg-cyan-50'    },
+                    { icon: Dna,          label: 'D1 PN',       value: selectedLog?.d1_pn || '—',                                 color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { icon: Award,        label: 'D3 Grade',    value: selectedLog?.d3_grade || '—',                              color: 'text-amber-600',   bg: 'bg-amber-50'   },
+                    { icon: Flag,         label: 'Fate',        value: selectedLog?.fate || '—',                                  color: 'text-rose-500',    bg: 'bg-rose-50'    },
+                  ].map(({ icon: Icon, label, value, color, bg }) => (
+                    <div key={label} className="rounded-xl border border-gray-100 bg-white px-2.5 py-2 flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded-full ${bg} flex items-center justify-center shrink-0`}>
+                        <Icon size={11} className={color} />
+                      </div>
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">{label}</span>
+                        <span className="text-[10px] font-bold text-gray-800 leading-none truncate">{value}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Result Preview */}
@@ -648,10 +797,10 @@ export default function AdvancedEmbryoGradingPage() {
                 <div className="px-3 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white">
                   <p className="text-[9px] font-semibold tracking-widest text-gray-400 uppercase">Result (Preview)</p>
                 </div>
-                {selectedGrade ? (() => {
+                {(() => {
                   const g = selectedGrade;
-                  const thumb = g.images[0]?.upload_image_url ?? null;
-                  const score = g.ai_score ?? null;
+                  const thumb = g?.images[0]?.upload_image_url ?? null;
+                  const score = g?.ai_score ?? null;
                   return (
                     <div className="flex flex-col divide-y divide-[#F8F4FD]">
                       {/* Identity row */}
@@ -663,12 +812,14 @@ export default function AdvancedEmbryoGradingPage() {
                           }
                         </div>
                         <div className="flex flex-col gap-1 min-w-0">
-                          <p className="text-[10px] font-bold text-gray-800">Oocyte #{selectedOocyteNo ?? '—'}</p>
+                          <p className="text-[10px] font-bold text-gray-800">
+                            {selectedOocyteNo != null ? `Oocyte #${selectedOocyteNo}` : '—'}
+                          </p>
                           <div className="flex items-center gap-1">
                             <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
-                              Image #{(selectedImageIdx ?? 0) + 1}
+                              {selectedImageIdx != null ? `Image #${selectedImageIdx + 1}` : '—'}
                             </span>
-                            {g.grade && (
+                            {g?.grade && (
                               <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md border border-current/20 ${gradeTextCls(g.grade)}`}>
                                 {g.grade}
                               </span>
@@ -680,60 +831,59 @@ export default function AdvancedEmbryoGradingPage() {
                       <div className="px-3 py-2.5 flex flex-col gap-2">
                         <div className="flex items-center justify-between">
                           <span className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase">Grade</span>
-                          <span className={`text-base font-black ${g.grade ? gradeTextCls(g.grade) : 'text-gray-400'}`}>{g.grade || '—'}</span>
+                          <span className={`text-base font-black ${g?.grade ? gradeTextCls(g.grade) : 'text-gray-300'}`}>{g?.grade || '—'}</span>
                         </div>
-                        {score != null && (
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase">AI Score</span>
-                              <span className={`text-[10px] font-black ${scoreTextCls(score)}`}>{score} / 10</span>
-                            </div>
-                            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                              <div className={`h-full rounded-full ${scoreBarCls(score)}`} style={{ width: `${(score / 10) * 100}%` }} />
-                            </div>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase">AI Score</span>
+                            <span className={`text-[10px] font-black ${score != null ? scoreTextCls(score) : 'text-gray-300'}`}>
+                              {score != null ? `${score} / 10` : '— / 10'}
+                            </span>
                           </div>
-                        )}
+                          <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${score != null ? scoreBarCls(score) : 'bg-gray-200'}`}
+                              style={{ width: score != null ? `${(score / 10) * 100}%` : '0%' }} />
+                          </div>
+                        </div>
                       </div>
                       {/* Quality Flags */}
-                      {(g.hatching || g.vacuolization || g.multinucleation) && (
-                        <div className="px-3 py-2.5 flex flex-col gap-1.5">
-                          <p className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">Quality Flags</p>
-                          {[
-                            { label: 'Hatching',        val: g.hatching },
-                            { label: 'Vacuolization',   val: g.vacuolization },
-                            { label: 'Multinucleation', val: g.multinucleation },
-                          ].filter(r => r.val).map(r => (
-                            <div key={r.label} className="flex items-center justify-between">
-                              <span className="text-[9px] text-gray-500">{r.label}</span>
-                              <span className={`text-[8px] font-semibold px-2 py-0.5 rounded-full ${flagBadgeCls(r.val!)}`}>{r.val}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div className="px-3 py-2.5 flex flex-col gap-1.5">
+                        <p className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">Quality Flags</p>
+                        {[
+                          { label: 'Hatching',        val: g?.hatching },
+                          { label: 'Vacuolization',   val: g?.vacuolization },
+                          { label: 'Multinucleation', val: g?.multinucleation },
+                        ].map(r => (
+                          <div key={r.label} className="flex items-center justify-between">
+                            <span className="text-[9px] text-gray-500">{r.label}</span>
+                            {r.val
+                              ? <span className={`text-[8px] font-semibold px-2 py-0.5 rounded-full ${flagBadgeCls(r.val)}`}>{r.val}</span>
+                              : <span className="text-[9px] text-gray-300 font-semibold">—</span>
+                            }
+                          </div>
+                        ))}
+                      </div>
                       {/* Morphology */}
-                      {(g.zona_pellucida || g.blastocoel || g.cytoplasmic_granularity || g.bridge) && (
-                        <div className="px-3 py-2.5 flex flex-col gap-1.5">
-                          <p className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">Morphology</p>
-                          {[
-                            { label: 'Zona Pellucida', val: g.zona_pellucida },
-                            { label: 'Blastocoel',     val: g.blastocoel },
-                            { label: 'Cyto. Gran.',    val: g.cytoplasmic_granularity },
-                            { label: 'Bridge',         val: g.bridge },
-                          ].filter(r => r.val).map(r => (
-                            <div key={r.label} className="flex items-center justify-between">
-                              <span className="text-[9px] text-gray-500">{r.label}</span>
-                              <span className={`text-[8px] font-semibold px-2 py-0.5 rounded-full ${flagBadgeCls(r.val!)}`}>{r.val}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div className="px-3 py-2.5 flex flex-col gap-1.5">
+                        <p className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">Morphology</p>
+                        {[
+                          { label: 'Zona Pellucida', val: g?.zona_pellucida },
+                          { label: 'Blastocoel',     val: g?.blastocoel },
+                          { label: 'Cyto. Gran.',    val: g?.cytoplasmic_granularity },
+                          { label: 'Bridge',         val: g?.bridge },
+                        ].map(r => (
+                          <div key={r.label} className="flex items-center justify-between">
+                            <span className="text-[9px] text-gray-500">{r.label}</span>
+                            {r.val
+                              ? <span className={`text-[8px] font-semibold px-2 py-0.5 rounded-full ${flagBadgeCls(r.val)}`}>{r.val}</span>
+                              : <span className="text-[9px] text-gray-300 font-semibold">—</span>
+                            }
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   );
-                })() : (
-                  <div className="px-3 py-6 text-center">
-                    <p className="text-[9px] text-gray-400">Select an image to see result preview.</p>
-                  </div>
-                )}
+                })()}
               </div>
 
             </div>
@@ -1136,7 +1286,7 @@ function OocyteList({ logs, loading, selectedOocyteNo, imageSlots, gradeCountMap
               <button key={log.log_id} type="button" onClick={() => onSelect(log.oocyte_no)}
                 className={`w-full flex items-center gap-3 py-2.5 transition-all text-left border-b border-[#F5F0F8] relative ${active ? 'bg-primary-bg pl-3 pr-4' : 'hover:bg-surface pl-4 pr-4'}`}>
                 {active && <span className="absolute left-0 top-0 bottom-0 w-1 rounded-r bg-primary" />}
-                <span className={`text-[9px] font-bold w-5 shrink-0 ${active ? 'text-primary' : 'text-gray-300'}`}>{String(idx + 1).padStart(2, '0')}</span>
+                <span className={`text-[9px] font-bold w-5 shrink-0 ${active ? 'text-primary' : 'text-gray-800'}`}>{String(idx + 1).padStart(2, '0')}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <p className={`text-[10px] font-semibold ${active ? 'text-primary' : 'text-gray-700'}`}>Oocyte #{log.oocyte_no}</p>
