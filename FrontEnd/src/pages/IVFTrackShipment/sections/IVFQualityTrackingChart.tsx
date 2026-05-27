@@ -30,7 +30,7 @@ const KPI_TAB_ICONS: Record<string, string> = {
   ln2_level: 'M12 2.69l5.66 5.66a8 8 0 11-11.31 0z', // droplet
   ln2_evaporation_rate: 'M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2', // wind
   tive_battery_percentage: '', // battery — use rect
-  ln2_lid_state: 'M7 11V7a5 5 0 0110 0v4', // lock
+  ln2_lid_state: '', // lock — rendered separately (needs rect + path)
   shock: 'M13 2 3 14h9l-1 8 10-12h-9l1-8z', // zap
 };
 
@@ -39,6 +39,14 @@ const KpiTabIcon = ({ id }: { id: string }) => {
     return (
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="1" y="6" width="18" height="12" rx="2" ry="2"/><line x1="23" y1="13" x2="23" y2="11"/>
+      </svg>
+    );
+  }
+  if (id === 'ln2_lid_state') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
       </svg>
     );
   }

@@ -125,6 +125,7 @@ export interface KpiConfigPayload {
     tank_id?: number | null;
     incubator_id?: number | null;
     chamber_id?: string | null;
+    refrigerator_id?: number | null;
     kpi_name: string;
     alert_name?: string | null;
     min?: number | null;
@@ -665,23 +666,34 @@ export class IvfService extends BaseApiService {
         );
     }
 
-    /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank. */
-    async getKpiConfigList(id: number, type: "tank" | "incubator" = "tank", chamberId?: string | null): Promise<{
+    /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank/incubator/refrigerator. */
+    async getKpiConfigList(
+        id: number,
+        type: "tank" | "incubator" | "refrigerator" = "tank",
+        scopeId?: string | null,
+    ): Promise<{
         tank_id?: number;
         incubator_id?: number;
+        refrigerator_id?: number;
         tank_code?: string;
         incubator_code?: string;
+        refrigerator_code?: string;
         branch_id: number;
         hospital_id: number | null;
         config: Array<KpiConfigRow>;
     }> {
-        let param = type === "incubator" ? `incubator_id=${encodeURIComponent(id)}` : `tank_id=${encodeURIComponent(id)}`;
+        let param: string;
         if (type === "incubator") {
-            if (chamberId) {
-                param += `&chamber_id=${encodeURIComponent(chamberId)}`;
-            } else if (chamberId === null) {
+            param = `incubator_id=${encodeURIComponent(id)}`;
+            if (scopeId) {
+                param += `&chamber_id=${encodeURIComponent(scopeId)}`;
+            } else if (scopeId === null) {
                 param += `&chamber_id=null`;
             }
+        } else if (type === "refrigerator") {
+            param = `refrigerator_id=${encodeURIComponent(id)}`;
+        } else {
+            param = `tank_id=${encodeURIComponent(id)}`;
         }
         return await this.request(
             `/api/ivf/quality/kpi-config/list?${param}`,
@@ -775,6 +787,65 @@ export class IvfService extends BaseApiService {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ incubator_id: incubatorId, chamber_id: chamberId, configs }),
         });
+    }
+
+    async bulkUpsertKpiConfigForRefrigerator(
+        refrigeratorId: number,
+        configs: Array<{
+            kpi_name: string;
+            alert_name?: string | null;
+            min?: number | null;
+            max?: number | null;
+            unit?: string | null;
+            alert_type?: string | null;
+            cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
+            status?: boolean;
+        }>,
+    ): Promise<{ updated: number; created: number }> {
+        return await this.request("/api/ivf/quality/kpi-config/bulk-refrigerator", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refrigerator_id: refrigeratorId, configs }),
+        });
+    }
+
+    async getRefrigeratorKpiHistory(
+        refrigeratorId: number,
+        durationMinutes?: number,
+    ): Promise<{
+        refrigerator_id: number;
+        refrigerator_code: string;
+        kpi_series: Record<string, Array<{
+            timestamp: string;
+            value: number;
+            avg?: number;
+            min?: number;
+            max?: number;
+            count?: number;
+            unit: string;
+        }>>;
+    }> {
+        const params = new URLSearchParams();
+        if (durationMinutes != null && durationMinutes > 0) params.set("duration_minutes", String(durationMinutes));
+        const qs = params.toString();
+        return await this.request(
+            `/api/ivf/quality/refrigerators/${encodeURIComponent(refrigeratorId)}/kpi-history${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+        );
+    }
+
+    /** Latest single reading for freezer_temperature and refrigerator_temperature. */
+    async getRefrigeratorZoneLatest(refrigeratorId: number): Promise<Array<{
+        kpi_name: string;
+        label: string;
+        value: number | null;
+        unit: string;
+    }>> {
+        return this.request(
+            `/api/ivf/quality/refrigerators/${encodeURIComponent(refrigeratorId)}/zone-latest`,
+            { method: "GET" },
+        );
     }
 
     async checkTankInTransitStatus(
@@ -1395,16 +1466,45 @@ export class IvfService extends BaseApiService {
     }
 
     async uploadImage(cycleId: number, gradeId: number, file: File, options?: { expFile?: File; teFile?: File; icmFile?: File; day?: number }): Promise<IvfImage> {
-        const form = new FormData();
-        form.append('upload_image', file);
-        if (options?.expFile) form.append('exp_img', options.expFile);
-        if (options?.teFile)  form.append('te_img',  options.teFile);
-        if (options?.icmFile) form.append('icm_img', options.icmFile);
-        if (options?.day != null) form.append('day', String(options.day));
-        return this.requestFormData<IvfImage>(
-            `/api/ivf/cycles/${cycleId}/grades/${gradeId}/images`,
-            form,
-            { method: 'POST' },
+        const presign = await this.request<{ container_sas_url: string; prefix: string }>(
+            `/api/ivf/cycles/${cycleId}/grades/${gradeId}/images/presign`,
+            { method: 'GET' },
+        );
+
+        const [baseUrl, sasQuery] = presign.container_sas_url.split('?');
+
+        const uploadBlob = async (f: File, label: string): Promise<string> => {
+            const ext = f.name.includes('.') ? '.' + f.name.split('.').pop() : '';
+            const blobName = `${presign.prefix}/${label}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+            const blobUrl = `${baseUrl}/${blobName}?${sasQuery}`;
+            await fetch(blobUrl, {
+                method: 'PUT',
+                headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': f.type || 'application/octet-stream' },
+                body: f,
+            });
+            return `${baseUrl}/${blobName}`;
+        };
+
+        const upload_image_url = await uploadBlob(file, 'upload');
+        const exp_img_url  = options?.expFile  ? await uploadBlob(options.expFile,  'exp')  : undefined;
+        const te_img_url   = options?.teFile   ? await uploadBlob(options.teFile,   'te')   : undefined;
+        const icm_img_url  = options?.icmFile  ? await uploadBlob(options.icmFile,  'icm')  : undefined;
+
+        return this.request<IvfImage>(
+            `/api/ivf/cycles/${cycleId}/grades/${gradeId}/images/register`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    upload_image_url,
+                    exp_img_url:  exp_img_url  ?? null,
+                    te_img_url:   te_img_url   ?? null,
+                    icm_img_url:  icm_img_url  ?? null,
+                    file_name:    file.name,
+                    file_size:    file.size,
+                    day:          options?.day ?? null,
+                }),
+            },
         );
     }
 

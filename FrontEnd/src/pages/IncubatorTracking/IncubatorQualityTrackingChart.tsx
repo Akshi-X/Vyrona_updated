@@ -180,7 +180,9 @@ interface IncubatorQualityTrackingChartProps {
   incubatorId: number;
   chamberId: string;
   incubatorCode?: string;
+  selectedKpiKey?: string | null;
   onLatestValues?: (vals: Record<string, number | string>) => void;
+  onKpiTabsLoaded?: (tabs: Array<{ id: string; label: string; unit: string }>) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +192,9 @@ export default function IncubatorQualityTrackingChart({
   incubatorId,
   chamberId,
   incubatorCode,
+  selectedKpiKey,
   onLatestValues,
+  onKpiTabsLoaded,
 }: IncubatorQualityTrackingChartProps) {
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
@@ -295,6 +299,14 @@ export default function IncubatorQualityTrackingChart({
     setError(null);
   }, [incubatorId, chamberId]);
 
+  // Sync activeTab from external selectedKpiKey (e.g. KPI tile clicked in visualizer)
+  useEffect(() => {
+    if (!selectedKpiKey) return;
+    if (kpiTabs.some((tab) => tab.id === selectedKpiKey) && activeTab !== selectedKpiKey) {
+      setActiveTab(selectedKpiKey);
+    }
+  }, [selectedKpiKey, kpiTabs, activeTab]);
+
   // Fetch KPI config for tabs and threshold lines
   useEffect(() => {
     ivfService
@@ -334,6 +346,7 @@ export default function IncubatorQualityTrackingChart({
         setKpiTabs(tabs);
         setActiveTab((current) => (tabs.some((t) => t.id === current) ? current : tabs[0]?.id ?? ''));
         setHasLoadedKpiConfig(true);
+        onKpiTabsLoaded?.(tabs);
       })
       .catch(() => {
         if (!isMountedRef.current) return;
@@ -342,6 +355,7 @@ export default function IncubatorQualityTrackingChart({
         setKpiTabs(tabs);
         setActiveTab(tabs[0]?.id ?? '');
         setHasLoadedKpiConfig(true);
+        onKpiTabsLoaded?.(tabs);
       });
   }, [incubatorId, chamberId]);
 

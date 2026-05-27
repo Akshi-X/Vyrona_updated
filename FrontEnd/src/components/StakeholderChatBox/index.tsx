@@ -3,7 +3,7 @@ import { chatService } from '../../services/chatService';
 import { userService, type UserListItem } from '../../services/userService';
 import renderMessageWithMentions from './utils/renderMessageWithMentions';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
-import { usePatientChatWebSocket, useCanisterChatWebSocket, useIncubatorChatWebSocket } from '../../hooks/useChatWebSocket';
+import { usePatientChatWebSocket, useCanisterChatWebSocket, useIncubatorChatWebSocket, useRefrigeratorChatWebSocket } from '../../hooks/useChatWebSocket';
 
 const formatTimestamp = (dateString: string): string => {
   try {
@@ -42,7 +42,10 @@ interface StakeholderChatBoxProps {
   canisterNumber?: string | undefined; // For IVF flow
   incubatorId?: number | undefined; // For Incubator flow
   chamberId?: string | undefined; // For Incubator flow (optional chamber scope)
+  refrigeratorId?: number | undefined; // For Refrigerator flow
+  zoneId?: string | undefined; // For Refrigerator flow (optional zone scope)
   onMessagesUpdated?: () => void; // Callback to refresh unread messages in parent
+  embedded?: boolean; // Render inline (no modal backdrop/wrapper)
 }
 
 const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
@@ -52,7 +55,10 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
   canisterNumber,
   incubatorId,
   chamberId,
-  onMessagesUpdated
+  refrigeratorId,
+  zoneId,
+  onMessagesUpdated,
+  embedded = false,
 }) => {
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const unreadSeparatorRef = useRef<HTMLDivElement | null>(null);
@@ -80,22 +86,27 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
   const isCGTFlow = !!(patientId && patientId.trim());
   const isIVFFlow = !!(canisterNumber && canisterNumber.trim());
   const isIncubatorFlow = !!(incubatorId != null);
+  const isRefrigeratorFlow = !!(refrigeratorId != null);
   const chatIdentifier =
     (patientId && patientId.trim()) ||
     (canisterNumber && canisterNumber.trim()) ||
-    (incubatorId != null ? incubatorId.toString() : undefined);
+    (incubatorId != null ? incubatorId.toString() : undefined) ||
+    (refrigeratorId != null ? refrigeratorId.toString() : undefined);
 
   // WebSocket hooks — only the active one actually connects
   const patientWs = usePatientChatWebSocket(isCGTFlow ? patientId : undefined);
   const canisterWs = useCanisterChatWebSocket(isIVFFlow ? canisterNumber : undefined);
   const incubatorWs = useIncubatorChatWebSocket(isIncubatorFlow ? incubatorId : undefined, chamberId);
+  const refrigeratorWs = useRefrigeratorChatWebSocket(isRefrigeratorFlow ? refrigeratorId : undefined, zoneId);
 
   // Use the appropriate WebSocket hook based on flow
-  const { messages: wsMessages, unreadCount, markAsRead, refreshMessages } = isIncubatorFlow
-    ? incubatorWs
-    : isCGTFlow
-      ? patientWs
-      : canisterWs;
+  const { messages: wsMessages, unreadCount, markAsRead, refreshMessages } = isRefrigeratorFlow
+    ? refrigeratorWs
+    : isIncubatorFlow
+      ? incubatorWs
+      : isCGTFlow
+        ? patientWs
+        : canisterWs;
 
   // Fetch current user
   const fetchCurrentUser = async (): Promise<void> => {
@@ -171,7 +182,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
     setMessages(transformedMessages);
     
    
-  }, [wsMessages, currentUserId, chatIdentifier, isOpen]);
+  }, [wsMessages, currentUserId, chatIdentifier, isOpen, embedded]);
 
   // Onboarding: listen for a custom event to pre-fill the draft input.
   // This avoids the React 18 synthetic-event unreliability of the native setter trick.
@@ -238,9 +249,9 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
     });
   }, [messages]);
 
-  // Initialize when chat opens
+  // Initialize when chat opens (or when mounted in embedded mode)
   useEffect(() => {
-    if (isOpen && chatIdentifier) {
+    if ((isOpen || embedded) && chatIdentifier) {
       const initializeChat = async () => {
         setLoadingMessages(true);
         await fetchCurrentUser();
@@ -250,16 +261,16 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         setLoadingMessages(false);
       };
       initializeChat();
-    } else {
-      // Reset when chat closes
+    } else if (!embedded) {
+      // Reset when modal chat closes (not applicable in embedded mode)
       hasMarkedAsReadRef.current = false;
       previousUnreadCountRef.current = 0;
     }
-  }, [isOpen, chatIdentifier, unreadCount, currentUserId]);
+  }, [isOpen, embedded, chatIdentifier, unreadCount, currentUserId]);
 
   // Scroll to bottom when loading completes and messages are available
   useEffect(() => {
-    if (!loadingMessages && messages.length > 0 && isOpen) {
+    if (!loadingMessages && messages.length > 0 && (isOpen || embedded)) {
       // Wait a bit longer after loading completes to ensure all content is rendered
       // This ensures we scroll after WebSocket messages are fully loaded
       const timeoutId = setTimeout(() => {
@@ -276,7 +287,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
 
   // Scroll to bottom when chat opens or messages change (initial load)
   useEffect(() => {
-    if (messages.length > 0 && isOpen && !loadingMessages) {
+    if (messages.length > 0 && (isOpen || embedded) && !loadingMessages) {
       // Force scroll to bottom on initial load to ensure we show latest messages
       // Use multiple requestAnimationFrame calls to ensure content is rendered
       requestAnimationFrame(() => {
@@ -289,7 +300,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
 
   // Scroll to bottom smoothly when new messages arrive (user is viewing chat)
   useEffect(() => {
-    if (messages.length > 0 && isOpen && !loadingMessages && messages.length > previousMessageCountRef.current) {
+    if (messages.length > 0 && (isOpen || embedded) && !loadingMessages && messages.length > previousMessageCountRef.current) {
       // New message arrived - scroll smoothly to bottom
       // Use requestAnimationFrame to ensure DOM is updated
       requestAnimationFrame(() => {
@@ -423,6 +434,8 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         tank_code?: string;
         incubator_id?: number;
         chamber_id?: string;
+        refrigerator_id?: number;
+        zone_id?: string;
         tagged_user_ids: string[];
       } = {
         message_content: messageToSend,
@@ -436,6 +449,9 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       } else if (isIncubatorFlow && incubatorId != null) {
         requestPayload.incubator_id = incubatorId;
         if (chamberId) requestPayload.chamber_id = chamberId;
+      } else if (isRefrigeratorFlow && refrigeratorId != null) {
+        requestPayload.refrigerator_id = refrigeratorId;
+        if (zoneId) requestPayload.zone_id = zoneId;
       }
       
       await chatService.sendMessage(requestPayload);
@@ -451,6 +467,8 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
           chatService.markCanisterAsRead(canisterNumber).catch(() => {});
         } else if (isIncubatorFlow && incubatorId != null) {
           chatService.markIncubatorAsRead(incubatorId, chamberId).catch(() => {});
+        } else if (isRefrigeratorFlow && refrigeratorId != null) {
+          chatService.markRefrigeratorAsRead(refrigeratorId).catch(() => {});
         }
       }
       hasMarkedAsReadRef.current = true;
@@ -518,6 +536,8 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
           chatService.markCanisterAsRead(canisterNumber).catch(() => {});
         } else if (isIncubatorFlow && incubatorId != null) {
           chatService.markIncubatorAsRead(incubatorId, chamberId).catch(() => {});
+        } else if (isRefrigeratorFlow && refrigeratorId != null) {
+          chatService.markRefrigeratorAsRead(refrigeratorId).catch(() => {});
         }
       }
       hasMarkedAsReadRef.current = true;
@@ -666,38 +686,14 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
     }
   }, [showMentionDropdown]);
 
-  // Lock body scroll when chat box is open
-  useBodyScrollLock(isOpen);
+  // Lock body scroll when chat box is open as a modal (not in embedded mode)
+  useBodyScrollLock(isOpen && !embedded);
 
-  if (!isOpen) return null;
+  const effectivelyOpen = isOpen || embedded;
+  if (!effectivelyOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm" onClick={handleClose}>
-      <div id="onboarding-stakeholder-chatbox" className="w-[65vw] max-w-[700px] h-[70vh] bg-white rounded-lg border border-line shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="px-5 pt-5 pb-3 border-b">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-black">Stakeholder Chats</h3>
-                <p className="text-[11px] text-gray-500">Receive message from stakeholders and team members</p>
-              </div>
-            </div>
-            <button id="onboarding-chat-close-btn" className="p-2 rounded-full hover:bg-gray-100" onClick={handleClose}>
-              <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-        
-        {/* Body - Group Chat Layout */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+  const chatContent = (
+    <div className="flex-1 flex flex-col overflow-hidden">
           <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4">
             {loadingMessages ? (
               <div className="text-center text-xs text-gray-500 mt-10">Loading messages...</div>
@@ -764,8 +760,8 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
           </div>
           
           {/* Composer */}
-          <div className="px-6 py-4 border-t bg-gray-50 relative">
-            <div className="flex items-end gap-3">
+          <div className={embedded ? 'px-3 py-2 border-t bg-gray-50 relative' : 'px-6 py-4 border-t bg-gray-50 relative'}>
+            <div className={embedded ? 'flex items-end gap-2' : 'flex items-end gap-3'}>
               <div className="flex-1 relative">
                 <input
                   id="onboarding-chat-input"
@@ -776,7 +772,10 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                   onChange={(e) => handleMessageChange(e.target.value)}
                   onKeyDown={handleKeyDown}
                   disabled={!chatIdentifier}
-                  className="w-full min-h-[44px] max-h-32 py-2.5 px-4 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white shadow-sm"
+                  className={embedded
+                    ? 'w-full min-h-[30px] py-1 px-3 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white shadow-sm'
+                    : 'w-full min-h-[44px] max-h-32 py-2.5 px-4 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white shadow-sm'
+                  }
                 />
                 {/* Mention dropdown */}
                 {showMentionDropdown && mentionSuggestions.length > 0 && (
@@ -818,19 +817,49 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                 id="onboarding-chat-send-btn"
                 disabled={!chatIdentifier || !draftMessage.trim()}
                 onClick={handleSendDraft}
-                className={`min-w-[44px] h-[44px] rounded-lg flex items-center justify-center transition-all duration-200 shadow-sm ${
-                  (!chatIdentifier || !draftMessage.trim()) 
-                    ? 'bg-gray-300 cursor-not-allowed' 
+                className={`${embedded ? 'min-w-[30px] h-[30px]' : 'min-w-[44px] h-[44px]'} rounded-lg flex items-center justify-center transition-all duration-200 shadow-sm ${
+                  (!chatIdentifier || !draftMessage.trim())
+                    ? 'bg-gray-300 cursor-not-allowed'
                     : 'bg-[#8d2b8f] hover:bg-[#7a2473] active:bg-[#6a1f64] cursor-pointer'
                 }`}
               >
-                <svg className="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                <svg className={embedded ? 'w-3.5 h-3.5 text-white' : 'w-5 h-5 text-white'} viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14A1 1 0 003 18h14a1 1 0 00.894-1.447l-7-14z"/>
                 </svg>
               </button>
             </div>
           </div>
         </div>
+  );
+
+  if (embedded) {
+    return chatContent;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm" onClick={handleClose}>
+      <div id="onboarding-stakeholder-chatbox" className="w-[65vw] max-w-[700px] h-[70vh] bg-white rounded-lg border border-line shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 pt-5 pb-3 border-b">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-black">Stakeholder Chats</h3>
+                <p className="text-[11px] text-gray-500">Receive message from stakeholders and team members</p>
+              </div>
+            </div>
+            <button id="onboarding-chat-close-btn" className="p-2 rounded-full hover:bg-gray-100" onClick={handleClose}>
+              <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        {chatContent}
       </div>
     </div>
   );
