@@ -43,6 +43,7 @@ from app.models.IVF.ln2_readings_model import Ln2Reading
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.models.IVF.tank_model import Tank
 from app.models.IVF.incubator_model import Incubator
+from app.models.IVF.refrigerator_model import Refrigerator
 from app.models.kpi_config_model import KpiConfig
 from app.models.readings_model import Readings
 from app.models.user_model import User
@@ -778,13 +779,34 @@ def list_kpi_config(
     tank_id: Optional[int] = Query(None, description="Tank ID"),
     incubator_id: Optional[int] = Query(None, description="Incubator ID"),
     chamber_id: Optional[str] = Query(None, description="Chamber ID filter (incubator only)"),
+    refrigerator_id: Optional[int] = Query(None, description="Refrigerator ID"),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List all KPI config rows for a tank or incubator (Alert Setting)."""
+    """List all KPI config rows for a tank, incubator, or refrigerator (Alert Setting)."""
     _require_alert_setting_role(current_user)
     quality_service = QualityService(db)
+
+    if refrigerator_id is not None:
+        refrigerator = db.query(Refrigerator).filter(
+            Refrigerator.refrigerator_id == refrigerator_id,
+            Refrigerator.hospital_id == current_user.hospital_id,
+        ).first()
+        if not refrigerator:
+            raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
+        q = db.query(KpiConfig).filter(
+            KpiConfig.refrigerator_id == refrigerator_id,
+            KpiConfig.zone_id.is_(None),
+        )
+        rows = q.order_by(KpiConfig.kpi_name, KpiConfig.alert_name).all()
+        return {
+            "refrigerator_id": refrigerator_id,
+            "refrigerator_code": refrigerator.refrigerator_code or "",
+            "branch_id": refrigerator.branch_id,
+            "hospital_id": refrigerator.hospital_id,
+            "config": [_kpi_config_metadata(r) for r in rows],
+        }
 
     if incubator_id is not None:
         incubator = db.query(Incubator).filter(
@@ -808,7 +830,7 @@ def list_kpi_config(
         }
 
     if tank_id is None:
-        raise HTTPException(status_code=400, detail="Provide tank_id or incubator_id")
+        raise HTTPException(status_code=400, detail="Provide tank_id, incubator_id, or refrigerator_id")
 
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
@@ -836,21 +858,26 @@ def create_kpi_config(
     current_user: User = Depends(get_current_user),
     body: dict = Body(...),
 ):
-    """Create a KPI config row. Body: hospital_id, branch_id, kpi_name, and either tank_id or incubator_id."""
+    """Create a KPI config row. Body: hospital_id, branch_id, kpi_name, and either tank_id, incubator_id, or refrigerator_id."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     for k in ("hospital_id", "branch_id", "kpi_name"):
         if k not in body:
             raise HTTPException(status_code=400, detail=f"Missing required field: {k}")
-    if body.get("tank_id") is None and body.get("incubator_id") is None:
-        raise HTTPException(status_code=400, detail="Provide tank_id or incubator_id")
+    if (
+        body.get("tank_id") is None
+        and body.get("incubator_id") is None
+        and body.get("refrigerator_id") is None
+    ):
+        raise HTTPException(status_code=400, detail="Provide tank_id, incubator_id, or refrigerator_id")
     try:
         hospital_id = int(body["hospital_id"])
         branch_id_val = int(body["branch_id"])
         tank_id = int(body["tank_id"]) if body.get("tank_id") is not None else None
         incubator_id_val = int(body["incubator_id"]) if body.get("incubator_id") is not None else None
+        refrigerator_id_val = int(body["refrigerator_id"]) if body.get("refrigerator_id") is not None else None
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="hospital_id, branch_id, tank_id/incubator_id must be integers")
+        raise HTTPException(status_code=400, detail="hospital_id, branch_id, tank_id/incubator_id/refrigerator_id must be integers")
     if branch_id is not None and branch_id_val != branch_id:
         raise HTTPException(status_code=403, detail="Cannot create config for another branch")
 
@@ -861,6 +888,8 @@ def create_kpi_config(
         tank_id=tank_id,
         incubator_id=incubator_id_val,
         chamber_id=body.get("chamber_id"),
+        refrigerator_id=refrigerator_id_val,
+        zone_id=None if refrigerator_id_val else body.get("zone_id"),
         kpi_name=str(body["kpi_name"]),
         alert_name=body.get("alert_name"),
         min_val=body.get("min") if body.get("min") is not None else None,
@@ -1004,6 +1033,60 @@ def bulk_upsert_kpi_config_for_incubator(
         metadata={
             "incubator_id": incubator_id,
             "chamber_id": chamber_id,
+            "updated": result.get("updated"),
+            "created": result.get("created"),
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
+    return result
+
+
+@router.post("/kpi-config/bulk-refrigerator")
+def bulk_upsert_kpi_config_for_refrigerator(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """
+    Bulk upsert KPI config for a single refrigerator.
+    Body: refrigerator_id (int), configs (list).
+    """
+    _require_alert_setting_role(current_user)
+    refrigerator_id = body.get("refrigerator_id")
+    configs = body.get("configs")
+    if not refrigerator_id:
+        raise HTTPException(status_code=400, detail="refrigerator_id is required")
+    if not isinstance(configs, list):
+        raise HTTPException(status_code=400, detail="configs must be a list")
+    try:
+        refrigerator_id = int(refrigerator_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="refrigerator_id must be an integer")
+
+    refrigerator = db.query(Refrigerator).filter(
+        Refrigerator.refrigerator_id == refrigerator_id,
+        Refrigerator.hospital_id == current_user.hospital_id,
+    ).first()
+    if not refrigerator:
+        raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
+
+    quality_service = QualityService(db)
+    result = quality_service.bulk_upsert_kpi_config_for_refrigerator(
+        refrigerator_id=refrigerator_id,
+        configs=configs,
+        hospital_id=refrigerator.hospital_id,
+        branch_id=refrigerator.branch_id,
+    )
+    db.commit()
+
+    ActivityLogService(db).log_activity(
+        action="alert_configuration.kpi_config_bulk_upserted",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("refrigerator", str(refrigerator_id)),
+        metadata={
+            "refrigerator_id": refrigerator_id,
             "updated": result.get("updated"),
             "created": result.get("created"),
         },
@@ -2024,6 +2107,11 @@ _CHAMBER_HEALTH_KPIS = {
     "incubator_co2": ("CO₂ Level", "%"),
 }
 
+_REFRIGERATOR_HEALTH_KPIS = {
+    "freezer_temperature": ("Freezer Temperature", "°C"),
+    "refrigerator_temperature": ("Refrigerator Temperature", "°C"),
+}
+
 
 @router.get("/incubators/{incubator_id}/chamber-latest")
 def get_incubator_chamber_latest(
@@ -2083,6 +2171,115 @@ def get_incubator_chamber_latest(
         })
 
     return result
+
+
+@router.get("/refrigerators/{refrigerator_id}/zone-latest")
+def get_refrigerator_zone_latest(
+    refrigerator_id: int = Path(..., description="Refrigerator ID"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the single latest reading for freezer_temperature and refrigerator_temperature."""
+    refrigerator = (
+        db.query(Refrigerator)
+        .filter(
+            Refrigerator.refrigerator_id == refrigerator_id,
+            Refrigerator.hospital_id == current_user.hospital_id,
+        )
+        .first()
+    )
+    if not refrigerator:
+        raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
+
+    from sqlalchemy import func as sa_func
+
+    subq = (
+        db.query(
+            KpiConfig.kpi_name,
+            Readings.kpi_value,
+            KpiConfig.unit,
+            sa_func.row_number()
+            .over(
+                partition_by=KpiConfig.kpi_name,
+                order_by=Readings.timestamp.desc(),
+            )
+            .label("rn"),
+        )
+        .join(Readings, Readings.kpi_config_id == KpiConfig.id)
+        .filter(
+            Readings.refrigerator_id == refrigerator_id,
+            KpiConfig.kpi_name.in_(list(_REFRIGERATOR_HEALTH_KPIS.keys())),
+        )
+        .subquery()
+    )
+
+    rows = db.query(subq.c.kpi_name, subq.c.kpi_value, subq.c.unit).filter(subq.c.rn == 1).all()
+
+    result = []
+    for kpi_name, default_label_unit in _REFRIGERATOR_HEALTH_KPIS.items():
+        default_label, default_unit = default_label_unit
+        match = next((r for r in rows if r.kpi_name == kpi_name), None)
+        result.append({
+            "kpi_name": kpi_name,
+            "label": default_label,
+            "value": float(match.kpi_value) if match else None,
+            "unit": (match.unit if match and match.unit else default_unit),
+        })
+
+    return result
+
+
+@router.get("/refrigerators/{refrigerator_id}/kpi-history")
+def get_refrigerator_kpi_history(
+    refrigerator_id: int = Path(..., description="Refrigerator ID"),
+    duration_minutes: Optional[int] = Query(
+        None,
+        description="LIVE=omit. Static: 60=1H, 1440=24H, 10080=7D.",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI history for a refrigerator (freezer_temperature + refrigerator_temperature)."""
+    refrigerator = db.query(Refrigerator).filter(
+        Refrigerator.refrigerator_id == refrigerator_id,
+        Refrigerator.hospital_id == current_user.hospital_id,
+    ).first()
+    if not refrigerator:
+        raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
+
+    refrigerator_code = refrigerator.refrigerator_code or f"R{refrigerator_id}"
+    quality_service = QualityService(db)
+
+    since = (
+        datetime.now(timezone.utc) - timedelta(minutes=duration_minutes)
+        if duration_minutes
+        else None
+    )
+
+    if duration_minutes is not None and duration_minutes > 0:
+        raw = quality_service.get_readings_per_kpi_since_refrigerator(refrigerator_id, since)
+    else:
+        raw = quality_service.get_last_n_readings_per_kpi_refrigerator(refrigerator_id, DEFAULT_LIVE_READINGS_CAP)
+
+    kpi_series: dict = {}
+    for item in (raw or {}).get("kpis") or []:
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        kpi_series.setdefault(name, []).append({
+            "timestamp": item.get("timestamp"),
+            "value": item.get("value"),
+            "unit": item.get("unit") or "",
+        })
+
+    for name in list(kpi_series.keys()):
+        kpi_series[name].reverse()
+
+    return {
+        "refrigerator_id": refrigerator_id,
+        "refrigerator_code": refrigerator_code,
+        "kpi_series": kpi_series,
+    }
 
 
 @router.post("/incubators/{incubator_code}/kpi-readings")

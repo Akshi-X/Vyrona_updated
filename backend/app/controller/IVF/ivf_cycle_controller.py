@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, UploadFile, File, Form  # UploadFile/File/Form used by report upload
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -16,6 +16,8 @@ from app.schemas.IVF.ivf_cycle_schema import (
     LogUpsert,
     LogResponse,
     ImageResponse,
+    ImageRegisterBody,
+    ImagePresignResponse,
     ReportResponse,
     GradeUpsert,
     GradeResponse,
@@ -82,8 +84,6 @@ def _log_metadata(cycle_id: int, his_id: Optional[str], payload: LogUpsert) -> d
         data["d1_zygote_status"] = payload.d1_zygote_status
     if payload.d3_grade is not None:
         data["d3_grade"] = payload.d3_grade
-    if payload.blast_grade is not None:
-        data["blast_grade"] = payload.blast_grade
     if payload.fate is not None:
         data["fate"] = payload.fate
     return data
@@ -279,7 +279,7 @@ def create_grade(
     svc = IvfCycleService(db)
     if not svc.get_cycle(cycle_id, hospital_id):
         raise HTTPException(status_code=404, detail="Cycle not found")
-    return svc.create_grade(log_id, cycle_id, payload, user_id=str(user.user_id))
+    return _grade_with_read_sas(svc.create_grade(log_id, cycle_id, payload, user_id=str(user.user_id)))
 
 
 @router.get("/cycles/{cycle_id}/logs/{log_id}/grades", response_model=List[GradeResponse])
@@ -294,7 +294,7 @@ def list_grades(
     svc = IvfCycleService(db)
     if not svc.get_cycle(cycle_id, hospital_id):
         raise HTTPException(status_code=404, detail="Cycle not found")
-    return svc.list_grades(log_id)
+    return [_grade_with_read_sas(g) for g in svc.list_grades(log_id)]
 
 
 @router.post("/cycles/{cycle_id}/logs/{log_id}/grades/{grade_id}/select-best", response_model=GradeResponse)
@@ -321,7 +321,7 @@ def select_best_grade(
         metadata={"cycle_id": cycle_id, "log_id": log_id, "grade_id": grade_id},
         audit_log_disabled=is_audit_log_disabled_for_user(user),
     )
-    return record
+    return _grade_with_read_sas(record)
 
 
 @router.put("/cycles/{cycle_id}/grades/{grade_id}", response_model=GradeResponse)
@@ -338,7 +338,7 @@ def update_grade(
     record = svc.update_grade(grade_id, cycle_id, payload, user_id=str(user.user_id))
     if not record:
         raise HTTPException(status_code=404, detail="Grade not found")
-    return record
+    return _grade_with_read_sas(record)
 
 
 @router.delete("/cycles/{cycle_id}/grades/{grade_id}", status_code=204)
@@ -355,42 +355,81 @@ def delete_grade(
         raise HTTPException(status_code=404, detail="Grade not found")
 
 
+# ── Image helpers ────────────────────────────────────────────────────────────
+
+def _sas_image(r: ImageResponse) -> ImageResponse:
+    for field in ("upload_image_url", "exp_img_url", "te_img_url", "icm_img_url"):
+        val = getattr(r, field, None)
+        if val:
+            setattr(r, field, ivf_blob.generate_read_sas_url(val))
+    return r
+
+
+def _with_read_sas(img) -> ImageResponse:
+    return _sas_image(ImageResponse.model_validate(img))
+
+
+def _grade_with_read_sas(grade) -> GradeResponse:
+    r = GradeResponse.model_validate(grade)
+    r.images = [_sas_image(img) for img in r.images]
+    return r
+
+
 # ── Image endpoints ───────────────────────────────────────────────────────────
 
-@router.post("/cycles/{cycle_id}/grades/{grade_id}/images", response_model=ImageResponse, status_code=201)
-def upload_image(
+@router.get("/cycles/{cycle_id}/grades/{grade_id}/images/presign", response_model=ImagePresignResponse)
+def get_image_presign(
     cycle_id: int,
     grade_id: int,
-    upload_image: UploadFile = File(...),
-    exp_img: Optional[UploadFile] = File(None),
-    te_img: Optional[UploadFile] = File(None),
-    icm_img: Optional[UploadFile] = File(None),
-    day: Optional[int] = Form(None),
-    request: Request = None,
+    request: Request,
     db: Session = Depends(get_db),
 ):
+    """Return a short-lived container write SAS URL for direct browser → Azure upload."""
     user = _ivf_user(request)
-    hospital_id = _hospital_id(request, db, user)
+    _hospital_id(request, db, user)
     svc = IvfCycleService(db)
     if not svc.get_grade_by_id(grade_id, cycle_id):
         raise HTTPException(status_code=404, detail="Grade record not found")
+    try:
+        ivf_blob._ensure_cors()
+        sas_url = ivf_blob.generate_container_write_sas_url(expiry_minutes=15)
+    except Exception as exc:
+        logger.warning("presign failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Storage service unavailable")
+    return ImagePresignResponse(
+        container_sas_url=sas_url,
+        prefix=f"ivf/oocytes/{cycle_id}/{grade_id}",
+        expires_in_minutes=15,
+    )
 
-    # TODO: replace with real blob storage once provisioned
-    MOCK_IMAGE_URL = "http://dev.mygrape.org/embryo/embryo_01.jpg"
-    primary_data = upload_image.file.read()
 
-    return svc.add_image(
+@router.post("/cycles/{cycle_id}/grades/{grade_id}/images/register", response_model=ImageResponse, status_code=201)
+def register_image(
+    cycle_id: int,
+    grade_id: int,
+    body: ImageRegisterBody,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Record blob URLs (uploaded directly by the browser) in the database."""
+    user = _ivf_user(request)
+    _hospital_id(request, db, user)
+    svc = IvfCycleService(db)
+    if not svc.get_grade_by_id(grade_id, cycle_id):
+        raise HTTPException(status_code=404, detail="Grade record not found")
+    img = svc.add_image(
         grade_id=grade_id,
         cycle_id=cycle_id,
-        upload_image_url=MOCK_IMAGE_URL,
-        exp_img_url=MOCK_IMAGE_URL,
-        te_img_url=MOCK_IMAGE_URL,
-        icm_img_url=MOCK_IMAGE_URL,
-        file_name=upload_image.filename,
-        file_size=len(primary_data),
-        day=day,
+        upload_image_url=body.upload_image_url,
+        exp_img_url=body.exp_img_url,
+        te_img_url=body.te_img_url,
+        icm_img_url=body.icm_img_url,
+        file_name=body.file_name,
+        file_size=body.file_size,
+        day=body.day,
         user_id=str(user.user_id),
     )
+    return _with_read_sas(img)
 
 
 @router.get("/cycles/{cycle_id}/grades/{grade_id}/images", response_model=List[ImageResponse])
@@ -405,7 +444,7 @@ def list_images(
     svc = IvfCycleService(db)
     if not svc.get_grade_by_id(grade_id, cycle_id):
         raise HTTPException(status_code=404, detail="Grade record not found")
-    return svc.list_images(grade_id)
+    return [_with_read_sas(img) for img in svc.list_images(grade_id)]
 
 
 @router.delete("/cycles/{cycle_id}/grades/{grade_id}/images/{image_id}", status_code=204)

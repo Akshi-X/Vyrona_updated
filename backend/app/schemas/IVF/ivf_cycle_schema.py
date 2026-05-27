@@ -39,6 +39,22 @@ class ImageResponse(BaseModel):
         from_attributes = True
 
 
+class ImageRegisterBody(BaseModel):
+    upload_image_url: str
+    exp_img_url: Optional[str] = None
+    te_img_url: Optional[str] = None
+    icm_img_url: Optional[str] = None
+    file_name: Optional[str] = None
+    file_size: Optional[int] = None
+    day: Optional[int] = None
+
+
+class ImagePresignResponse(BaseModel):
+    container_sas_url: str
+    prefix: str
+    expires_in_minutes: int
+
+
 # ── Cycle ────────────────────────────────────────────────────────────────────
 
 class CycleCreate(BaseModel):
