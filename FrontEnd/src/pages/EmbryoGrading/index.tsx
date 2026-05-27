@@ -573,7 +573,7 @@ export default function EmbryoGradingPage() {
           </div>
 
           {/* Right — Grading + Needs Attention on top, Recent Activity below */}
-          <div className="flex flex-col gap-4 min-h-0 overflow-hidden">
+          <div className="flex flex-col gap-4 min-h-0">
 
             {/* Top row: Grading Overview + Needs Attention */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
