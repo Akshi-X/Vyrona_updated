@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, ChevronRight, ChevronLeft, Check, Trash2, ImageIcon, Lightbulb, Pencil, X, ShieldCheck, Upload, User, Hash, FlaskConical, Dna, Award, Flag } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Trash2, ImageIcon, Lightbulb, Pencil, X, ShieldCheck, Upload, User, Hash, FlaskConical, Dna, Award, Flag, Egg, Droplets, Layers } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import type { IVFTreatment } from '../../types/ivf';
 import { ivfService, type IvfCycleLog, type IvfGrade } from '../../services/ivfService';
@@ -31,8 +31,10 @@ const MOCK_PER_IMAGE = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const flagBadgeCls = (val: string) => {
-  if (val === 'None' || val === 'Not Hatching') return 'bg-emerald-50 border border-emerald-200 text-emerald-700';
-  if (val === 'Minimal' || val === 'Mild')      return 'bg-amber-50 border border-amber-200 text-amber-700';
+  if (val === 'None')                                                          return 'bg-gray-100 border border-gray-300 text-gray-600';
+  if (val === 'Not Hatching' || val === 'Intact' || val === 'Good' || val === 'Fine' || val === 'Excellent')
+                                                                               return 'bg-primary/10 border border-primary/20 text-primary';
+  if (val === 'Minimal' || val === 'Mild')                                     return 'bg-amber-50 border border-amber-200 text-amber-700';
   return 'bg-gray-50 border border-gray-200 text-gray-600';
 };
 
@@ -187,13 +189,17 @@ export default function AdvancedEmbryoGradingPage() {
 
   // Upload state
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [noteDraft, setNoteDraft] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
   const [activeSection, setActiveSection] = useState<'note' | null>(null);
   const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [approveSelectedIdx, setApproveSelectedIdx] = useState<number | null>(null);
   const [overrideModalOpen, setOverrideModalOpen] = useState(false);
+  const [maxImagesOpen, setMaxImagesOpen] = useState(false);
+  const [noGradeDeleteOpen, setNoGradeDeleteOpen] = useState(false);
+  const [noBestGradeOpen, setNoBestGradeOpen] = useState(false);
   const [stagedViewIdx, setStagedViewIdx] = useState(0);
 
   const icmCanvasRef  = useRef<HTMLCanvasElement>(null);
@@ -243,6 +249,8 @@ export default function AdvancedEmbryoGradingPage() {
       cyto_gran: g.cytoplasmic_granularity ?? '',
       bridge: g.bridge ?? '',
     });
+    setNoteDraft(g.note ?? '');
+    setNoteSaved(false);
   }, [selectedImageIdx, existingGrades]);
 
   // ── Image slot handlers ───────────────────────────────────────────────────
@@ -250,14 +258,6 @@ export default function AdvancedEmbryoGradingPage() {
   const addImageSlot = (file: File) => {
     if (existingGrades.length + imageSlots.length >= 4) return;
     setImageSlots(prev => [...prev, { file, url: URL.createObjectURL(file) }]);
-    setUploadError(null);
-  };
-
-  const clearAll = () => {
-    imageSlots.forEach(s => URL.revokeObjectURL(s.url));
-    setImageSlots([]);
-    setStagedViewIdx(0);
-    setUploadError(null);
   };
 
   const handleOocyteSelect = (no: number) => {
@@ -269,7 +269,6 @@ export default function AdvancedEmbryoGradingPage() {
     setGradesLoading(true);
     setGradesError(null);
     setSelectedImageIdx(null);
-    setUploadError(null);
     setSelectedOocyteNo(no);
   };
 
@@ -364,7 +363,6 @@ export default function AdvancedEmbryoGradingPage() {
   const handleStartAnalysis = async () => {
     if (selectedOocyteNo == null || cycleId == null || !selectedLog || imageSlots.length === 0) return;
     setUploading(true);
-    setUploadError(null);
     try {
       const fetchMockFile = async (path: string, name: string) => {
         const blob = await fetch(path).then(r => r.blob());
@@ -402,7 +400,7 @@ export default function AdvancedEmbryoGradingPage() {
       setImageSlots([]);
       setStep('processing');
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+      console.error('Upload failed:', err);
     } finally {
       setUploading(false);
     }
@@ -534,7 +532,7 @@ export default function AdvancedEmbryoGradingPage() {
               <div className="rounded-xl border border-line bg-white overflow-hidden flex flex-col flex-1 min-h-0">
                 <div className="px-4 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0">
                   <p className="text-xs font-bold text-gray-800">Embryo Preview</p>
-                  <p className="text-[9px] text-gray-400 mt-0.5">Select a graded image to preview it here. Click a slot below to switch.</p>
+                  <p className="text-[9px] text-gray-400 mt-0.5">Select a graded image to preview it here.</p>
                 </div>
                 <div className={`relative flex-1 min-h-0 ${(mainImgUrl || imageSlots.length > 0) ? 'bg-black' : 'bg-gray-50'}`}>
                   {mainImgUrl ? (
@@ -552,13 +550,11 @@ export default function AdvancedEmbryoGradingPage() {
                     return (
                       <>
                         <img src={imageSlots[si].url} alt={`Staged ${si + 1}`} className="w-full h-full object-contain absolute inset-0" />
-                        {/* Badge */}
                         <div className="absolute top-2.5 left-2.5 z-10">
                           <span className="px-2 py-0.5 rounded-lg bg-black/60 text-white text-[9px] font-bold backdrop-blur-sm">
                             Image {si + 1}/{imageSlots.length}
                           </span>
                         </div>
-                        {/* Nav arrows */}
                         {imageSlots.length > 1 && (
                           <>
                             <button type="button" disabled={si === 0}
@@ -573,27 +569,78 @@ export default function AdvancedEmbryoGradingPage() {
                             </button>
                           </>
                         )}
-                        {/* Bottom info bar */}
-                        <div className="absolute bottom-0 left-0 right-0 z-10 bg-white/95 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between border-t border-line-light">
-                          <div>
-                            <p className="text-[10px] font-semibold text-gray-700">{imageSlots.length} image{imageSlots.length !== 1 ? 's' : ''} ready to be graded</p>
-                            <p className="text-[9px] text-gray-400 mt-0.5">Click &apos;Start AI Analysis&apos; or add another image.</p>
-                          </div>
-                          {existingGrades.length + imageSlots.length < 4 && (
-                            <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/40 text-primary text-[10px] font-bold cursor-pointer hover:bg-primary-bg transition-colors shrink-0">
-                              <Upload size={11} />
-                              Add Another Image
-                              <input type="file" accept="image/*" className="hidden"
-                                onChange={e => { if (e.target.files?.[0]) { addImageSlot(e.target.files[0]); setStagedViewIdx(imageSlots.length); } e.target.value = ''; }} />
-                            </label>
-                          )}
-                        </div>
                       </>
                     );
-                  })() : (
+                  })() : selectedOocyteNo == null ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center px-6 select-none">
+                      <svg width="140" height="140" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        {/* outer glow ring */}
+                        <circle cx="70" cy="70" r="64" fill="url(#outerGlow)" />
+                        {/* dashed microscope border */}
+                        <circle cx="70" cy="70" r="60" stroke="#6b1176" strokeOpacity="0.15" strokeWidth="1.5" strokeDasharray="4 3" />
+                        {/* inner field */}
+                        <circle cx="70" cy="70" r="50" fill="url(#innerField)" />
+                        {/* subtle grid lines */}
+                        <line x1="70" y1="20" x2="70" y2="120" stroke="#6b1176" strokeOpacity="0.06" strokeWidth="1" />
+                        <line x1="20" y1="70" x2="120" y2="70" stroke="#6b1176" strokeOpacity="0.06" strokeWidth="1" />
+                        {/* embryo cell cluster — 4-cell stage */}
+                        {/* top-left cell */}
+                        <circle cx="57" cy="57" r="16" fill="url(#cell1)" stroke="#6b1176" strokeOpacity="0.18" strokeWidth="1" />
+                        <circle cx="57" cy="57" r="7" fill="#6b1176" fillOpacity="0.18" />
+                        <circle cx="54" cy="54" r="2.5" fill="#6b1176" fillOpacity="0.35" />
+                        {/* top-right cell */}
+                        <circle cx="84" cy="57" r="14" fill="url(#cell2)" stroke="#6b1176" strokeOpacity="0.18" strokeWidth="1" />
+                        <circle cx="84" cy="57" r="6" fill="#6b1176" fillOpacity="0.15" />
+                        <circle cx="81" cy="54" r="2" fill="#6b1176" fillOpacity="0.30" />
+                        {/* bottom-left cell */}
+                        <circle cx="57" cy="83" r="13" fill="url(#cell3)" stroke="#6b1176" strokeOpacity="0.18" strokeWidth="1" />
+                        <circle cx="57" cy="83" r="5.5" fill="#6b1176" fillOpacity="0.15" />
+                        <circle cx="55" cy="81" r="2" fill="#6b1176" fillOpacity="0.28" />
+                        {/* bottom-right cell */}
+                        <circle cx="83" cy="83" r="15" fill="url(#cell4)" stroke="#6b1176" strokeOpacity="0.18" strokeWidth="1" />
+                        <circle cx="83" cy="83" r="6.5" fill="#6b1176" fillOpacity="0.18" />
+                        <circle cx="80" cy="80" r="2.5" fill="#6b1176" fillOpacity="0.32" />
+                        {/* floating accent dots */}
+                        <circle cx="31" cy="45" r="2.5" fill="#6b1176" fillOpacity="0.18" />
+                        <circle cx="109" cy="55" r="2" fill="#6b1176" fillOpacity="0.14" />
+                        <circle cx="36" cy="97" r="1.8" fill="#6b1176" fillOpacity="0.14" />
+                        <circle cx="107" cy="95" r="2.5" fill="#6b1176" fillOpacity="0.18" />
+                        <circle cx="70" cy="22" r="1.5" fill="#6b1176" fillOpacity="0.20" />
+                        <defs>
+                          <radialGradient id="outerGlow" cx="50%" cy="40%" r="55%" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stopColor="#6b1176" stopOpacity="0.07" />
+                            <stop offset="100%" stopColor="#6b1176" stopOpacity="0" />
+                          </radialGradient>
+                          <radialGradient id="innerField" cx="50%" cy="40%" r="55%" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stopColor="#f3eaf6" stopOpacity="0.9" />
+                            <stop offset="100%" stopColor="#ede5f4" stopOpacity="0.4" />
+                          </radialGradient>
+                          <radialGradient id="cell1" cx="35%" cy="35%" r="65%">
+                            <stop offset="0%" stopColor="#f9f3fc" />
+                            <stop offset="100%" stopColor="#dfc8e8" />
+                          </radialGradient>
+                          <radialGradient id="cell2" cx="35%" cy="35%" r="65%">
+                            <stop offset="0%" stopColor="#f9f3fc" />
+                            <stop offset="100%" stopColor="#d8bde4" />
+                          </radialGradient>
+                          <radialGradient id="cell3" cx="35%" cy="35%" r="65%">
+                            <stop offset="0%" stopColor="#f9f3fc" />
+                            <stop offset="100%" stopColor="#dbbfe6" />
+                          </radialGradient>
+                          <radialGradient id="cell4" cx="35%" cy="35%" r="65%">
+                            <stop offset="0%" stopColor="#f9f3fc" />
+                            <stop offset="100%" stopColor="#d4b8e0" />
+                          </radialGradient>
+                        </defs>
+                      </svg>
+                      <div className="flex flex-col gap-1">
+                        <p className="text-sm font-bold text-gray-700">Select an oocyte</p>
+                        <p className="text-[10px] text-gray-400 leading-relaxed">Choose an oocyte from the list on the left<br />to upload an image and begin AI grading</p>
+                      </div>
+                    </div>
+                  ) : (
                     <label className="absolute inset-0 flex flex-col items-center justify-center gap-3 cursor-pointer group">
                       <div className="text-center">
-                        <p className="text-sm font-bold text-gray-700">No image uploaded</p>
                         <p className="text-[10px] text-gray-400 mt-0.5">Upload an embryo image to begin grading.</p>
                       </div>
                       <div className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-white text-xs font-semibold group-hover:opacity-90 transition-opacity shadow-sm">
@@ -622,49 +669,6 @@ export default function AdvancedEmbryoGradingPage() {
                 </div>
               </div>
 
-              {/* Previously graded info banner */}
-              {(existingGrades.length > 0 || gradesLoading) && (
-                <div className="rounded-xl border border-line bg-white px-4 py-3 shrink-0">
-                  <div className="flex items-start gap-3">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                      <ImageIcon size={12} className="text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {gradesLoading ? (
-                        <>
-                          <div className="h-2.5 w-48 rounded bg-gray-200 animate-pulse mb-2" />
-                          <div className="flex gap-1">
-                            {[1, 2].map(n => (
-                              <div key={n} className="h-4 w-12 rounded-full bg-gray-200 animate-pulse" />
-                            ))}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-[10px] font-semibold text-gray-700 leading-snug">
-                            {existingGrades.length === 4
-                              ? `4 images for this oocyte have been previously graded. Upload an image to grade one more.`
-                              : `${existingGrades.length} image${existingGrades.length !== 1 ? 's' : ''} for this oocyte have been previously graded. Upload an image to grade one more.`}
-                          </p>
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {existingGrades.map((g, i) => (
-                              <button key={g.grade_id} type="button"
-                                onClick={() => setSelectedImageIdx(i)}
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold border transition-all ${
-                                  selectedImageIdx === i
-                                    ? 'bg-primary text-white border-primary'
-                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40 hover:text-primary'
-                                }`}>
-                                #{i + 1}{g.grade ? ` · ${g.grade}` : ''}{g.is_best ? ' ★' : ''}
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
               {/* Expansion / ICM / TE sub-image tiles row */}
               <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
                 <div className="grid grid-cols-3 divide-x divide-line-light">
@@ -694,6 +698,114 @@ export default function AdvancedEmbryoGradingPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Instruction Bar */}
+              <div className="rounded-xl border border-line-light bg-primary-bg shrink-0">
+                  {imageSlots.length > 0 ? (
+                    /* ── Ready to be graded view ── */
+                    <>
+                      <div className="px-3 py-2 border-b border-primary/10 flex items-center justify-between">
+                        <p className="text-[9px] font-bold text-primary/70 uppercase tracking-widest">Ready to be Graded</p>
+                        <span className="text-[9px] text-gray-400">{imageSlots.length} image{imageSlots.length !== 1 ? 's' : ''}</span>
+                      </div>
+                      {(() => {
+                        const si = Math.min(stagedViewIdx, imageSlots.length - 1);
+                        return (
+                          <div className="flex items-center gap-2 px-3 py-2">
+                            <button type="button" disabled={si === 0}
+                              onClick={() => setStagedViewIdx(p => Math.max(0, p - 1))}
+                              className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center disabled:opacity-25 hover:bg-primary/20 transition-colors shrink-0">
+                              <ChevronLeft size={12} className="text-primary" />
+                            </button>
+                            <div className="flex gap-1.5 flex-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                              {imageSlots.map((slot, idx) => (
+                                <button key={slot.url} type="button" onClick={() => setStagedViewIdx(idx)}
+                                  className={`w-10 h-10 rounded-md overflow-hidden border-2 shrink-0 transition-all ${idx === si ? 'border-primary shadow-md' : 'border-primary/20 opacity-50 hover:opacity-80'}`}>
+                                  <img src={slot.url} alt={`Staged ${idx + 1}`} className="w-full h-full object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                            <button type="button" disabled={si === imageSlots.length - 1}
+                              onClick={() => setStagedViewIdx(p => Math.min(imageSlots.length - 1, p + 1))}
+                              className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center disabled:opacity-25 hover:bg-primary/20 transition-colors shrink-0">
+                              <ChevronRight size={12} className="text-primary" />
+                            </button>
+                            <button type="button" disabled={uploading || selectedOocyteNo == null}
+                              onClick={handleStartAnalysis}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-white text-[9px] font-bold hover:bg-primary-light transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                              {uploading ? 'Uploading…' : 'Start AI Analysis'}
+                              {!uploading && <ChevronRight size={10} />}
+                            </button>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  ) : existingGrades.length === 0 && !gradesLoading ? (
+                    /* ── No oocyte selected / nothing graded ── */
+                    <div className="px-3 py-3 flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <ImageIcon size={12} className="text-primary/40" />
+                      </div>
+                      <p className="text-[9px] text-gray-400 font-medium">Select an oocyte to view graded images</p>
+                    </div>
+                  ) : (
+                    /* ── Graded images view ── */
+                    <>
+                      <div className="px-3 py-2 border-b border-primary/10 flex items-center justify-between">
+                        <p className="text-[9px] font-bold text-primary/70 uppercase tracking-widest">Graded Images</p>
+                        {!gradesLoading && existingGrades.length > 0 && (
+                          <span className="text-[9px] text-gray-400">{existingGrades.length} / 4</span>
+                        )}
+                      </div>
+                      {gradesLoading ? (
+                        <div className="flex gap-2 p-3">
+                          {[1, 2].map(n => (
+                            <div key={n} className="w-16 h-16 rounded-lg bg-primary/10 animate-pulse shrink-0" />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+                          <button type="button"
+                            disabled={(selectedImageIdx ?? 0) === 0}
+                            onClick={() => setSelectedImageIdx(i => Math.max(0, (i ?? 0) - 1))}
+                            className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center disabled:opacity-25 hover:bg-primary/20 transition-colors shrink-0">
+                            <ChevronLeft size={12} className="text-primary" />
+                          </button>
+                          <div className="flex gap-2 flex-1 overflow-x-auto pt-1.5 -mt-1.5" style={{ scrollbarWidth: 'none' }}>
+                            {existingGrades.map((g, i) => {
+                              const imgUrl = g.images[0]?.upload_image_url;
+                              return (
+                                <div key={g.grade_id} className="relative shrink-0">
+                                  <button type="button" onClick={() => setSelectedImageIdx(i)}
+                                    className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${selectedImageIdx === i ? 'border-primary shadow-md' : 'border-primary/20 opacity-60 hover:opacity-100'}`}>
+                                    {imgUrl
+                                      ? <img src={imgUrl} alt={`Grade ${i + 1}`} className="w-full h-full object-cover" />
+                                      : <div className="w-full h-full bg-primary/10 flex items-center justify-center"><ImageIcon size={14} className="text-primary/40" /></div>
+                                    }
+                                    <div className="absolute bottom-0 inset-x-0 bg-black/50 backdrop-blur-sm text-white text-[8px] font-bold text-center py-0.5 leading-tight">
+                                      {g.grade ?? `#${i + 1}`}
+                                    </div>
+                                  </button>
+                                  {g.is_best && (
+                                    <div className="absolute -top-1 -right-1 w-[14px] h-[14px] rounded-full bg-emerald-500 border border-white shadow-sm flex items-center justify-center pointer-events-none">
+                                      <Check size={7} strokeWidth={3.5} className="text-white" />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <button type="button"
+                            disabled={(selectedImageIdx ?? 0) >= existingGrades.length - 1}
+                            onClick={() => setSelectedImageIdx(i => Math.min(existingGrades.length - 1, (i ?? 0) + 1))}
+                            className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center disabled:opacity-25 hover:bg-primary/20 transition-colors shrink-0">
+                            <ChevronRight size={12} className="text-primary" />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
             </div>
           );
         })()}
@@ -706,27 +818,75 @@ export default function AdvancedEmbryoGradingPage() {
 
               {/* Action buttons */}
               <div className="flex flex-col gap-2 shrink-0">
-                <button type="button"
-                  onClick={() => setOverrideModalOpen(true)}
-                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
-                  style={{ background: 'var(--gradient-primary)' }}>
-                  <Pencil size={13} />
-                  Override Grade
-                </button>
-                <button type="button"
-                  onClick={() => setActiveSection(prev => prev === 'note' ? null : 'note')}
-                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
-                  style={{ background: 'var(--gradient-primary)', opacity: activeSection === 'note' ? 1 : 0.85 }}>
-                  <Lightbulb size={13} />
-                  Clinical Note
-                </button>
-                <button type="button"
-                  onClick={() => { setApproveSelectedIdx(selectedImageIdx); setApproveModalOpen(true); }}
-                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
-                  style={{ background: 'var(--gradient-primary)' }}>
-                  <ShieldCheck size={13} />
-                  Approve Embryo Grading
-                </button>
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Actions</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button"
+                    onClick={() => setOverrideModalOpen(true)}
+                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                    style={{ background: 'var(--gradient-primary)' }}>
+                    <Pencil size={13} />
+                    Override Grade
+                  </button>
+                  <button type="button"
+                    onClick={() => setActiveSection(prev => prev === 'note' ? null : 'note')}
+                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                    style={{ background: 'var(--gradient-primary)', opacity: activeSection === 'note' ? 1 : 0.85 }}>
+                    <Lightbulb size={13} />
+                    Clinical Note
+                  </button>
+                  <button type="button"
+                    onClick={() => { setApproveSelectedIdx(selectedImageIdx); setApproveModalOpen(true); }}
+                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                    style={{ background: 'var(--gradient-primary)' }}>
+                    <ShieldCheck size={13} />
+                    Approve
+                  </button>
+                  {existingGrades.length + imageSlots.length >= 4 ? (
+                    <button type="button"
+                      onClick={() => setMaxImagesOpen(true)}
+                      className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                      style={{ background: 'var(--gradient-primary)' }}>
+                      <Upload size={13} />
+                      Upload Image
+                    </button>
+                  ) : (
+                    <label className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity cursor-pointer"
+                      style={{ background: 'var(--gradient-primary)' }}>
+                      <Upload size={13} />
+                      Upload Image
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={e => { if (e.target.files?.[0]) { addImageSlot(e.target.files[0]); setStagedViewIdx(imageSlots.length); } e.target.value = ''; }} />
+                    </label>
+                  )}
+                  <button type="button"
+                    onClick={() => {
+                      if (selectedImageIdx != null && existingGrades[selectedImageIdx!]) {
+                        setDeactivateGradeId(existingGrades[selectedImageIdx!].grade_id);
+                      } else {
+                        setNoGradeDeleteOpen(true);
+                      }
+                    }}
+                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                    style={{ background: 'var(--gradient-primary)' }}>
+                    <Trash2 size={13} />
+                    Delete Grade
+                  </button>
+                  <button type="button"
+                    onClick={async () => {
+                      const g = selectedImageIdx != null ? existingGrades[selectedImageIdx] : null;
+                      if (!g || !cycleId || !selectedLog) { setNoBestGradeOpen(true); return; }
+                      if (g.is_best) return;
+                      try {
+                        await ivfService.selectBestGrade(cycleId, selectedLog.log_id, g.grade_id);
+                        setExistingGrades(prev => prev.map((eg, i) => ({ ...eg, is_best: i === selectedImageIdx })));
+                      } catch { /* silent */ }
+                    }}
+                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                    style={{ background: 'var(--gradient-primary)' }}>
+                    <Check size={13} />
+                    Mark as Best
+                  </button>
+                </div>
               </div>
 
               {/* Clinical Note panel */}
@@ -739,7 +899,7 @@ export default function AdvancedEmbryoGradingPage() {
                       </div>
                       <p className="text-[9px] font-bold text-primary uppercase tracking-widest">Clinical Note</p>
                     </div>
-                    {noteDraft.trim() && (
+                    {noteSaved && (
                       <span className="text-[8px] font-semibold text-emerald-600 flex items-center gap-1">
                         <Check size={9} strokeWidth={3} /> Saved
                       </span>
@@ -753,10 +913,23 @@ export default function AdvancedEmbryoGradingPage() {
                       rows={3}
                       className="w-full text-[9px] text-gray-700 bg-white/80 border border-primary/20 rounded-xl px-2.5 py-1.5 outline-none resize-none placeholder:text-gray-400 focus:border-primary/50 leading-relaxed"
                     />
-                    <button type="button" disabled={!noteDraft.trim()}
+                    <button type="button"
+                      disabled={!noteDraft.trim() || noteSaving || cycleId == null || selectedGrade == null}
+                      onClick={async () => {
+                        if (!cycleId || !selectedGrade) return;
+                        setNoteSaving(true);
+                        setNoteSaved(false);
+                        try {
+                          await ivfService.updateGrade(cycleId, selectedGrade.grade_id, { note: noteDraft });
+                          setExistingGrades(prev => prev.map(g => g.grade_id === selectedGrade.grade_id ? { ...g, note: noteDraft } : g));
+                          setNoteSaved(true);
+                        } finally {
+                          setNoteSaving(false);
+                        }
+                      }}
                       className="w-full py-1.5 rounded-xl text-[9px] font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-35 disabled:cursor-not-allowed"
                       style={{ background: 'var(--gradient-primary)' }}>
-                      Update Note
+                      {noteSaving ? 'Saving…' : 'Update Note'}
                     </button>
                     <p className="text-[8px] text-gray-400 text-center leading-relaxed">
                       AI assessment is for reference only and does not replace clinical judgment.
@@ -801,21 +974,25 @@ export default function AdvancedEmbryoGradingPage() {
                   const g = selectedGrade;
                   const thumb = g?.images[0]?.upload_image_url ?? null;
                   const score = g?.ai_score ?? null;
+                  const ARC_R = 26, circ = 2 * Math.PI * ARC_R;
+                  const trackArc = 0.75 * circ;
+                  const fillArc  = score != null ? (score / 10) * trackArc : 0;
+                  const arcStroke = score != null ? (score >= 8.5 ? '#10b981' : score >= 7 ? '#f59e0b' : '#f97316') : '#e5e7eb';
                   return (
-                    <div className="flex flex-col divide-y divide-[#F8F4FD]">
-                      {/* Identity row */}
+                    <div className="flex flex-col">
+                      {/* Identity */}
                       <div className="flex items-center gap-3 px-3 py-2.5">
-                        <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden shrink-0">
+                        <div className="w-11 h-11 rounded-xl bg-gray-100 overflow-hidden shrink-0 border border-gray-100">
                           {thumb
                             ? <img src={thumb} alt="thumb" className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={14} className="text-gray-300" /></div>
+                            : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={15} className="text-gray-300" /></div>
                           }
                         </div>
-                        <div className="flex flex-col gap-1 min-w-0">
-                          <p className="text-[10px] font-bold text-gray-800">
-                            {selectedOocyteNo != null ? `Oocyte #${selectedOocyteNo}` : '—'}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-bold text-gray-800 leading-none mb-1">
+                            {selectedOocyteNo != null ? `Oocyte #${selectedOocyteNo}` : 'No oocyte selected'}
                           </p>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-wrap">
                             <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
                               {selectedImageIdx != null ? `Image #${selectedImageIdx + 1}` : '—'}
                             </span>
@@ -824,63 +1001,101 @@ export default function AdvancedEmbryoGradingPage() {
                                 {g.grade}
                               </span>
                             )}
+                            {g?.is_best && (
+                              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200">Best</span>
+                            )}
                           </div>
                         </div>
                       </div>
-                      {/* Grade + Score */}
-                      <div className="px-3 py-2.5 flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase">Grade</span>
-                          <span className={`text-base font-black ${g?.grade ? gradeTextCls(g.grade) : 'text-gray-300'}`}>{g?.grade || '—'}</span>
+
+                      {/* Grade + Score ring hero */}
+                      <div className="mx-2.5 mb-2.5 rounded-xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #f5f0ff 0%, #ede9fe 100%)' }}>
+                        <div className="flex divide-x divide-primary/10 items-end">
+                          {/* Grade half */}
+                          <div className="flex-1 flex flex-col items-center justify-center py-4 px-3 gap-1">
+                            <div className={`text-4xl font-black leading-none ${g?.grade ? gradeTextCls(g.grade) : 'text-gray-300'}`}>
+                              {g?.grade || '—'}
+                            </div>
+                            <span className="text-[7px] font-bold text-primary/40 uppercase tracking-widest">Grade</span>
+                          </div>
+                          {/* Score ring half */}
+                          <div className="flex-1 flex flex-col items-center justify-center py-3 px-3 gap-0.5">
+                            <div className="relative w-16 h-16">
+                              <svg width="64" height="64" viewBox="0 0 64 64">
+                                <circle cx="32" cy="32" r={ARC_R} fill="none" stroke="rgba(107,17,118,0.13)" strokeWidth="5"
+                                  strokeDasharray={`${trackArc} ${circ}`} strokeLinecap="round" transform="rotate(135 32 32)" />
+                                <circle cx="32" cy="32" r={ARC_R} fill="none" stroke={arcStroke} strokeWidth="5"
+                                  strokeDasharray={`${fillArc} ${circ}`} strokeLinecap="round" transform="rotate(135 32 32)"
+                                  style={{ transition: 'stroke-dasharray 0.5s ease' }} />
+                              </svg>
+                              <div className="absolute inset-0 flex flex-col items-center justify-center gap-0">
+                                <span className="text-[13px] font-black leading-none" style={{ color: arcStroke }}>
+                                  {score != null ? score.toFixed(1) : '—'}
+                                </span>
+                                <span className="text-[7px] font-bold text-gray-400">/10</span>
+                              </div>
+                            </div>
+                            <span className="text-[7px] font-bold text-primary/40 uppercase tracking-widest">AI Score</span>
+                          </div>
                         </div>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase">AI Score</span>
-                            <span className={`text-[10px] font-black ${score != null ? scoreTextCls(score) : 'text-gray-300'}`}>
-                              {score != null ? `${score} / 10` : '— / 10'}
-                            </span>
+                      </div>
+
+                      {g ? (
+                        <>
+                          {/* Quality Flags */}
+                          <div className="px-3 pb-2.5 flex flex-col gap-1.5">
+                            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Quality Flags</p>
+                            {[
+                              { label: 'Hatching',        val: g.hatching,        Icon: Egg      },
+                              { label: 'Vacuolization',   val: g.vacuolization,   Icon: Droplets },
+                              { label: 'Multinucleation', val: g.multinucleation, Icon: Layers   },
+                            ].map(r => {
+                              const iconCls = !r.val ? 'text-gray-300'
+                                : (r.val === 'None' || r.val === 'Not Hatching') ? 'text-primary/50'
+                                : (r.val === 'Minimal' || r.val === 'Mild') ? 'text-amber-400'
+                                : 'text-orange-400';
+                              return (
+                                <div key={r.label} className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <r.Icon size={10} className={`shrink-0 ${iconCls}`} />
+                                    <span className="text-[9px] text-gray-600">{r.label}</span>
+                                  </div>
+                                  {r.val
+                                    ? <span className={`text-[8px] font-semibold px-2 py-0.5 rounded-full ${flagBadgeCls(r.val)}`}>{r.val}</span>
+                                    : <span className="text-[9px] text-gray-300 font-semibold">—</span>
+                                  }
+                                </div>
+                              );
+                            })}
                           </div>
-                          <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                            <div className={`h-full rounded-full transition-all ${score != null ? scoreBarCls(score) : 'bg-gray-200'}`}
-                              style={{ width: score != null ? `${(score / 10) * 100}%` : '0%' }} />
+
+                          {/* Morphology — 2×2 grid */}
+                          <div className="px-3 pb-3 pt-2.5 border-t border-[#F8F4FD] flex flex-col gap-1.5">
+                            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Morphology</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {[
+                                { label: 'Zona Pellucida', val: g.zona_pellucida },
+                                { label: 'Blastocoel',     val: g.blastocoel },
+                                { label: 'Cyto. Gran.',    val: g.cytoplasmic_granularity },
+                                { label: 'Bridge',         val: g.bridge },
+                              ].map(r => (
+                                <div key={r.label} className="rounded-lg border border-gray-100 bg-gray-50/60 px-2 py-1.5">
+                                  <p className="text-[7px] font-bold text-gray-500 uppercase tracking-wide leading-none mb-1">{r.label}</p>
+                                  {r.val
+                                    ? <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-md inline-block ${flagBadgeCls(r.val)}`}>{r.val}</span>
+                                    : <span className="text-[9px] text-gray-300 font-semibold">—</span>
+                                  }
+                                </div>
+                              ))}
+                            </div>
                           </div>
+                        </>
+                      ) : (
+                        <div className="px-3 pb-4 flex flex-col items-center justify-center gap-1.5 text-center">
+                          <p className="text-[10px] font-semibold text-gray-400">No AI result yet</p>
+                          <p className="text-[9px] text-gray-300">Upload an image and run analysis to see grade details.</p>
                         </div>
-                      </div>
-                      {/* Quality Flags */}
-                      <div className="px-3 py-2.5 flex flex-col gap-1.5">
-                        <p className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">Quality Flags</p>
-                        {[
-                          { label: 'Hatching',        val: g?.hatching },
-                          { label: 'Vacuolization',   val: g?.vacuolization },
-                          { label: 'Multinucleation', val: g?.multinucleation },
-                        ].map(r => (
-                          <div key={r.label} className="flex items-center justify-between">
-                            <span className="text-[9px] text-gray-500">{r.label}</span>
-                            {r.val
-                              ? <span className={`text-[8px] font-semibold px-2 py-0.5 rounded-full ${flagBadgeCls(r.val)}`}>{r.val}</span>
-                              : <span className="text-[9px] text-gray-300 font-semibold">—</span>
-                            }
-                          </div>
-                        ))}
-                      </div>
-                      {/* Morphology */}
-                      <div className="px-3 py-2.5 flex flex-col gap-1.5">
-                        <p className="text-[8px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">Morphology</p>
-                        {[
-                          { label: 'Zona Pellucida', val: g?.zona_pellucida },
-                          { label: 'Blastocoel',     val: g?.blastocoel },
-                          { label: 'Cyto. Gran.',    val: g?.cytoplasmic_granularity },
-                          { label: 'Bridge',         val: g?.bridge },
-                        ].map(r => (
-                          <div key={r.label} className="flex items-center justify-between">
-                            <span className="text-[9px] text-gray-500">{r.label}</span>
-                            {r.val
-                              ? <span className={`text-[8px] font-semibold px-2 py-0.5 rounded-full ${flagBadgeCls(r.val)}`}>{r.val}</span>
-                              : <span className="text-[9px] text-gray-300 font-semibold">—</span>
-                            }
-                          </div>
-                        ))}
-                      </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -891,47 +1106,6 @@ export default function AdvancedEmbryoGradingPage() {
         })()}
       </div>
 
-      {/* Bottom action bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-t border-line bg-white mt-4 shrink-0 -mx-6 -mb-6">
-        {step === 'processing' && (
-          <p className="text-xs text-gray-400 mx-auto">Analyzing — please wait...</p>
-        )}
-        {step === 'select-best' && (
-          <>
-            <div className="flex items-center gap-4">
-              {imageSlots.length > 0 && (
-                <>
-                  <p className="text-xs font-semibold text-amber-600">{imageSlots.length} pending upload</p>
-                  <button type="button" onClick={clearAll} className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-red-500 transition-colors">
-                    <Trash2 size={12} /> Clear
-                  </button>
-                </>
-              )}
-              {uploadError && <p className="text-[10px] text-red-500 font-medium">{uploadError}</p>}
-            </div>
-            <div className="flex items-center gap-3">
-              {imageSlots.length > 0 && (
-                <button type="button" disabled={uploading || selectedOocyteNo == null} onClick={handleStartAnalysis}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg border border-primary text-primary text-xs font-semibold hover:bg-primary-bg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                  {uploading ? 'Uploading...' : 'Start AI Analysis'}
-                  {!uploading && <ChevronRight size={14} />}
-                </button>
-              )}
-              <button type="button" disabled={selectedImageIdx === null || completing} onClick={() => handleConfirmSelection()}
-                className="inline-flex items-center gap-3 pl-4 pr-3 py-2 rounded-xl text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: 'var(--gradient-primary)' }}>
-                <div className="flex flex-col items-start">
-                  <span className="text-[8px] font-semibold text-white/60 leading-none mb-0.5 uppercase tracking-widest">
-                    {completing ? 'Saving…' : 'Grading complete'}
-                  </span>
-                  <span className="text-xs font-bold leading-none">Development Tracker</span>
-                </div>
-                <ArrowRight size={15} className="shrink-0 opacity-80" />
-              </button>
-            </div>
-          </>
-        )}
-      </div>
 
       {/* ── Approve Embryo Grading Modal ── */}
       {approveModalOpen && (
@@ -1227,6 +1401,66 @@ export default function AdvancedEmbryoGradingPage() {
 
 
 
+      {/* ── No grade selected for best popup ── */}
+      {noBestGradeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setNoBestGradeOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-bold text-gray-800">No grade selected</p>
+              <p className="text-xs text-gray-500">Please select a graded image before marking it as best.</p>
+            </div>
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setNoBestGradeOpen(false)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── No grade to delete popup ── */}
+      {noGradeDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setNoGradeDeleteOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-bold text-gray-800">No grade selected</p>
+              <p className="text-xs text-gray-500">Please select a graded image from the list before deleting.</p>
+            </div>
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setNoGradeDeleteOpen(false)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Max images popup ── */}
+      {maxImagesOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setMaxImagesOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-bold text-gray-800">Maximum images reached</p>
+              <p className="text-xs text-gray-500">You can upload up to 4 images per oocyte. To add a new image, please delete an existing one first.</p>
+            </div>
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setMaxImagesOpen(false)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes ai-progress { from { width: 0% } to { width: 100% } }
         @keyframes fade-in { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: translateY(0) } }
@@ -1257,8 +1491,8 @@ function OocyteList({ logs, loading, selectedOocyteNo, imageSlots, gradeCountMap
   };
 
   return (
-    <div className={`rounded-xl border bg-white overflow-hidden flex flex-col min-h-[220px] ${locked ? 'border-line opacity-60 pointer-events-none' : 'border-line'}`}>
-      <div className="px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0">
+    <div className={`rounded-xl border bg-white flex flex-col min-h-[220px] ${locked ? 'border-line opacity-60 pointer-events-none' : 'animate-glow-pulse'}`}>
+      <div className="px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0 rounded-t-xl overflow-hidden">
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-gray-800">Select an oocyte to grade</p>
           {locked && <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Locked</span>}
