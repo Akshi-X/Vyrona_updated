@@ -580,7 +580,7 @@ export default function EmbryoGradingPage() {
 
               {/* Center — Grading Overview + Trend */}
               <div className="flex flex-col gap-3">
-                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="bg-white border border-gray-200 rounded-2xl ">
                   <div className="px-4 py-3.5 border-b border-gray-100">
                     <p className="text-sm font-bold text-gray-900">Grading Overview</p>
                     <p className="text-[11px] text-gray-400 mt-0.5">Embryo quality distribution across all active cycles</p>
