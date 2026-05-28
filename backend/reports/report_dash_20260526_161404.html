@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Alert Config Test Report</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; }
+        .header { background: #0f172a; padding: 24px 40px; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { color: #f8fafc; font-size: 20px; font-weight: 600; }
+        .header .meta { color: #64748b; font-size: 12px; text-align: right; line-height: 1.8; }
+        .summary { display: flex; gap: 16px; padding: 20px 40px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+        .summary-card { flex: 1; background: #f8fafc; border-radius: 8px; padding: 14px 18px; border: 1px solid #e2e8f0; }
+        .summary-card .num { font-size: 28px; font-weight: 700; }
+        .summary-card .lbl { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+        .num-total { color: #334155; } .num-passed { color: #16a34a; } .num-failed { color: #dc2626; } .num-skipped { color: #d97706; }
+        .container { padding: 28px 40px; display: flex; flex-direction: column; gap: 20px; }
+        .class-block { background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
+        .class-header { background: #1e293b; padding: 14px 20px; }
+        .class-header h2 { color: #f1f5f9; font-size: 15px; font-weight: 600; }
+        .class-doc { color: #94a3b8; font-size: 12px; margin-top: 5px; line-height: 1.6; }
+        .class-stats { display: flex; gap: 8px; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        thead tr { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+        th { color: #64748b; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 16px; text-align: left; }
+        td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: top; font-size: 13px; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: #fafafa; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .passed  { background: #dcfce7; color: #15803d; }
+        .failed  { background: #fee2e2; color: #b91c1c; }
+        .skipped { background: #fef3c7; color: #b45309; }
+        .test-name { font-weight: 500; color: #1e293b; font-size: 13px; }
+        .test-desc { color: #64748b; font-size: 12px; margin-top: 4px; line-height: 1.6; font-style: italic; }
+        .dur { color: #94a3b8; font-size: 12px; white-space: nowrap; }
+        .expand-btn { cursor: pointer; font-size: 11px; color: #3b82f6; background: none; border: none; padding: 0; margin-top: 8px; display: inline-block; }
+        .expand-btn:hover { text-decoration: underline; }
+        .drawer { display: none; margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 10px; }
+        .drawer.open { display: block; }
+        .log-section { margin-bottom: 10px; }
+        .log-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 4px; }
+        .log-box { background: #0f172a; color: #94a3b8; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; padding: 12px 14px; border-radius: 6px; white-space: pre-wrap; line-height: 1.7; max-height: 250px; overflow-y: auto; }
+        .log-error { color: #fca5a5; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Alert Config — Test Report</h1>
+      <div class="meta">
+        <p>Generated: 2026-05-26 16:14:04</p>
+        <p>Classes: 1</p>
+      </div>
+    </div>
+    <div class="summary">
+      <div class="summary-card">
+        <div class="num num-total">4</div>
+        <div class="lbl">Total</div>
+      </div>
+      <div class="summary-card">
+        <div class="num num-passed">4</div>
+        <div class="lbl">Passed</div>
+      </div>
+      <div class="summary-card">
+        <div class="num num-failed">0</div>
+        <div class="lbl">Failed</div>
+      </div>
+      <div class="summary-card">
+        <div class="num num-skipped">0</div>
+        <div class="lbl">Skipped</div>
+      </div>
+    </div>
+    <div class="container">
+      <div class="class-block">
+        <div class="class-header">
+          <h2>General</h2>
+          <div class="class-stats">
+            <span class="badge passed">✓ 4 passed</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:100px">Result</th>
+              <th>Test / Description</th>
+              <th style="width:90px">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_report_dash_monthly_summary_uses_requested_month</div>
+                <div class="expand-btn" id="btn-d-General-0" onclick="toggleDrawer('d-General-0')">▶ show logs</div>
+                <div class="drawer" id="d-General-0">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:14:03,390 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/reports/monthly-summary?month=2026-05 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/reports/monthly-summary?month=2026-05 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '37e42943-53bf-4396-8e76-1ce50887127c', 'id': '37e42943-53bf-4396-8e76-1ce50887127c', 'user_id': '37e42943-53bf-4396-8e76-1ce50887127c', 'email': '19565d7a-c914-410c-a405-a33e8a782bca@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2057', 'branch_id': '2110', 'department': 'IVF', 'token_type': 'access', 'identity': '37e42943-53bf-4396-8e76-1ce50887127c', 'exp': datetime.datetime(2026, 5, 27, 16, 14, 3, 171945, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 14, 3, 171953, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.09s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_report_dash_monthly_summary_excludes_other_months</div>
+                <div class="expand-btn" id="btn-d-General-1" onclick="toggleDrawer('d-General-1')">▶ show logs</div>
+                <div class="drawer" id="d-General-1">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:14:03,948 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/reports/monthly-summary?month=2026-04 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/reports/monthly-summary?month=2026-04 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '6040b3cb-eba5-453d-bddc-c90d43812480', 'id': '6040b3cb-eba5-453d-bddc-c90d43812480', 'user_id': '6040b3cb-eba5-453d-bddc-c90d43812480', 'email': '0813a64d-c312-422d-8628-4546cec859b9@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2058', 'branch_id': '2111', 'department': 'IVF', 'token_type': 'access', 'identity': '6040b3cb-eba5-453d-bddc-c90d43812480', 'exp': datetime.datetime(2026, 5, 27, 16, 14, 3, 924297, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 14, 3, 924304, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.03s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_report_dash_monthly_summary_invalid_month_format_returns_400</div>
+                <div class="expand-btn" id="btn-d-General-2" onclick="toggleDrawer('d-General-2')">▶ show logs</div>
+                <div class="drawer" id="d-General-2">
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:14:04,324 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/reports/monthly-summary: Invalid month value.
+2026-05-26 16:14:04,327 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/reports/monthly-summary?month=05-2026 &quot;HTTP/1.1 400 Bad Request&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/reports/monthly-summary: Invalid month value.
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/reports/monthly-summary?month=05-2026 &quot;HTTP/1.1 400 Bad Request&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': '1aced44e-ece6-47e0-ab8a-9aef836a3669', 'id': '1aced44e-ece6-47e0-ab8a-9aef836a3669', 'user_id': '1aced44e-ece6-47e0-ab8a-9aef836a3669', 'email': '3eb70198-2f9e-4f01-a2da-2e22d8533b68@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2059', 'branch_id': '2112', 'department': 'IVF', 'token_type': 'access', 'identity': '1aced44e-ece6-47e0-ab8a-9aef836a3669', 'exp': datetime.datetime(2026, 5, 27, 16, 14, 4, 318985, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 14, 4, 318991, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_report_dash_download_requires_report_type</div>
+                <div class="expand-btn" id="btn-d-General-3" onclick="toggleDrawer('d-General-3')">▶ show logs</div>
+                <div class="drawer" id="d-General-3">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">Valid response: {&quot;status&quot;:&quot;success&quot;}
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:14:04,893 - app.middleware.exception_handler - WARNING - Validation error on /api/reports/download
+2026-05-26 16:14:04,895 - httpx - INFO - HTTP Request: POST http://testserver/api/reports/download &quot;HTTP/1.1 422 Unprocessable Entity&quot;
+2026-05-26 16:14:04,903 - httpx - INFO - HTTP Request: POST http://testserver/api/reports/download &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:226 Validation error on /api/reports/download
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/reports/download &quot;HTTP/1.1 422 Unprocessable Entity&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/reports/download &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG TOKEN DATA ---
+{'sub': 'e51af3ec-cb92-4ad5-9d40-863cd61c3ad5', 'id': 'e51af3ec-cb92-4ad5-9d40-863cd61c3ad5', 'user_id': 'e51af3ec-cb92-4ad5-9d40-863cd61c3ad5', 'email': 'd553de32-3e6a-487e-8729-1854c41b84bb@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2060', 'branch_id': '2113', 'department': 'IVF', 'token_type': 'access', 'identity': 'e51af3ec-cb92-4ad5-9d40-863cd61c3ad5', 'exp': datetime.datetime(2026, 5, 27, 16, 14, 4, 880088, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 14, 4, 880098, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <script>
+            function toggleDrawer(id) {
+                const drawer = document.getElementById(id);
+                const btn = document.getElementById('btn-' + id);
+                const isOpen = drawer.classList.contains('open');
+                drawer.classList.toggle('open');
+                btn.textContent = isOpen ? '▶ show logs' : '▼ hide logs';
+            }
+        </script>
+  </body>
+</html>
