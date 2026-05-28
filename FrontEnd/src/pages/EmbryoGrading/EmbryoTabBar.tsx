@@ -39,7 +39,7 @@ export default function EmbryoTabBar({ his }: EmbryoTabBarProps) {
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
               isActive
                 ? 'bg-white shadow-sm text-gray-900'
-                : 'text-[#6b1176]/50 hover:text-[#6b1176]/80 hover:bg-white/50'
+                : 'text-primary hover:text-primary hover:bg-white/50'
             }`}
           >
             <span className={`transition-colors ${isActive ? 'text-primary' : ''}`}>
