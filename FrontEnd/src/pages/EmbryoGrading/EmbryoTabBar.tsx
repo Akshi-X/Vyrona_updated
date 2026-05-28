@@ -21,29 +21,34 @@ export default function EmbryoTabBar({ his }: EmbryoTabBarProps) {
     : 'logsheet';
 
   const tabs: { id: Tab; label: string; to: string; icon: React.ReactNode }[] = [
-    { id: 'logsheet', label: 'Development Tracker', to: `/embryo-console/${his}`,          icon: <ClipboardList size={14} /> },
-    { id: 'grading',  label: 'Grading',            to: `/embryo-console/${his}/advanced`, icon: <Star size={14} /> },
-    { id: 'compare',  label: 'Compare',            to: `/embryo-console/${his}/compare`,  icon: <ArrowLeftRight size={14} /> },
-    { id: 'reports',  label: 'Reports',            to: `/embryo-console/${his}/reports`,  icon: <BarChart2 size={14} /> },
+    { id: 'logsheet', label: 'Development Tracker', to: `/embryo-console/${his}`,          icon: <ClipboardList size={12} /> },
+    { id: 'grading',  label: 'AI Grading',         to: `/embryo-console/${his}/advanced`, icon: <Star size={12} /> },
+    { id: 'compare',  label: 'Compare & Select',   to: `/embryo-console/${his}/compare`,  icon: <ArrowLeftRight size={12} /> },
+    { id: 'reports',  label: 'Client Report',      to: `/embryo-console/${his}/reports`,  icon: <BarChart2 size={12} /> },
   ];
 
   return (
-    <div className="flex border border-primary shrink-0 rounded-xl overflow-hidden" style={{ background: 'var(--gradient-primary)' }}>
-      {tabs.map(tab => (
-        <button
-          key={tab.id}
-          type="button"
-          onClick={() => navigate(tab.to)}
-          className={`flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 transition-colors -mb-px ${
-            active === tab.id
-              ? 'border-white text-white'
-              : 'border-transparent text-white/60 hover:text-white/90'
-          }`}
-        >
-          {tab.icon}
-          {tab.label}
-        </button>
-      ))}
+    <div className="flex flex-1 p-1 rounded-xl gap-0.5" style={{ background: '#ede5f4' }}>
+      {tabs.map(tab => {
+        const isActive = active === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => navigate(tab.to)}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+              isActive
+                ? 'bg-white shadow-sm text-gray-900'
+                : 'text-[#6b1176]/50 hover:text-[#6b1176]/80 hover:bg-white/50'
+            }`}
+          >
+            <span className={`transition-colors ${isActive ? 'text-primary' : ''}`}>
+              {tab.icon}
+            </span>
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

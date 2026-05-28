@@ -1,8 +1,10 @@
+import { useState } from 'react';
+
 interface ConfirmDialogProps {
   title: string;
   message: string;
   confirmLabel: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
   confirmClassName?: string;
 }
@@ -15,6 +17,17 @@ export default function ConfirmDialog({
   onCancel,
   confirmClassName = 'px-4 py-2 text-sm rounded-lg bg-primary text-white hover:bg-[#8a2a95] transition-colors',
 }: ConfirmDialogProps) {
+  const [loading, setLoading] = useState(false);
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      await onConfirm();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
@@ -24,16 +37,23 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+            disabled={loading}
+            className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             type="button"
-            onClick={onConfirm}
-            className={confirmClassName}
+            onClick={handleConfirm}
+            disabled={loading}
+            className={`${confirmClassName} inline-flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed`}
           >
-            {confirmLabel}
+            {loading && (
+              <svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M12 2a10 10 0 0 1 0 20" />
+              </svg>
+            )}
+            {loading ? 'Removing…' : confirmLabel}
           </button>
         </div>
       </div>

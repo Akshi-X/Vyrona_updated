@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import { ivfService } from '../../services/ivfService';
 import MockQualityTrackingChart from '../../pages/IncubatorTracking/MockQualityTrackingChart';
-import MockContainerDataTable from '../../pages/IncubatorTracking/MockContainerDataTable';
+import MockContainerDataTable from '../../pages/IncubatorTracking/ContainerDataTable';
 
 type IllustrationMetrics = {
   temp: string;
@@ -304,7 +304,7 @@ export default function IncubatorDetailPage() {
           </div>
 
           {hasIncubatorId ? (
-            <MockContainerDataTable />
+            <MockContainerDataTable incubatorId={Number(normalizedTankId)} chamberId="" />
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               <div className="py-8 text-center text-gray-400">No incubator selected.</div>
