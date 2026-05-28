@@ -812,11 +812,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     });
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    if ("outputColorSpace" in renderer) {
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-    } else {
-      (renderer as any).outputEncoding = (THREE as any).sRGBEncoding;
-    }
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
     mount.appendChild(renderer.domElement);
