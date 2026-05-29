@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
-import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTrackingDark.svg';
+import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/CryocanDarkN.svg';
 import { useAuth } from '../../contexts/AuthContext';
 import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
