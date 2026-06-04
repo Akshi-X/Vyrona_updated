@@ -746,12 +746,15 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     return () => window.removeEventListener("resize", update);
   }, []);
   useEffect(() => {
+    const effectivePos = containerWidth < 515
+      ? { ...inspectPos, x: inspectPos.x + 3.5, z: inspectPos.z + 1.5, y: inspectPos.y - 1.8 }
+      : inspectPos;
     inspectOverrideRef.current = {
       enabled: inspectOverride,
-      pos: inspectPos,
+      pos: effectivePos,
       rotDeg: inspectRotDeg,
     };
-  }, [inspectOverride, inspectPos, inspectRotDeg]);
+  }, [inspectOverride, inspectPos, inspectRotDeg, containerWidth]);
   useEffect(() => {
     viewStageRef.current = viewStage;
     const isInspecting = viewStage === "inspecting";
