@@ -181,7 +181,7 @@ export default function OnboardingShell() {
                                 ...base,
                                 borderRadius: 16,
                                 padding: 20,
-                                maxWidth: 360,
+                                maxWidth: 320,
                             }),
                         }}
                     >
