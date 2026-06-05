@@ -87,6 +87,14 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [steps]);
 
+    // Refs so Effect 4 can read activeStep fields without adding activeStep to deps
+    const skipIfMissingRef  = useRef(false);
+    const skipIfPresentRef  = useRef<string | undefined>(undefined);
+    const stepTargetRef     = useRef<string>("");
+    skipIfMissingRef.current  = activeStep?.skipIfMissing  ?? false;
+    skipIfPresentRef.current  = activeStep?.skipIfPresent;
+    stepTargetRef.current     = activeStep?.target ?? "";
+
     // ── 4. Keep tour open & in sync with stepIndex ─────────────────
     useEffect(() => {
         if (stepCount === 0) return;
@@ -94,9 +102,24 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             setIsOpen(false);
             return;
         }
+
+        // skipIfPresent: element exists right now → skip immediately (no async needed)
+        if (skipIfPresentRef.current && !!document.querySelector(skipIfPresentRef.current)) {
+            const next = stepIndex + 1;
+            setCurrentStep(next);
+            setStepIndex(levelId, next);
+            return;
+        }
+
+        // skipIfMissing: don't open the tour yet — Effect 5a polls briefly.
+        // The element may appear within a frame (async data load on narrow screens)
+        // or never appear (genuinely wide screen). Effect 5a decides which.
+        if (skipIfMissingRef.current) return;
+
         setCurrentStep(stepIndex);
-        if (isTourActive) setIsOpen(true);
-    }, [stepIndex, stepCount, isTourActive, setCurrentStep, setIsOpen]);
+        if (!isTourActive) return;
+        setIsOpen(true);
+    }, [stepIndex, stepCount, isTourActive, levelId, setCurrentStep, setStepIndex, setIsOpen]);
 
     // ── 4b. Navigate to startPage if step requires a specific page ──
     useEffect(() => {
@@ -130,6 +153,45 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
         return () => clearInterval(interval);
     }, [activeStep, stepIndex, stepCount, setCurrentStep, setIsOpen]);
+
+
+    // ── 5a. skipIfMissing: poll briefly for element, then open or skip ──────
+    // Needed because some elements render async (e.g. left toggle waits for
+    // sensorTiles to load). Wide screens: element never appears → skip after
+    // MAX_WAIT. Narrow screens with async data: element appears quickly → show.
+    useEffect(() => {
+        if (!isTourActive || !activeStep?.skipIfMissing) return;
+        const MAX_WAIT_MS = 150;
+        const TICK_MS     = 16;
+        let elapsed = 0;
+        const id = setInterval(() => {
+            elapsed += TICK_MS;
+            const el = document.querySelector(activeStep.target);
+            if (el) {
+                clearInterval(id);
+                setCurrentStep(stepIndex);
+                setIsOpen(true);
+            } else if (elapsed >= MAX_WAIT_MS) {
+                clearInterval(id);
+                const next = stepIndex + 1;
+                setCurrentStep(next);
+                setStepIndex(levelId, next);
+            }
+        }, TICK_MS);
+        return () => clearInterval(id);
+    }, [activeStep, isTourActive, stepIndex, levelId, setCurrentStep, setStepIndex, setIsOpen]);
+
+    // ── 5b. Scroll target into view for steps inside overflow containers ──
+    useEffect(() => {
+        if (!isTourActive || !activeStep?.scrollIntoView) return;
+        const el = document.querySelector(activeStep.target) as HTMLElement | null;
+        if (!el) return;
+        // Instant scroll so the element is in place before @reactour measures it —
+        // avoids the popover appearing at the pre-scroll position then jumping.
+        el.scrollIntoView({ behavior: "instant", block: "nearest" });
+        setCurrentStep(stepIndex);
+        setIsOpen(true);
+    }, [activeStep, isTourActive, stepIndex, setCurrentStep, setIsOpen]);
 
     // ── 5c. Dispatch onboardingEvent when a step becomes active ──────
     useEffect(() => {
@@ -261,10 +323,10 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
                 return;
             }
 
-            // Whitelisted element hit — fire the click and advance the tour
+            // Block the raw pointer event, then fire a synthetic click so the
+            // element's own onClick always runs (opens modals, toggles panels, etc.)
             event.preventDefault();
             event.stopPropagation();
-
             (matchedEl as HTMLElement | null)?.click();
 
             const advance = () => {

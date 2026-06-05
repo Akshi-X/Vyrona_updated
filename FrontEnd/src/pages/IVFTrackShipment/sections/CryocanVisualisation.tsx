@@ -745,14 +745,16 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
+
+
   useEffect(() => {
     const effectivePos = containerWidth < 515
-      ? { ...inspectPos, x: inspectPos.x + 3.5, z: inspectPos.z + 1.5, y: inspectPos.y - 1.8 }
+      ? { x: -2.5, y: 0.5, z: 6.1 }
       : inspectPos;
     inspectOverrideRef.current = {
       enabled: inspectOverride,
       pos: effectivePos,
-      rotDeg: inspectRotDeg,
+      rotDeg: containerWidth < 515 ? { ...inspectRotDeg, z: 0 } : inspectRotDeg,
     };
   }, [inspectOverride, inspectPos, inspectRotDeg, containerWidth]);
   useEffect(() => {
@@ -3906,6 +3908,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           {/* Left overlay toggle — visible only below 1450 px */}
           {showSensorTiles && isNarrow && !rightOpen && (
             <button
+              id="onboarding-cryo-left-toggle"
               type="button"
               onClick={() => { setLeftOpen(p => { if (!p) setRightOpen(false); return !p; }); }}
               style={{
@@ -3952,6 +3955,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           {/* Right overlay toggle — visible only below 1230 px */}
           {showSidebar && isRightNarrow && !leftOpen && (
             <button
+              id="onboarding-cryo-right-toggle"
               type="button"
               onClick={() => { setRightOpen(p => { if (!p) setLeftOpen(false); return !p; }); }}
               style={{
@@ -4187,6 +4191,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               </div>
               {/* Live Conditions card — shown when not inspecting */}
               <div
+                id="onboarding-cryo-live-conditions"
                 className="cryo-fade-in bg-white flex flex-col"
                 style={{
                   position: "absolute",
@@ -4272,6 +4277,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   return (
                     <button
                       key={tile.id}
+                      id={`onboarding-cryo-tile-${tile.id}`}
                       type="button"
                       onClick={() => onSensorSelect && onSensorSelect(tile.id)}
                       className="text-left kpi-card"
@@ -4418,6 +4424,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
           {/* 3D canvas column */}
           <div
+            id="onboarding-cryo-canvas"
             className="cryo-fade-in relative overflow-hidden"
             style={{
               background: externalTempAlert
@@ -5103,6 +5110,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             >
             {/* System Activity panel */}
             <div
+              id="onboarding-cryo-system-activity"
               className="cryo-fade-in bg-white"
               style={{
                 flexShrink: 0,
@@ -5246,6 +5254,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
             {/* Container Data */}
             <div
+              id="onboarding-cryo-container-data"
               className="cryo-fade-in bg-white"
               style={{
                 flexShrink: 0,

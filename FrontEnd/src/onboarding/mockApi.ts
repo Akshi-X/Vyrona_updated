@@ -3,6 +3,7 @@ import { userService } from "../services/userService";
 import dashboardData from "./mocks/dashboard-data.json";
 import controlTowerData from "./mocks/control-tower-data.json";
 import liveFeedFrames from "./mocks/live-feed-data.json";
+import cryocanData from "./mocks/cryocan-data.json";
 
 // ── Cached real profile (fetched once when mocks enable) ──────────────────────
 let cachedProfile: { user_id: string; first_name: string; last_name: string; role: string; department?: string | null } | null = null;
@@ -641,7 +642,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
 
         // IVF track shipment — canister tracking details (cryolocks list).
         if (endpoint.startsWith("/api/quality-tracking/tanks/") && endpoint.includes("/tracking-details")) {
-            return dashboardData.ivfTankTrackingDetails;
+            return cryocanData.trackingDetails;
         }
 
         // IVF track shipment — create refill log entry.
@@ -775,6 +776,10 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
         // Reports page — activity logs (filtered by query params).
         if (endpoint.startsWith("/api/activity-logs")) {
             const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            // Tank-specific activity (cryocan page) — serve dedicated cryocan mock logs
+            if (qs.get("target_type") === "tank") {
+                return cryocanData.activityLogs;
+            }
             const actionsParam = qs.get("actions");
             const allowedActions = actionsParam ? actionsParam.split(",").map(s => s.trim()).filter(Boolean) : [];
             const outcomeParam  = qs.get("outcome")    ?? "";
