@@ -82,6 +82,10 @@ export interface OnboardingStep {
     skipIfPresent?: string;
     /** Set true to skip this step at runtime (preserves the definition for reference) */
     _disabled?: boolean;
+    /** Wide two-column layout: gif on left, text + nav on right */
+    is_wide?: boolean;
+    /** Path to a gif shown in the left panel when is_wide is true */
+    gif?: string;
 }
 
 export interface OnboardingQuizQuestion {

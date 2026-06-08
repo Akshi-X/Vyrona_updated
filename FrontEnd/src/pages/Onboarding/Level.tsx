@@ -111,10 +111,10 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             return;
         }
 
-        // skipIfMissing: don't open the tour yet — Effect 5a polls briefly.
-        // The element may appear within a frame (async data load on narrow screens)
-        // or never appear (genuinely wide screen). Effect 5a decides which.
-        if (skipIfMissingRef.current) return;
+        // skipIfMissing: hide immediately while Effect 5a polls.
+        // Without this the tour stays open from the previous step and renders
+        // the popover at top-left because the new target doesn't exist yet.
+        if (skipIfMissingRef.current) { setIsOpen(false); return; }
 
         setCurrentStep(stepIndex);
         if (!isTourActive) return;
@@ -133,6 +133,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     // ── 5. Re-sync tour when target appears asynchronously ──────────
     useEffect(() => {
         if (!activeStep || stepIndex >= stepCount) return;
+        if (activeStep.skipIfMissing) return;
         if (document.querySelector(activeStep.target)) return;
 
         const interval = setInterval(() => {
@@ -261,6 +262,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     // ── 8. Click guard ───────────────────────────────────────────────
     useEffect(() => {
         if (!isTourActive || !activeStep || confirmedSteps[activeStep.id]) return;
+        if (!activeStep.requireClick) return;
 
         const applyDisabledStyles = () => {
             activeStep.disableClickID?.forEach((sel) => {
@@ -342,9 +344,23 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             }
         };
 
+        // Block click events (which trigger React onClick) for non-whitelisted elements.
+        // pointerdown alone isn't enough — React onClick fires from the click event.
+        const handleClick = (event: Event) => {
+            if ((event.target as Element)?.closest(".reactour__popover")) return;
+            const hasWhitelist = (activeStep.clickOnlyId?.length ?? 0) > 0;
+            if (!hasWhitelist) { event.preventDefault(); event.stopPropagation(); return; }
+            const hitWhitelisted = activeStep.clickOnlyId!.some((sel) =>
+                !!(event.target as Element)?.closest(sel)
+            );
+            if (!hitWhitelisted) { event.preventDefault(); event.stopPropagation(); }
+        };
+
         document.addEventListener("pointerdown", handlePointerDown, true);
+        document.addEventListener("click", handleClick, true);
         return () => {
             document.removeEventListener("pointerdown", handlePointerDown, true);
+            document.removeEventListener("click", handleClick, true);
             restoreDisabledStyles();
         };
     }, [activeStep, confirmedSteps, stepIndex, levelId, setCurrentStep, setStepIndex, isTourActive]);
@@ -377,6 +393,8 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         icon: activeStep?.icon ?? "",
         content: activeStep?.content ?? "",
         genieImage: activeStep?.genieImage,
+        is_wide: activeStep?.is_wide,
+        gif: activeStep?.gif,
         stepIndex,
         totalSteps: stepCount,
         canNext,

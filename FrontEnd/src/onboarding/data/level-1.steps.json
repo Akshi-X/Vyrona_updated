@@ -289,6 +289,7 @@
         "icon": "Table2",
         "content": "A live view of site-level metrics across your network. Track your data across your sites without leaving mgSCALE, use fiters when are particular about some details, all in one table at your glance.",
         "placement": "top",
+        "is_wide": true,
         "requireClick": false,
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     }

@@ -18,10 +18,8 @@ export default function OnboardingOverlay() {
     const { isOpen: isTourOpen } = useTour();
     const tourNavCtx = useTourNavContext();
 
-    // Open on reload only when onboarding is still in progress (onboarding_completed = false in localStorage).
-    // onboardingCompleted is seeded from localStorage synchronously by AuthContext before this renders.
     const [isOpen, setIsOpen] = useState(() =>
-        onboardingCompleted === false && location.pathname.startsWith("/onboarding/")
+        onboardingCompleted !== true && location.pathname.startsWith("/onboarding/")
     );
     const [showWelcome, setShowWelcome] = useState(false);
     const [showLevelWelcome, setShowLevelWelcome] = useState(false);
@@ -103,12 +101,11 @@ export default function OnboardingOverlay() {
     // Auto-open welcome on first dashboard landing (only if level-0 not yet completed and onboarding is still in progress)
     useEffect(() => {
         if (isHydrating) return;
-        if (onboardingCompleted !== false) return;
         if (location.pathname === "/onboarding/dashboard" && level0Status !== "completed") {
             setShowWelcome(true);
             setIsOpen(true);
         }
-    }, [location.pathname, level0Status, onboardingCompleted, isHydrating]);
+    }, [location.pathname, level0Status, isHydrating]);
 
     const [showTimeline, setShowTimeline] = useState(false);
 
@@ -120,7 +117,6 @@ export default function OnboardingOverlay() {
     const prevTourCompleteRef = useRef(false);
     useEffect(() => {
         prevTourCompleteRef.current = tourComplete;
-        if (onboardingCompleted !== false) return;
         if (tourComplete && activeLevelId && activeLevelProgress?.status !== "completed") {
             const quiz = getQuiz(activeLevelId);
             const quizAttempted = quiz.length > 0 && (activeLevelProgress?.lastQuizIndex ?? 0) >= quiz.length;
@@ -131,7 +127,7 @@ export default function OnboardingOverlay() {
             setIsOpen(true);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tourComplete, activeLevelId, activeLevelProgress?.status, activeLevelProgress?.lastQuizIndex, onboardingCompleted]);
+    }, [tourComplete, activeLevelId, activeLevelProgress?.status, activeLevelProgress?.lastQuizIndex]);
 
     // When level-0 transitions to completed, hide welcome and show level-1's welcome card.
     // On reload (already completed), just hide welcome without re-showing the card.
