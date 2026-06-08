@@ -1964,18 +1964,19 @@ export default function AlertSetting() {
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setDirectionFilter("incubators")}
-                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "incubators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
+                                            disabled
+                                            // onClick={() => setDirectionFilter("incubators")}
+                                            className="flex-1 px-3 h-12 border rounded-lg text-sm font-medium border-line bg-white text-gray-300 cursor-not-allowed"
                                         >
                                             Incubators
                                         </button>
-                                        <button
+                                        {/* <button
                                             type="button"
                                             onClick={() => setDirectionFilter("refrigerators")}
                                             className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "refrigerators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
                                         >
                                             Refrigerators
-                                        </button>
+                                        </button> */}
                                     </div>
                                 </div>
                                 <div>
