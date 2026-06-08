@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Lock } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useLayoutEffect } from "react";
@@ -8,7 +8,7 @@ import { TourProvider, useTour } from "@reactour/tour";
 import { OnboardingModeProvider } from "../../contexts/OnboardingModeContext";
 import { disableOnboardingMocks, enableOnboardingMocks } from "../../onboarding/mockApi";
 import OnboardingOverlay from "./OnboardingOverlay";
-import { TourNavStoreProvider, useTourNavContext } from "../../contexts/TourNavContext";
+import { TourNavStoreProvider, useTourNavContext, type TourNavContextValue } from "../../contexts/TourNavContext";
 import TourStepHeading from "./TourStepHeading";
 import {
     GeniePreloaderProvider,
@@ -24,41 +24,10 @@ function GeniePreloaderGate({ children }: { children: React.ReactNode }) {
     return <GeniePreloaderCard />;
 }
 
-// ── Custom tour content – title row with X dismiss + description ──────────────
-function TourContent({ content }: { content: unknown }) {
-    const ctx = useTourNavContext();
-    const nav = ctx?.nav;
-    const { setIsOpen } = useTour();
-
+// ── Shared nav buttons used by both default and wide layouts ──────────────────
+function TourNavButtons({ nav }: { nav: NonNullable<TourNavContextValue["nav"]> }) {
     return (
-        <div className="space-y-2">
-            <TourStepHeading
-                title={nav?.title ?? ""}
-                icon={nav?.icon}
-                onClose={() => { setIsOpen(false); ctx?.setIsTourActive(false); ctx?.openOverlay?.(); }}
-            />
-            {nav?.genieImage && (
-                <img
-                    src={nav.genieImage}
-                    alt=""
-                    className="w-full h-72 object-contain object-center"
-                />
-            )}
-            <p className="text-sm leading-relaxed text-slate-700">
-                {(nav?.content ?? content) as React.ReactNode}
-            </p>
-        </div>
-    );
-}
-
-// ── Custom tour navigation – prev/next with proper disabled states ─────────────
-function TourNavigation(_props: Record<string, unknown>) {
-    const ctx = useTourNavContext();
-    const nav = ctx?.nav;
-    if (!nav) return null;
-
-    return (
-        <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+        <div className="space-y-2 border-t border-slate-100 pt-3 mt-3">
             {nav.requiresClick && (
                 <p className="text-[11px] font-medium text-amber-600">
                     Click the highlighted area to continue
@@ -91,6 +60,117 @@ function TourNavigation(_props: Record<string, unknown>) {
                 </div>
             </div>
         </div>
+    );
+}
+
+// ── Custom tour content – title row with X dismiss + description ──────────────
+function TourContent({ content }: { content: unknown }) {
+    const ctx = useTourNavContext();
+    const nav = ctx?.nav;
+    const { setIsOpen } = useTour();
+
+    const handleClose = () => { setIsOpen(false); ctx?.setIsTourActive(false); ctx?.openOverlay?.(); };
+
+    if (nav?.is_wide) {
+        const mediaSrc = nav.gif ?? nav.genieImage;
+        return (
+            <div className="flex items-stretch">
+                {/* Left: gif/image panel — fixed width, stretches to content height */}
+                <div className="w-52 shrink-0 bg-slate-100 rounded-l-2xl overflow-hidden flex items-center justify-center min-h-[180px]">
+                    {mediaSrc && (
+                        <img src={mediaSrc} alt="" className="w-full h-full object-cover" />
+                    )}
+                </div>
+                {/* Right: content + nav */}
+                <div className="flex flex-col flex-1 p-5 gap-2 min-w-0">
+                    <TourStepHeading
+                        title={nav.title}
+                        icon={nav.icon}
+                        onClose={handleClose}
+                    />
+                    <p className="text-sm leading-relaxed text-slate-700 flex-1">
+                        {nav.content as React.ReactNode}
+                    </p>
+                    <TourNavButtons nav={nav} />
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-2">
+            <TourStepHeading
+                title={nav?.title ?? ""}
+                icon={nav?.icon}
+                onClose={handleClose}
+            />
+            {nav?.genieImage && (
+                <img
+                    src={nav.genieImage}
+                    alt=""
+                    className="w-full h-72 object-contain object-center"
+                />
+            )}
+            <p className="text-sm leading-relaxed text-slate-700">
+                {(nav?.content ?? content) as React.ReactNode}
+            </p>
+        </div>
+    );
+}
+
+// ── Custom tour navigation – prev/next with proper disabled states ─────────────
+function TourNavigation() {
+    const ctx = useTourNavContext();
+    const nav = ctx?.nav;
+    // Wide layout renders its own nav inline inside TourContent
+    if (!nav || nav.is_wide) return null;
+
+    return <TourNavButtons nav={nav} />;
+}
+
+// ── TourProvider with per-step dynamic popover width ──────────────────────────
+function TourProviderWithDynamicStyles({ children }: { children: React.ReactNode }) {
+    const ctx = useTourNavContext();
+    const isWide = !!ctx?.nav?.is_wide;
+
+    // Dispatch resize AFTER this component has committed the new maxWidth to DOM.
+    // This is the only place where the timing is guaranteed correct — the effect fires
+    // after React has painted the new popover width, so reactour measures accurately.
+    const prevIsWideRef = useRef<boolean>(false);
+    useEffect(() => {
+        if (isWide === prevIsWideRef.current) return;
+        prevIsWideRef.current = isWide;
+        const raf = requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+        return () => cancelAnimationFrame(raf);
+    }, [isWide]);
+
+    return (
+        <TourProvider
+            steps={[]}
+            disableInteraction={false}
+            disableDotsNavigation={true}
+            disableKeyboardNavigation={true}
+            onClickMask={() => {}}
+            onClickClose={() => {}}
+            components={{
+                Content: TourContent,
+                Navigation: TourNavigation,
+                Close: () => null,
+                Badge: () => null,
+            }}
+            styles={{
+                popover: (base) => ({
+                    ...base,
+                    borderRadius: 16,
+                    padding: isWide ? 0 : 20,
+                    maxWidth: isWide ? 640 : 320,
+                    maxHeight: "calc(100vh - 32px)",
+                    overflow: "auto",
+                }),
+            }}
+        >
+            {children}
+        </TourProvider>
     );
 }
 
@@ -164,45 +244,24 @@ export default function OnboardingShell() {
         <OnboardingModeProvider value={true}>
             <GeniePreloaderProvider>
                 <TourNavStoreProvider>
-                    <TourProvider
-                        steps={[]}
-                        disableInteraction={false}
-                        disableDotsNavigation={true}
-                        disableKeyboardNavigation={true}
-                        onClickMask={() => {}}
-                        onClickClose={() => {}}
-                        components={{
-                            Content: TourContent,
-                            Navigation: TourNavigation,
-                            Close: () => null,
-                        }}
-                        styles={{
-                            popover: (base) => ({
-                                ...base,
-                                borderRadius: 16,
-                                padding: 20,
-                                maxWidth: 360,
-                            }),
-                        }}
-                    >
+                    <TourProviderWithDynamicStyles>
                         <GeniePreloaderGate>
                             {hideSidebar ? (
                                 // Pages with their own full-width layout — no sidebar, no offset wrapper.
-                                <>
-                                    <Outlet />
-                                    <OnboardingOverlay />
-                                </>
+                                <Outlet />
                             ) : (
                                 <div className="bg-surface flex w-full min-h-screen overflow-x-hidden">
                                     <Sidebar onLogout={handleLogout} />
                                     <div className="flex-1 ml-0 md:ml-60 min-w-0">
                                         <Outlet />
-                                        <OnboardingOverlay />
                                     </div>
                                 </div>
                             )}
+                        {/* Kept outside the hideSidebar conditional so React never remounts it on
+                            layout changes — preserves isOpen state when navigating to no-sidebar routes. */}
+                        <OnboardingOverlay />
                         </GeniePreloaderGate>
-                    </TourProvider>
+                    </TourProviderWithDynamicStyles>
                 </TourNavStoreProvider>
             </GeniePreloaderProvider>
         </OnboardingModeProvider>

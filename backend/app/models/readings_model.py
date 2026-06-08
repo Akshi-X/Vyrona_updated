@@ -18,6 +18,8 @@ class Readings(Base):
     tank_id = Column(Integer, ForeignKey("tanks.tank_id", ondelete="CASCADE"), nullable=True, index=True)
     incubator_id = Column(Integer, ForeignKey("incubators.incubator_id", ondelete="CASCADE"), nullable=True, index=True)
     chamber_id = Column(String, nullable=True, index=True)
+    refrigerator_id = Column(Integer, ForeignKey("refrigerators.refrigerator_id", ondelete="CASCADE"), nullable=True, index=True)
+    zone_id = Column(String, nullable=True, index=True)
 
     kpi_config_id = Column(
         Integer,
@@ -40,4 +42,5 @@ class Readings(Base):
         Index("idx_readings_tank_timestamp", "tank_id", "timestamp"),
         Index("idx_readings_kpi_config_timestamp", "kpi_config_id", "timestamp"),
         Index("idx_readings_incubator_chamber_ts", "incubator_id", "chamber_id", "timestamp"),
+        Index("idx_readings_refrigerator_zone_ts", "refrigerator_id", "zone_id", "timestamp"),
     )

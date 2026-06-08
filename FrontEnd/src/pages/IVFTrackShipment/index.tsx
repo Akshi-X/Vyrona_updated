@@ -2,8 +2,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
-import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTrackingDark.svg';
+import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/CryocanDarkN.svg';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
 import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
 import IVFQualityTrackingChart from './sections/IVFQualityTrackingChart';
@@ -33,8 +34,10 @@ export default function IVFTrackShipmentPage() {
     const { tankId } = useParams<{ tankId: string }>();
     const { userRole } = useAuth();
     const navigate = useNavigate();
+    const isOnboarding = useOnboardingMode();
     const [headerTankCode, setHeaderTankCode] = useState<string>("-");
     const [headerBranchName, setHeaderBranchName] = useState<string>("-");
+    const [headerTankId, setHeaderTankId] = useState<number | undefined>(undefined);
     const [tankMaxCapacity, setTankMaxCapacity] = useState<number | null>(null);
     const [tankMinCapacity, setTankMinCapacity] = useState<number | null>(null);
     const [ln2L2Threshold, setLn2L2Threshold] = useState<number | null>(null);
@@ -64,8 +67,7 @@ export default function IVFTrackShipmentPage() {
         }>
     >([]);
     const [exporting, setExporting] = useState(false);
-    const [useNewCryocan,] = useState(false);
-    // const [useNewCryocan, setUseNewCryocan] = useState(false);
+    const [useNewCryocan, setUseNewCryocan] = useState(true);
     const [systemActivity, setSystemActivity] = useState<ActivityLogRecord[]>([]);
     const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
     const qualityChartRef = useRef<HTMLDivElement>(null);
@@ -239,6 +241,7 @@ export default function IVFTrackShipmentPage() {
         if (!tankId) {
             setHeaderTankCode("-");
             setHeaderBranchName("-");
+            setHeaderTankId(undefined);
             setTankMaxCapacity(null);
             setTankMinCapacity(null);
             setLn2L2Threshold(null);
@@ -251,6 +254,7 @@ export default function IVFTrackShipmentPage() {
 
             setHeaderTankCode(kpiConfigResponse?.tank_code || "-");
             setHeaderBranchName(kpiConfigResponse?.branch_name || "-");
+            setHeaderTankId(kpiConfigResponse?.tank_id ?? undefined);
             setTankMaxCapacity(kpiConfigResponse?.tank_max_capacity_reading ?? null);
             setTankMinCapacity(kpiConfigResponse?.tank_min_capacity_reading ?? null);
             setLn2L2Threshold(thresholds.l2);
@@ -539,7 +543,7 @@ export default function IVFTrackShipmentPage() {
                                     <div className="text-sm font-semibold text-black">
                                         {headerTankCode} - {headerBranchName}
                                     </div>
-                                    {/* <div className="inline-flex rounded-lg border border-line bg-white p-1">
+                                    {!isOnboarding && <div className="inline-flex rounded-lg border border-line bg-white p-1">
                                         <button
                                             type="button"
                                             onClick={() => setUseNewCryocan(false)}
@@ -564,7 +568,7 @@ export default function IVFTrackShipmentPage() {
                                         >
                                             3D UI
                                         </button>
-                                    </div> */}
+                                    </div>}
                                 </div>
                             </div>
                             {/* <ContainerProcessFlow /> */}
@@ -602,6 +606,7 @@ export default function IVFTrackShipmentPage() {
                                         externalTempAlert={externalTempAlert}
                                         internalTempAlert={internalTempAlert}
                                         tankCode={headerTankCode !== "-" ? headerTankCode : undefined}
+                                        tankId={headerTankId ?? routeTankId}
                                         branchName={headerBranchName !== "-" ? headerBranchName : undefined}
                                         selectedSensorId={selectedSensorId}
                                         onSensorSelect={(id) => {
@@ -610,7 +615,7 @@ export default function IVFTrackShipmentPage() {
                                         }}
                                     />
                                     <div ref={qualityChartRef} style={{ marginBottom: 16 }}>
-                                        <IVFQualityTrackingChart canisterNumber={tankId} selectedKpiKey={selectedSensorId} />
+                                        <IVFQualityTrackingChart canisterNumber={tankId} selectedKpiKey={selectedSensorId} onTabChange={() => setSelectedSensorId(null)} />
                                     </div>
                                 </>
                             )}

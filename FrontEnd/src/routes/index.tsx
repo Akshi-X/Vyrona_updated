@@ -24,6 +24,7 @@ import EmbryoReportsPage from "../pages/EmbryoGrading/EmbryoReportsPage";
 import EmbryoShell from "../pages/EmbryoGrading/EmbryoShell";
 import IncubatorTrackingDashboardPage from "../pages/IncubatorTracking";
 import IncubatorDetailPage from "../pages/IncubatorTracking/IncubatorDetailPage";
+import RefrigeratorTrackingPage from "../pages/RefrigeratorTracking";
 import SidebarLayout from "../components/SidebarLayout";
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
@@ -210,6 +211,12 @@ const IncubatorDetailWithAuth = () => (
     </RoleBasedRoute>
 );
 
+const RefrigeratorTrackingWithAuth = () => (
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
+        <RefrigeratorTrackingPage />
+    </RoleBasedRoute>
+);
+
 /**
  * Alert Setting with role-based access
  * IVF Admins, Managers, and Users can access this
@@ -284,8 +291,8 @@ export const router = createBrowserRouter([
             { path: "/onboarding/support",                               element: <><Support /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/success",                               element: <><OnboardingSuccess /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/users",                                 element: <><UsersPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/embryo-grading",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/embryo-grading/:his/advanced",          element: <><AdvancedEmbryoGradingPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/embryo-console",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/embryo-console/:his/advanced",          element: <><AdvancedEmbryoGradingPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking/:id",                element: <><IncubatorDetailPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/track/:patientId",                      element: <><TrackPage /><ActiveOnboardingLevel /></> },
@@ -310,9 +317,9 @@ export const router = createBrowserRouter([
             { path: "/outbound-quality-tracking", element: <OutboundQualityTrackingWithVariant /> },
             { path: "/alert-setting", element: <AlertSettingWithAuth /> },
             { path: "/refill-log", element: <RefillLogWithAuth /> },
-            { path: "/embryo-grading", element: <EmbryoGradingWithAuth /> },
+            { path: "/embryo-console", element: <EmbryoGradingWithAuth /> },
             {
-                path: "/embryo-grading/:his",
+                path: "/embryo-console/:his",
                 element: <EmbryoShellWithAuth />,
                 children: [
                     { index: true,         element: <EmbryoGradingDetailPage /> },
@@ -323,6 +330,8 @@ export const router = createBrowserRouter([
             },
             { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
             { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
+            { path: "/refrigerator-tracking/:refrigeratorId", element: <RefrigeratorTrackingWithAuth /> },
+            { path: "/refrigerator-tracking", element: <RefrigeratorTrackingWithAuth /> },
             { path: "/database", element: <DatabaseWithAuth /> },
             {
                 path: "/reports",
