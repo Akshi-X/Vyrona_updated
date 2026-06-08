@@ -5,7 +5,7 @@
         "title": "myGrape Genie",
         "icon": "LayoutDashboard",
         "content": "Hi, Welcome to mgSCALE, I'm the care taker of the lab. I understand that you are here to learn how to use mgSCALE. That's a right choice! with mgSCALE most of your burden are automated. I'll walk you through on how it's possible.",
-        "placement": "bottom",
+        "placement": "middle_middle",
         "requireClick": false,
         "genieImage": "/genie/welcoming_with_waving_hand.webp"
     },
@@ -15,7 +15,7 @@
         "title": "KPI Pulse",
         "icon": "LayoutDashboard",
         "content": "This is your embryologist's command centre. Every KPI shown here is tailored to what you need to act on storage volumes, container health, and deviations all in one view the moment you log in.",
-        "placement": "bottom",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining.webp"
     },
@@ -25,7 +25,7 @@
         "title": "KPI Pulse",
         "icon": "LayoutDashboard",
         "content": "These metrics are retrieved directly from your hospital's data systems, representing verified, real-time inventory rather than manual records. Any discrepancy between these values and your laboratory documentation requires immediate review.",
-        "placement": "bottom",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
@@ -35,7 +35,7 @@
         "title": "Total Cryolocks",
         "icon": "FlaskConical",
         "content": "This metric displays the total number of Cryolocks currently stored across all sites. Since Cryolocks contain vitrified embryos, this count reflects your active inventory and should align with your laboratory records.",
-        "placement": "bottom",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_from_inside_cryocan.webp"
     },
@@ -45,7 +45,7 @@
         "title": "Total Containers",
         "icon": "FlaskConical",
         "content": "This metric shows the total number of cryogenic containers (tanks) actively monitored. Each container holds multiple Cryolocks, tracking this number helps you manage storage capacity and flag any unregistered units.",
-        "placement": "bottom",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_cryocan.webp"
     },
@@ -55,7 +55,7 @@
         "title": "KPI Pulse",
         "icon": "LayoutDashboard",
         "content": "A single overlooked deviation or an unmonitored container can compromise a patient's only viable embryos. These KPIs exist so that never happens on your watch, turning complex lab data into a clear signal you can act on in seconds.",
-        "placement": "bottom",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_casual.webp"
     },
@@ -188,7 +188,7 @@
         "title": "Track Cryocan Quality",
         "icon": "Search",
         "content": "This panel allows you to enter a tank code to retrieve its live status which includes temperature, lid state, and LN2 levels. For this walkthrough, simply close the panel when you are ready to continue.",
-        "placement": "middle_left",
+        "placement": "bottom_middle",
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": [
@@ -239,7 +239,8 @@
         "title": "Critical Alerts Panel",
         "icon": "AlertTriangle",
         "content": "Each card here represents an unresolved critical event. Review the details, take the necessary action in the lab, and acknowledge the alert to clear it from the queue. Close this panel to continue.",
-        "placement": "left",
+        "placement": "bottom_middle",
+        "is_wide": true,
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": [
@@ -266,7 +267,8 @@
         "title": "Stakeholder Chats Panel",
         "icon": "MessageCircle",
         "content": "Each thread is linked to a patient or case, keeping communications traceable and auditable. Reply directly here to keep everyone aligned. Close this panel to continue.",
-        "placement": "left",
+        "placement": "bottom_middle",
+        "is_wide": true,
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": [
@@ -293,7 +295,8 @@
         "title": "My Tasks Panel",
         "icon": "ClipboardList",
         "content": "Mark tasks complete as you work through them. Overdue items are highlighted so nothing slips through, especially for embryo or cryostorage workflows that are time sensitive. Close this panel to continue.",
-        "placement": "left",
+        "placement": "bottom_middle",
+        "is_wide": true,
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": [

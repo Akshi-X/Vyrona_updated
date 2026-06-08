@@ -5,7 +5,8 @@ import { useOnboarding } from "../../contexts/OnboardingContext";
 import { useTourNavContext, type TourNavState } from "../../contexts/TourNavContext";
 import type { OnboardingStep } from "../../types/onboarding";
 
-const GAP = 10;
+const GAP = 8;   // space between popover and target element
+const EDGE = 20; // minimum space from all screen edges
 
 // PositionProps as actually passed by @reactour/popover:
 // p.width / p.height  → popover dimensions
@@ -26,40 +27,75 @@ function clamp(value: number, min: number, max: number) {
     return Math.min(Math.max(value, min), max);
 }
 
-const CUSTOM_POSITIONS: Partial<Record<NonNullable<OnboardingStep["placement"]>, (p: PositionProps) => [number, number]>> = {
+const POSITION_FNS: Record<NonNullable<OnboardingStep["placement"]>, (p: PositionProps) => [number, number]> = {
+    // Standard placements — replicate reactour's built-in logic but clamp to EDGE from all screen edges
+    top: (p) => [
+        clamp(p.left, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top - p.height - GAP, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    bottom: (p) => [
+        clamp(p.left, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.bottom + GAP, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    left: (p) => [
+        clamp(p.left - p.width - GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    right: (p) => [
+        clamp(p.right + GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    center: (p) => [
+        (p.windowWidth - p.width) / 2,
+        (p.windowHeight - p.height) / 2,
+    ],
+    middle_middle: (p) => [
+        (p.windowWidth - p.width) / 2,
+        (p.windowHeight - p.height) / 2,
+    ],
     // Corner positions: to the right/left, vertically anchored to target's top or bottom
     top_right: (p) => [
-        clamp(p.right + GAP, GAP, p.windowWidth - p.width - GAP),
-        clamp(p.top, GAP, p.windowHeight - p.height - GAP),
+        clamp(p.right + GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top, EDGE, p.windowHeight - p.height - EDGE),
     ],
     top_left: (p) => [
-        clamp(p.left - p.width - GAP, GAP, p.windowWidth - p.width - GAP),
-        clamp(p.top, GAP, p.windowHeight - p.height - GAP),
+        clamp(p.left - p.width - GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top, EDGE, p.windowHeight - p.height - EDGE),
     ],
     bottom_right: (p) => [
-        clamp(p.right + GAP, GAP, p.windowWidth - p.width - GAP),
-        clamp(p.bottom - p.height, GAP, p.windowHeight - p.height - GAP),
+        clamp(p.right + GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.bottom - p.height, EDGE, p.windowHeight - p.height - EDGE),
     ],
     bottom_left: (p) => [
-        clamp(p.left - p.width - GAP, GAP, p.windowWidth - p.width - GAP),
-        clamp(p.bottom - p.height, GAP, p.windowHeight - p.height - GAP),
+        clamp(p.left - p.width - GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.bottom - p.height, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    // Middle positions: above/below target, horizontally centred on the target
+    top_middle: (p) => [
+        clamp(p.left + (p.right - p.left - p.width) / 2, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top - p.height - GAP, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    bottom_middle: (p) => [
+        clamp(p.left + (p.right - p.left - p.width) / 2, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.bottom + GAP, EDGE, p.windowHeight - p.height - EDGE),
     ],
     // Side positions: to the right/left, vertically centred on the target
     middle_right: (p) => [
-        clamp(p.right + GAP, GAP, p.windowWidth - p.width - GAP),
-        clamp(p.top + (p.bottom - p.top - p.height) / 2, GAP, p.windowHeight - p.height - GAP),
+        clamp(p.right + GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top + (p.bottom - p.top - p.height) / 2, EDGE, p.windowHeight - p.height - EDGE),
     ],
     middle_left: (p) => [
-        clamp(p.left - p.width - GAP, GAP, p.windowWidth - p.width - GAP),
-        clamp(p.top + (p.bottom - p.top - p.height) / 2, GAP, p.windowHeight - p.height - GAP),
+        clamp(p.left - p.width - GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top + (p.bottom - p.top - p.height) / 2, EDGE, p.windowHeight - p.height - EDGE),
     ],
 };
 
 function resolvePosition(placement: OnboardingStep["placement"]) {
-    if (!placement) return "bottom";
-    const fn = CUSTOM_POSITIONS[placement];
-    if (fn) return (p: PositionProps) => fn(p);
-    return placement as "top" | "bottom" | "left" | "right" | "center";
+    const fn = POSITION_FNS[placement ?? "bottom"];
+    return (p: PositionProps) => {
+        if (p.right === undefined) return "right" as const;
+        return fn(p);
+    };
 }
 
 interface OnboardingLevelProps {

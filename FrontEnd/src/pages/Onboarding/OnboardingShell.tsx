@@ -119,7 +119,7 @@ function TourContent({ content }: { content: unknown }) {
 }
 
 // ── Custom tour navigation – prev/next with proper disabled states ─────────────
-function TourNavigation(_props: Record<string, unknown>) {
+function TourNavigation() {
     const ctx = useTourNavContext();
     const nav = ctx?.nav;
     // Wide layout renders its own nav inline inside TourContent
@@ -150,8 +150,8 @@ function TourProviderWithDynamicStyles({ children }: { children: React.ReactNode
             disableInteraction={false}
             disableDotsNavigation={true}
             disableKeyboardNavigation={true}
-            onClickMask={() => {}}
-            onClickClose={() => {}}
+            onClickMask={() => { }}
+            onClickClose={() => { }}
             components={{
                 Content: TourContent,
                 Navigation: TourNavigation,
@@ -164,7 +164,8 @@ function TourProviderWithDynamicStyles({ children }: { children: React.ReactNode
                     borderRadius: 16,
                     padding: isWide ? 0 : 20,
                     maxWidth: isWide ? 640 : 320,
-                    overflow: isWide ? "hidden" : undefined,
+                    maxHeight: "calc(100vh - 32px)",
+                    overflow: "auto",
                 }),
             }}
         >
@@ -247,19 +248,18 @@ export default function OnboardingShell() {
                         <GeniePreloaderGate>
                             {hideSidebar ? (
                                 // Pages with their own full-width layout — no sidebar, no offset wrapper.
-                                <>
-                                    <Outlet />
-                                    <OnboardingOverlay />
-                                </>
+                                <Outlet />
                             ) : (
                                 <div className="bg-surface flex w-full min-h-screen overflow-x-hidden">
                                     <Sidebar onLogout={handleLogout} />
                                     <div className="flex-1 ml-0 md:ml-60 min-w-0">
                                         <Outlet />
-                                        <OnboardingOverlay />
                                     </div>
                                 </div>
                             )}
+                            {/* Kept outside the hideSidebar conditional so React never remounts it on
+                            layout changes — preserves isOpen state when navigating to no-sidebar routes. */}
+                            <OnboardingOverlay />
                         </GeniePreloaderGate>
                     </TourProviderWithDynamicStyles>
                 </TourNavStoreProvider>

@@ -7,7 +7,9 @@
         "content": "Click the Control Tower in the sidebar to navigate there and see your live operational overview.",
         "placement": "right",
         "requireClick": true,
-        "clickOnlyId": ["#onboarding-sidebar-control-tower"],
+        "clickOnlyId": [
+            "#onboarding-sidebar-control-tower"
+        ],
         "startPage": "/onboarding/dashboard",
         "genieImage": "/genie/control_tower.webp"
     },
@@ -17,7 +19,7 @@
         "title": "Filter Panel",
         "icon": "SlidersHorizontal",
         "content": "Use these filters to narrow your view by direction, branch, or status, so you can focus on exactly the containers or routes that matter right now.",
-        "placement": "left",
+        "placement": "top_right",
         "requireClick": false,
         "startPage": "/onboarding/control-tower",
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
@@ -38,7 +40,7 @@
         "title": "Live Map",
         "icon": "Map",
         "content": "And here's the map tying it all together, with every branch, route, and status visualised in real time. Now let's walk through the filters to see how you control this view.",
-        "placement": "bottom",
+        "placement": "middle_left",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_globe.webp"
     },
@@ -48,7 +50,7 @@
         "title": "Direction",
         "icon": "SlidersHorizontal",
         "content": "This filter allows you to toggle between monitoring Cryotanks (for inbound cryo shipments) and Incubators (for IVF incubation units) to customize the assets shown on the map.",
-        "placement": "left",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_settings.webp"
     },
@@ -58,7 +60,7 @@
         "title": "Branch",
         "icon": "SlidersHorizontal",
         "content": "This filter enables you to narrow the map view to assets and routes associated with a specific branch, or view the entire network by keeping it set to 'All Branches'.",
-        "placement": "left",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_globe.webp"
     },
@@ -68,9 +70,11 @@
         "title": "Open the Branch List",
         "icon": "SlidersHorizontal",
         "content": "Click this button to open the branch dropdown and see all available locations.",
-        "placement": "left",
+        "placement": "top_right",
         "requireClick": true,
-        "clickOnlyId": ["#onboarding-control-branch-btn"],
+        "clickOnlyId": [
+            "#onboarding-control-branch-btn"
+        ],
         "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
@@ -79,10 +83,12 @@
         "title": "Select a Branch",
         "icon": "SlidersHorizontal",
         "content": "Pick a branch from the list to narrow your view. Go ahead and select Egmore.",
-        "placement": "left",
+        "placement": "top_right",
         "requireClick": true,
         "prevDisable": true,
-        "clickOnlyId": ["#onboarding-control-branch-list-3"],
+        "clickOnlyId": [
+            "#onboarding-control-branch-list-3"
+        ],
         "disableClickID": [
             "#onboarding-control-branch-list-All",
             "#onboarding-control-branch-list-16",
@@ -120,7 +126,7 @@
         "title": "Status",
         "icon": "SlidersHorizontal",
         "content": "Filter by asset status, including Safe, Risk, or Critical, to quickly zero in on what needs your attention right now.",
-        "placement": "left",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_caution.webp"
     },
@@ -130,9 +136,11 @@
         "title": "Open the Status Filter",
         "icon": "SlidersHorizontal",
         "content": "Click here to open the status dropdown and see the available filter options.",
-        "placement": "left",
+        "placement": "top_right",
         "requireClick": true,
-        "clickOnlyId": ["#onboarding-control-status-btn"],
+        "clickOnlyId": [
+            "#onboarding-control-status-btn"
+        ],
         "genieImage": "/genie/explaining_settings.webp"
     },
     {
@@ -141,10 +149,12 @@
         "title": "Filter by Critical",
         "icon": "SlidersHorizontal",
         "content": "Select Critical to instantly surface only the containers that need immediate attention.",
-        "placement": "left",
+        "placement": "top_right",
         "requireClick": true,
         "prevDisable": true,
-        "clickOnlyId": ["#onboarding-control-status-list-Critical"],
+        "clickOnlyId": [
+            "#onboarding-control-status-list-Critical"
+        ],
         "disableClickID": [
             "#onboarding-control-status-list-All",
             "#onboarding-control-status-list-Safe"
@@ -177,7 +187,7 @@
         "title": "Global Map",
         "icon": "Map",
         "content": "This map visualizes the active lanes and risk zones across all your monitored sites.",
-        "placement": "bottom",
+        "placement": "middle_left",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_globe.webp"
     },
@@ -187,7 +197,7 @@
         "title": "Explore a Container",
         "icon": "Activity",
         "content": "Each row here represents an active container. In the live system, selecting a container opens a detailed view of its sensor readings and history, which we will explore in depth during the next level.",
-        "placement": "right",
+        "placement": "bottom_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_casual.webp"
     }
