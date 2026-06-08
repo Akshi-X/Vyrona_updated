@@ -176,7 +176,7 @@
         "id": "level-5",
         "title": "Refill Log",
         "route": "/onboarding/refill-log",
-        "pointsRequired": 60,
+        "pointsRequired": 105,
         "scoreRequired": 250,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-5.steps.json",
