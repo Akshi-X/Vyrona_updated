@@ -3,6 +3,100 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTour } from "@reactour/tour";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 import { useTourNavContext, type TourNavState } from "../../contexts/TourNavContext";
+import type { OnboardingStep } from "../../types/onboarding";
+
+const GAP = 8;   // space between popover and target element
+const EDGE = 20; // minimum space from all screen edges
+
+// PositionProps as actually passed by @reactour/popover:
+// p.width / p.height  → popover dimensions
+// p.top / p.left / p.right / p.bottom → target element rect (with padding)
+// p.windowWidth / p.windowHeight → viewport dimensions
+type PositionProps = {
+    width: number;
+    height: number;
+    top: number;
+    left: number;
+    right: number;
+    bottom: number;
+    windowWidth: number;
+    windowHeight: number;
+};
+
+function clamp(value: number, min: number, max: number) {
+    return Math.min(Math.max(value, min), max);
+}
+
+const POSITION_FNS: Record<NonNullable<OnboardingStep["placement"]>, (p: PositionProps) => [number, number]> = {
+    // Standard placements — replicate reactour's built-in logic but clamp to EDGE from all screen edges
+    top: (p) => [
+        clamp(p.left, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top - p.height - GAP, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    bottom: (p) => [
+        clamp(p.left, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.bottom + GAP, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    left: (p) => [
+        clamp(p.left - p.width - GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    right: (p) => [
+        clamp(p.right + GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    center: (p) => [
+        (p.windowWidth - p.width) / 2,
+        (p.windowHeight - p.height) / 2,
+    ],
+    middle_middle: (p) => [
+        (p.windowWidth - p.width) / 2,
+        (p.windowHeight - p.height) / 2,
+    ],
+    // Corner positions: to the right/left, vertically anchored to target's top or bottom
+    top_right: (p) => [
+        clamp(p.right + GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    top_left: (p) => [
+        clamp(p.left - p.width - GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    bottom_right: (p) => [
+        clamp(p.right + GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.bottom - p.height, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    bottom_left: (p) => [
+        clamp(p.left - p.width - GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.bottom - p.height, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    // Middle positions: above/below target, horizontally centred on the target
+    top_middle: (p) => [
+        clamp(p.left + (p.right - p.left - p.width) / 2, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top - p.height - GAP, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    bottom_middle: (p) => [
+        clamp(p.left + (p.right - p.left - p.width) / 2, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.bottom + GAP, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    // Side positions: to the right/left, vertically centred on the target
+    middle_right: (p) => [
+        clamp(p.right + GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top + (p.bottom - p.top - p.height) / 2, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+    middle_left: (p) => [
+        clamp(p.left - p.width - GAP, EDGE, p.windowWidth - p.width - EDGE),
+        clamp(p.top + (p.bottom - p.top - p.height) / 2, EDGE, p.windowHeight - p.height - EDGE),
+    ],
+};
+
+function resolvePosition(placement: OnboardingStep["placement"]) {
+    const fn = POSITION_FNS[placement ?? "bottom"];
+    return (p: PositionProps) => {
+        if (p.right === undefined) return "right" as const;
+        return fn(p);
+    };
+}
 
 interface OnboardingLevelProps {
     levelId: string;
@@ -77,7 +171,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         const mapped = steps.map((step) => ({
             selector: step.target,
             content: step.content,
-            position: step.placement || "bottom",
+            position: resolvePosition(step.placement),
         }));
         setSteps?.(mapped);
 
@@ -111,10 +205,10 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             return;
         }
 
-        // skipIfMissing: don't open the tour yet — Effect 5a polls briefly.
-        // The element may appear within a frame (async data load on narrow screens)
-        // or never appear (genuinely wide screen). Effect 5a decides which.
-        if (skipIfMissingRef.current) return;
+        // skipIfMissing: hide immediately while Effect 5a polls.
+        // Without this the tour stays open from the previous step and renders
+        // the popover at top-left because the new target doesn't exist yet.
+        if (skipIfMissingRef.current) { setIsOpen(false); return; }
 
         setCurrentStep(stepIndex);
         if (!isTourActive) return;
@@ -133,6 +227,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     // ── 5. Re-sync tour when target appears asynchronously ──────────
     useEffect(() => {
         if (!activeStep || stepIndex >= stepCount) return;
+        if (activeStep.skipIfMissing) return;
         if (document.querySelector(activeStep.target)) return;
 
         const interval = setInterval(() => {
@@ -261,6 +356,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     // ── 8. Click guard ───────────────────────────────────────────────
     useEffect(() => {
         if (!isTourActive || !activeStep || confirmedSteps[activeStep.id]) return;
+        if (!activeStep.requireClick) return;
 
         const applyDisabledStyles = () => {
             activeStep.disableClickID?.forEach((sel) => {
@@ -342,9 +438,23 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             }
         };
 
+        // Block click events (which trigger React onClick) for non-whitelisted elements.
+        // pointerdown alone isn't enough — React onClick fires from the click event.
+        const handleClick = (event: Event) => {
+            if ((event.target as Element)?.closest(".reactour__popover")) return;
+            const hasWhitelist = (activeStep.clickOnlyId?.length ?? 0) > 0;
+            if (!hasWhitelist) { event.preventDefault(); event.stopPropagation(); return; }
+            const hitWhitelisted = activeStep.clickOnlyId!.some((sel) =>
+                !!(event.target as Element)?.closest(sel)
+            );
+            if (!hitWhitelisted) { event.preventDefault(); event.stopPropagation(); }
+        };
+
         document.addEventListener("pointerdown", handlePointerDown, true);
+        document.addEventListener("click", handleClick, true);
         return () => {
             document.removeEventListener("pointerdown", handlePointerDown, true);
+            document.removeEventListener("click", handleClick, true);
             restoreDisabledStyles();
         };
     }, [activeStep, confirmedSteps, stepIndex, levelId, setCurrentStep, setStepIndex, isTourActive]);
@@ -377,6 +487,8 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         icon: activeStep?.icon ?? "",
         content: activeStep?.content ?? "",
         genieImage: activeStep?.genieImage,
+        is_wide: activeStep?.is_wide,
+        gif: activeStep?.gif,
         stepIndex,
         totalSteps: stepCount,
         canNext,

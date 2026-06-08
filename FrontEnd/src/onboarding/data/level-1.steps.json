@@ -5,7 +5,7 @@
         "title": "myGrape Genie",
         "icon": "LayoutDashboard",
         "content": "Hi, Welcome to mgSCALE, I'm the care taker of the lab. I understand that you are here to learn how to use mgSCALE. That's a right choice! with mgSCALE most of your burden are automated. I'll walk you through on how it's possible.",
-        "placement": "bottom",
+        "placement": "middle_middle",
         "requireClick": false,
         "genieImage": "/genie/welcoming_with_waving_hand.webp"
     },
@@ -15,7 +15,7 @@
         "title": "KPI Pulse",
         "icon": "LayoutDashboard",
         "content": "This is your embryologist's command centre. Every KPI shown here is tailored to what you need to act on — storage volumes, container health, and deviations — all in one view the moment you log in.",
-        "placement": "bottom",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining.webp"
     },
@@ -25,7 +25,7 @@
         "title": "KPI Pulse",
         "icon": "LayoutDashboard",
         "content": "These numbers are pulled directly from your hospital's data systems — so what you see here always reflects actual inventory, not a manual entry. Any mismatch between this count and your lab records is worth investigating immediately.",
-        "placement": "bottom",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
@@ -35,7 +35,7 @@
         "title": "Total Cryolocks",
         "icon": "FlaskConical",
         "content": "Shows the total number of Cryolocks currently stored across all sites. A Cryolock holds vitrified embryos — this count reflects your active inventory and should match your lab records.",
-        "placement": "bottom",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_from_inside_cryocan.webp"
     },
@@ -45,7 +45,7 @@
         "title": "Total Containers",
         "icon": "FlaskConical",
         "content": "The total number of cryogenic containers (tanks) actively monitored. Each container holds multiple Cryolocks — tracking this number helps you manage storage capacity and flag any unregistered units.",
-        "placement": "bottom",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_cryocan.webp"
     },
@@ -55,7 +55,7 @@
         "title": "KPI Pulse",
         "icon": "LayoutDashboard",
         "content": "A single overlooked deviation or an unmonitored container can compromise a patient's only viable embryos. These KPIs exist so that never happens on your watch — they turn complex lab data into a clear signal you can act on in seconds.",
-        "placement": "bottom",
+        "placement": "top_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_casual.webp"
     },
@@ -65,7 +65,7 @@
         "title": "Container Performance",
         "icon": "FlaskConical",
         "content": "See which cryogenic containers have triggered quality deviations and what's driving them most. Use this to prioritise which tanks need a closer look today.",
-        "placement": "right",
+        "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
@@ -75,7 +75,7 @@
         "title": "Container Performance",
         "icon": "FlaskConical",
         "content": "Each card shows the deviation count alongside the top driver — so you know not just how many issues exist, but exactly what is causing them. Repeated drivers across containers signal a systemic problem worth escalating.",
-        "placement": "right",
+        "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
@@ -85,7 +85,7 @@
         "title": "Quality Deviations Flagged",
         "icon": "AlertTriangle",
         "content": "The total number of quality deviations currently flagged across all monitored containers. This includes the ones that are active alerts or acknowledged ones. This number here says that mgSCALE has cautioned you on deviations.",
-        "placement": "right",
+        "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_caution.webp"
     },
@@ -95,7 +95,7 @@
         "title": "Top Deviation Driver",
         "icon": "BarChart2",
         "content": "The single biggest cause of container deviations right now — whether it's a temperature excursion, low LN2, or a lid state issue. Focus your attention here to address the most recurring problem",
-        "placement": "right",
+        "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/lid_state.webp"
     },
@@ -105,7 +105,7 @@
         "title": "Container Performance",
         "icon": "FlaskConical",
         "content": "Unresolved container deviations don't just affect equipment — they put stored embryos and genetic material at direct risk. Catching a temperature breach or low LN2 level here means an rrecoverable incident and an irreversible loss has been priorly alerted and avoided.",
-        "placement": "right",
+        "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/idea_with_thermometer.webp"
     },
@@ -115,7 +115,7 @@
         "title": "Incubator Performance",
         "icon": "Thermometer",
         "content": "Incubator stability is critical for embryo development. This panel surfaces deviations and their top causes so your lab team can act before culture conditions are compromised.",
-        "placement": "right",
+        "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_casual.webp"
     },
@@ -125,7 +125,7 @@
         "title": "Incubator Performance",
         "icon": "Thermometer",
         "content": "Even a brief temperature fluctuation inside an incubator can impair embryo development at a cellular level. The deviation count and top driver here give your lab team the earliest possible signal — so corrective action happens in minutes, not hours.",
-        "placement": "right",
+        "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/explaining.webp"
     },
@@ -135,7 +135,7 @@
         "title": "Incubator Quality Deviations",
         "icon": "Thermometer",
         "content": "The number of quality deviations flagged inside your incubators. Unlike container deviations, incubator issues directly affect live culture — each flagged deviation here should be traced to a specific chamber and resolved before the next culture check.",
-        "placement": "right",
+        "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_caution.webp"
     },
@@ -145,7 +145,7 @@
         "title": "Incubator Top Deviation Driver",
         "icon": "Thermometer",
         "content": "The leading cause of incubator deviations right now. CO₂ fluctuations, humidity drops, and door seal failures are common culprits — knowing the driver lets you go straight to the right corrective protocol instead of running a full diagnostic.",
-        "placement": "right",
+        "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_settings.webp"
     },
@@ -155,7 +155,7 @@
         "title": "Incubator Performance",
         "icon": "Thermometer",
         "content": "Every embryo in culture right now is depending on these conditions staying stable. Any flagged deviation here would have reduced blastocyst development rates, lower implantation success, and in the worst case, mean a patient has no viable embryos left for transfer.",
-        "placement": "right",
+        "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
@@ -175,7 +175,7 @@
         "title": "Cryocan Quality Tracking",
         "icon": "FlaskConical",
         "content": "Click this card to open the Cryocan Quality Tracking tool and check the storage health of your liquid nitrogen tanks.",
-        "placement": "bottom",
+        "placement": "top_left",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-dashboard-cryocan-card"],
         "genieImage": "/genie/explaining_with_cryocan.webp"
@@ -186,7 +186,7 @@
         "title": "Track Cryocan Quality",
         "icon": "Search",
         "content": "Enter a tank code to instantly retrieve its quality status — temperature readings, lid state, LN2 level, and any active deviations. Close this panel when you're ready to continue.",
-        "placement": "left",
+        "placement": "bottom_middle",
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn", "#onboarding-modal-cancel-btn"],
@@ -199,7 +199,7 @@
         "title": "Deviation Distribution",
         "icon": "BarChart2",
         "content": "This chart breaks down every deviation type across your sites — Battery Level, Lid State, LN2, Evaporation Rate, Temperature, and Shock Detection. Spot patterns across sites at a glance.",
-        "placement": "left",
+        "placement": "bottom_left",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
@@ -230,7 +230,8 @@
         "title": "Critical Alerts Panel",
         "icon": "AlertTriangle",
         "content": "Each card here represents an unresolved critical event. Review the details, take the necessary action in the lab, and acknowledge the alert to clear it from the queue. Close this panel to continue.",
-        "placement": "left",
+        "placement": "bottom_middle",
+        "is_wide": true,
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
@@ -253,7 +254,8 @@
         "title": "Stakeholder Chats Panel",
         "icon": "MessageCircle",
         "content": "Each thread is linked to a patient or case, keeping communications traceable and auditable. Reply directly here to keep everyone aligned. Close this panel to continue.",
-        "placement": "left",
+        "placement": "bottom_middle",
+        "is_wide": true,
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
@@ -276,7 +278,8 @@
         "title": "My Tasks Panel",
         "icon": "ClipboardList",
         "content": "Mark tasks complete as you work through them. Overdue items are highlighted so nothing slips through — especially for time-sensitive embryo or cryostorage workflows. Close this panel to continue.",
-        "placement": "left",
+        "placement": "bottom_middle",
+        "is_wide": true,
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
@@ -289,6 +292,7 @@
         "icon": "Table2",
         "content": "A live view of site-level metrics across your network. Track your data across your sites without leaving mgSCALE, use fiters when are particular about some details, all in one table at your glance.",
         "placement": "top",
+        "is_wide": true,
         "requireClick": false,
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     }
