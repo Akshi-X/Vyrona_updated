@@ -491,6 +491,38 @@ class ActiveIncubatorsResponse(BaseModel):
 
 
 # ============================================
+# ACTIVE REFRIGERATORS CONTROL TOWER SCHEMA
+# ============================================
+
+class ActiveRefrigeratorItem(BaseModel):
+    refrigerator_id: int
+    refrigerator_code: Optional[str] = None
+    external_id: Optional[str] = None
+    type: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class BranchRefrigerators(BaseModel):
+    branch_id: int
+    branch_name: str
+    refrigerators: List[ActiveRefrigeratorItem]
+
+    class Config:
+        from_attributes = True
+
+
+class ActiveRefrigeratorsResponse(BaseModel):
+    branches: List[BranchRefrigerators]
+    total: int
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================
 # EMBRYO TRACKING SCHEMA
 # ============================================
 

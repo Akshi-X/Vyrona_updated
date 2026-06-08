@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Modal from "../Modal";
-import ContainerQualityTrackingIcon from "../../assets/DashBoardIcons/DarkContainerQualityTracking.svg";
+import ContainerQualityTrackingIcon from "../../assets/DashBoardIcons/CryocanDarkN.svg";
 import { useAuth } from "../../contexts/AuthContext";
 import {
     ivfService,

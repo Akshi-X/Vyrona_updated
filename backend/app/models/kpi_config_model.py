@@ -32,6 +32,13 @@ class KpiConfig(Base):
         index=True,
     )
     chamber_id = Column(String(255), nullable=True)
+    refrigerator_id = Column(
+        Integer,
+        ForeignKey("refrigerators.refrigerator_id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    zone_id = Column(String(255), nullable=True)
 
     kpi_name = Column(
         String(255),

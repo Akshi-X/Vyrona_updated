@@ -59,6 +59,19 @@
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
+@keyframes glow-pulse {
+  0%, 100% {
+    border-color: rgba(124, 30, 135, 0.2);
+  }
+  50% {
+    border-color: rgba(124, 30, 135, 0.85);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
 /* Font configuration */
 body {
   font-family: 'Open Sans', sans-serif;

@@ -32,15 +32,18 @@ export const level0Config = (levelConfigs as OnboardingLevelConfig[]).find(
     (l) => l.id === "level-0",
 );
 
+const filterSteps = (steps: unknown[]) =>
+    (steps as OnboardingStep[]).filter((s) => !s._disabled);
+
 export const onboardingStepsByLevel: Record<string, OnboardingStep[]> = {
-    "level-1": level1Steps as OnboardingStep[],
-    "level-2": level2Steps as OnboardingStep[],
-    "level-3": level3Steps as OnboardingStep[],
-    "level-4": level4Steps as OnboardingStep[],
-    "level-5": level5Steps as OnboardingStep[],
-    "level-6": level6Steps as OnboardingStep[],
-    "level-7": level7Steps as OnboardingStep[],
-    "level-8": level8Steps as OnboardingStep[],
+    "level-1": filterSteps(level1Steps),
+    "level-2": filterSteps(level2Steps),
+    "level-3": filterSteps(level3Steps),
+    "level-4": filterSteps(level4Steps),
+    "level-5": filterSteps(level5Steps),
+    "level-6": filterSteps(level6Steps),
+    "level-7": filterSteps(level7Steps),
+    "level-8": filterSteps(level8Steps),
 };
 
 export const onboardingQuizByLevel: Record<string, OnboardingQuizQuestion[]> = {
