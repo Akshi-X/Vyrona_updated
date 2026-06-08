@@ -13,6 +13,8 @@ export interface TourNavState {
     requiresClick: boolean;
     goNext: () => void;
     goPrev: () => void;
+    is_wide?: boolean;
+    gif?: string;
 }
 
 interface TourNavContextValue {

@@ -36,9 +36,9 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
     const [quizResult, setQuizResult] = useState<"pass" | "fail" | null>(null);
     const [lastScore, setLastScore] = useState<number>(0);
 
-    // Fire confetti when score meets or exceeds threshold
+    // Fire confetti only on a fresh quiz pass, not when revisiting a completed level
     useEffect(() => {
-        if (quizResult !== "pass" && !isCompleted) return;
+        if (quizResult !== "pass") return;
 
         const isLastLevel = levelId === "level-8";
         const colors = ["var(--color-primary)", "#a855f7", "#ffffff", "#f9a8d4", "#fbbf24", "#34d399"];
@@ -65,7 +65,7 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
             };
             frame();
         }
-    }, [quizResult, isCompleted, levelId]);
+    }, [quizResult, levelId]);
 
     // Reveal state — set when user clicks an answer, cleared when advancing
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -74,6 +74,13 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
     const tourComplete = steps.length > 0 && (progress?.lastStepIndex ?? 0) >= steps.length;
 
     const [showInterlude, setShowInterlude] = useState(() => quizIndex === 0 && !isCompleted);
+
+    // Auto-advance from the tour-complete interlude to the quiz
+    useEffect(() => {
+        if (!showInterlude) return;
+        const t = setTimeout(() => setShowInterlude(false), 2500);
+        return () => clearTimeout(t);
+    }, [showInterlude]);
 
     const levelConfig = levels.find((level) => level.id === levelId);
     const currentQuestion = quiz[quizIndex];
@@ -149,9 +156,7 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
         return (
             <div className="space-y-4">
                 <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-primary">{levelConfig?.title ?? "Level"}</p>
-                    <h3 className="text-lg font-semibold text-slate-900">Quiz Score Card</h3>
-                    <p className="text-sm text-slate-500 mt-0.5">Retry the tour to earn more points.</p>
+                    <p className="text-sm text-slate-500">Retry the tour to earn more points.</p>
                 </div>
 
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
@@ -162,6 +167,11 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
                                 {lastScore}
                                 <span className="ml-1 text-base font-normal text-slate-400">/ {maxScore}</span>
                             </p>
+                            {(progress?.highScore ?? 0) > 0 && (
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                    Best: <span className="font-semibold text-slate-600">{progress?.highScore} pts</span>
+                                </p>
+                            )}
                         </div>
                         <p className="text-2xl font-bold text-slate-700">{pct}%</p>
                     </div>
@@ -306,13 +316,29 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
                     </div>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={() => levelId === "level-8" ? navigate("/dashboard") : onComplete?.()}
-                    className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-                >
-                    {levelId === "level-8" ? "Go to Dashboard →" : "Continue →"}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={handleRetry}
+                        className="inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                        Retry tour
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleRetryQuiz}
+                        className="inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                        Retry quiz
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => levelId === "level-8" ? navigate("/dashboard") : onComplete?.()}
+                        className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                    >
+                        {levelId === "level-8" ? "Go to Dashboard →" : "Continue →"}
+                    </button>
+                </div>
             </div>
         );
     }
