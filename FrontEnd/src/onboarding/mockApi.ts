@@ -627,6 +627,12 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
             return dashboardData.ivfStorage;
         }
 
+        // IVF canister existence check — always succeed so the search modal works with mock tank codes.
+        if (endpoint.match(/^\/api\/ivf\/canisters\/[^/]+\/check/)) {
+            const tankCode = decodeURIComponent(endpoint.split("/")[4]);
+            return { exists: true, canister_id: tankCode, message: "Tank found" };
+        }
+
         // IVF track shipment — tank KPI config (any tankId).
         if (endpoint.startsWith("/api/ivf/quality/tanks/") && endpoint.includes("/kpi-config")) {
             return dashboardData.ivfTankKpiConfig;
@@ -656,7 +662,8 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
 
             // Build a branch-aware log for the activity log list
             const branchEntry = (() => {
-                for (const b of (controlTowerData as any).activeCanisters?.branches ?? []) {
+                type Branch = { branch_id: number; branch_name: string; tanks: { tank_id: number; tank_code: string }[] };
+                for (const b of (controlTowerData.activeCanisters.branches as Branch[])) {
                     for (const t of b.tanks ?? []) {
                         if (t.tank_id === tankIdFromUrl) return { branch_name: b.branch_name, tank_code: t.tank_code };
                     }
@@ -852,7 +859,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
         if (endpoint.match(/^\/api\/ivf\/reservoir-logs\/\d+$/) && (options?.method === "PUT" || options?.method === "PATCH")) {
             const logId = Number(endpoint.split("/").pop());
             const body = options?.body ? JSON.parse(options.body as string) : {};
-            const log = dashboardData.refillReservoirLogs.logs.find((l: any) => l.log_id === logId);
+            const log = dashboardData.refillReservoirLogs.logs.find((l) => l.log_id === logId);
             if (log) Object.assign(log, body);
             return { success: true };
         }
@@ -874,7 +881,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
 
         // Support / Profile — submit a new feedback ticket.
         if (endpoint === "/api/feedback/create" && options?.method === "POST") {
-            let body: Record<string, any> = {};
+            let body: Record<string, unknown> = {};
             // submitFeedback sends FormData; pull the JSON "request" field.
             if (options.body instanceof FormData) {
                 const raw = (options.body as FormData).get("request");
@@ -1091,9 +1098,10 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
     // Replace window.WebSocket with a fake that connects silently.
     // This prevents real-backend WS errors (e.g. "Tank does not belong to your branch")
     // from appearing in onboarding. The fake reports "connected" but never delivers data.
-    if (typeof window !== "undefined" && !(window as any).__onboardingOriginalWebSocket) {
-        (window as any).__onboardingOriginalWebSocket = window.WebSocket;
-        (window as any).WebSocket = FakeWebSocket;
+    const win = window as typeof window & { __onboardingOriginalWebSocket?: typeof WebSocket };
+    if (typeof window !== "undefined" && !win.__onboardingOriginalWebSocket) {
+        win.__onboardingOriginalWebSocket = window.WebSocket;
+        (window as { WebSocket: unknown }).WebSocket = FakeWebSocket;
     }
 };
 
@@ -1103,8 +1111,9 @@ export const disableOnboardingMocks = () => {
     // OnboardingShell restores previousDepartment in its own cleanup — nothing to do here.
 
     // Restore original WebSocket
-    if (typeof window !== "undefined" && (window as any).__onboardingOriginalWebSocket) {
-        window.WebSocket = (window as any).__onboardingOriginalWebSocket;
-        delete (window as any).__onboardingOriginalWebSocket;
+    const win = window as typeof window & { __onboardingOriginalWebSocket?: typeof WebSocket };
+    if (typeof window !== "undefined" && win.__onboardingOriginalWebSocket) {
+        window.WebSocket = win.__onboardingOriginalWebSocket;
+        delete win.__onboardingOriginalWebSocket;
     }
 };
