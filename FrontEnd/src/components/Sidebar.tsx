@@ -51,8 +51,9 @@ const isDropdown = (item: NavItem): item is NavGroup =>
 const DASHBOARD_CHILD_PATHS = [
     "/dashboard",
     "/ivf-track-shipment",
-    "/incubator-tracking",
-    "/embryo-grading",
+    // "/incubator-tracking",
+    // "/refrigerator-tracking",
+    // "/embryo-console",
 ];
 
 const isDashboardRoute = (pathname: string) =>
@@ -73,8 +74,9 @@ const ALL_NAV_ITEMS: NavItem[] = [
         children: [
             { label: "Overview",                  path: "/dashboard"          },
             { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
-            // { label: "Incubator Tracking",      path: "/incubator-tracking" },
-            // { label: "Embryo Grading",          path: "/embryo-grading"     },
+            // { label: "Incubator Tracking",      path: "/incubator-tracking"    },
+            // { label: "Refrigerator Tracking",   path: "/refrigerator-tracking" },
+            // { label: "Embryo Console",          path: "/embryo-console"        },
         ],
     },
     { icon: DatabaseIconWhite,    label: "Database",            path: "/database"      },
@@ -86,7 +88,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
         dropdown: true,
         children: [
             { label: "Cryotanks",  path: "/alert-setting" },
-            // { label: "Incubators", path: "/alert-setting?direction=incubators" },
+            // { label: "Incubators",    path: "/alert-setting?direction=incubators"    },
+            // { label: "Refrigerators", path: "/alert-setting?direction=refrigerators" },
         ],
     },
     { icon: "", lucideIcon: Download, label: "Reports",         path: "/reports"       },
@@ -169,6 +172,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         if (isDropdown(item)) {
             const filtered = item.children.filter((child) => {
                 if (child.path === "/ivf-track-shipment") return isIVF;
+                // if (child.path === "/refrigerator-tracking") return isIVF;
                 return true;
             });
             return { ...item, children: filtered };
@@ -221,7 +225,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     <img
                         src={MyGrapeLogo}
                         alt="myGrape logo"
-                        className="w-[110px] h-[75px] md:w-[150px] md:h-[100px]"
+                        className="w-[110px] h-[75px] md:w-[135px] md:h-[90px]"
                     />
                 </header>
 

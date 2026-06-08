@@ -12,10 +12,10 @@ interface OnboardingTimelineProps {
 }
 
 const STATUS_CONFIG = {
-    completed:   { dot: "bg-emerald-500", ring: "ring-emerald-200", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Completed", icon: "✓" },
-    in_progress: { dot: "bg-amber-400 animate-pulse", ring: "ring-amber-200", badge: "bg-amber-50 text-amber-700 border-amber-200", label: "In Progress", icon: "→" },
-    available:   { dot: "bg-slate-300", ring: "ring-slate-100", badge: "bg-slate-50 text-slate-600 border-slate-200", label: "Available", icon: "○" },
-    locked:      { dot: "bg-slate-200", ring: "ring-slate-100", badge: "bg-slate-50 text-slate-400 border-slate-200", label: "Locked", icon: "⚿" },
+    completed:   { dot: "bg-emerald-500", ring: "bg-emerald-200", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Completed", icon: "✓" },
+    in_progress: { dot: "bg-amber-400 animate-pulse", ring: "bg-amber-200", badge: "bg-amber-50 text-amber-700 border-amber-200", label: "In Progress", icon: "→" },
+    available:   { dot: "bg-slate-300", ring: "bg-slate-100", badge: "bg-slate-50 text-slate-600 border-slate-200", label: "Available", icon: "○" },
+    locked:      { dot: "bg-slate-200", ring: "bg-slate-100", badge: "bg-slate-50 text-slate-400 border-slate-200", label: "Locked", icon: "⚿" },
 };
 
 export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeToQuiz }: OnboardingTimelineProps) {
@@ -154,10 +154,12 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                         return (
                             <div key={level.id} className="relative flex gap-4">
                                 {/* Dot */}
-                                <div className={`relative z-10 mt-3.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ring-4 ${cfg.ring} ${cfg.dot}`}>
-                                    {isCompleted && (
-                                        <span className="text-[9px] font-bold text-white">✓</span>
-                                    )}
+                                <div className={`relative z-10 mt-3.5 shrink-0 self-start rounded-full p-[3px] ${cfg.ring}`}>
+                                    <div className={`flex h-[22px] w-[22px] items-center justify-center rounded-full ${cfg.dot}`}>
+                                        {isCompleted && (
+                                            <span className="text-[9px] font-bold text-white">✓</span>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Card */}
@@ -199,7 +201,7 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                                                     <div className="flex justify-between text-[10px] text-slate-400">
                                                         <span>
                                                             {highScore > 0
-                                                                ? `Best: ${highScore} / ${pointsRequired} pts`
+                                                                ? `Your Best: ${highScore} pts | Minimum: ${pointsRequired} pts`
                                                                 : `${pointsRequired} pts to pass`}
                                                         </span>
                                                         {pct > 0 && (

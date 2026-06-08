@@ -3,6 +3,7 @@ import { userService } from "../services/userService";
 import dashboardData from "./mocks/dashboard-data.json";
 import controlTowerData from "./mocks/control-tower-data.json";
 import liveFeedFrames from "./mocks/live-feed-data.json";
+import cryocanData from "./mocks/cryocan-data.json";
 
 // ── Cached real profile (fetched once when mocks enable) ──────────────────────
 let cachedProfile: { user_id: string; first_name: string; last_name: string; role: string; department?: string | null } | null = null;
@@ -239,7 +240,7 @@ class FakeWebSocket {
         }
     }
 
-    close(_code?: number, _reason?: string) {
+    close() {
         this.stopLiveFeed();
         this.stopQualityFeed();
         this.readyState = 3; // CLOSED
@@ -315,7 +316,7 @@ function shiftKpiHistoryToNow(data: typeof dashboardData.ivfKpiHistory24H) {
 
 export const enableOnboardingMocks = (department: string = "IVF") => {
     // Persist the real user's department so Dashboard and Sidebar initialise correctly.
-    try { localStorage.setItem("department", department.toUpperCase()); } catch {}
+    try { localStorage.setItem("department", department.toUpperCase()); } catch { /* storage unavailable */ }
 
     // Deep-clone so mutations don't bleed across sessions
     mockTankAlerts = JSON.parse(JSON.stringify(dashboardData.ivfTankAlerts));
@@ -569,7 +570,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
 
         // Alert Setting — branch list for filter dropdown.
         if (endpoint.startsWith("/api/ivf/branches")) {
-            const allBranches = controlTowerData.activeCanisters.branches.map((b: any) => ({
+            const allBranches = (controlTowerData.activeCanisters.branches as { branch_id: number; branch_name: string }[]).map((b) => ({
                 branch_id: b.branch_id,
                 branch_name: b.branch_name,
             }));
@@ -583,18 +584,19 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
         // so the subsequent re-fetch reflects the saved changes.
         if (endpoint === "/api/ivf/quality/kpi-config/bulk" && options?.method === "POST") {
             const body = options?.body ? JSON.parse(options.body as string) : {};
-            const configs: any[] = body.configs ?? [];
-            const configList: any[] = dashboardData.alertSettingKpiConfigList.config;
-            let nextId = Math.max(...configList.map((c: any) => c.id), 0) + 1;
-            configs.forEach((incoming: any) => {
-                const existing = configList.find((c: any) => c.kpi_name === incoming.kpi_name);
+            type KpiConfigEntry = Record<string, unknown> & { kpi_name: string; id?: number };
+            const configs: KpiConfigEntry[] = body.configs ?? [];
+            const configList = dashboardData.alertSettingKpiConfigList.config as KpiConfigEntry[];
+            let nextId = Math.max(...configList.map((c) => Number(c.id) || 0), 0) + 1;
+            configs.forEach((incoming) => {
+                const existing = configList.find((c) => c.kpi_name === incoming.kpi_name);
                 if (existing) {
                     Object.assign(existing, incoming);
                 } else {
                     configList.push({ id: nextId++, hospital_id: 1, branch_id: 16, tank_id: 161, ...incoming });
                 }
             });
-            return { updated: configs.filter((c: any) => configList.some((e: any) => e.kpi_name === c.kpi_name)).length, created: 0 };
+            return { updated: configs.filter((c) => configList.some((e) => e.kpi_name === c.kpi_name)).length, created: 0 };
         }
 
         // Alert Setting — KPI config list for a specific tank.
@@ -626,6 +628,12 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
             return dashboardData.ivfStorage;
         }
 
+        // IVF canister existence check — always succeed so the search modal works with mock tank codes.
+        if (endpoint.match(/^\/api\/ivf\/canisters\/[^/]+\/check/)) {
+            const tankCode = decodeURIComponent(endpoint.split("/")[4]);
+            return { exists: true, canister_id: tankCode, message: "Tank found" };
+        }
+
         // IVF track shipment — tank KPI config (any tankId).
         if (endpoint.startsWith("/api/ivf/quality/tanks/") && endpoint.includes("/kpi-config")) {
             return dashboardData.ivfTankKpiConfig;
@@ -641,7 +649,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
 
         // IVF track shipment — canister tracking details (cryolocks list).
         if (endpoint.startsWith("/api/quality-tracking/tanks/") && endpoint.includes("/tracking-details")) {
-            return dashboardData.ivfTankTrackingDetails;
+            return cryocanData.trackingDetails;
         }
 
         // IVF track shipment — create refill log entry.
@@ -655,7 +663,8 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
 
             // Build a branch-aware log for the activity log list
             const branchEntry = (() => {
-                for (const b of (controlTowerData as any).activeCanisters?.branches ?? []) {
+                type Branch = { branch_id: number; branch_name: string; tanks: { tank_id: number; tank_code: string }[] };
+                for (const b of (controlTowerData.activeCanisters.branches as Branch[])) {
                     for (const t of b.tanks ?? []) {
                         if (t.tank_id === tankIdFromUrl) return { branch_name: b.branch_name, tank_code: t.tank_code };
                     }
@@ -687,7 +696,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
             dashboardData.refillAllLogs.logs.unshift({
                 tank_id: tankIdFromUrl || 60,
                 tank_code: branchEntry.tank_code ?? body.tank_code ?? "—",
-                branch_name: branchEntry.branch_name,
+                branch_name: branchEntry.branch_name ?? "",
                 refill_date: newLog.refill_date,
                 refill_time: newLog.refill_time,
                 refilled_by: newLog.refilled_by,
@@ -775,6 +784,10 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
         // Reports page — activity logs (filtered by query params).
         if (endpoint.startsWith("/api/activity-logs")) {
             const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            // Tank-specific activity (cryocan page) — serve dedicated cryocan mock logs
+            if (qs.get("target_type") === "tank") {
+                return cryocanData.activityLogs;
+            }
             const actionsParam = qs.get("actions");
             const allowedActions = actionsParam ? actionsParam.split(",").map(s => s.trim()).filter(Boolean) : [];
             const outcomeParam  = qs.get("outcome")    ?? "";
@@ -847,7 +860,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
         if (endpoint.match(/^\/api\/ivf\/reservoir-logs\/\d+$/) && (options?.method === "PUT" || options?.method === "PATCH")) {
             const logId = Number(endpoint.split("/").pop());
             const body = options?.body ? JSON.parse(options.body as string) : {};
-            const log = dashboardData.refillReservoirLogs.logs.find((l: any) => l.log_id === logId);
+            const log = dashboardData.refillReservoirLogs.logs.find((l) => l.log_id === logId);
             if (log) Object.assign(log, body);
             return { success: true };
         }
@@ -869,7 +882,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
 
         // Support / Profile — submit a new feedback ticket.
         if (endpoint === "/api/feedback/create" && options?.method === "POST") {
-            let body: Record<string, any> = {};
+            let body: Record<string, unknown> = {};
             // submitFeedback sends FormData; pull the JSON "request" field.
             if (options.body instanceof FormData) {
                 const raw = (options.body as FormData).get("request");
@@ -884,17 +897,17 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
                 : "Demo User";
             const newTicket: MockSupportTicket = {
                 feedback_id: newId,
-                feedback: body.subject ?? "New Ticket",
-                type: body.feedback_type ?? "other",
+                feedback: (body.subject as string) ?? "New Ticket",
+                type: (body.feedback_type as string) ?? "other",
                 status: "Open",
                 submitted_on: new Date().toISOString(),
                 submitted_by_name: submitterName,
                 hospital_name: "Iris Fertility",
                 branch_name: "Chennai",
-                subject: body.subject ?? "",
-                description: body.description ?? "",
-                priority: body.priority ?? "medium",
-                affected_modules: body.affected_modules ?? [],
+                subject: (body.subject as string) ?? "",
+                description: (body.description as string) ?? "",
+                priority: (body.priority as string) ?? "medium",
+                affected_modules: (body.affected_modules as string[]) ?? [],
                 attachment_paths: [],
                 comments: [],
             };
@@ -1086,9 +1099,10 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
     // Replace window.WebSocket with a fake that connects silently.
     // This prevents real-backend WS errors (e.g. "Tank does not belong to your branch")
     // from appearing in onboarding. The fake reports "connected" but never delivers data.
-    if (typeof window !== "undefined" && !(window as any).__onboardingOriginalWebSocket) {
-        (window as any).__onboardingOriginalWebSocket = window.WebSocket;
-        (window as any).WebSocket = FakeWebSocket;
+    const win = window as typeof window & { __onboardingOriginalWebSocket?: typeof WebSocket };
+    if (typeof window !== "undefined" && !win.__onboardingOriginalWebSocket) {
+        win.__onboardingOriginalWebSocket = window.WebSocket;
+        (window as { WebSocket: unknown }).WebSocket = FakeWebSocket;
     }
 };
 
@@ -1098,8 +1112,9 @@ export const disableOnboardingMocks = () => {
     // OnboardingShell restores previousDepartment in its own cleanup — nothing to do here.
 
     // Restore original WebSocket
-    if (typeof window !== "undefined" && (window as any).__onboardingOriginalWebSocket) {
-        window.WebSocket = (window as any).__onboardingOriginalWebSocket;
-        delete (window as any).__onboardingOriginalWebSocket;
+    const win = window as typeof window & { __onboardingOriginalWebSocket?: typeof WebSocket };
+    if (typeof window !== "undefined" && win.__onboardingOriginalWebSocket) {
+        window.WebSocket = win.__onboardingOriginalWebSocket;
+        delete win.__onboardingOriginalWebSocket;
     }
 };

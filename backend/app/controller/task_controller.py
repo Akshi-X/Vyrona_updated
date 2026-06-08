@@ -206,6 +206,28 @@ def get_incubator_tasks(
     )
 
 
+@router.get("/refrigerators/{refrigerator_id}/tasks", response_model=PatientTaskListResponse)
+def get_refrigerator_tasks(
+    refrigerator_id: int = Path(..., description="Refrigerator ID"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    status: Optional[TaskStatus] = Query(None),
+    priority: Optional[TaskPriority] = Query(None),
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Retrieve paginated tasks linked to a refrigerator."""
+    return task_service.get_tasks_by_refrigerator(
+        refrigerator_id=refrigerator_id,
+        current_user=current_user,
+        db=db,
+        status=status,
+        priority=priority,
+        page=page,
+        page_size=page_size
+    )
+
+
 # ---------------------------
 # 4. Update Task (Full Update - Creator or Assignee)
 # ---------------------------

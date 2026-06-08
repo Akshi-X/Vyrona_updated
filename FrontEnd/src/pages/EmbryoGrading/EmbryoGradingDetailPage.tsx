@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { History, FlaskConical, Activity, Sun, Tag, Server, Thermometer, Star } from 'lucide-react';
+import { History, FlaskConical, Activity, Sun, Tag, Server, Star } from 'lucide-react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { ivfService, type IvfCycle, type IvfCycleLog, type IvfCycleWithLogs, type IvfLogUpsert, type ChamberLatestItem } from '../../services/ivfService';
@@ -547,25 +547,19 @@ export default function EmbryoGradingDetailPage() {
                           </div>
                         </div>
 
-                        {/* Chamber */}
-                        <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                        {/* Chamber + Chamber Health (merged) */}
+                        <div className="col-span-2 rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
                           <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
                             <Server size={13} />
                           </div>
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Chamber</span>
+                          <div className="flex flex-col gap-0.5 shrink-0">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Chamber</span>
                             <span className="text-sm font-bold text-gray-800">{String(selectedCycle.chamber_position ?? '—')}</span>
                           </div>
-                        </div>
-
-                        {/* Chamber Health */}
-                        <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
-                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                            <Thermometer size={13} />
-                          </div>
-                          <div className="flex flex-col gap-1 min-w-0">
-                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Chamber Health</span>
-                            <div className="flex items-center gap-1">
+                          <div className="w-px self-stretch bg-gray-100 mx-1 shrink-0" />
+                          <div className="flex flex-col gap-1 flex-1 min-w-0">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Chamber Health</span>
+                            <div className="flex items-center gap-1.5">
                               {[
                                 { kpi_name: 'incubator_temp', label: 'T' },
                                 { kpi_name: 'incubator_o2',   label: 'O₂' },
@@ -574,10 +568,10 @@ export default function EmbryoGradingDetailPage() {
                                 const match = chamberHealth.find(h => h.kpi_name === def.kpi_name);
                                 const val = chamberHealthLoading ? '…' : match?.value != null ? `${match.value}${match.unit}` : '—';
                                 return (
-                                  <span key={def.kpi_name} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/5 border border-primary/10 text-[10px]">
-                                    <span className="font-semibold text-gray-400">{def.label}</span>
-                                    <span className="font-black text-primary">{val}</span>
-                                  </span>
+                                  <div key={def.kpi_name} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/5 border border-primary/10">
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{def.label}</span>
+                                    <span className="text-[11px] font-black text-primary leading-none">{val}</span>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -791,7 +785,7 @@ export default function EmbryoGradingDetailPage() {
                                     <button
                                       type="button"
                                       onClick={() => openEditLog(log, 0)}
-                                      className="px-2 py-1 text-xs bg-primary text-white rounded hover:bg-[#5a0f62] transition-colors"
+                                      className="px-2 py-1 text-xs border border-primary/30 text-primary rounded font-medium hover:bg-primary/5 transition-colors"
                                       title="Update entry"
                                     >
                                       Update
@@ -1059,10 +1053,10 @@ export default function EmbryoGradingDetailPage() {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => navigate(`/embryo-grading/${his}/advanced`, { state: { savedLogForm: logForm, savedEditingLogId: editingLogId } })}
+                              onClick={() => navigate(`/embryo-console/${his}/advanced`, { state: { savedLogForm: logForm, savedEditingLogId: editingLogId } })}
                               className="w-full px-4 py-3 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-primary transition-colors"
                             >
-                              Start Embryo Grading
+                              Start AI Grading
                             </button>
                           )}
                         </div>

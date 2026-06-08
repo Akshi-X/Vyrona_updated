@@ -13,6 +13,7 @@ class ChatMessageCreateRequest(BaseModel):
     tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     incubator_id: Optional[int] = None  # For incubator tracking
     chamber_id: Optional[str] = None  # Optional chamber within an incubator
+    refrigerator_id: Optional[int] = None  # For refrigerator tracking
     message_content: str
     tagged_user_ids: Optional[List[str]] = []
 
@@ -27,16 +28,17 @@ class ChatMessageCreateRequest(BaseModel):
 
     @model_validator(mode='after')
     def validate_patient_or_tank(self):
-        """Validate that exactly one of patient_id, tank_code, incubator_id is provided"""
+        """Validate that exactly one of patient_id, tank_code, incubator_id, refrigerator_id is provided"""
         patient_id = self.patient_id.strip() if self.patient_id and isinstance(self.patient_id, str) else self.patient_id
         tank_code = self.tank_code.strip() if self.tank_code and isinstance(self.tank_code, str) else self.tank_code
         incubator_id = self.incubator_id
+        refrigerator_id = self.refrigerator_id
 
-        provided = [bool(patient_id), bool(tank_code), incubator_id is not None]
+        provided = [bool(patient_id), bool(tank_code), incubator_id is not None, refrigerator_id is not None]
         if sum(provided) == 0:
-            raise ValueError("One of patient_id (CGT), tank_code (IVF), or incubator_id must be provided")
+            raise ValueError("One of patient_id (CGT), tank_code (IVF), incubator_id, or refrigerator_id must be provided")
         if sum(provided) > 1:
-            raise ValueError("Provide only one of patient_id, tank_code, or incubator_id")
+            raise ValueError("Provide only one of patient_id, tank_code, incubator_id, or refrigerator_id")
 
         self.patient_id = patient_id if patient_id else None
         self.tank_code = tank_code if tank_code else None
@@ -77,6 +79,7 @@ class ChatMessageResponse(BaseModel):
     tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     incubator_id: Optional[int] = None
     chamber_id: Optional[str] = None
+    refrigerator_id: Optional[int] = None
     sender_id: str
     sender_name: str
     sender_role: Optional[str] = None
@@ -97,6 +100,7 @@ class ChatMessageCreateResponse(BaseModel):
     tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     incubator_id: Optional[int] = None
     chamber_id: Optional[str] = None
+    refrigerator_id: Optional[int] = None
     message_content: str
     sender_id: str
     sender_name: str
@@ -130,6 +134,17 @@ class IncubatorMessagesResponse(BaseModel):
     """Schema for incubator messages response"""
     incubator_id: int
     chamber_id: Optional[str] = None
+    messages: List[ChatMessageResponse]
+    total_messages: int
+    unread_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class RefrigeratorMessagesResponse(BaseModel):
+    """Schema for refrigerator messages response"""
+    refrigerator_id: int
     messages: List[ChatMessageResponse]
     total_messages: int
     unread_count: int = 0
