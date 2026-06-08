@@ -40,7 +40,9 @@ const UserProfilePage: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const navigate = useNavigate();
   const isOnboarding = useOnboardingMode();
-  const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token, onboardingCompleted } = useAuth();
+  const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token, 
+    // onboardingCompleted 
+  } = useAuth();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
  
  
@@ -663,7 +665,9 @@ const UserProfilePage: React.FC = () => {
           )}
         </div>
 
-        {onboardingCompleted && !isOnboarding && (
+        {/* {
+        // onboardingCompleted 
+        && !isOnboarding && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 flex items-center justify-between gap-6">
             <div className="flex items-center gap-5 min-w-0">
               <img src="/genie/explaining_casual.webp" alt="" className="w-40 h-40 object-contain shrink-0" />
@@ -683,7 +687,7 @@ const UserProfilePage: React.FC = () => {
               </svg>
             </button>
           </div>
-        )}
+        )} */}
 
         {/* Support Activity Section */}
         <div id="onboarding-profile-support-activity" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
