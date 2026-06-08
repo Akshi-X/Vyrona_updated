@@ -669,7 +669,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
                         if (t.tank_id === tankIdFromUrl) return { branch_name: b.branch_name, tank_code: t.tank_code };
                     }
                 }
-                return { branch_name: null, tank_code: null };
+                return { branch_name: "", tank_code: "" };
             })();
 
             const newLog = {
@@ -882,7 +882,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
 
         // Support / Profile — submit a new feedback ticket.
         if (endpoint === "/api/feedback/create" && options?.method === "POST") {
-            let body: Record<string, unknown> = {};
+            let body: any = {};
             // submitFeedback sends FormData; pull the JSON "request" field.
             if (options.body instanceof FormData) {
                 const raw = (options.body as FormData).get("request");

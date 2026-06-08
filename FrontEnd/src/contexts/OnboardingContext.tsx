@@ -117,11 +117,21 @@ const applyDateUnlocks = (
         0,
     );
 
-    onboardingLevels.forEach((level) => {
+    onboardingLevels.forEach((level, index) => {
         const prog = levels[level.id];
         if (!prog) return;
         // Never touch in_progress or completed levels
         if (prog.status === "in_progress" || prog.status === "completed") return;
+
+        // TEMPORARY: Unlock next level immediately when previous level is completed
+        if (index > 0) {
+            const prevLevel = onboardingLevels[index - 1];
+            const prevLevelCompleted = levels[prevLevel.id]?.status === "completed";
+            if (prevLevelCompleted) {
+                levels[level.id] = { ...prog, status: "available" };
+                return;
+            }
+        }
 
         const dateOk = !!prog.unlockedAt && prog.unlockedAt <= now;
         const scoreOk = overallHighScore >= (level.scoreRequired ?? 0);
