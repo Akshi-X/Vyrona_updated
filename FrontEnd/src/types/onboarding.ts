@@ -62,7 +62,7 @@ export interface OnboardingStep {
     title: string;
     content: string;
     icon?: string;
-    placement?: "top" | "bottom" | "left" | "right" | "center" | "top_left" | "top_right" | "bottom_left" | "bottom_right" | "middle_right" | "middle_left";
+    placement?: "top" | "bottom" | "left" | "right" | "center" | "top_left" | "top_right" | "bottom_left" | "bottom_right" | "middle_right" | "middle_left" | "top_middle" | "bottom_middle" | "middle_middle";
     requireClick?: boolean;
     prevDisable?: boolean;
     /** On reload/refresh, walk the step index back past this step so the user never resumes mid-flow */
