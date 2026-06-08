@@ -696,7 +696,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
             dashboardData.refillAllLogs.logs.unshift({
                 tank_id: tankIdFromUrl || 60,
                 tank_code: branchEntry.tank_code ?? body.tank_code ?? "—",
-                branch_name: branchEntry.branch_name,
+                branch_name: branchEntry.branch_name ?? "",
                 refill_date: newLog.refill_date,
                 refill_time: newLog.refill_time,
                 refilled_by: newLog.refilled_by,
@@ -897,17 +897,17 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
                 : "Demo User";
             const newTicket: MockSupportTicket = {
                 feedback_id: newId,
-                feedback: body.subject ?? "New Ticket",
-                type: body.feedback_type ?? "other",
+                feedback: (body.subject as string) ?? "New Ticket",
+                type: (body.feedback_type as string) ?? "other",
                 status: "Open",
                 submitted_on: new Date().toISOString(),
                 submitted_by_name: submitterName,
                 hospital_name: "Iris Fertility",
                 branch_name: "Chennai",
-                subject: body.subject ?? "",
-                description: body.description ?? "",
-                priority: body.priority ?? "medium",
-                affected_modules: body.affected_modules ?? [],
+                subject: (body.subject as string) ?? "",
+                description: (body.description as string) ?? "",
+                priority: (body.priority as string) ?? "medium",
+                affected_modules: (body.affected_modules as string[]) ?? [],
                 attachment_paths: [],
                 comments: [],
             };

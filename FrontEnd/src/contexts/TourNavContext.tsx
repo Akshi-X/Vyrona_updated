@@ -17,7 +17,7 @@ export interface TourNavState {
     gif?: string;
 }
 
-interface TourNavContextValue {
+export interface TourNavContextValue {
     nav: TourNavState | null;
     setNav: (nav: TourNavState | null) => void;
     startTour: (() => void) | null;
