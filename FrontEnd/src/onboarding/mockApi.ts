@@ -240,7 +240,7 @@ class FakeWebSocket {
         }
     }
 
-    close(_code?: number, _reason?: string) {
+    close() {
         this.stopLiveFeed();
         this.stopQualityFeed();
         this.readyState = 3; // CLOSED
@@ -316,7 +316,7 @@ function shiftKpiHistoryToNow(data: typeof dashboardData.ivfKpiHistory24H) {
 
 export const enableOnboardingMocks = (department: string = "IVF") => {
     // Persist the real user's department so Dashboard and Sidebar initialise correctly.
-    try { localStorage.setItem("department", department.toUpperCase()); } catch {}
+    try { localStorage.setItem("department", department.toUpperCase()); } catch { /* storage unavailable */ }
 
     // Deep-clone so mutations don't bleed across sessions
     mockTankAlerts = JSON.parse(JSON.stringify(dashboardData.ivfTankAlerts));
@@ -570,7 +570,7 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
 
         // Alert Setting — branch list for filter dropdown.
         if (endpoint.startsWith("/api/ivf/branches")) {
-            const allBranches = controlTowerData.activeCanisters.branches.map((b: any) => ({
+            const allBranches = (controlTowerData.activeCanisters.branches as { branch_id: number; branch_name: string }[]).map((b) => ({
                 branch_id: b.branch_id,
                 branch_name: b.branch_name,
             }));
@@ -584,18 +584,19 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
         // so the subsequent re-fetch reflects the saved changes.
         if (endpoint === "/api/ivf/quality/kpi-config/bulk" && options?.method === "POST") {
             const body = options?.body ? JSON.parse(options.body as string) : {};
-            const configs: any[] = body.configs ?? [];
-            const configList: any[] = dashboardData.alertSettingKpiConfigList.config;
-            let nextId = Math.max(...configList.map((c: any) => c.id), 0) + 1;
-            configs.forEach((incoming: any) => {
-                const existing = configList.find((c: any) => c.kpi_name === incoming.kpi_name);
+            type KpiConfigEntry = Record<string, unknown> & { kpi_name: string; id?: number };
+            const configs: KpiConfigEntry[] = body.configs ?? [];
+            const configList = dashboardData.alertSettingKpiConfigList.config as KpiConfigEntry[];
+            let nextId = Math.max(...configList.map((c) => Number(c.id) || 0), 0) + 1;
+            configs.forEach((incoming) => {
+                const existing = configList.find((c) => c.kpi_name === incoming.kpi_name);
                 if (existing) {
                     Object.assign(existing, incoming);
                 } else {
                     configList.push({ id: nextId++, hospital_id: 1, branch_id: 16, tank_id: 161, ...incoming });
                 }
             });
-            return { updated: configs.filter((c: any) => configList.some((e: any) => e.kpi_name === c.kpi_name)).length, created: 0 };
+            return { updated: configs.filter((c) => configList.some((e) => e.kpi_name === c.kpi_name)).length, created: 0 };
         }
 
         // Alert Setting — KPI config list for a specific tank.

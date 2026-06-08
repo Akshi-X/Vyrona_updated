@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTour } from "@reactour/tour";
 import confetti from "canvas-confetti";
 import { useOnboarding } from "../../contexts/OnboardingContext";
+import { useTourNavContext } from "../../contexts/TourNavContext";
 
 interface LevelOverlayProps {
     levelId: string;
@@ -27,6 +28,7 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
 
     const navigate = useNavigate();
     const { setIsOpen: setTourOpen } = useTour();
+    const tourNavCtx = useTourNavContext();
     const steps = getSteps(levelId);
     const quiz = getQuiz(levelId);
     const progress = getLevelProgress(levelId);
@@ -75,14 +77,7 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
 
     const [showInterlude, setShowInterlude] = useState(() => quizIndex === 0 && !isCompleted);
 
-    // Auto-advance from the tour-complete interlude to the quiz
-    useEffect(() => {
-        if (!showInterlude) return;
-        const t = setTimeout(() => setShowInterlude(false), 2500);
-        return () => clearTimeout(t);
-    }, [showInterlude]);
-
-    const levelConfig = levels.find((level) => level.id === levelId);
+const levelConfig = levels.find((level) => level.id === levelId);
     const currentQuestion = quiz[quizIndex];
 
     // Notify parent of the current section so the overlay header can update
@@ -136,7 +131,8 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
         setQuizResult(null);
         setSelectedIndex(null);
         setIsRevealed(false);
-        setShowInterlude(true);
+        tourNavCtx?.setPendingStartLevelId(levelId);
+        onComplete?.();
     };
 
     const handleRetryQuiz = () => {

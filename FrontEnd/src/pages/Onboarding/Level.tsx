@@ -3,6 +3,64 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTour } from "@reactour/tour";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 import { useTourNavContext, type TourNavState } from "../../contexts/TourNavContext";
+import type { OnboardingStep } from "../../types/onboarding";
+
+const GAP = 10;
+
+// PositionProps as actually passed by @reactour/popover:
+// p.width / p.height  → popover dimensions
+// p.top / p.left / p.right / p.bottom → target element rect (with padding)
+// p.windowWidth / p.windowHeight → viewport dimensions
+type PositionProps = {
+    width: number;
+    height: number;
+    top: number;
+    left: number;
+    right: number;
+    bottom: number;
+    windowWidth: number;
+    windowHeight: number;
+};
+
+function clamp(value: number, min: number, max: number) {
+    return Math.min(Math.max(value, min), max);
+}
+
+const CUSTOM_POSITIONS: Partial<Record<NonNullable<OnboardingStep["placement"]>, (p: PositionProps) => [number, number]>> = {
+    // Corner positions: to the right/left, vertically anchored to target's top or bottom
+    top_right: (p) => [
+        clamp(p.right + GAP, GAP, p.windowWidth - p.width - GAP),
+        clamp(p.top, GAP, p.windowHeight - p.height - GAP),
+    ],
+    top_left: (p) => [
+        clamp(p.left - p.width - GAP, GAP, p.windowWidth - p.width - GAP),
+        clamp(p.top, GAP, p.windowHeight - p.height - GAP),
+    ],
+    bottom_right: (p) => [
+        clamp(p.right + GAP, GAP, p.windowWidth - p.width - GAP),
+        clamp(p.bottom - p.height, GAP, p.windowHeight - p.height - GAP),
+    ],
+    bottom_left: (p) => [
+        clamp(p.left - p.width - GAP, GAP, p.windowWidth - p.width - GAP),
+        clamp(p.bottom - p.height, GAP, p.windowHeight - p.height - GAP),
+    ],
+    // Side positions: to the right/left, vertically centred on the target
+    middle_right: (p) => [
+        clamp(p.right + GAP, GAP, p.windowWidth - p.width - GAP),
+        clamp(p.top + (p.bottom - p.top - p.height) / 2, GAP, p.windowHeight - p.height - GAP),
+    ],
+    middle_left: (p) => [
+        clamp(p.left - p.width - GAP, GAP, p.windowWidth - p.width - GAP),
+        clamp(p.top + (p.bottom - p.top - p.height) / 2, GAP, p.windowHeight - p.height - GAP),
+    ],
+};
+
+function resolvePosition(placement: OnboardingStep["placement"]) {
+    if (!placement) return "bottom";
+    const fn = CUSTOM_POSITIONS[placement];
+    if (fn) return (p: PositionProps) => fn(p);
+    return placement as "top" | "bottom" | "left" | "right" | "center";
+}
 
 interface OnboardingLevelProps {
     levelId: string;
@@ -77,7 +135,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         const mapped = steps.map((step) => ({
             selector: step.target,
             content: step.content,
-            position: step.placement || "bottom",
+            position: resolvePosition(step.placement),
         }));
         setSteps?.(mapped);
 
