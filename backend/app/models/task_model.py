@@ -37,6 +37,10 @@ class Tasks(Base):
     incubator_id = Column(Integer, ForeignKey("incubators.incubator_id"), nullable=True)
     chamber_id = Column(String(255), nullable=True)
 
+    # Refrigerator Reference (for refrigerator tracking)
+    refrigerator_id = Column(Integer, ForeignKey("refrigerators.refrigerator_id"), nullable=True)
+    zone_id = Column(String(255), nullable=True)
+
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -48,4 +52,5 @@ class Tasks(Base):
     patient = relationship("Patient", backref="tasks")
     tank = relationship("Tank", backref="tasks")
     incubator = relationship("Incubator", backref="tasks")
+    refrigerator = relationship("Refrigerator", backref="tasks")
 

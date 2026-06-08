@@ -366,6 +366,29 @@ class ShipmentService extends BaseApiService {
   }
 
   /**
+   * GET /api/ivf/control_tower/active_refrigerators
+   */
+  async getActiveRefrigerators(filters?: { branch_id?: number }): Promise<{
+    branches: Array<{
+      branch_id: number;
+      branch_name: string;
+      refrigerators: Array<{
+        refrigerator_id: number;
+        refrigerator_code: string | null;
+        external_id: string | null;
+        type: string | null;
+        updated_at: string | null;
+      }>;
+    }>;
+    total: number;
+  }> {
+    const params = new URLSearchParams();
+    if (filters?.branch_id != null) params.append('branch_id', String(filters.branch_id));
+    const qs = params.toString();
+    return this.get(qs ? `/api/ivf/control_tower/active_refrigerators?${qs}` : '/api/ivf/control_tower/active_refrigerators');
+  }
+
+  /**
    * Get Active Canisters by Branch (nested format)
    * GET /api/ivf/control_tower/active_canisters (alternative format)
    */

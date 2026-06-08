@@ -62,7 +62,7 @@ export interface OnboardingStep {
     title: string;
     content: string;
     icon?: string;
-    placement?: "top" | "bottom" | "left" | "right" | "center";
+    placement?: "top" | "bottom" | "left" | "right" | "center" | "top_left" | "top_right" | "bottom_left" | "bottom_right" | "middle_right" | "middle_left" | "top_middle" | "bottom_middle" | "middle_middle";
     requireClick?: boolean;
     prevDisable?: boolean;
     /** On reload/refresh, walk the step index back past this step so the user never resumes mid-flow */
@@ -74,6 +74,18 @@ export interface OnboardingStep {
     inputText?: string;
     stepDelay?: number;
     onboardingEvent?: string;
+    /** Scroll the target element into view before the spotlight positions itself */
+    scrollIntoView?: boolean;
+    /** Auto-advance if the target element is not in the DOM (e.g. conditionally rendered on narrow screens only) */
+    skipIfMissing?: boolean;
+    /** Auto-advance if the given selector IS found in the DOM (opposite of skipIfMissing) */
+    skipIfPresent?: string;
+    /** Set true to skip this step at runtime (preserves the definition for reference) */
+    _disabled?: boolean;
+    /** Wide two-column layout: gif on left, text + nav on right */
+    is_wide?: boolean;
+    /** Path to a gif shown in the left panel when is_wide is true */
+    gif?: string;
 }
 
 export interface OnboardingQuizQuestion {
