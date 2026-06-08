@@ -16,7 +16,7 @@
         "target": "#onboarding-control-filter-panel",
         "title": "Filter Panel",
         "icon": "SlidersHorizontal",
-        "content": "Use these filters to narrow your view by direction, branch, or status — so you can focus on exactly the containers or routes that matter right now.",
+        "content": "Use these filters to narrow your view by direction, branch, or status, so you can focus on exactly the containers or routes that matter right now.",
         "placement": "left",
         "requireClick": false,
         "startPage": "/onboarding/control-tower",
@@ -27,7 +27,7 @@
         "target": "#onboarding-control-active-containers",
         "title": "Active Containers",
         "icon": "Package",
-        "content": "This panel lists every active container being monitored — container ID, status, and branch at a glance.",
+        "content": "This panel lists every active container being monitored, showing the container ID, status, and branch at a glance.",
         "placement": "right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_cryocan.webp"
@@ -37,7 +37,7 @@
         "target": "#onboarding-control-map",
         "title": "Live Map",
         "icon": "Map",
-        "content": "And here's the map tying it all together — every branch, route, and status visualised in real time. Now let's walk through the filters to see how you control this view.",
+        "content": "And here's the map tying it all together, with every branch, route, and status visualised in real time. Now let's walk through the filters to see how you control this view.",
         "placement": "bottom",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_globe.webp"
@@ -47,7 +47,7 @@
         "target": "#onboarding-control-filter-direction",
         "title": "Direction",
         "icon": "SlidersHorizontal",
-        "content": "Toggle between Cryotanks and Incubators to switch the type of assets you're monitoring. Cryotanks tracks inbound cryo shipments; Incubators covers IVF incubation units.",
+        "content": "This filter allows you to toggle between monitoring Cryotanks (for inbound cryo shipments) and Incubators (for IVF incubation units) to customize the assets shown on the map.",
         "placement": "left",
         "requireClick": false,
         "genieImage": "/genie/explaining_settings.webp"
@@ -57,7 +57,7 @@
         "target": "#onboarding-control-filter-branch",
         "title": "Branch",
         "icon": "SlidersHorizontal",
-        "content": "Select a specific branch to narrow your view to assets and routes associated with that location. Leave it as All Branches to see everything at once.",
+        "content": "This filter enables you to narrow the map view to assets and routes associated with a specific branch, or view the entire network by keeping it set to 'All Branches'.",
         "placement": "left",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_globe.webp"
@@ -109,7 +109,7 @@
         "target": "#onboarding-control-active-containers",
         "title": "Branch Selected",
         "icon": "Package",
-        "content": "The branch filter is now set to Egmore. This panel updates instantly — you can see only the containers and routes associated with that location.",
+        "content": "The branch filter is now set to Egmore. This panel updates instantly, so you can see only the containers and routes associated with that location.",
         "placement": "right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_cryocan.webp"
@@ -119,7 +119,7 @@
         "target": "#onboarding-control-filter-status",
         "title": "Status",
         "icon": "SlidersHorizontal",
-        "content": "Filter by asset status — Safe, Risk, or Critical — to quickly zero in on what needs your attention right now.",
+        "content": "Filter by asset status, including Safe, Risk, or Critical, to quickly zero in on what needs your attention right now.",
         "placement": "left",
         "requireClick": false,
         "genieImage": "/genie/explaining_caution.webp"
@@ -156,7 +156,7 @@
         "target": "#onboarding-control-active-containers",
         "title": "Critical Containers",
         "icon": "Package",
-        "content": "Status is now filtered to Critical. This list shows only containers flagged as critical — your highest priority items at a glance.",
+        "content": "Status is now filtered to Critical. This list shows only containers flagged as critical, representing your highest priority items at a glance.",
         "placement": "right",
         "requireClick": false,
         "genieImage": "/genie/explaining_caution.webp"
@@ -166,7 +166,7 @@
         "target": "#onboarding-control-active-containers",
         "title": "Active Containers",
         "icon": "Package",
-        "content": "This panel lists every active container currently being monitored. Each row shows the container ID, status, and branch — giving you a live snapshot of your entire cryogenic network at a glance.",
+        "content": "This panel lists every active container currently being monitored. Each row shows the container ID, status, and branch, giving you a live snapshot of your entire cryogenic network at a glance.",
         "placement": "right",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_cryocan.webp"
@@ -186,7 +186,7 @@
         "target": "#onboarding-control-container-list",
         "title": "Explore a Container",
         "icon": "Activity",
-        "content": "Each row here is a live container. Click any tank to drill into its sensor readings and history — we'll dive deeper into this in the next level.",
+        "content": "Each row here represents an active container. In the live system, selecting a container opens a detailed view of its sensor readings and history, which we will explore in depth during the next level.",
         "placement": "right",
         "requireClick": false,
         "genieImage": "/genie/explaining_casual.webp"
