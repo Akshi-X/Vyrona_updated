@@ -38,12 +38,16 @@ class TestScenario_ExternalTemperature:
     UNIT = "°C"
 
     def test_step2_min_provided_max_empty_returns_400(self, post_kpi_config):
-        """Arrange: provide `min` but leave `max` empty.
-
-        Act: attempt to POST the KPI config.
-
-        Assert: API rejects the request with 400 and the error message
-        "Both min and max are required".
+        
+        """Verify external temperature config validation when max is missing.
+        
+        Given a KPI config payload with min provided but max empty,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide `min` but leave `max` empty.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects the request with 400 and the error message "Both min and max are required".
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -56,12 +60,16 @@ class TestScenario_ExternalTemperature:
         assert resp.json()["message"]["error"] == "Both min and max are required"
 
     def test_step3_max_provided_min_empty_returns_400(self, post_kpi_config):
-        """Arrange: provide `max` but leave `min` empty.
-
-        Act: attempt to POST the KPI config.
-
-        Assert: API rejects the request with 400 and the same required-field
-        error as above.
+        
+        """Verify external temperature config validation when min is missing.
+        
+        Given a KPI config payload with max provided but min empty,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide `max` but leave `min` empty.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects the request with 400 and the same required-field error as above.
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -74,10 +82,15 @@ class TestScenario_ExternalTemperature:
         assert resp.json()["message"]["error"] == "Both min and max are required"
 
     def test_step4_valid_min_max_saves_successfully(self, post_kpi_config):
-        """Arrange: provide a valid `min` and `max` range.
-
+        
+        """Verify successful save of valid external temperature range.
+        
+        Given a KPI config payload with both valid min and max provided,
+        when attempting to POST the KPI config,
+        then the API creates the resource successfully.
+        
+        Arrange: Provide a valid `min` and `max` range.
         Act: POST the KPI config.
-
         Assert: API creates the resource and returns 201 (Created).
         """
         resp = post_kpi_config({
@@ -92,9 +105,16 @@ class TestScenario_ExternalTemperature:
     def test_step4_config_persists_on_reopen(
         self, client, setup_kpi_environment, post_kpi_config, auth_headers
     ):
-        """Arrange: save a valid config, Act: read it back using the lookup
-
-        Assert: the persisted entry matches the saved `min` and `max` values.
+        
+        """Verify persistence of saved external temperature configuration.
+        
+        Given a saved valid KPI config,
+        when reading it back using the lookup endpoint,
+        then the persisted entry matches the saved values.
+        
+        Arrange: Save a valid config.
+        Act: Read it back using the lookup endpoint.
+        Assert: The persisted entry matches the saved `min` and `max` values.
         """
         post_kpi_config({
             "kpi_name": self.KPI,
@@ -112,10 +132,15 @@ class TestScenario_ExternalTemperature:
         assert entry["max"] == 38
 
     def test_step5_min_greater_than_max_returns_400(self, post_kpi_config):
-        """Arrange: provide an inverted range where `min` > `max`.
-
-        Act: attempt to POST the KPI config.
-
+        
+        """Verify validation that min bound must be less than or equal to max bound.
+        
+        Given a KPI config payload with min greater than max,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide an inverted range where `min` > `max`.
+        Act: Attempt to POST the KPI config.
         Assert: API rejects with 400 and the message "Min must be ≤ Max".
         """
         resp = post_kpi_config({
@@ -142,9 +167,16 @@ class TestScenario_LN2Level:
     def test_step1_max_is_null_in_response(
         self, client, setup_kpi_environment, auth_headers
     ):
-        """Arrange: read the LN2 level config if present.
-
-        Assert: when a LN2 entry exists, `max` is returned as None.
+        
+        """Verify that LN2 level config has no maximum limit parameter.
+        
+        Given an LN2 level configuration entry exists,
+        when the config is retrieved from the database,
+        then the max value is returned as null.
+        
+        Arrange: Read the LN2 level config if present.
+        Act: Query the configuration using the lookup.
+        Assert: When a LN2 entry exists, `max` is returned as None.
         """
         entry = get_config_by_kpi(
             client, setup_kpi_environment, self.KPI, auth_headers=auth_headers
@@ -153,10 +185,16 @@ class TestScenario_LN2Level:
             assert entry["max"] is None
 
     def test_step2_negative_min_returns_400(self, setup_kpi_environment, post_kpi_config):
-        """Arrange: set `min` to a negative value.
-
-        Act: attempt to save; Assert: API returns 400 with
-        "Min cannot be negative".
+        
+        """Verify that negative battery level min values are rejected.
+        
+        Given a battery level config payload with a negative min value,
+        when saving the config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Set `min` to a negative percentage.
+        Act: Save the config via POST request.
+        Assert: API returns 400 with "Min cannot be negative".
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -169,9 +207,16 @@ class TestScenario_LN2Level:
         assert resp.json()["message"]["error"] == "Min cannot be negative"
 
     def test_step3_min_zero_is_valid(self, post_kpi_config):
-        """Arrange: set `min` to zero (valid lower bound).
-
-        Act: save the config; Assert: API responds with 201.
+        
+        """Verify that zero is accepted as a valid LN2 level min value.
+        
+        Given a configuration payload with min set to zero,
+        when saving the config,
+        then the API responds with a 201 status code.
+        
+        Arrange: Set `min` to zero (valid lower bound).
+        Act: Save the config via POST request.
+        Assert: API responds with 201.
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -183,9 +228,16 @@ class TestScenario_LN2Level:
         assert resp.status_code == 201
 
     def test_step4_min_50_saves_successfully(self, post_kpi_config):
-        """Arrange: set `min` to a positive value and save.
-
-        Act & Assert: API creates the resource and returns 201.
+        
+        """Verify successful save of positive LN2 level min threshold.
+        
+        Given a configuration payload with min set to a positive value,
+        when saving the config,
+        then the API creates the resource successfully.
+        
+        Arrange: Set `min` to a positive value and save.
+        Act: POST the config to the endpoint.
+        Assert: API creates the resource and returns 201.
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -208,9 +260,16 @@ class TestScenario_BatteryLevel:
     UNIT = "%"
 
     def test_step1_max_is_null_in_response(self, client, setup_kpi_environment, auth_headers):
-        """Assert that a stored battery-level config (if present) has
-
-        `max` set to None (min-only semantics).
+        
+        """Verify that LN2 level config has no maximum limit parameter.
+        
+        Given an LN2 level configuration entry exists,
+        when the config is retrieved from the database,
+        then the max value is returned as null.
+        
+        Arrange: Read the LN2 level config if present.
+        Act: Query the configuration using the lookup.
+        Assert: When a LN2 entry exists, `max` is returned as None.
         """
         entry = get_config_by_kpi(
             client, setup_kpi_environment, self.KPI, auth_headers=auth_headers
@@ -218,9 +277,16 @@ class TestScenario_BatteryLevel:
         if entry:
             assert entry["max"] is None
     def test_step1_min_is_null_in_response(self, client, setup_kpi_environment, auth_headers):
-        """Assert that a stored battery-level config (if present) has
-
-        `min` set to None (min-only semantics).
+        
+        """Verify step1 min is null in response.
+        
+        Given the test parameters are prepared,
+        when the action is executed,
+        then the system behaves as expected.
+        
+        Arrange: Prepare test parameters.
+        Act: Execute the target request/action.
+        Assert: Verify that the response/state matches the expectation.
         """
         entry = get_config_by_kpi(
             client, setup_kpi_environment, self.KPI, auth_headers=auth_headers
@@ -229,9 +295,16 @@ class TestScenario_BatteryLevel:
             assert entry["min"] is None
 
     def test_step2_negative_min_returns_400(self, post_kpi_config):
-        """Negative percentages should be rejected.
-
-        Act: save with min=-5; Assert: 400 with "Min cannot be negative".
+        
+        """Verify that negative battery level min values are rejected.
+        
+        Given a battery level config payload with a negative min value,
+        when saving the config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Set `min` to a negative percentage.
+        Act: Save the config via POST request.
+        Assert: API returns 400 with "Min cannot be negative".
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -244,9 +317,16 @@ class TestScenario_BatteryLevel:
         assert resp.json()["message"]["error"] == "Min cannot be negative"
 
     def test_step2_negative_max_returns_400(self, post_kpi_config):
-        """Negative percentages should be rejected.
-
-        Act: save with max=-5; Assert: 400 with "Max cannot be negative".
+        
+        """Verify that negative battery level max values are rejected.
+        
+        Given a battery level config payload with a negative max value,
+        when saving the config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Set `max` to a negative percentage.
+        Act: Save the config via POST request.
+        Assert: API returns 400 with "Max cannot be negative".
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -259,9 +339,16 @@ class TestScenario_BatteryLevel:
         assert resp.json()["message"]["error"] == "Max cannot be negative"
 
     def test_step3_min_exceeds_100_returns_400(self, post_kpi_config):
-        """Percentages above 100 should be rejected.
-
-        Act: save with min=101; Assert: 400 with "Min cannot exceed 100".
+        
+        """Verify that battery level min values above 100% are rejected.
+        
+        Given a battery level config payload with min exceeding 100%,
+        when saving the config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Set `min` to a value greater than 100.
+        Act: Save the config via POST request.
+        Assert: API returns 400 with "Min cannot exceed 100%".
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -273,9 +360,16 @@ class TestScenario_BatteryLevel:
         assert resp.status_code == 400
         assert resp.json()["message"]["error"] == "Min cannot exceed 100"
     def test_step3_max_exceeds_100_returns_400(self, post_kpi_config):
-        """Percentages above 100 should be rejected.
-
-        Act: save with max=101; Assert: 400 with "Max cannot exceed 100".
+        
+        """Verify that battery level max values above 100% are rejected.
+        
+        Given a battery level config payload with max exceeding 100%,
+        when saving the config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Set `max` to a value greater than 100.
+        Act: Save the config via POST request.
+        Assert: API returns 400 with "Max cannot exceed 100%".
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -288,9 +382,16 @@ class TestScenario_BatteryLevel:
         assert resp.json()["message"]["error"] == "Max cannot exceed 100"
 
     def test_step4_valid_min_saves_successfully(self, post_kpi_config):
-        """Valid percentage within bounds should save successfully.
-
-        Act & Assert: POST with min=20 returns 201.
+        
+        """Verify successful save of valid battery level min percentage.
+        
+        Given a battery level config payload with a valid percentage,
+        when saving the config,
+        then the API accepts it successfully.
+        
+        Arrange: Set `min` to a valid battery level percentage.
+        Act: POST the battery level config to the endpoint.
+        Assert: API creates the resource and returns 201.
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -302,9 +403,16 @@ class TestScenario_BatteryLevel:
         assert resp.status_code == 201
 
     def test_step5_max_zero_is_not_valid(self, post_kpi_config):
-        """Arrange: set `max` to zero (valid upper bound).
-
-        Act: save the config; Assert: API responds with 400.
+        
+        """Verify that battery level max cannot be zero.
+        
+        Given a battery level config payload with max set to zero,
+        when saving the config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Set `max` to zero (invalid upper bound).
+        Act: Save the config via POST request.
+        Assert: API responds with 400.
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -326,9 +434,16 @@ class TestScenario_BatteryLevel:
     def test_step6_min_greater_than_max_returns_400(
         self, post_kpi_config, min_val, max_val
     ):
-        """Parametrized: inverted ranges should be rejected with the
-
-        message "Min must be ≤ Max".
+        
+        """Verify validation that battery min percentage must be less than or equal to max percentage.
+        
+        Given a battery level config payload with min greater than max,
+        when saving the config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Set `min` value greater than `max` value.
+        Act: Attempt to save the config via POST request.
+        Assert: API rejects with 400 and the message "Max must be ≥ Min".
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -351,7 +466,17 @@ class TestScenario_InternalTemperature:
     UNIT = "°C"
 
     def test_step2_min_provided_max_empty_returns_400(self, post_kpi_config):
-        """Provide `min` without `max` — expect required-field error."""
+        
+        """Verify external temperature config validation when max is missing.
+        
+        Given a KPI config payload with min provided but max empty,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide `min` but leave `max` empty.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects the request with 400 and the error message "Both min and max are required".
+        """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Int Temp Warning",
@@ -363,7 +488,17 @@ class TestScenario_InternalTemperature:
         assert resp.json()["message"]["error"] == "Both min and max are required"
 
     def test_step3_max_provided_min_empty_returns_400(self, post_kpi_config):
-        """Provide `max` without `min` — expect required-field error."""
+        
+        """Verify external temperature config validation when min is missing.
+        
+        Given a KPI config payload with max provided but min empty,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide `max` but leave `min` empty.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects the request with 400 and the same required-field error as above.
+        """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Int Temp Warning",
@@ -385,9 +520,16 @@ class TestScenario_InternalTemperature:
     def test_step4_valid_min_max_saves_successfully(
         self, post_kpi_config, min_val, max_val
     ):
-        """Parametrized: valid ranges (positive, negative, cross-zero) should
-
-        be accepted and return 201.
+        
+        """Verify successful save of valid external temperature range.
+        
+        Given a KPI config payload with both valid min and max provided,
+        when attempting to POST the KPI config,
+        then the API creates the resource successfully.
+        
+        Arrange: Provide a valid `min` and `max` range.
+        Act: POST the KPI config.
+        Assert: API creates the resource and returns 201 (Created).
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -401,7 +543,17 @@ class TestScenario_InternalTemperature:
     def test_step4_config_persists_on_reopen(
         self, client, setup_kpi_environment, post_kpi_config, auth_headers
     ):
-        """Save a valid internal-temp config and verify it persists on lookup."""
+        
+        """Verify persistence of saved external temperature configuration.
+        
+        Given a saved valid KPI config,
+        when reading it back using the lookup endpoint,
+        then the persisted entry matches the saved values.
+        
+        Arrange: Save a valid config.
+        Act: Read it back using the lookup endpoint.
+        Assert: The persisted entry matches the saved `min` and `max` values.
+        """
         post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Int Temp Warning",
@@ -427,9 +579,16 @@ class TestScenario_InternalTemperature:
     def test_step5_min_greater_than_max_returns_400(
         self, post_kpi_config, min_val, max_val
     ):
-        """Parametrized: inverted ranges should be rejected with the
-
-        message "Min must be ≤ Max".
+        
+        """Verify validation that min bound must be less than or equal to max bound.
+        
+        Given a KPI config payload with min greater than max,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide an inverted range where `min` > `max`.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects with 400 and the message "Min must be ≤ Max".
         """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
@@ -452,7 +611,17 @@ class TestScenario_EvaporationRateLN2:
     UNIT = "kg/hr"
 
     def test_step2_min_provided_max_empty_returns_400(self, post_kpi_config):
-        """Provide only `min` for evaporation rate — expect required-field error."""
+        
+        """Verify external temperature config validation when max is missing.
+        
+        Given a KPI config payload with min provided but max empty,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide `min` but leave `max` empty.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects the request with 400 and the error message "Both min and max are required".
+        """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Evap Rate Warning",
@@ -464,7 +633,17 @@ class TestScenario_EvaporationRateLN2:
         assert resp.json()["message"]["error"] == "Both min and max are required"
 
     def test_step3_max_provided_min_empty_returns_400(self, post_kpi_config):
-        """Provide only `max` for evaporation rate — expect required-field error."""
+        
+        """Verify external temperature config validation when min is missing.
+        
+        Given a KPI config payload with max provided but min empty,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide `max` but leave `min` empty.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects the request with 400 and the same required-field error as above.
+        """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Evap Rate Warning",
@@ -476,7 +655,17 @@ class TestScenario_EvaporationRateLN2:
         assert resp.json()["message"]["error"] == "Both min and max are required"
 
     def test_step4_valid_min_max_saves_successfully(self, post_kpi_config):
-        """Valid float range should be accepted and return 201."""
+        
+        """Verify successful save of valid external temperature range.
+        
+        Given a KPI config payload with both valid min and max provided,
+        when attempting to POST the KPI config,
+        then the API creates the resource successfully.
+        
+        Arrange: Provide a valid `min` and `max` range.
+        Act: POST the KPI config.
+        Assert: API creates the resource and returns 201 (Created).
+        """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Evap Rate Warning",
@@ -489,7 +678,17 @@ class TestScenario_EvaporationRateLN2:
     def test_step4_config_persists_on_reopen(
         self, client, setup_kpi_environment, post_kpi_config, auth_headers
     ):
-        """Save an evaporation-rate config and verify persistence on lookup."""
+        
+        """Verify persistence of saved external temperature configuration.
+        
+        Given a saved valid KPI config,
+        when reading it back using the lookup endpoint,
+        then the persisted entry matches the saved values.
+        
+        Arrange: Save a valid config.
+        Act: Read it back using the lookup endpoint.
+        Assert: The persisted entry matches the saved `min` and `max` values.
+        """
         post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Evap Rate Warning",
@@ -506,7 +705,17 @@ class TestScenario_EvaporationRateLN2:
         assert entry["max"] == 0.5
 
     def test_step5_min_greater_than_max_returns_400(self, post_kpi_config):
-        """Inverted float range should be rejected with ordering error."""
+        
+        """Verify validation that min bound must be less than or equal to max bound.
+        
+        Given a KPI config payload with min greater than max,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide an inverted range where `min` > `max`.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects with 400 and the message "Min must be ≤ Max".
+        """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
             "unit": self.UNIT,
@@ -528,7 +737,17 @@ class TestScenario_ShockDetection:
     UNIT = "g"
 
     def test_step2_min_provided_max_empty_returns_400(self, post_kpi_config):
-        """Provide only `min` — expect required-field error for shock detection."""
+        
+        """Verify external temperature config validation when max is missing.
+        
+        Given a KPI config payload with min provided but max empty,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide `min` but leave `max` empty.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects the request with 400 and the error message "Both min and max are required".
+        """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Shock Detection Warning",
@@ -540,7 +759,17 @@ class TestScenario_ShockDetection:
         assert resp.json()["message"]["error"] == "Both min and max are required"
 
     def test_step3_max_provided_min_empty_returns_400(self, post_kpi_config):
-        """Provide only `max` — expect required-field error for shock detection."""
+        
+        """Verify external temperature config validation when min is missing.
+        
+        Given a KPI config payload with max provided but min empty,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide `max` but leave `min` empty.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects the request with 400 and the same required-field error as above.
+        """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Shock Detection Warning",
@@ -552,7 +781,17 @@ class TestScenario_ShockDetection:
         assert resp.json()["message"]["error"] == "Both min and max are required"
 
     def test_step4_valid_min_max_saves_successfully(self, post_kpi_config):
-        """Valid shock-detection range should save successfully (201)."""
+        
+        """Verify successful save of valid external temperature range.
+        
+        Given a KPI config payload with both valid min and max provided,
+        when attempting to POST the KPI config,
+        then the API creates the resource successfully.
+        
+        Arrange: Provide a valid `min` and `max` range.
+        Act: POST the KPI config.
+        Assert: API creates the resource and returns 201 (Created).
+        """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Shock Detection Warning",
@@ -565,7 +804,17 @@ class TestScenario_ShockDetection:
     def test_step4_config_persists_on_reopen(
         self, client, setup_kpi_environment, post_kpi_config, auth_headers
     ):
-        """Save a shock-detection config and verify it persists on lookup."""
+        
+        """Verify persistence of saved external temperature configuration.
+        
+        Given a saved valid KPI config,
+        when reading it back using the lookup endpoint,
+        then the persisted entry matches the saved values.
+        
+        Arrange: Save a valid config.
+        Act: Read it back using the lookup endpoint.
+        Assert: The persisted entry matches the saved `min` and `max` values.
+        """
         post_kpi_config({
             "kpi_name": self.KPI,
             "alert_name": "Shock Detection Warning",
@@ -582,7 +831,17 @@ class TestScenario_ShockDetection:
         assert entry["max"] == 5
 
     def test_step5_min_greater_than_max_returns_400(self, post_kpi_config):
-        """Inverted shock-detection range should be rejected with ordering error."""
+        
+        """Verify validation that min bound must be less than or equal to max bound.
+        
+        Given a KPI config payload with min greater than max,
+        when attempting to POST the KPI config,
+        then the API rejects the request with a 400 status code.
+        
+        Arrange: Provide an inverted range where `min` > `max`.
+        Act: Attempt to POST the KPI config.
+        Assert: API rejects with 400 and the message "Min must be ≤ Max".
+        """
         resp = post_kpi_config({
             "kpi_name": self.KPI,
             "unit": self.UNIT,
@@ -613,9 +872,16 @@ class TestKpiConfigValidation:
     def test_min_equal_to_max_is_valid(
         self, post_kpi_config, kpi, alert_name, unit, min_val, max_val
     ):
-        """Equal min and max should be accepted (boundary case).
-
-        Act: POST where `min == max`; Assert: API creates the config (201).
+        
+        """Verify min equal to max is valid.
+        
+        Given the test parameters are prepared,
+        when POST where `min == max`;,
+        then API creates the config (201)..
+        
+        Arrange: Prepare test parameters.
+        Act: POST where `min == max`;
+        Assert: API creates the config (201).
         """
         resp = post_kpi_config({
             "kpi_name": kpi,
@@ -631,10 +897,16 @@ class TestKpiConfigValidation:
     def test_symbols_in_min_returns_400(
         self, post_kpi_config, kpi, alert_name, unit, min_val, max_val
     ):
-        """Non-numeric symbols in `min` should be rejected with 400.
-
-        This guards against clients sending invalid string payloads for
-        numeric fields.
+        
+        """Verify symbols in min returns 400.
+        
+        Given the test parameters are prepared,
+        when the action is executed,
+        then the system behaves as expected.
+        
+        Arrange: Prepare test parameters.
+        Act: Execute the target request/action.
+        Assert: Verify that the response/state matches the expectation.
         """
         resp = post_kpi_config({
             "kpi_name": kpi,

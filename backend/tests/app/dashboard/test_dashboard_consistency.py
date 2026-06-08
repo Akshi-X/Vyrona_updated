@@ -310,12 +310,16 @@ def _make_token(
 # TC-M01: Current month deviation count excludes prior months
 # ══════════════════════════════════════════════════════════════════
 def test_TC_M01_current_month_deviation_count(dashboard_client, dashboard_env):
-    """
-    TC-M01 | P0
-    GIVEN  May has 3 flagged deviations; April had 7
-    WHEN   Admin/IVF user views the dashboard in May
-    THEN   quality-deviations-flagged returns 3, not 7 or 10.
-    Monthly filter must exclude April's alerts entirely.
+    
+    """Verify that quality deviations count only includes alerts from the current month.
+    
+    Given May has 3 flagged deviations and April had 7,
+    when an Admin/IVF user views the quality deviations dashboard metrics in May,
+    then the API returns a count of 3 deviations (excluding April's alerts entirely).
+    
+    Arrange: Seed 3 alerts in May and 7 alerts in April for the active tank.
+    Act: Retrieve quality deviations from the dashboard metrics endpoint while mocked to May.
+    Assert: Verify that the returned count is exactly 3.
     """
     print("\n" + "=" * 60)
     print("TC-M01: Current month deviation count (filter excludes prior months)")
@@ -392,12 +396,16 @@ def test_TC_M01_current_month_deviation_count(dashboard_client, dashboard_env):
 # TC-M02: Deviation graph bars sum matches monthly count
 # ══════════════════════════════════════════════════════════════════
 def test_TC_M02_deviation_graph_bars_match_monthly_count(dashboard_client, dashboard_env):
-    """
-    TC-M02 | P0
-    GIVEN  3 deviations seeded for May
-    WHEN   Admin/IVF user views the deviations-graph endpoint
-    THEN   Sum of all bar segments = 3 for the current month.
-    Graph bars must stay consistent with the flagged count card.
+    
+    """Verify that deviation graph bar segments sum matches the monthly deviations count.
+    
+    Given 3 deviations seeded for the month of May,
+    when an Admin/IVF user views the deviations graph for May,
+    then the sum of all bar segments in the graph equals 3.
+    
+    Arrange: Seed 3 deviations in May for the active tank.
+    Act: Retrieve the deviations graph metric for the May date range.
+    Assert: Verify that the sum of the deviation counts across all graph bars is exactly 3.
     """
     print("\n" + "=" * 60)
     print("TC-M02: Deviation graph bar sum matches monthly count")
@@ -471,12 +479,16 @@ def test_TC_M02_deviation_graph_bars_match_monthly_count(dashboard_client, dashb
 # TC-M03: Monthly label updates on month rollover
 # ══════════════════════════════════════════════════════════════════
 def test_TC_M03_monthly_label_updates_on_month_rollover(dashboard_client, dashboard_env):
-    """
-    TC-M03 | P1
-    GIVEN  Dashboard open on May 31 with no June data
-    WHEN   Date rolls to June 1 and one June deviation is seeded
-    THEN   Response label contains 'June'; deviation count = 1 (June only).
-    Stats must reset to the new month on rollover.
+    
+    """Verify that the monthly label and stats update correctly on month rollover.
+    
+    Given no June data and the month rolls over from May to June with 1 new June deviation,
+    when an Admin/IVF user views the dashboard in June,
+    then the period label contains 'June' and the deviations count resets to 1.
+    
+    Arrange: Seed 1 alert in June.
+    Act: Retrieve quality deviations while mocked to June 1.
+    Assert: Verify that the period label mentions "June" and the count is 1.
     """
     print("\n" + "=" * 60)
     print("TC-M03: Monthly label updates on month rollover (May → June)")
@@ -552,12 +564,16 @@ def test_TC_M03_monthly_label_updates_on_month_rollover(dashboard_client, dashbo
 # TC-M04: Volume counts unchanged on month rollover
 # ══════════════════════════════════════════════════════════════════
 def test_TC_M04_volume_counts_unchanged_on_month_rollover(dashboard_client, dashboard_env):
-    """
-    TC-M04 | P1
-    GIVEN  Total containers and cryolocks are all-time counts
-    WHEN   Month rolls May → June
-    THEN   Both volume endpoints return identical values —
-           they must never be monthly-filtered.
+    
+    """Verify that container and cryolock volume counts are unaffected by month rollover.
+    
+    Given total containers and cryolocks are seeded in the database,
+    when the month rolls over from May to June,
+    then both volume endpoints return identical all-time totals.
+    
+    Arrange: Obtain baseline total containers and cryolocks in May.
+    Act: Retrieve total containers and cryolocks after mocking the date to June.
+    Assert: Verify that the volume counts remain identical across the month boundary.
     """
     print("\n" + "=" * 60)
     print("TC-M04: Volume counts unchanged on month rollover (May → June)")
@@ -605,12 +621,16 @@ def test_TC_M04_volume_counts_unchanged_on_month_rollover(dashboard_client, dash
 # TC-A01: Badge equals active alert count (excludes acknowledged)
 # ══════════════════════════════════════════════════════════════════
 def test_TC_A01_badge_equals_active_alert_count(dashboard_client, dashboard_env):
-    """
-    TC-A01 | P0
-    GIVEN  3 Active alerts + 1 Acknowledged alert for this hospital
-    WHEN   Admin/IVF user hits /alerts/hospital
-    THEN   Active count = 3  (Acknowledged must be excluded).
-    Badge must count Active alerts only.
+    
+    """Verify that the active alert count excludes acknowledged alerts.
+    
+    Given 3 Active alerts and 1 Acknowledged alert seeded for the hospital,
+    when the client retrieves the hospital alerts list,
+    then the active alert count equals 3 (excluding the acknowledged alert).
+    
+    Arrange: Seed 3 Active alerts and 1 Acknowledged alert.
+    Act: Request the active hospital alerts list.
+    Assert: Verify that the count of active alerts returned is exactly 3.
     """
     print("\n" + "=" * 60)
     print("TC-A01: Badge equals active alert count (Acknowledged excluded)")
@@ -673,12 +693,16 @@ def test_TC_A01_badge_equals_active_alert_count(dashboard_client, dashboard_env)
 # TC-A02: Badge increments on new deviation
 # ══════════════════════════════════════════════════════════════════
 def test_TC_A02_badge_increments_on_new_deviation(dashboard_client, dashboard_env):
-    """
-    TC-A02 | P0
-    GIVEN  4 Active alerts  (badge = 4)
-    WHEN   A new Active alert is inserted  (system trigger simulation)
-    THEN   Next read of /alerts/hospital returns active count = 5.
-    Badge must increment when a new active alert is inserted.
+    
+    """Verify that the active alert count badge increments when a new deviation occurs.
+    
+    Given 4 initial Active alerts,
+    when a new Active alert is triggered in the system,
+    then the hospital alerts list returns an active count of 5.
+    
+    Arrange: Seed 4 Active alerts.
+    Act: Insert a new Active alert into the database and retrieve the hospital alerts list.
+    Assert: Verify that the active count increments to 5.
     """
     print("\n" + "=" * 60)
     print("TC-A02: Badge increments on new deviation (4 → 5)")
@@ -755,12 +779,16 @@ def test_TC_A02_badge_increments_on_new_deviation(dashboard_client, dashboard_en
 # TC-A03: Badge decrements on acknowledgement
 # ══════════════════════════════════════════════════════════════════
 def test_TC_A03_badge_decrements_on_acknowledgement(dashboard_client, dashboard_env):
-    """
-    TC-A03 | P1
-    GIVEN  4 Active alerts
-    WHEN   Admin/IVF user acknowledges one via POST /alerts/acknowledge
-    THEN   Active count drops to 3 on the next read.
-    Acknowledged alerts must be excluded from the active badge.
+    
+    """Verify that the active alert count badge decrements when an alert is acknowledged.
+    
+    Given 4 initial Active alerts,
+    when a user acknowledges one of the active alerts,
+    then the hospital alerts list returns an active count of 3.
+    
+    Arrange: Seed 4 Active alerts.
+    Act: POST an acknowledgement for one of the alerts, then read the hospital alerts list.
+    Assert: Verify that the active count decrements to 3.
     """
     print("\n" + "=" * 60)
     print("TC-A03: Badge decrements on acknowledgement (4 → 3)")
@@ -841,12 +869,16 @@ def test_TC_A03_badge_decrements_on_acknowledgement(dashboard_client, dashboard_
 # TC-A04: Badge hidden when all alerts acknowledged
 # ══════════════════════════════════════════════════════════════════
 def test_TC_A04_badge_hidden_when_all_alerts_acknowledged(dashboard_client, dashboard_env):
-    """
-    TC-A04 | P1
-    GIVEN  All 4 alerts are Acknowledged
-    WHEN   Admin/IVF user hits /alerts/hospital
-    THEN   Active count = 0  (no stale badge count).
-    When all alerts are acknowledged the badge must be hidden (count = 0).
+    
+    """Verify that the active alert badge is hidden when all alerts are acknowledged.
+    
+    Given all 4 seeded alerts are marked as Acknowledged,
+    when the client retrieves the hospital alerts list,
+    then the active count is returned as 0.
+    
+    Arrange: Seed 4 alerts marked as Acknowledged.
+    Act: Request the hospital alerts list.
+    Assert: Verify that the active count is 0.
     """
     print("\n" + "=" * 60)
     print("TC-A04: Badge hidden when all alerts are acknowledged (count = 0)")
@@ -904,14 +936,16 @@ def test_TC_A04_badge_hidden_when_all_alerts_acknowledged(dashboard_client, dash
 # TC-AUTH01: Expired JWT is rejected with 401
 # ══════════════════════════════════════════════════════════════════
 def test_TC_AUTH01_expired_jwt_returns_401(dashboard_client, dashboard_env):
-    """
-    TC-AUTH01 | P0
-    GIVEN  A JWT whose exp claim is 1 hour in the past
-    WHEN   Any IVF dashboard endpoint is called with that token
-    THEN   All endpoints must return 401 Unauthorized.
-
-    Ensures the JWT middleware validates expiry and does not fall through
-    to the service layer with a stale token.
+    
+    """Verify that requests with an expired JWT are rejected with a 401 status code.
+    
+    Given a JWT whose expiration claim is in the past,
+    when the client calls any IVF dashboard endpoint with the expired token,
+    then the API rejects the request with a 401 Unauthorized status.
+    
+    Arrange: Generate a JWT with an expiration timestamp in the past.
+    Act: Request IVF dashboard endpoints using the expired token.
+    Assert: Verify that all requests are rejected with a 401 status code.
     """
     print("\n" + "=" * 60)
     print("TC-AUTH01: Expired JWT returns 401 on all IVF dashboard routes")
@@ -950,13 +984,16 @@ def test_TC_AUTH01_expired_jwt_returns_401(dashboard_client, dashboard_env):
 # TC-AUTH02: Missing Authorization header returns 401
 # ══════════════════════════════════════════════════════════════════
 def test_TC_AUTH02_no_auth_header_returns_401(dashboard_client, dashboard_env):
-    """
-    TC-AUTH02 | P0
-    GIVEN  A request with no Authorization header whatsoever
-    WHEN   Any IVF dashboard endpoint is called
-    THEN   All endpoints must return 401 Unauthorized (not 500 or 200).
-
-    Ensures unauthenticated requests are rejected at the middleware layer.
+    
+    """Verify that requests missing the Authorization header are rejected with a 401 status code.
+    
+    Given a request with no Authorization header,
+    when the client calls any IVF dashboard endpoint,
+    then the API rejects the request with a 401 Unauthorized status.
+    
+    Arrange: Prepare requests omitting the Authorization header.
+    Act: Send requests to the IVF dashboard endpoints.
+    Assert: Verify that all requests are rejected with a 401 status code.
     """
     print("\n" + "=" * 60)
     print("TC-AUTH02: No Authorization header → 401 on all IVF dashboard routes")
@@ -992,14 +1029,16 @@ def test_TC_AUTH02_no_auth_header_returns_401(dashboard_client, dashboard_env):
 # TC-AUTH03: Non-IVF department returns 403 on all IVF routes
 # ══════════════════════════════════════════════════════════════════
 def test_TC_AUTH03_non_ivf_department_returns_403(dashboard_client, dashboard_env):
-    """
-    TC-AUTH03 | P0
-    GIVEN  A valid JWT for a user whose department = 'OPD' (not IVF)
-    WHEN   Any /api/ivf/* endpoint is called
-    THEN   All endpoints must return 403 Forbidden.
-
-    RBAC rule: department=IVF is required to access IVF dashboard routes.
-    Any other department — even with role=Admin — must be denied.
+    
+    """Verify that users from a non-IVF department are forbidden from accessing IVF routes.
+    
+    Given a valid JWT for a user whose department is not IVF (e.g. OPD),
+    when the client calls any IVF dashboard endpoint,
+    then the API rejects the request with a 403 Forbidden status.
+    
+    Arrange: Generate a JWT token with department set to "OPD".
+    Act: Send requests to the IVF dashboard endpoints.
+    Assert: Verify that all requests are rejected with a 403 status code.
     """
     print("\n" + "=" * 60)
     print("TC-AUTH03: Non-IVF department (OPD/Admin) → 403 on all IVF routes")
@@ -1047,19 +1086,16 @@ def test_TC_AUTH03_non_ivf_department_returns_403(dashboard_client, dashboard_en
 # TC-AUTH04: Cross-hospital isolation — Hospital A cannot see Hospital B alerts
 # ══════════════════════════════════════════════════════════════════
 def test_TC_AUTH04_cross_hospital_data_isolation(dashboard_client, dashboard_env, setup_kpi_environment):
-    """
-    TC-AUTH04 | P0
-    GIVEN  Hospital A has 3 Active alerts; Hospital B has 5 Active alerts
-    WHEN   An Admin/IVF user of Hospital A calls /alerts/hospital
-    THEN   Active count = 3  (Hospital B's 5 alerts must be invisible).
-
-    Ensures hospital_id scoping in the service layer — no cross-tenant leakage.
-
-    NOTE: This test requires two independent KPI environments. It uses
-    setup_kpi_environment twice via two separate DB sessions seeded with
-    different hospital rows. If your conftest only supports one hospital
-    per test session, adapt setup_kpi_environment to accept a hospital_name
-    parameter and call it twice with distinct names.
+    
+    """Verify data isolation between different hospitals.
+    
+    Given Hospital A has 3 Active alerts and Hospital B has 5 Active alerts,
+    when an Admin/IVF user from Hospital A requests the alerts list,
+    then the response returns an active count of 3 (Hospital B's alerts remain invisible).
+    
+    Arrange: Seed 3 alerts for Hospital A and 5 alerts for Hospital B.
+    Act: Request the hospital alerts list using Hospital A's credentials.
+    Assert: Verify that only Hospital A's 3 alerts are returned.
     """
     print("\n" + "=" * 60)
     print("TC-AUTH04: Cross-hospital isolation — A cannot see B's alerts")
@@ -1147,13 +1183,16 @@ def test_TC_AUTH04_cross_hospital_data_isolation(dashboard_client, dashboard_env
 
 
 def test_TC_AUTH05_admin_from_any_branch_sees_all_hospital_deviations(dashboard_client, dashboard_env):
-    """
-    TC-AUTH05 | P0
-    GIVEN  Two branches (A and C) under the same hospital with deviations seeded
-    WHEN   An Admin user belonging to Branch C calls /alerts/hospital
-    THEN   The Admin must see deviations from across the entire hospital (A + C).
-
-    Ensures an Admin from any branch in the hospital has hospital-wide visibility.
+    
+    """Verify that hospital Admins have visibility across all branches of the hospital.
+    
+    Given deviations are seeded in two separate branches under the same hospital,
+    when an Admin user assigned to one branch requests the hospital alerts list,
+    then the response aggregates active alerts from all branches in the hospital.
+    
+    Arrange: Seed alerts in Branch A and Branch C of the same hospital, and obtain an Admin token for a user in Branch C.
+    Act: Request the hospital alerts list.
+    Assert: Verify that the response returns the aggregated count of 5 alerts from both branches.
     """
     print("\n" + "=" * 60)
     print("TC-AUTH05: Admin from any branch sees all hospital deviations")
@@ -1248,11 +1287,16 @@ def test_TC_AUTH05_admin_from_any_branch_sees_all_hospital_deviations(dashboard_
             db.rollback()
 
 def test_TC_AUTH06_missing_hospital_or_branch_claim_returns_401(dashboard_client, dashboard_env):
-    """
-    TC-AUTH06 | P0
-    GIVEN  A token missing hospital_id or branch_id
-    WHEN   An IVF dashboard endpoint is called
-    THEN   The request must return 401 Unauthorized.
+    
+    """Verify that tokens missing critical scope claims are rejected.
+    
+    Given a JWT token that is missing the hospital_id or branch_id claim,
+    when the client requests quality deviations,
+    then the API rejects the request with a 401 Unauthorized status.
+    
+    Arrange: Generate JWT tokens missing either the hospital_id or branch_id claim.
+    Act: Request the quality deviations endpoint.
+    Assert: Verify that both requests are rejected with a 401 status code.
     """
     db = dashboard_env["db"]
 
@@ -1297,11 +1341,16 @@ def test_TC_AUTH06_missing_hospital_or_branch_claim_returns_401(dashboard_client
 
 
 def test_TC_AUTH07_manager_role_sees_hospital_wide_alerts(dashboard_client, dashboard_env):
-    """
-    TC-AUTH07 | P0
-    GIVEN  A Manager token in Hospital A
-    WHEN   /api/ivf/alerts/hospital is called
-    THEN   The Manager must see alerts from all branches in the hospital.
+    
+    """Verify that users with the Manager role have hospital-wide alerts visibility.
+    
+    Given a Manager role token in a hospital with alerts seeded across multiple branches,
+    when the manager requests the hospital alerts list,
+    then the response returns all active alerts across all branches of the hospital.
+    
+    Arrange: Seed alerts in multiple branches under the same hospital, and obtain a Manager token.
+    Act: Request the hospital alerts list.
+    Assert: Verify that the response returns all active alerts across all branches (total count 5).
     """
     db = dashboard_env["db"]
     hospital_id = dashboard_env["hospital_id"]
@@ -1376,11 +1425,16 @@ def test_TC_AUTH07_manager_role_sees_hospital_wide_alerts(dashboard_client, dash
 
 
 def test_TC_AUTH08_user_role_sees_only_assigned_branch_alerts(dashboard_client, dashboard_env):
-    """
-    TC-AUTH08 | P0
-    GIVEN  A User role belonging to Branch A and active alerts in Branch A and Branch B
-    WHEN   /api/ivf/alerts/hospital is called
-    THEN   The User must only see active alerts from their assigned branch.
+    
+    """Verify that users with the User role can only see alerts from their assigned branch.
+    
+    Given a user assigned to Branch A in a hospital with alerts in both Branch A and Branch B,
+    when the user requests the hospital alerts list,
+    then the response contains only active alerts from Branch A.
+    
+    Arrange: Seed alerts in Branch A and Branch B, and obtain a User token for Branch A.
+    Act: Request the hospital alerts list.
+    Assert: Verify that the response contains only the 2 active alerts from Branch A.
     """
     db = dashboard_env["db"]
     hospital_id = dashboard_env["hospital_id"]
@@ -1477,11 +1531,16 @@ def test_TC_AUTH08_user_role_sees_only_assigned_branch_alerts(dashboard_client, 
 
 
 def test_TC_AUTH09_user_role_branch_scopes_deviations_graph(dashboard_client, dashboard_env):
-    """
-    TC-AUTH09 | P0
-    GIVEN  A User role in Branch A and deviations seeded in Branch A and Branch B
-    WHEN   /api/ivf/dashboard/metrics/deviations-graph is called
-    THEN   The User must only receive graph data for Branch A.
+    
+    """Verify that users with the User role can only view deviation graph data for their assigned branch.
+    
+    Given a user assigned to Branch A in a hospital with alerts in both Branch A and Branch B,
+    when the user requests the deviations graph,
+    then the graph data is scoped only to tanks and alerts within Branch A.
+    
+    Arrange: Seed alerts in Branch A and Branch B, and obtain a User token for Branch A.
+    Act: Request the deviations graph.
+    Assert: Verify that the graph only contains data for Branch A's tanks and excludes Branch B.
     """
     db = dashboard_env["db"]
     hospital_id = dashboard_env["hospital_id"]
@@ -1594,13 +1653,16 @@ def test_TC_AUTH09_user_role_branch_scopes_deviations_graph(dashboard_client, da
 
 
 def test_TC_AUTH10_admin_ivf_top_deviation_driver_returns_highest_driver(dashboard_client, dashboard_env):
-    """
-    TC-AUTH10 | P1
-    GIVEN  An Admin role in IVF and KPI deviation alerts seeded for internal, external,
-           and shock drivers across the current month
-    WHEN   /api/ivf/dashboard/metrics/top-deviation-driver is called
-    THEN   The response must return the driver with the highest deviation count
-           and include all driver counts in the payload.
+    
+    """Verify that the top deviation driver endpoint returns the driver with the highest count.
+    
+    Given multiple KPI configs and deviation alerts seeded across the current month,
+    when an Admin/IVF user requests the top deviation driver,
+    then the response returns the driver name and count with the highest deviations.
+    
+    Arrange: Seed KPI configs and alerts for internal temp, external temp, and shock in the current month.
+    Act: Request the top deviation driver endpoint.
+    Assert: Verify that "External Temperature" is returned as the top driver with 4 deviations.
     """
     print("\n" + "=" * 60)
     print("TC-AUTH10: Admin/IVF top deviation driver returns highest current-month driver")
@@ -1732,16 +1794,16 @@ def test_TC_AUTH10_admin_ivf_top_deviation_driver_returns_highest_driver(dashboa
 # TC-ACK01: Double-acknowledging the same alert is idempotent or returns 400
 # ══════════════════════════════════════════════════════════════════
 def test_TC_ACK01_double_acknowledge_is_idempotent_or_400(dashboard_client, dashboard_env):
-    """
-    TC-ACK01 | P1
-    GIVEN  One Active alert that has already been acknowledged once
-    WHEN   The same alert_id is acknowledged a second time
-    THEN   The response is 200/204 (idempotent) OR 400/409 (reject re-ack).
-           Either way, the active count must not go negative and must remain 0.
-
-    The test accepts both behaviours — the important invariant is that
-    a double-acknowledge never corrupts state (negative count, 500 error,
-    or the alert flipping back to Active).
+    
+    """Verify that double-acknowledging the same alert is handled gracefully without corrupting state.
+    
+    Given an alert that has already been acknowledged once,
+    when the user attempts to acknowledge the same alert_id a second time,
+    then the API returns a successful status (idempotent) or an explicit 400/409 rejection, keeping the active count at 0.
+    
+    Arrange: Seed an Active alert and acknowledge it once.
+    Act: Post a second acknowledgement request for the same alert ID.
+    Assert: Verify that the second request returns a valid success or error code, and the active count remains 0.
     """
     print("\n" + "=" * 60)
     print("TC-ACK01: Double-acknowledge is idempotent or rejected (count stays 0)")
@@ -1805,12 +1867,16 @@ def test_TC_ACK01_double_acknowledge_is_idempotent_or_400(dashboard_client, dash
 
 
 def test_TC_ACK04_concurrent_ack_race_is_idempotent_or_rejected(dashboard_client, dashboard_env):
-    """
-    TC-ACK04 | P0
-    GIVEN  Two concurrent acknowledge requests for the same alert_id
-    WHEN   both requests are executed
-    THEN   One request must succeed and the other must be idempotent or rejected,
-           and the active count must remain 0.
+    
+    """Verify that concurrent acknowledgement requests for the same alert are handled safely.
+    
+    Given two concurrent acknowledgement requests sent for the same alert,
+    when both requests are executed simultaneously,
+    then one request succeeds and the other is either handled idempotently or rejected, with no state corruption.
+    
+    Arrange: Seed an Active alert.
+    Act: Send two concurrent POST requests to acknowledge the alert ID.
+    Assert: Verify that one succeeds and the other does not cause any server error, and the active count remains 0.
     """
     from concurrent.futures import ThreadPoolExecutor
 
@@ -1869,14 +1935,16 @@ def test_TC_ACK04_concurrent_ack_race_is_idempotent_or_rejected(dashboard_client
 # TC-ACK02: Acknowledging a non-existent alert_id returns 404
 # ══════════════════════════════════════════════════════════════════
 def test_TC_ACK02_nonexistent_alert_id_returns_404(dashboard_client, dashboard_env):
-    """
-    TC-ACK02 | P0
-    GIVEN  A random UUID that was never seeded as an alert
-    WHEN   POST /alerts/acknowledge is called with that alert_id
-    THEN   Response must be 404 Not Found.
-
-    Ensures the service does a DB lookup and fails gracefully rather
-    than silently succeeding or returning a 500.
+    
+    """Verify that acknowledging a non-existent alert ID returns a 404 error.
+    
+    Given a random alert ID that does not exist in the database,
+    when the user attempts to acknowledge it,
+    then the API rejects the request with a 404 Not Found status.
+    
+    Arrange: Create a random UUID not corresponding to any database alert.
+    Act: Post an acknowledgement request for the random ID.
+    Assert: Verify that the response status code is 404.
     """
     print("\n" + "=" * 60)
     print("TC-ACK02: Acknowledging non-existent alert_id → 404")
@@ -1906,14 +1974,16 @@ def test_TC_ACK02_nonexistent_alert_id_returns_404(dashboard_client, dashboard_e
 # TC-ACK03: Empty acknowledgment_reason is rejected with 422
 # ══════════════════════════════════════════════════════════════════
 def test_TC_ACK03_missing_alert_id_rejected_with_422(dashboard_client, dashboard_env):
-    """
-    TC-ACK03 | P1
-    GIVEN  A request body missing the required alert_id field
-    WHEN   POST /alerts/acknowledge is called
-    THEN   Response must be 422 (alert_id is a required field).
-
-    NOTE: acknowledgment_reason is Optional[str] in the schema — empty string
-    and omitted field are both accepted by design. Only alert_id is enforced.
+    
+    """Verify that acknowledge requests missing required fields are rejected with a 422 status.
+    
+    Given a request body missing the alert_id field,
+    when the client posts to the acknowledge endpoint,
+    then the API rejects the request with a 422 Unprocessable Entity status.
+    
+    Arrange: Use an authenticated client and prepare requests missing the alert_id field.
+    Act: Post to the acknowledge endpoint.
+    Assert: Verify that the requests are rejected with a 422 status code.
     """
     print("\n" + "=" * 60)
     print("TC-ACK03: Missing alert_id → 422")
@@ -1957,15 +2027,16 @@ def test_TC_ACK03_missing_alert_id_rejected_with_422(dashboard_client, dashboard
 # TC-MT01: Role=User graph is scoped to their branch's tanks only
 # ══════════════════════════════════════════════════════════════════
 def test_TC_MT01_user_role_graph_scoped_to_own_branch_tanks(dashboard_client, dashboard_env):
-    """
-    TC-MT01 | P1
-    GIVEN  Branch A has Tank-1 (2 deviations) and Branch B has Tank-2 (3 deviations)
-           A Role=User JWT is issued for Branch A
-    WHEN   That user calls the deviation graph endpoint
-    THEN   Bar total = 2  (Branch B's 3 deviations must be excluded).
-
-    RBAC rule: role=User scopes the graph to tanks within the user's own branch_id.
-    The user must not see data from tanks in other branches of the same hospital.
+    
+    """Verify that users with the User role only receive graph metrics for tanks in their assigned branch.
+    
+    Given Tank-1 in Branch A and Tank-2 in Branch B,
+    when a user from Branch A requests the deviations graph,
+    then the response only counts deviations from Tank-1.
+    
+    Arrange: Seed alerts for Tank-1 in Branch A and Tank-2 in Branch B, and obtain a User token for Branch A.
+    Act: Request the deviations graph.
+    Assert: Verify that the returned graph bar total is 2 (only showing Tank-1).
     """
     print("\n" + "=" * 60)
     print("TC-MT01: Role=User graph scoped to their branch's tanks (not other branches)")
@@ -2074,11 +2145,16 @@ def test_TC_MT01_user_role_graph_scoped_to_own_branch_tanks(dashboard_client, da
 
 
 def test_TC_MT03_user_role_cannot_see_deviations_from_multiple_other_branches(dashboard_client, dashboard_env):
-    """
-    TC-MT03 | P1
-    GIVEN  A Role=User in Branch A and two other branches in the same hospital
-    WHEN   The user calls the deviations graph endpoint
-    THEN   Only Branch A's deviations must be visible; other branches must be excluded.
+    
+    """Verify that users with the User role cannot see deviations from other hospital branches.
+    
+    Given active alerts in Branch A, Branch B, and Branch C,
+    when a user from Branch A requests the deviations graph,
+    then only Branch A's deviations are returned.
+    
+    Arrange: Seed alerts across Branch A, Branch B, and Branch C, and obtain a User token for Branch A.
+    Act: Request the deviations graph.
+    Assert: Verify that the returned graph bar total is 2 (only showing Branch A).
     """
     db          = dashboard_env["db"]
     hospital_id = dashboard_env["hospital_id"]
@@ -2201,16 +2277,16 @@ def test_TC_MT03_user_role_cannot_see_deviations_from_multiple_other_branches(da
 # TC-MT02: Role=Admin graph aggregates ALL branches of the hospital
 # ══════════════════════════════════════════════════════════════════
 def test_TC_MT02_admin_graph_aggregates_all_branches(dashboard_client, dashboard_env):
-    """
-    TC-MT02 | P1
-    GIVEN  Branch A has Tank-1 (2 deviations) and Branch B has Tank-2 (3 deviations),
-           both under the same hospital
-           A Role=Admin JWT is issued for this hospital
-    WHEN   That Admin calls the deviation graph endpoint
-    THEN   Bar total = 5  (all branches aggregated, no branch filter applied).
-
-    RBAC rule: role=Admin|Manager sees data across ALL branches of the hospital.
-    The graph must not silently filter to only the Admin's own branch_id.
+    
+    """Verify that hospital Admins receive aggregated graph metrics across all branches.
+    
+    Given Tank-1 in Branch A and Tank-2 in Branch B,
+    when an Admin requests the deviations graph,
+    then the response aggregates data from both branches.
+    
+    Arrange: Seed alerts for Tank-1 in Branch A and Tank-2 in Branch B.
+    Act: Request the deviations graph using an Admin token.
+    Assert: Verify that the returned graph bar total is 5 (aggregating both branches).
     """
     print("\n" + "=" * 60)
     print("TC-MT02: Role=Admin graph aggregates all branches (total = 5)")

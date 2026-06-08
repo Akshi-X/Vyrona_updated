@@ -11,59 +11,114 @@ from dominate.tags import (
 )
 
 
-def generate_grouped_html_report(session, exitstatus):
-    """
-    Generate a custom HTML report grouped by test class.
+def _format_report_title(module_name: str) -> str:
+    names = {
+        "test_alert": "Alert Config Test Report",
+        "test_auth": "Authentication Test Report",
+        "report_dash": "Report Generation Test Report",
+        "test_dashboard_consistency": "Dashboard Consistency Test Report",
+    }
+    if module_name in names:
+        return names[module_name]
+    return " ".join(word.title() for word in module_name.split("_")) + " Test Report"
+
+
+def _format_module_group_name(module_name: str) -> str:
+    groups = {
+        "test_alert": "Alert Configuration",
+        "test_auth": "Authentication & Invite Flow",
+        "report_dash": "Report Generation",
+        "test_dashboard_consistency": "Dashboard Consistency",
+    }
+    if module_name in groups:
+        return groups[module_name]
+    return " ".join(word.title() for word in module_name.split("_"))
+
+
+def _normalize_report_module(report_or_item):
+    parts = report_or_item.nodeid.split("::")
+    return Path(parts[0]).stem
+
+
+def _get_report_group_name(report):
+    parts = report.nodeid.split("::")
+    if len(parts) >= 3:
+        return parts[1]
+    module_name = _normalize_report_module(report)
+    return _format_module_group_name(module_name)
+
+
+def _get_first_paragraph(text: str) -> str:
+    if not text:
+        return ""
+    paragraphs = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
+    return " ".join(paragraphs[0].split()) if paragraphs else ""
+
+
+def _format_description(text: str) -> list[str]:
+    if not text:
+        return []
+    import re
+    paragraphs = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
     
-    This function extracts all test results from session.config._custom_reports,
-    groups them by class, renders class and method docstrings, and writes a
-    styled HTML file (report_grouped.html) with:
-    - Summary cards (total, passed, failed, skipped)
-    - Per-class blocks with docstring summaries
-    - Per-test rows with descriptions and expandable logs
-    """
-    all_reports = getattr(session.config, "_custom_reports", [])
+    formatted = []
+    for p in paragraphs:
+        # Normalize internal whitespace
+        cleaned = " ".join(p.split())
+        # Split by Arrange:, Act:, Assert: keywords (case-insensitive)
+        sub_parts = re.split(r'\s*(?=(?i:arrange|act|assert):)', cleaned)
+        for part in sub_parts:
+            part = part.strip()
+            if part:
+                formatted.append(part)
+    return formatted
 
-    # Group reports by class name
-    grouped = collections.defaultdict(list)
-    for report in all_reports:
-        parts = report.nodeid.split("::")
-        class_name = parts[1] if len(parts) >= 3 else "General"
-        grouped[class_name].append(report)
 
-    # Collect class docstrings
-    class_docs = {}
-    for item in session.items:
+def _write_module_report(module_name: str, module_items: list, module_reports: list):
+    report_title = _format_report_title(module_name)
+    report_groups = collections.defaultdict(list)
+    for report in module_reports:
+        report_groups[_get_report_group_name(report)].append(report)
+
+    module_doc = ""
+    if module_items:
+        try:
+            module_doc = inspect.getdoc(module_items[0].module) or ""
+        except Exception:
+            module_doc = ""
+
+    group_docs = {}
+    for item in module_items:
         parts = item.nodeid.split("::")
         if len(parts) >= 3:
-            cls = parts[1]
-            if cls not in class_docs:
+            group_name = parts[1]
+            if group_name not in group_docs:
                 try:
-                    class_docs[cls] = inspect.getdoc(item.cls) or ""
+                    group_docs[group_name] = inspect.getdoc(item.cls) or ""
                 except Exception:
-                    class_docs[cls] = ""
+                    group_docs[group_name] = ""
+        else:
+            group_name = _format_module_group_name(module_name)
+            if group_name not in group_docs:
+                group_docs[group_name] = module_doc
 
-    # Calculate summary counts
-    call_reports = [r for r in all_reports if r.when == "call"]
+    call_reports = [r for r in module_reports if r.when == "call"]
     total   = len(call_reports)
     passed  = sum(1 for r in call_reports if r.outcome == "passed")
     failed  = sum(1 for r in call_reports if r.outcome == "failed")
     skipped = sum(1 for r in call_reports if r.outcome == "skipped")
 
-    # Create document with styling
-    doc = document(title="Alert Config Test Report")
+    doc = document(title=report_title)
     with doc.head:
         style(_get_stylesheet())
 
     with doc:
-        # Header section
         with div(cls="header"):
-            h1("Alert Config — Test Report")
+            h1(report_title)
             with div(cls="meta"):
                 p(f"Generated: {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                p(f"Classes: {len(grouped)}")
+                p(f"Groups: {len(report_groups)}")
 
-        # Summary cards
         with div(cls="summary"):
             with div(cls="summary-card"):
                 div(str(total),   cls="num num-total");  div("Total",   cls="lbl")
@@ -74,25 +129,23 @@ def generate_grouped_html_report(session, exitstatus):
             with div(cls="summary-card"):
                 div(str(skipped), cls="num num-skipped");div("Skipped", cls="lbl")
 
-        # Class-grouped test results
         with div(cls="container"):
-            for class_name, reports in grouped.items():
+            for group_name, reports in report_groups.items():
                 c_calls   = [r for r in reports if r.when == "call"]
                 c_passed  = sum(1 for r in c_calls if r.outcome == "passed")
                 c_failed  = sum(1 for r in c_calls if r.outcome == "failed")
 
                 with div(cls="class-block"):
                     with div(cls="class-header"):
-                        h2(class_name)
-                        cdoc = class_docs.get(class_name, "")
+                        h2(group_name)
+                        cdoc = _get_first_paragraph(group_docs.get(group_name, ""))
                         if cdoc:
-                            div(cdoc.split("\n")[0], cls="class-doc")
+                            div(cdoc, cls="class-doc")
                         with div(cls="class-stats"):
                             span(f"✓ {c_passed} passed", cls="badge passed")
                             if c_failed:
                                 span(f"✗ {c_failed} failed", cls="badge failed")
 
-                    # Test results table
                     with table():
                         with thead():
                             with tr():
@@ -101,11 +154,12 @@ def generate_grouped_html_report(session, exitstatus):
                                 th("Duration",    style="width:90px")
                         with tbody():
                             for idx, r in enumerate(c_calls):
-                                test_name = r.nodeid.split("::")[-1]
                                 desc = getattr(r, "description", "") or ""
+                                desc_paragraphs = _format_description(desc)
+                                test_title = desc_paragraphs[0] if desc_paragraphs else r.nodeid.split("::")[-1]
+                                extra_desc = desc_paragraphs[1:]
                                 dur  = f"{r.duration:.2f}s" if hasattr(r, "duration") else ""
 
-                                # Extract log sections
                                 stdout_setup = stdout_call = stderr_call = log_call = traceback_log = ""
                                 if hasattr(r, "sections"):
                                     for title, content in r.sections:
@@ -124,15 +178,14 @@ def generate_grouped_html_report(session, exitstatus):
                                         traceback_log = ""
 
                                 has_logs = any([stdout_setup, stdout_call, stderr_call, log_call, traceback_log])
-                                drawer_id = f"d-{class_name}-{idx}".replace(" ", "-")
+                                drawer_id = f"d-{group_name}-{idx}".replace(" ", "-")
 
-                                # Render test row
                                 with tr():
                                     td(span(r.outcome.upper(), cls=f"badge {r.outcome}"))
                                     with td():
-                                        div(test_name, cls="test-name")
-                                        if desc:
-                                            div(desc, cls="test-desc")
+                                        div(test_title, cls="test-name")
+                                        for paragraph in extra_desc:
+                                            div(paragraph, cls="test-desc")
                                         if has_logs:
                                             div("▶ show logs", cls="expand-btn",
                                                 onclick=f"toggleDrawer('{drawer_id}')",
@@ -160,7 +213,6 @@ def generate_grouped_html_report(session, exitstatus):
                                                         div(stdout_setup, cls="log-box")
                                     td(dur, cls="dur")
 
-        # JavaScript for expandable logs
         script("""
             function toggleDrawer(id) {
                 const drawer = document.getElementById(id);
@@ -171,23 +223,43 @@ def generate_grouped_html_report(session, exitstatus):
             }
         """)
 
-    # Generate dynamic report name
-    test_file = session.items[0].location[0]
-    module_name = Path(test_file).stem
-
     timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-
     reports_dir = Path("reports")
     reports_dir.mkdir(exist_ok=True)
-
     report_filename = f"{module_name}_{timestamp}.html"
     report_path = reports_dir / report_filename
 
-    # Write report
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(doc.render())
 
     print(f"\nHTML report generated: {report_path}")
+
+
+def generate_grouped_html_report(session, exitstatus):
+    """
+    Generate one HTML report per test module in the current session.
+
+    This function collects all pytest reports, splits them by module, and
+    renders one report file per module with proper titles, group headers, and
+    multiline test docstring descriptions.
+    """
+    all_reports = getattr(session.config, "_custom_reports", [])
+    if not all_reports:
+        return
+
+    reports_by_module = collections.defaultdict(list)
+    for report in all_reports:
+        module_name = _normalize_report_module(report)
+        reports_by_module[module_name].append(report)
+
+    items_by_module = collections.defaultdict(list)
+    for item in session.items:
+        module_name = _normalize_report_module(item)
+        items_by_module[module_name].append(item)
+
+    for module_name, module_reports in reports_by_module.items():
+        module_items = items_by_module.get(module_name, [])
+        _write_module_report(module_name, module_items, module_reports)
 
 def _get_stylesheet():
     """Return the complete CSS stylesheet for the report."""
