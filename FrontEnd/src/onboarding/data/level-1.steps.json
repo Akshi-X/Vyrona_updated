@@ -189,6 +189,7 @@
         "icon": "Search",
         "content": "This panel allows you to enter a tank code to retrieve its live status which includes temperature, lid state, and LN2 levels. For this walkthrough, simply close the panel when you are ready to continue.",
         "placement": "bottom_middle",
+        "is_wide": true,
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": [
