@@ -3,10 +3,10 @@
         "id": "ct-q1",
         "prompt": "What is the purpose of the Control Tower?",
         "choices": [
-            "Manage user passwords and notification settings",
+            "Manage user passwords",
             "Centralize live oversight of containers, branches, and routes",
-            "Generate monthly billing reports for all clinic branches",
-            "Archive historical shipment records for audits"
+            "Generate monthly billing reports",
+            "Archive old shipment records"
         ],
         "correctIndex": 1,
         "points": 15
@@ -15,10 +15,10 @@
         "id": "ct-q2",
         "prompt": "What does the Direction toggle in the filter panel switch between?",
         "choices": [
-            "Inbound and Outbound shipments",
+            "Inbound and Outbound",
             "Cryotanks and Incubators",
-            "Map view and List view options",
-            "Administrator and Embryologist roles"
+            "Map view and List view",
+            "Admin and Staff roles"
         ],
         "correctIndex": 1,
         "points": 15
@@ -29,7 +29,7 @@
         "choices": [
             "Only the home branch is shown",
             "All branches and their assets are visible at once",
-            "The entire map is shown and the performances are saved",
+            "The map is hidden",
             "Filters are reset to default"
         ],
         "correctIndex": 1,
@@ -39,10 +39,10 @@
         "id": "ct-q4",
         "prompt": "What does selecting a specific branch in the filter do?",
         "choices": [
-            "Deletes the data records for other branches",
+            "Deletes data for other branches",
             "Narrows the view to assets and routes at that location",
-            "Logs you into that branch's local network",
-            "Sends an alert notification to that branch manager"
+            "Logs you into that branch",
+            "Sends an alert to that branch"
         ],
         "correctIndex": 1,
         "points": 15
@@ -50,12 +50,7 @@
     {
         "id": "ct-q5",
         "prompt": "Which status filter should you use to see only the highest-priority containers?",
-        "choices": [
-            "Safe",
-            "Risk",
-            "All Status",
-            "Critical"
-        ],
+        "choices": ["Safe", "Risk", "All Status", "Critical"],
         "correctIndex": 3,
         "points": 15
     },
@@ -87,10 +82,10 @@
         "id": "ct-q8",
         "prompt": "What can you do by clicking a container row in the list?",
         "choices": [
-            "Delete the container from the network",
-            "Assign it to a different branch location",
+            "Delete the container",
+            "Assign it to a different branch",
             "Drill into its sensor readings and history",
-            "Export its history as a PDF report"
+            "Export it as a PDF"
         ],
         "correctIndex": 2,
         "points": 15
@@ -100,7 +95,7 @@
         "prompt": "What does the Control Tower map visualize?",
         "choices": [
             "Employee attendance records",
-            "Every branch, route, and container status",
+            "Every branch, route, and container status in real time",
             "Monthly deviation trends only",
             "Network connection speeds"
         ],
