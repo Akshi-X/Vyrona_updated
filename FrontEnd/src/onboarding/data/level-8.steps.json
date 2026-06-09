@@ -4,7 +4,7 @@
         "target": "#onboarding-sidebar-users",
         "title": "Users",
         "icon": "Users",
-        "content": "The Users page is your roster for everyone with access to your clinic's mgSCALE account, including Admins, Managers, and branch-level Users, all in one searchable, filterable list.",
+        "content": "The Users page is your roster for everyone with access to your clinic's mgSCALE account — Admins, Managers, and branch-level Users — all in one searchable, filterable list.",
         "placement": "right",
         "requireClick": false,
         "startPage": "/onboarding/dashboard",
@@ -18,24 +18,24 @@
         "content": "Click here to open the Users page.",
         "placement": "right",
         "requireClick": true,
-        "clickOnlyId": [
-            "#onboarding-sidebar-users"
-        ],
+        "clickOnlyId": ["#onboarding-sidebar-users"],
         "startPage": "/onboarding/dashboard",
         "prevDisable": true,
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
+
     {
         "id": "us8-add-btn",
         "target": "#onboarding-users-add-btn",
         "title": "Add User",
         "icon": "UserPlus",
-        "content": "This button opens the invite flow. You'll enter the new member's email, assign them a role, and optionally link them to a branch. The platform then sends them a time-limited invite link.",
+        "content": "This button opens the invite flow. You'll enter the new member's email, assign them a role, and optionally link them to a branch — the platform then sends them a time-limited invite link.",
         "placement": "bottom",
         "requireClick": false,
         "startPage": "/onboarding/users",
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
     },
+
     {
         "id": "us8-filters",
         "target": "#onboarding-users-filters",
@@ -43,7 +43,6 @@
         "icon": "Filter",
         "content": "Filter the user list by role or branch to find the person you're looking for. Reset Filters clears all active filters and returns to the full list.",
         "placement": "bottom",
-        "is_wide": true,
         "requireClick": false,
         "genieImage": "/genie/explaining_settings.webp"
     },
@@ -52,7 +51,7 @@
         "target": "#onboarding-users-filter-role",
         "title": "Filter by Role",
         "icon": "ShieldCheck",
-        "content": "Narrow the list to Admin, Manager, or User accounts. This is useful when you want to audit who holds elevated access across your clinic.",
+        "content": "Narrow the list to Admin, Manager, or User accounts — useful when you want to audit who holds elevated access across your clinic.",
         "placement": "bottom",
         "requireClick": false,
         "genieImage": "/genie/explaining_settings.webp"
@@ -67,14 +66,14 @@
         "requireClick": false,
         "genieImage": "/genie/explaining_with_globe.webp"
     },
+
     {
         "id": "us8-results",
         "target": "#onboarding-users-results",
         "title": "User List",
         "icon": "Users",
         "content": "All registered users for your hospital appear here. Admins can invite new members, track invite status, and resend invite links directly from this view.",
-        "placement": "top_middle",
-        "is_wide": true,
+        "placement": "top",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
@@ -83,9 +82,8 @@
         "target": "#onboarding-users-table",
         "title": "Users Table",
         "icon": "Table",
-        "content": "Each row shows one user's identity, access level, branch assignment, account standing, and last login activity, providing everything you need to manage your team at a glance.",
-        "placement": "top_middle",
-        "is_wide": true,
+        "content": "Each row shows one user's identity, access level, branch assignment, account standing, and last login activity — everything you need to manage your team at a glance.",
+        "placement": "top",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
     },
@@ -97,9 +95,7 @@
         "content": "Let's walk through the invite flow. Click Add User to open the modal.",
         "placement": "bottom",
         "requireClick": true,
-        "clickOnlyId": [
-            "#onboarding-users-add-btn"
-        ],
+        "clickOnlyId": ["#onboarding-users-add-btn"],
         "prevDisable": true,
         "genieImage": "/genie/explaining_with_phone.webp"
     },
@@ -108,7 +104,7 @@
         "target": "#onboarding-users-invite-modal-card",
         "title": "Invite User Modal",
         "icon": "UserPlus",
-        "content": "The Invite User modal collects the essential details required to add a new team member, including their work email, platform role, and branch assignment.",
+        "content": "This modal collects the minimum required to add someone to your account — their email, the role they should hold, and a branch if they're a standard User.",
         "placement": "left",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
@@ -118,7 +114,7 @@
         "target": "#onboarding-users-invite-email",
         "title": "Email Address",
         "icon": "Mail",
-        "content": "Enter the person's work email. The platform validates the format before the invite can be sent. A typo here means the invite link never reaches them.",
+        "content": "Enter the person's work email. The platform validates the format before the invite can be sent — a typo here means the invite link never reaches them.",
         "placement": "left",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_phone.webp"
@@ -128,7 +124,7 @@
         "target": "#onboarding-users-invite-role",
         "title": "Assign a Role",
         "icon": "ShieldCheck",
-        "content": "The Role field allows you to assign permissions (User, Manager, or Admin). Selecting the User role reveals a Branch field, as standard users must be linked to a specific branch to scope their data access correctly.",
+        "content": "Choose User, Manager, or Admin. Selecting User reveals a Branch field — every standard user must be linked to one branch so the platform can correctly scope their data access.",
         "placement": "left",
         "requireClick": false,
         "genieImage": "/genie/explaining_settings.webp"
@@ -138,7 +134,7 @@
         "target": "#onboarding-users-invite-actions",
         "title": "Send or Cancel",
         "icon": "Send",
-        "content": "The Send Invite button emails the invitation link immediately. The link remains active for one week, and the Resend Invite option in the Users table can be used if a fresh link needs to be issued.",
+        "content": "Send Invite emails the link immediately. The link expires after one week — if the user misses it, use the Resend Invite option in the Users table to issue a fresh one.",
         "placement": "top",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_phone.webp"

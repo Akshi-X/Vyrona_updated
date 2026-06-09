@@ -4,7 +4,7 @@
         "target": "#onboarding-sidebar-profile",
         "title": "Your Profile",
         "icon": "User",
-        "content": "Your Profile is where you manage your personal details, raise and track support requests, and set your notification preferences, all in one place.",
+        "content": "Your Profile is where you manage your personal details, raise and track support requests, and set your notification preferences — all in one place.",
         "placement": "right",
         "requireClick": false,
         "startPage": "/onboarding/dashboard",
@@ -18,21 +18,19 @@
         "content": "Click your profile card to open the profile page.",
         "placement": "right",
         "requireClick": true,
-        "clickOnlyId": [
-            "#onboarding-sidebar-profile"
-        ],
+        "clickOnlyId": ["#onboarding-sidebar-profile"],
         "startPage": "/onboarding/dashboard",
         "prevDisable": true,
         "genieImage": "/genie/explaining_casual.webp"
     },
+
     {
         "id": "pf7-basic-info",
         "target": "#onboarding-profile-basic-info",
         "title": "Basic Information",
         "icon": "UserCircle",
-        "content": "This section holds your core identity on the platform, including name, email, role, and phone number. Keep it accurate so alerts and team communications always reach the right person.",
+        "content": "This section holds your core identity on the platform — name, email, role, and phone number. Keep it accurate so alerts and team communications always reach the right person.",
         "placement": "bottom",
-        "is_wide": true,
         "requireClick": false,
         "startPage": "/onboarding/user-profile",
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
@@ -42,8 +40,8 @@
         "target": "#onboarding-profile-first-name",
         "title": "First Name",
         "icon": "User",
-        "content": "Your first name as it appears across the platform, in alert logs, audit records, and team communications.",
-        "placement": "top_right",
+        "content": "Your first name as it appears across the platform — in alert logs, audit records, and team communications.",
+        "placement": "bottom",
         "requireClick": false,
         "genieImage": "/genie/explaining.webp"
     },
@@ -53,7 +51,7 @@
         "title": "Last Name",
         "icon": "User",
         "content": "Your last name. Combined with your first name, this forms the identity shown to other team members throughout the system.",
-        "placement": "top_left",
+        "placement": "bottom",
         "requireClick": false,
         "genieImage": "/genie/explaining.webp"
     },
@@ -62,8 +60,8 @@
         "target": "#onboarding-profile-email",
         "title": "Email Address",
         "icon": "Mail",
-        "content": "Your registered work email is read-only because it is tied to your account credentials and can only be changed by your administrator.",
-        "placement": "bottom_right",
+        "content": "Your registered work email — read-only because it is tied to your account credentials and can only be changed by your administrator.",
+        "placement": "bottom",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_phone.webp"
     },
@@ -72,8 +70,8 @@
         "target": "#onboarding-profile-role",
         "title": "Role",
         "icon": "ShieldCheck",
-        "content": "The assigned role determines access levels and feature availability across the platform (such as User, Manager, or Admin). These permissions are managed centrally by your hospital administrator.",
-        "placement": "bottom_left",
+        "content": "Your role controls what you can see and do across the platform — User, Manager, or Admin. Roles are assigned by your hospital administrator and cannot be changed here.",
+        "placement": "bottom",
         "requireClick": false,
         "genieImage": "/genie/explaining_settings.webp"
     },
@@ -82,9 +80,8 @@
         "target": "#onboarding-profile-phone",
         "title": "Phone Number",
         "icon": "Phone",
-        "content": "Your contact number is optional, but worth adding so your team can reach you directly for urgent escalations outside the platform.",
+        "content": "Your contact number — optional, but worth adding so your team can reach you directly for urgent escalations outside the platform.",
         "placement": "bottom",
-        "is_wide": true,
         "requireClick": false,
         "genieImage": "/genie/explaining_with_phone.webp"
     },
@@ -93,12 +90,10 @@
         "target": "#onboarding-profile-edit-btn",
         "title": "Edit Profile",
         "icon": "Pencil",
-        "content": "Click Edit Profile to unlock your name and phone fields. Email and role stay read-only, as they are managed by your administrator.",
+        "content": "Click Edit Profile to unlock your name and phone fields. Email and role stay read-only — those are managed by your administrator.",
         "placement": "bottom",
         "requireClick": true,
-        "clickOnlyId": [
-            "#onboarding-profile-edit-btn"
-        ],
+        "clickOnlyId": ["#onboarding-profile-edit-btn"],
         "prevDisable": true,
         "genieImage": "/genie/explaining_settings.webp"
     },
@@ -107,9 +102,8 @@
         "target": "#onboarding-profile-basic-info",
         "title": "Edit Your Details",
         "icon": "Pencil",
-        "content": "Your name and phone number fields are now editable. Email and role remain locked, as they are managed at the account level by your administrator.",
+        "content": "Your name and phone number fields are now editable. Email and role remain locked — those are managed at the account level by your administrator.",
         "placement": "bottom",
-        "is_wide": true,
         "requireClick": false,
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
@@ -118,23 +112,21 @@
         "target": "#onboarding-profile-save-btn",
         "title": "Save Changes",
         "icon": "Check",
-        "content": "Click Save to commit your changes. The form validates inputs before saving. Names must contain letters only, and phone numbers must be a valid format.",
+        "content": "Click Save to commit your changes. The form validates inputs before saving — names must contain letters only, and phone numbers must be a valid format.",
         "placement": "bottom",
         "requireClick": true,
-        "clickOnlyId": [
-            "#onboarding-profile-save-btn"
-        ],
+        "clickOnlyId": ["#onboarding-profile-save-btn"],
         "prevDisable": true,
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
+
     {
         "id": "pf7-support-activity",
         "target": "#onboarding-profile-support-activity",
         "title": "Support Activity",
         "icon": "MessageSquare",
-        "content": "The Support Activity panel displays all support tickets you have submitted, including bug reports and feature requests. It allows you to monitor their resolution status and post follow-up comments directly from your profile.",
+        "content": "All support tickets you've raised — bug reports, feature requests, and general queries — appear here. Track their status and add follow-up comments without leaving the platform.",
         "placement": "top",
-        "is_wide": true,
         "requireClick": false,
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
     },
@@ -145,21 +137,19 @@
         "icon": "PlusCircle",
         "content": "Click Submit New Request to open the support form, pre-filled with your name and email, so you can raise a ticket without re-entering your details.",
         "placement": "bottom",
-        "is_wide": true,
         "requireClick": true,
-        "clickOnlyId": [
-            "#onboarding-profile-submit-request"
-        ],
+        "clickOnlyId": ["#onboarding-profile-submit-request"],
         "prevDisable": true,
         "genieImage": "/genie/explaining_with_phone.webp"
     },
+
     {
         "id": "pf7-support-fullname",
         "target": "#onboarding-support-fullname",
         "title": "Full Name",
         "icon": "User",
         "content": "Your full name is pulled from your profile and locked — every ticket is automatically attributed to the correct person.",
-        "placement": "top_right",
+        "placement": "bottom",
         "requireClick": false,
         "startPage": "/onboarding/support",
         "genieImage": "/genie/explaining.webp"
@@ -170,7 +160,7 @@
         "title": "Work Email",
         "icon": "Mail",
         "content": "Your registered email is pre-filled and read-only. The support team will reply to this address when they respond to your ticket.",
-        "placement": "top_left",
+        "placement": "bottom",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_phone.webp"
     },
@@ -179,8 +169,8 @@
         "target": "#onboarding-support-feedback-type",
         "title": "Type of Feedback",
         "icon": "Tag",
-        "content": "Choosing the feedback type (such as Bug, Feature Request, or Data Quality) helps the platform route your ticket to the correct support team immediately.",
-        "placement": "bottom_right",
+        "content": "Select the category that best describes your issue — Bug, Feature Request, Data Quality Issue, or others. This routes your ticket to the correct team immediately.",
+        "placement": "bottom",
         "requireClick": false,
         "onboardingEvent": "onboarding:support-feedback-type:bug",
         "genieImage": "/genie/explaining_settings.webp"
@@ -190,9 +180,8 @@
         "target": "#onboarding-support-subject",
         "title": "Subject",
         "icon": "FileText",
-        "content": "Entering a clear and descriptive subject helps the support team quickly identify, prioritize, and locate the issue you are reporting.",
-        "placement": "top_middle",
-        "is_wide": true,
+        "content": "Write a clear, concise title — for example 'Alert not triggering on Tank B-03'. A specific subject helps support prioritise and locate your ticket faster.",
+        "placement": "bottom",
         "requireClick": false,
         "onboardingEvent": "onboarding:support-fill-subject",
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
@@ -203,8 +192,7 @@
         "title": "Detailed Description",
         "icon": "AlignLeft",
         "content": "Describe what happened, what you expected, and include any relevant tank or shipment IDs. The more detail you provide, the faster the support team can reproduce and resolve the issue.",
-        "placement": "top_middle",
-        "is_wide": true,
+        "placement": "top",
         "requireClick": false,
         "onboardingEvent": "onboarding:support-fill-description",
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
@@ -214,8 +202,8 @@
         "target": "#onboarding-support-priority",
         "title": "Priority",
         "icon": "AlertTriangle",
-        "content": "Selecting a priority level defines the urgency of your request. Critical priority is reserved for issues actively impacting patient safety or live lab operations.",
-        "placement": "top_right",
+        "content": "Set the urgency — Low, Medium, High, or Critical. Reserve Critical for issues actively impacting patient safety or live operations.",
+        "placement": "top",
         "requireClick": false,
         "onboardingEvent": "onboarding:support-fill-priority",
         "genieImage": "/genie/explaining_caution.webp"
@@ -225,8 +213,8 @@
         "target": "#onboarding-support-modules",
         "title": "Affected Modules",
         "icon": "Layers",
-        "content": "Specifying the affected platform modules informs the engineering team exactly which area of the system is impacted so they can investigate.",
-        "placement": "top_left",
+        "content": "Select every part of the platform your issue affects. This tells the engineering team exactly which area of the system to investigate.",
+        "placement": "top",
         "requireClick": false,
         "onboardingEvent": "onboarding:support-fill-modules",
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
@@ -247,23 +235,21 @@
         "target": "#onboarding-support-submit-btn",
         "title": "Submit Feedback",
         "icon": "Send",
-        "content": "Click Submit Feedback to send your ticket to the myGrape support team. You'll land on a confirmation page showing your ticket ID, so keep it for any follow-up.",
-        "placement": "bottom_left",
-        "is_wide": true,
+        "content": "Click Submit Feedback to send your ticket to the myGrape support team. You'll land on a confirmation page showing your ticket ID — keep it for any follow-up.",
+        "placement": "top",
         "requireClick": true,
-        "clickOnlyId": [
-            "#onboarding-support-submit-btn"
-        ],
+        "clickOnlyId": ["#onboarding-support-submit-btn"],
         "prevDisable": true,
         "genieImage": "/genie/explaining_with_phone.webp"
     },
+
     {
         "id": "pf7-success-card",
         "target": "#onboarding-success-card",
         "title": "Ticket Submitted!",
         "icon": "CheckCircle",
         "content": "Your support ticket has been submitted. The myGrape team will review it and respond to your registered email within 24 hours.",
-        "placement": "top_left",
+        "placement": "bottom",
         "requireClick": false,
         "startPage": "/onboarding/success",
         "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
@@ -273,8 +259,8 @@
         "target": "#onboarding-success-ticket",
         "title": "Your Ticket ID",
         "icon": "Hash",
-        "content": "Save this ticket ID, which appears in your Support Activity list and is your reference number for any follow-up with the support team.",
-        "placement": "middle_left",
+        "content": "Save this ticket ID — it appears in your Support Activity list and is your reference number for any follow-up with the support team.",
+        "placement": "bottom",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
@@ -286,20 +272,18 @@
         "content": "Click Go to Profile to return to your profile page, where the ticket you just submitted will appear in your Support Activity list.",
         "placement": "top",
         "requireClick": true,
-        "clickOnlyId": [
-            "#onboarding-success-profile-btn"
-        ],
+        "clickOnlyId": ["#onboarding-success-profile-btn"],
         "prevDisable": true,
         "genieImage": "/genie/welcoming_with_waving_hand.webp"
     },
+
     {
         "id": "pf7-support-table",
         "target": "#onboarding-profile-support-table",
         "title": "Your Tickets",
         "icon": "Table",
-        "content": "Your submitted ticket now appears here. All tickets are listed, showing Ticket ID, title, type, and current status.",
+        "content": "Your submitted ticket now appears here. All tickets are listed — showing Ticket ID, title, type, and current status.",
         "placement": "top",
-        "is_wide": true,
         "requireClick": false,
         "startPage": "/onboarding/user-profile",
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
@@ -311,7 +295,6 @@
         "icon": "Hash",
         "content": "Each ticket gets a unique ID like TK-2026-04-001 on creation. Use this ID when following up with support so they can pull up your request instantly.",
         "placement": "top",
-        "is_wide": true,
         "requireClick": false,
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
@@ -321,7 +304,7 @@
         "title": "Ticket Status",
         "icon": "CircleDot",
         "content": "Tickets move through three stages: Open → In Review → Resolved. Track progress here without needing to contact support separately.",
-        "placement": "top_right",
+        "placement": "top",
         "requireClick": false,
         "genieImage": "/genie/explaining_settings.webp"
     },
@@ -330,9 +313,8 @@
         "target": "#onboarding-profile-support-table",
         "title": "Ticket Type",
         "icon": "Tag",
-        "content": "Each ticket is categorised by type, such as Bug Report, Feature Request, or General Query, so the right team picks it up immediately.",
+        "content": "Each ticket is categorised by type — Bug Report, Feature Request, or General Query — so the right team picks it up immediately.",
         "placement": "top",
-        "is_wide": true,
         "requireClick": false,
         "genieImage": "/genie/explaining_settings.webp"
     },
@@ -341,7 +323,7 @@
         "target": "#onboarding-profile-support-table",
         "title": "View Ticket Details",
         "icon": "ExternalLink",
-        "content": "Click any row to open the full ticket to read the complete description, view support team comments, and add your own follow-up notes.",
+        "content": "Click any row to open the full ticket — read the complete description, view support team comments, and add your own follow-up notes.",
         "placement": "top",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
@@ -351,7 +333,7 @@
         "target": "#onboarding-profile-notifications",
         "title": "Notifications",
         "icon": "Bell",
-        "content": "Control how the platform communicates with you. Changes here only affect your account, and other users' preferences remain unchanged.",
+        "content": "Control how the platform communicates with you. Changes here only affect your account — other users' preferences remain unchanged.",
         "placement": "top",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_phone.webp"
@@ -361,7 +343,7 @@
         "target": "#onboarding-profile-notif-ticket",
         "title": "Ticket Update Emails",
         "icon": "Mail",
-        "content": "Turn this on to receive an email whenever one of your support ticket statuses changes, which is useful if you want updates without checking the platform manually.",
+        "content": "Turn this on to receive an email whenever one of your support ticket statuses changes — useful if you want updates without checking the platform manually.",
         "placement": "top",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_phone.webp"
@@ -371,7 +353,7 @@
         "target": "#onboarding-profile-notif-updates",
         "title": "Feature Update Emails",
         "icon": "Sparkles",
-        "content": "Stay informed about new myGrape features and product improvements. This option is coming soon, and once live, you'll receive periodic feature update newsletters.",
+        "content": "Stay informed about new myGrape features and product improvements. This option is coming soon — once live, you'll receive periodic feature update newsletters.",
         "placement": "top",
         "requireClick": false,
         "genieImage": "/genie/explaining_casual.webp"

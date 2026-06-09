@@ -1,14 +1,14 @@
 [
     {
         "id": "q7-1",
-        "prompt": "What can you manage inside the Profile section?",
+        "prompt": "Which fields in the Basic Information section are read-only and cannot be changed from the profile page?",
         "choices": [
-            "Clinical tanks, temperature sensors, and alarm thresholds",
-            "Personal details, support tickets, and notification settings",
-            "Hospital billing, API keys, and server status",
-            "Shipment logs, carrier routes, and package dimensions"
+            "First name and last name",
+            "Phone number and role",
+            "Email address and role",
+            "First name and email address"
         ],
-        "correctIndex": 1,
+        "correctIndex": 2,
         "points": 15
     },
     {
@@ -25,14 +25,14 @@
     },
     {
         "id": "q7-3",
-        "prompt": "What is the purpose of the 'Affected Modules' field on the support form?",
+        "prompt": "What does the Save button validate before committing your profile changes?",
         "choices": [
-            "To assign the ticket to a specific support agent",
-            "To tell the engineering team which areas of the platform to investigate",
-            "To choose which branch will pay for the support ticket",
-            "To select who receives email notifications about the ticket"
+            "That your email matches your hospital domain",
+            "That your role is set correctly by the administrator",
+            "Names must contain letters only, and phone numbers must be a valid format",
+            "That your phone number matches the branch directory"
         ],
-        "correctIndex": 1,
+        "correctIndex": 2,
         "points": 15
     },
     {
