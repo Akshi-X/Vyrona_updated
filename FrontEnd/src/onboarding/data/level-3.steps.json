@@ -339,6 +339,7 @@
         "content": "The alert has been acknowledged and moved out of the active queue. Acknowledged alerts remain visible in the log for audit purposes — nothing is ever deleted. Close this panel to continue.",
         "placement": "bottom_middle",
         "is_wide": true,
+        "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
         "startPage": "/onboarding/ivf-track-shipment/161",

@@ -1,38 +1,122 @@
 [
     {
         "id": "q7-1",
-        "prompt": "What can you update in the Basic Information section of your profile?",
+        "prompt": "What can you manage inside the Profile section?",
         "choices": [
-            "Tank thresholds and alert configurations",
-            "Your name, email, phone number, and role details",
-            "Branch-level LN2 reservoir inventory",
-            "WebSocket connection preferences"
+            "Clinical tanks, temperature sensors, and alarm thresholds",
+            "Personal details, support tickets, and notification settings",
+            "Hospital billing, API keys, and server status",
+            "Shipment logs, carrier routes, and package dimensions"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
     },
     {
         "id": "q7-2",
-        "prompt": "What does the Support Activity section show?",
+        "prompt": "After clicking Edit Profile, which fields become editable?",
         "choices": [
-            "Live sensor readings from all tanks",
-            "Support tickets you've raised, including bugs and feature requests",
-            "Monthly LN2 usage reports",
-            "Pending refill approvals"
+            "Email and role",
+            "Name and phone number",
+            "Role and branch assignment",
+            "All fields including email and role"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
     },
     {
         "id": "q7-3",
-        "prompt": "What can you control from the Notifications section?",
+        "prompt": "What is the purpose of the 'Affected Modules' field on the support form?",
         "choices": [
-            "Which tanks trigger critical alerts",
-            "Email and notification preferences for receiving alerts",
-            "Alert cooldown periods",
-            "User role assignments"
+            "To assign the ticket to a specific support agent",
+            "To tell the engineering team which areas of the platform to investigate",
+            "To choose which branch will pay for the support ticket",
+            "To select who receives email notifications about the ticket"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
+    },
+    {
+        "id": "q7-4",
+        "prompt": "On the support submission form, what is pre-filled and locked automatically?",
+        "choices": [
+            "Subject line and description",
+            "Priority and affected modules",
+            "Full name and work email",
+            "Feedback type and priority level"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q7-5",
+        "prompt": "What does the Type of Feedback field help the support team do?",
+        "choices": [
+            "Assess the urgency of your request",
+            "Route your ticket to the correct team immediately",
+            "Pre-fill the subject line with the right category",
+            "Determine which modules are affected"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "q7-6",
+        "prompt": "When should you set Priority to Critical on a support ticket?",
+        "choices": [
+            "For any bug that affects your personal workflow",
+            "Whenever the issue involves a cryotank reading",
+            "When the issue is actively impacting patient safety or live operations",
+            "For all Feature Requests to ensure faster review"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q7-7",
+        "prompt": "What do you receive immediately after submitting a support ticket?",
+        "choices": [
+            "An email with the full ticket details",
+            "A confirmation page showing your ticket ID",
+            "A phone call from the support team within the hour",
+            "A redirect to the Activity Logs report"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "q7-8",
+        "prompt": "What are the three stages a support ticket moves through?",
+        "choices": [
+            "Submitted → Reviewed → Closed",
+            "Pending → Active → Resolved",
+            "New → Assigned → Completed",
+            "Open → In Review → Resolved"
+        ],
+        "correctIndex": 3,
+        "points": 15
+    },
+    {
+        "id": "q7-9",
+        "prompt": "What does clicking a row in the Support Activity table let you do?",
+        "choices": [
+            "Re-submit the ticket with updated details",
+            "Delete the ticket from your history",
+            "Open the full ticket to read the description, view support comments, and add follow-up notes",
+            "Escalate the ticket to Critical priority"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q7-10",
+        "prompt": "What does the Ticket Update Emails toggle in Notifications do?",
+        "choices": [
+            "Sends you a weekly summary of all open tickets",
+            "Emails you whenever one of your support ticket statuses changes",
+            "Notifies the support team when you add a comment",
+            "Enables SMS alerts for Critical priority tickets"
+        ],
+        "correctIndex": 1,
+        "points": 15
     }
 ]
