@@ -13,12 +13,12 @@
     },
     {
         "id": "q6-2",
-        "prompt": "How does the Monthly Summary table update when you select a different month?",
+        "prompt": "A manager wants to compare how many alerts were triggered for LN2 Level vs. Internal Temperature in March. Which report type should they use?",
         "choices": [
-            "You must click a Submit button to reload the data",
-            "The table refreshes automatically — no submit button needed",
-            "Results are emailed to your registered address",
-            "A new browser tab opens with the selected month's data"
+            "Critical Alerts Report filtered by date range",
+            "Monthly Summary Report for the month of March",
+            "Activity Logs filtered by action type",
+            "Refill Logs filtered by tank code"
         ],
         "correctIndex": 1,
         "points": 15
@@ -41,7 +41,7 @@
         "choices": [
             "Specific branch names and tank codes",
             "Active or Acknowledged status only",
-            "High, Medium, or Low severity",
+            "High or Low severity",
             "Monthly refill count ranges"
         ],
         "correctIndex": 2,
