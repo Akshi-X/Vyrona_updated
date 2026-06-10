@@ -1,38 +1,122 @@
 [
     {
         "id": "q6-1",
-        "prompt": "What types of reports can you generate from the Reports page?",
+        "prompt": "What does the Monthly Summary Report show for a selected month?",
         "choices": [
-            "Only temperature trend reports",
-            "Monthly KPI summaries, critical alert history, and refill logs",
-            "Patient sample tracking only",
-            "WebSocket connection logs"
+            "Live sensor readings from all active cryotanks",
+            "Number of alerts sent and deviations detected per KPI parameter",
+            "A full list of refill events with performer and reservoir details",
+            "Every user action and system event in chronological order"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
     },
     {
         "id": "q6-2",
-        "prompt": "What can the Report Filters help you do?",
+        "prompt": "A manager wants to compare how many alerts were triggered for LN2 Level vs. Internal Temperature in March. Which report type should they use?",
         "choices": [
-            "Adjust alert thresholds",
-            "Filter reports by branch, date range, and report type",
-            "Modify sensor configurations",
-            "Assign refill tasks to technicians"
+            "Critical Alerts Report filtered by date range",
+            "Monthly Summary Report for the month of March",
+            "Activity Logs filtered by action type",
+            "Refill Logs filtered by tank code"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
     },
     {
         "id": "q6-3",
-        "prompt": "What can you do with the results shown in the Report Results section?",
+        "prompt": "In the Critical Alerts Report, what does the Status filter include?",
         "choices": [
-            "Only view them on screen, no export available",
-            "Review on screen or export to CSV for compliance and management",
-            "Share directly to patient records",
-            "Automatically schedule refills"
+            "Not started, In progress, and Done",
+            "Low, Medium, and High",
+            "Active and Acknowledged",
+            "Open, In Review, and Resolved"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q6-4",
+        "prompt": "What does the Severity filter in the Critical Alerts Report let you narrow results to?",
+        "choices": [
+            "Specific branch names and tank codes",
+            "Active or Acknowledged status only",
+            "High or Low severity",
+            "Monthly refill count ranges"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q6-5",
+        "prompt": "What information does each row in the Critical Alerts results table show?",
+        "choices": [
+            "Tank owner, shift schedule, and reservoir capacity",
+            "Refill performer, LN2 quantity added, and order date",
+            "When the alert occurred, its severity, status, tank, and the alert message",
+            "Actor type, action outcome, and event metadata"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q6-6",
+        "prompt": "What are the status options available in the Refill Logs Status filter?",
+        "choices": [
+            "Active and Acknowledged",
+            "High, Medium, and Low priority",
+            "Not started, In progress, and Done",
+            "Pending and Completed"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q6-7",
+        "prompt": "What details does each row in the Refill Logs results capture?",
+        "choices": [
+            "Alert type, severity level, and ticket reference ID",
+            "Tank, branch, who refilled, date and time, reservoir used, and LN2 order and receipt dates",
+            "Action performed, actor type, outcome, and event metadata",
+            "Monthly KPI totals and deviation counts per parameter"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
+    },
+    {
+        "id": "q6-8",
+        "prompt": "What is the primary purpose of the Activity Logs report?",
+        "choices": [
+            "Show monthly KPI snapshots for each branch",
+            "Track every LN2 refill event across your tanks",
+            "Export a filtered list of critical alert history",
+            "Provide a full audit trail of every user action, system event, and automated trigger"
+        ],
+        "correctIndex": 3,
+        "points": 15
+    },
+    {
+        "id": "q6-9",
+        "prompt": "In Activity Logs, what does the Actor Type filter distinguish between?",
+        "choices": [
+            "Admin, Manager, and User account types",
+            "Human user actions versus automated system processes and scheduled jobs",
+            "Successful and failed operations",
+            "Bug reports and feature requests"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "q6-10",
+        "prompt": "How do you export data from any report type?",
+        "choices": [
+            "Click Share Report and enter your email address",
+            "Save the page as a PDF from your browser",
+            "Click Download CSV after reviewing the filtered results",
+            "Request an export through the support team"
+        ],
+        "correctIndex": 2,
+        "points": 15
     }
 ]

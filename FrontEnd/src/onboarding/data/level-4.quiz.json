@@ -1,38 +1,122 @@
 [
     {
         "id": "q4-1",
-        "prompt": "What is the purpose of setting a cooldown period on a KPI alert?",
+        "prompt": "What does the Alert Configuration page let you set?",
         "choices": [
-            "To delay the alert until the next day",
-            "To prevent repeated notifications for the same ongoing breach",
-            "To increase the alert threshold automatically",
-            "To disable the alert after it fires once"
+            "Monthly KPI summaries and activity reports",
+            "KPI thresholds and notification rules for every container across all branches",
+            "User roles and branch access permissions",
+            "Refill schedules and LN2 order dates"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
     },
     {
         "id": "q4-2",
-        "prompt": "Which alert type should be used for a sensor value that requires immediate action if breached?",
+        "prompt": "What two notification channels can you enable for alert delivery?",
         "choices": [
-            "Soft alert",
-            "Warning alert",
-            "Critical alert",
-            "Info alert"
+            "SMS and Push Notification",
+            "Email and WhatsApp",
+            "Email and Slack",
+            "WhatsApp and In-App only"
         ],
-        "correctIndex": 2,
-        "points": 20
+        "correctIndex": 1,
+        "points": 15
     },
     {
         "id": "q4-3",
-        "prompt": "How can you apply the same alert thresholds to multiple containers at once?",
+        "prompt": "What is the difference between a Critical Alert and a Soft Alert?",
         "choices": [
-            "Edit each container individually",
-            "Use the branch filter to show all containers, then select multiple and apply in bulk",
-            "Contact support to update thresholds",
-            "Thresholds can only be set per hospital, not per container"
+            "Critical alerts are permanent; soft alerts expire after 24 hours",
+            "Critical alerts trigger email notifications; soft alerts send in-app notifications only",
+            "Critical alerts apply to all branches; soft alerts apply to one branch",
+            "Critical alerts require Admin approval; soft alerts are automatic"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
+    },
+    {
+        "id": "q4-4",
+        "prompt": "What is the purpose of a cooldown period on a KPI alert?",
+        "choices": [
+            "To delay the alert until the next business day",
+            "To automatically increase the threshold after a breach",
+            "To prevent repeated notifications for the same ongoing breach",
+            "To disable the alert after it fires once"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q4-5",
+        "prompt": "What are the configured Internal Temperature thresholds for container T-161?",
+        "choices": [
+            "0°C to 20°C",
+            "-200°C to -180°C",
+            "-150°C to -100°C",
+            "-250°C to -200°C"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "q4-6",
+        "prompt": "What is the minimum LN2 Level threshold set for container T-161?",
+        "choices": [
+            "10 kg",
+            "15 kg",
+            "22 kg",
+            "30 kg"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q4-7",
+        "prompt": "What alert type does the Battery Level KPI use, and what triggers it?",
+        "choices": [
+            "Critical alert, triggers when charge drops below 50%",
+            "Soft alert, triggers when charge drops below 20%",
+            "Critical alert, triggers when charge drops below 20%",
+            "Soft alert, triggers when charge drops below 10%"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "q4-8",
+        "prompt": "What does the Shock Detection KPI alert flag?",
+        "choices": [
+            "Temperature spikes during shipment",
+            "LN2 level drops below the minimum threshold",
+            "Rough handling when impact exceeds the configured G-force threshold",
+            "Lid openings during transport"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q4-9",
+        "prompt": "What does the Lid State alert catch?",
+        "choices": [
+            "LN2 evaporation exceeding the set rate",
+            "Battery drain during long-term storage",
+            "Unexpected lid openings that could warm the container",
+            "Temperature drops below the minimum threshold"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q4-10",
+        "prompt": "What is the configured Evaporation Rate range for container T-161?",
+        "choices": [
+            "0.1 to 0.5 kg/hr",
+            "0.5 to 2.0 kg/hr",
+            "1.0 to 3.0 kg/hr",
+            "2.0 to 5.0 kg/hr"
+        ],
+        "correctIndex": 1,
+        "points": 15
     }
 ]

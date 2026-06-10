@@ -9,7 +9,7 @@
             "Archive old shipment records"
         ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "ct-q2",
@@ -21,7 +21,7 @@
             "Admin and Staff roles"
         ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "ct-q3",
@@ -33,7 +33,7 @@
             "Filters are reset to default"
         ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "ct-q4",
@@ -45,14 +45,14 @@
             "Sends an alert to that branch"
         ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "ct-q5",
         "prompt": "Which status filter should you use to see only the highest-priority containers?",
         "choices": ["Safe", "Risk", "All Status", "Critical"],
         "correctIndex": 3,
-        "points": 10
+        "points": 15
     },
     {
         "id": "ct-q6",
@@ -64,7 +64,7 @@
             "Low, Medium, High"
         ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "ct-q7",
@@ -76,7 +76,7 @@
             "Sensor firmware version only"
         ],
         "correctIndex": 0,
-        "points": 10
+        "points": 15
     },
     {
         "id": "ct-q8",
@@ -88,7 +88,7 @@
             "Export it as a PDF"
         ],
         "correctIndex": 2,
-        "points": 10
+        "points": 15
     },
     {
         "id": "ct-q9",
@@ -100,7 +100,7 @@
             "Network connection speeds"
         ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "ct-q10",
@@ -112,6 +112,6 @@
             "Switch to the dashboard home"
         ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     }
 ]
