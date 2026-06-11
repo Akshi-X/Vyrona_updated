@@ -59,9 +59,9 @@
         "prompt": "What three statuses can you filter containers by in the Control Tower?",
         "choices": [
             "Active, Inactive, Pending",
-            "Safe, Risk, Critical",
+            "Safe, Critical",
             "Open, Closed, Archived",
-            "Low, Medium, High"
+            "Low, High"
         ],
         "correctIndex": 1,
         "points": 15
