@@ -267,7 +267,7 @@
         "target": "#onboarding-dashboard-stakeholder-modal",
         "title": "Stakeholder Chats Panel",
         "icon": "MessageCircle",
-        "content": "Each thread is linked to a patient or case, keeping communications traceable and auditable. Reply directly here to keep everyone aligned. Close this panel to continue.",
+        "content": "Each thread is linked to a Cryocan, keeping communications traceable and auditable. Reply directly here to keep everyone aligned. Close this panel to continue.",
         "placement": "bottom_middle",
         "is_wide": true,
         "requireClick": true,
