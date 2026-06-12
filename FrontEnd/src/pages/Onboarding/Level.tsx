@@ -94,7 +94,16 @@ function resolvePosition(placement: OnboardingStep["placement"]) {
     const fn = POSITION_FNS[placement ?? "bottom"];
     return (p: PositionProps) => {
         if (p.right === undefined) return "right" as const;
-        return fn(p);
+        // @reactour passes p.height=0 on first render before it measures the popover.
+        // Use a conservative fallback so the clamp keeps the tooltip on screen.
+        // @reactour's own ResizeObserver updates sizes and re-calls this function
+        // with the real height, so the position corrects itself automatically.
+        return fn({
+            ...p,
+            height: p.height || 320,
+            windowWidth: window.innerWidth,
+            windowHeight: window.innerHeight,
+        });
     };
 }
 
@@ -215,7 +224,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         setIsOpen(true);
     }, [stepIndex, stepCount, isTourActive, levelId, setCurrentStep, setStepIndex, setIsOpen]);
 
-    // ── 4b. Navigate to startPage if step requires a specific page ──
+    // ── 4b. Navigate to startPage ──────────────────────────────────
     useEffect(() => {
         if (!isTourActive) return;
         if (!activeStep?.startPage) return;
@@ -226,7 +235,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
     // ── 5. Re-sync tour when target appears asynchronously ──────────
     useEffect(() => {
-        if (!activeStep || stepIndex >= stepCount) return;
+        if (!isTourActive || !activeStep || stepIndex >= stepCount) return;
         if (activeStep.skipIfMissing) return;
         if (document.querySelector(activeStep.target)) return;
 
@@ -247,7 +256,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         }, 50);
 
         return () => clearInterval(interval);
-    }, [activeStep, stepIndex, stepCount, setCurrentStep, setIsOpen]);
+    }, [activeStep, isTourActive, stepIndex, stepCount, setCurrentStep, setIsOpen]);
 
 
     // ── 5a. skipIfMissing: poll briefly for element, then open or skip ──────
@@ -294,7 +303,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         document.dispatchEvent(new CustomEvent(activeStep.onboardingEvent));
     }, [activeStep, isTourActive]);
 
-    // ── 5b. Auto-fill inputText via a custom DOM event ───────────────
+    // ── 5d. Auto-fill inputText via a custom DOM event ───────────────
     // Dispatches "onboarding:set-chat-input" so the target component can
     // call setDraftMessage directly — avoids React 18 synthetic-event issues
     // with the native value-setter trick.
@@ -447,7 +456,12 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             const hitWhitelisted = activeStep.clickOnlyId!.some((sel) =>
                 !!(event.target as Element)?.closest(sel)
             );
-            if (!hitWhitelisted) { event.preventDefault(); event.stopPropagation(); }
+            if (!hitWhitelisted) { event.preventDefault(); event.stopPropagation(); return; }
+            // handlePointerDown already fired a programmatic (isTrusted: false) click that
+            // ran the element's onClick. Block the natural (isTrusted: true) click that the
+            // browser fires after pointerup — otherwise toggle-style buttons fire twice and
+            // end up back in their original state.
+            if ((event as MouseEvent).isTrusted) { event.preventDefault(); event.stopPropagation(); }
         };
 
         document.addEventListener("pointerdown", handlePointerDown, true);
