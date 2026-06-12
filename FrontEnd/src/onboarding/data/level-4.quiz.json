@@ -1,19 +1,19 @@
 [
     {
         "id": "q4-1",
-        "prompt": "What does the Alert Configuration page let you set?",
+        "prompt": "Before you can view or edit a container's KPI thresholds in Alert Configuration, what must you do first?",
         "choices": [
-            "Monthly KPI summaries and activity reports",
-            "KPI thresholds and notification rules for every container across all branches",
-            "User roles and branch access permissions",
-            "Refill schedules and LN2 order dates"
+            "Enable notification channels in your profile settings",
+            "Select a branch and pick a container from the list",
+            "Download the current config as a backup",
+            "Create a new alert rule template"
         ],
         "correctIndex": 1,
         "points": 15
     },
     {
         "id": "q4-2",
-        "prompt": "What two notification channels can you enable for alert delivery?",
+        "prompt": "What two notification channels can you enable for alert delivery in Alert Configuration?",
         "choices": [
             "SMS and Push Notification",
             "Email and WhatsApp",
@@ -25,96 +25,96 @@
     },
     {
         "id": "q4-3",
-        "prompt": "What is the difference between a Critical Alert and a Soft Alert?",
+        "prompt": "Your operations manager needs to receive a WhatsApp message the moment a container temperature exceeds the safe threshold. Which alert type should you select for the Temperature KPI?",
         "choices": [
-            "Critical alerts are permanent; soft alerts expire after 24 hours",
-            "Critical alerts trigger email notifications; soft alerts send in-app notifications only",
-            "Critical alerts apply to all branches; soft alerts apply to one branch",
-            "Critical alerts require Admin approval; soft alerts are automatic"
-        ],
-        "correctIndex": 1,
-        "points": 15
-    },
-    {
-        "id": "q4-4",
-        "prompt": "What is the purpose of a cooldown period on a KPI alert?",
-        "choices": [
-            "To delay the alert until the next business day",
-            "To automatically increase the threshold after a breach",
-            "To prevent repeated notifications for the same ongoing breach",
-            "To disable the alert after it fires once"
+            "Soft Alert",
+            "Threshold Override",
+            "Critical Alert",
+            "In-App Notification"
         ],
         "correctIndex": 2,
         "points": 15
     },
     {
-        "id": "q4-5",
-        "prompt": "What are the configured Internal Temperature thresholds for container T-161?",
+        "id": "q4-4",
+        "prompt": "After a temperature breach, the same alert keeps firing every few minutes and is flooding the team's WhatsApp. Which setting in Alert Configuration controls how long to wait before sending the next notification for the same ongoing breach?",
         "choices": [
-            "0°C to 20°C",
-            "-200°C to -180°C",
-            "-150°C to -100°C",
-            "-250°C to -200°C"
+            "Alert Threshold",
+            "Notification Channel",
+            "Alert Severity",
+            "Cooldown Period"
+        ],
+        "correctIndex": 3,
+        "points": 15
+    },
+    {
+        "id": "q4-5",
+        "prompt": "After selecting a container in Alert Configuration, what does the KPI panel show?",
+        "choices": [
+            "The container's refill history and reservoir logs",
+            "The 7 KPI parameters you can configure thresholds and alert rules for",
+            "A live sensor feed with real-time readings",
+            "The notification history for that container"
         ],
         "correctIndex": 1,
         "points": 15
     },
     {
         "id": "q4-6",
-        "prompt": "What is the minimum LN2 Level threshold set for container T-161?",
+        "prompt": "A technician wants alerts to fire when LN2 drops below the safe limit and also receive notifications on WhatsApp. What two things must be configured in Alert Configuration?",
         "choices": [
-            "10 kg",
-            "15 kg",
-            "22 kg",
-            "30 kg"
+            "The report type and export format",
+            "The LN2 Level threshold and the WhatsApp notification channel",
+            "The cooldown period and the branch filter",
+            "The alert severity and the refill log entry"
         ],
-        "correctIndex": 2,
+        "correctIndex": 1,
         "points": 15
     },
     {
         "id": "q4-7",
-        "prompt": "What alert type does the Battery Level KPI use, and what triggers it?",
+        "prompt": "You're setting up a Battery Level alert. You want only an in-app warning when the battery gets low — no WhatsApp message. Which alert type fits this use case?",
         "choices": [
-            "Critical alert, triggers when charge drops below 50%",
-            "Soft alert, triggers when charge drops below 20%",
-            "Critical alert, triggers when charge drops below 20%",
-            "Soft alert, triggers when charge drops below 10%"
+            "Critical Alert",
+            "Soft Alert",
+            "Threshold Override",
+            "Notification Mute"
         ],
         "correctIndex": 1,
         "points": 15
     },
     {
         "id": "q4-8",
-        "prompt": "What does the Shock Detection KPI alert flag?",
+        "prompt": "A container is being moved to a new storage rack. You want an alert if it gets dropped or roughly handled beyond a set impact level. Which KPI should you configure in Alert Configuration?",
         "choices": [
-            "Temperature spikes during shipment",
-            "LN2 level drops below the minimum threshold",
-            "Rough handling when impact exceeds the configured G-force threshold",
-            "Lid openings during transport"
+            "Lid State",
+            "Evaporation Rate",
+            "Battery Level",
+            "Shock Detection"
         ],
-        "correctIndex": 2,
+        "correctIndex": 3,
         "points": 15
     },
     {
         "id": "q4-9",
-        "prompt": "What does the Lid State alert catch?",
+        "prompt": "An overnight audit found that a container was briefly opened and closed with no record of it. You want this to trigger an alert automatically in future. Which KPI alert should you enable in Alert Configuration?",
         "choices": [
-            "LN2 evaporation exceeding the set rate",
-            "Battery drain during long-term storage",
-            "Unexpected lid openings that could warm the container",
-            "Temperature drops below the minimum threshold"
+            "Evaporation Rate",
+            "Battery Level",
+            "Lid State",
+            "Temperature"
         ],
         "correctIndex": 2,
         "points": 15
     },
     {
         "id": "q4-10",
-        "prompt": "What is the configured Evaporation Rate range for container T-161?",
+        "prompt": "After adjusting KPI thresholds for a container in Alert Configuration, what is required for the changes to take effect?",
         "choices": [
-            "0.1 to 0.5 kg/hr",
-            "0.5 to 2.0 kg/hr",
-            "1.0 to 3.0 kg/hr",
-            "2.0 to 5.0 kg/hr"
+            "The configuration saves automatically when you leave the page",
+            "Click Save to commit the changes to that container's alert rules",
+            "A branch manager must approve the changes before they apply",
+            "The system applies changes at midnight in a scheduled sync"
         ],
         "correctIndex": 1,
         "points": 15
