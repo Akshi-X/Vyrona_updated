@@ -117,7 +117,7 @@
         "content": "Incubator stability is critical for embryo development. This panel surfaces deviations and their top causes so your lab team can act before culture conditions are compromised.",
         "placement": "middle_right",
         "requireClick": false,
-        "genieImage": "/genie/explaining_casual.webp"
+        "genieImage": "/genie/incubator.webp"
     },
     {
         "id": "dash-incubator-detail",
@@ -157,7 +157,7 @@
         "content": "Every embryo in culture right now is depending on these conditions staying stable. Any flagged deviation here would have reduced blastocyst development rates, lower implantation success, and in the worst case, mean a patient has no viable embryos left for transfer.",
         "placement": "middle_right",
         "requireClick": false,
-        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+        "genieImage": "/genie/incubator.webp"
     },
     {
         "id": "dash-quality-tracking",
@@ -209,7 +209,7 @@
         "content": "This chart breaks down every deviation type across your sites, including Battery Level, Lid State, LN2, Evaporation Rate, Temperature, and Shock Detection. Spot patterns across sites at a glance.",
         "placement": "bottom_left",
         "requireClick": false,
-        "genieImage": "/genie/explaining_with_numbers.webp"
+        "genieImage": "/genie/chart_explain.webp"
     },
     {
         "id": "dash-alerts",
@@ -247,7 +247,7 @@
         "clickOnlyId": [
             "#onboarding-modal-close-btn"
         ],
-        "genieImage": "/genie/explaining_caution.webp"
+        "genieImage": "/genie/alerts.webp"
     },
     {
         "id": "dash-stakeholder-icon",
@@ -260,14 +260,14 @@
         "clickOnlyId": [
             "#onboarding-dashboard-stakeholder-icon"
         ],
-        "genieImage": "/genie/explaining_with_phone.webp"
+        "genieImage": "/genie/chats.webp"
     },
     {
         "id": "dash-stakeholder-modal",
         "target": "#onboarding-dashboard-stakeholder-modal",
         "title": "Stakeholder Chats Panel",
         "icon": "MessageCircle",
-        "content": "Each thread is linked to a patient or case, keeping communications traceable and auditable. Reply directly here to keep everyone aligned. Close this panel to continue.",
+        "content": "Each thread is linked to a Cryocan, keeping communications traceable and auditable. Reply directly here to keep everyone aligned. Close this panel to continue.",
         "placement": "bottom_middle",
         "is_wide": true,
         "requireClick": true,
@@ -303,7 +303,7 @@
         "clickOnlyId": [
             "#onboarding-modal-close-btn"
         ],
-        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
+        "genieImage": "/genie/task.webp"
     },
     {
         "id": "dash-shipments",

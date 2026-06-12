@@ -30,7 +30,8 @@
         "title": "Basic Information",
         "icon": "UserCircle",
         "content": "This section holds your core identity on the platform — name, email, role, and phone number. Keep it accurate so alerts and team communications always reach the right person.",
-        "placement": "bottom",
+        "placement": "bottom_middle",
+        "is_wide": true,
         "requireClick": false,
         "startPage": "/onboarding/user-profile",
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
@@ -126,9 +127,10 @@
         "title": "Support Activity",
         "icon": "MessageSquare",
         "content": "All support tickets you've raised — bug reports, feature requests, and general queries — appear here. Track their status and add follow-up comments without leaving the platform.",
-        "placement": "top",
+        "placement": "bottom_middle",
+        "is_wide": true,
         "requireClick": false,
-        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
+        "genieImage": "/genie/support.webp"
     },
     {
         "id": "pf7-submit-request",
@@ -136,7 +138,7 @@
         "title": "Submit New Request",
         "icon": "PlusCircle",
         "content": "Click Submit New Request to open the support form, pre-filled with your name and email, so you can raise a ticket without re-entering your details.",
-        "placement": "bottom",
+        "placement": "top_left",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-profile-submit-request"],
         "prevDisable": true,

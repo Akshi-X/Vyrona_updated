@@ -1,60 +1,180 @@
 [
     {
         "id": "ct3-q1",
-        "prompt": "What does the colour of a branch marker on the map indicate?",
+        "prompt": "On the live map, what does a red pin indicate about a branch?",
         "choices": [
-            "The branch's geographic region",
-            "The number of containers at that branch",
-            "The branch's health status — safe, risk, or critical",
-            "The last time the branch was updated"
+            "The branch is offline",
+            "The branch is safe",
+            "The branch is at risk",
+            "The branch is in a critical state"
         ],
-        "correctIndex": 2,
-        "points": 15
+        "correctIndex": 3,
+        "points": 10
     },
     {
         "id": "ct3-q2",
         "prompt": "What happens when you click a branch marker on the map?",
         "choices": [
-            "The branch is deleted",
+            "A new container is created at that branch",
             "The map zooms in and the container list filters to that branch",
-            "A new container is created",
-            "The page refreshes"
+            "The page navigates to the branch settings",
+            "All filters are reset to default"
         ],
         "correctIndex": 1,
-        "points": 15
+        "points": 10
     },
     {
         "id": "ct3-q3",
-        "prompt": "What information can you find by clicking a container row?",
+        "prompt": "What does the Cryocan page show you about a container?",
         "choices": [
-            "User login history",
-            "Branch billing records",
-            "Sensor readings and full container history",
-            "Map configuration settings"
+            "Only the refill schedule and billing records",
+            "A live 3D model, real-time sensor tiles, trend charts, and operational logs",
+            "Branch configuration and user access settings",
+            "Shipment tracking and delivery status only"
+        ],
+        "correctIndex": 1,
+        "points": 10
+    },
+    {
+        "id": "ct3-q4",
+        "prompt": "What should the internal temperature of a healthy cryogenic container stay near?",
+        "choices": [
+            "0 °C",
+            "-80 °C",
+            "-196 °C",
+            "-50 °C"
         ],
         "correctIndex": 2,
         "points": 15
     },
     {
-        "id": "ct3-q4",
-        "prompt": "After clicking a branch marker, what updates on the screen?",
+        "id": "ct3-q5",
+        "prompt": "Why is tracking the external temperature alongside the internal temperature useful?",
         "choices": [
-            "Only the map zoom changes, nothing else",
-            "The active containers list filters to show only that branch's containers",
-            "All filters are reset to default",
-            "The page navigates away from Control Tower"
+            "It tells you the room humidity level",
+            "It helps determine whether a temperature excursion is environment-driven or equipment-driven",
+            "It controls the thermostat for the lab room",
+            "It records the shipping route ambient conditions"
         ],
         "correctIndex": 1,
         "points": 15
     },
     {
-        "id": "ct3-q5",
-        "prompt": "What is the best way to investigate a specific container's sensor health?",
+        "id": "ct3-q6",
+        "prompt": "The LN2 Fill Level tile shows 100%. What does this mean?",
         "choices": [
-            "Check the branch name in the filter panel",
-            "Click the container row to open its detail view",
-            "Export the map as an image",
-            "Reset all filters and scroll the list"
+            "The tank is critically low and needs immediate refill",
+            "The sensor is offline and no reading is available",
+            "The tank is completely full",
+            "The threshold alert has been triggered"
+        ],
+        "correctIndex": 2,
+        "points": 10
+    },
+    {
+        "id": "ct3-q7",
+        "prompt": "L2 point in the LN2 level indicates which of the following?",
+        "choices": [
+            "The container is nearing its refill threshold",
+            "A lid left open, a seal failure, or unusual thermal load",
+            "The sensor battery is running low",
+            "The container has been moved to a new branch"
+        ],
+        "correctIndex": 0,
+        "points": 15
+    },
+    {
+        "id": "ct3-q8",
+        "prompt": "What happens when the monitoring device battery drops to 0%?",
+        "choices": [
+            "An automated refill is triggered",
+            "The container is flagged as critical on the map",
+            "Temperature and shock readings are no longer available until the device is recharged",
+            "The container is locked and cannot be opened"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "ct3-q9",
+        "prompt": "The Lid State tile turns red. What does this immediately signal?",
+        "choices": [
+            "A refill was successfully completed",
+            "The container lid is open, and LN2 evaporation and sample integrity are at immediate risk",
+            "The lid sensor battery is low",
+            "A scheduled maintenance check is due"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "ct3-q10",
+        "prompt": "What can you do with the 3D cryocan model on the container page?",
+        "choices": [
+            "Print a physical label for the tank",
+            "Drag to rotate it and click canisters inside to inspect patient samples and their storage status",
+            "Upload a new model image for the container",
+            "Lock the container remotely using the model controls"
+        ],
+        "correctIndex": 1,
+        "points": 10
+    },
+    {
+        "id": "ct3-q11",
+        "prompt": "What does the System Activity feed record?",
+        "choices": [
+            "Only LN2 refill events",
+            "Alerts fired, refills detected, tasks updated, configuration changes, and user logins — each timestamped and actor-tagged",
+            "Patient appointment schedules and billing logs",
+            "Network connectivity events for the monitoring device"
+        ],
+        "correctIndex": 1,
+        "points": 10
+    },
+    {
+        "id": "ct3-q12",
+        "prompt": "After you acknowledge a critical alert, what happens to it?",
+        "choices": [
+            "It is permanently deleted from the system",
+            "It is moved to a hidden archive only admins can see",
+            "It is moved out of the active queue but remains visible in the log for audit purposes",
+            "It reappears after 24 hours if not resolved"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "ct3-q13",
+        "prompt": "Who can see messages sent in the Stakeholder Chat for a container?",
+        "choices": [
+            "Only the person who sent the message",
+            "Only branch managers",
+            "All stakeholders — doctors, embryologists, and lab coordinators",
+            "Only users with Admin role"
+        ],
+        "correctIndex": 2,
+        "points": 10
+    },
+    {
+        "id": "ct3-q14",
+        "prompt": "What information does the My Tasks panel display for each task?",
+        "choices": [
+            "Only the task name and due date",
+            "Task name, assignee, due date, priority, and status",
+            "Task name, container ID, and billing code",
+            "Only open tasks — completed tasks are hidden"
+        ],
+        "correctIndex": 1,
+        "points": 10
+    },
+    {
+        "id": "ct3-q15",
+        "prompt": "The Quality Tracking Chart's 24H range shows a steep downward slope in LN2 level. What should you do?",
+        "choices": [
+            "Switch to the LATEST range to confirm the sensor is online",
+            "Investigate for rapid evaporation and correlate the dip with the Refill Log to check whether a top-up already occurred",
+            "Acknowledge the chart as read and continue",
+            "Restart the monitoring device to reset the reading"
         ],
         "correctIndex": 1,
         "points": 15

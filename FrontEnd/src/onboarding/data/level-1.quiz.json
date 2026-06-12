@@ -106,5 +106,17 @@
         ],
         "correctIndex": 1,
         "points": 15
+    },
+    {
+        "id": "dash-q10",
+        "prompt": "What does the Site Level Information table on the dashboard allow you to do?",
+        "choices": [
+            "Submit billing requests for each site",
+            "Monitor real-time key metrics for every laboratory site in one view",
+            "Configure alert thresholds for all branches at once",
+            "Download a PDF report of all site activity"
+        ],
+        "correctIndex": 1,
+        "points": 15
     }
 ]
