@@ -25,6 +25,10 @@ class ChatMessage(Base):
     incubator_id = Column(Integer, ForeignKey("incubators.incubator_id"), nullable=True, index=True)
     chamber_id = Column(String(255), nullable=True)
 
+    # Refrigerator Reference (for refrigerator tracking)
+    refrigerator_id = Column(Integer, ForeignKey("refrigerators.refrigerator_id"), nullable=True, index=True)
+    zone_id = Column(String(255), nullable=True)
+
     # Sender Information
     sender_id = Column(String, ForeignKey("users.user_id"), nullable=False, index=True)
     # Note: sender_role removed - use sender_id relationship to User table to get role
@@ -42,6 +46,7 @@ class ChatMessage(Base):
     patient = relationship("Patient", backref="chat_messages")
     tank = relationship("Tank", backref="chat_messages")
     incubator = relationship("Incubator", backref="chat_messages")
+    refrigerator = relationship("Refrigerator", backref="chat_messages")
     sender = relationship("User", foreign_keys=[sender_id], backref="sent_messages")
     # Note: read_statuses relationship removed - ChatReadStatus now uses composite PK (user_id, patient_id)
     # and tracks last_read_message_id instead of per-message read status
@@ -51,4 +56,5 @@ class ChatMessage(Base):
         Index('idx_chat_messages_patient_created', 'patient_id', 'created_at'),
         Index('idx_chat_messages_tank_created', 'tank_id', 'created_at'),
         Index('idx_chat_messages_incubator_created', 'incubator_id', 'created_at'),
+        Index('idx_chat_messages_refrigerator_created', 'refrigerator_id', 'created_at'),
     )

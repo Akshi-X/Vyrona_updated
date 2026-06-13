@@ -32,7 +32,7 @@ interface MyTasksModalProps {
     onAdd?: () => void;
     onEdit?: (task: MyTask) => void | Promise<void>;
     onDelete?: (taskId: string) => void;
-    variant?: "dashboard" | "track" | "ivf" | "incubator";
+    variant?: "dashboard" | "track" | "ivf" | "incubator" | "refrigerator";
     currentUserName?: string;
     currentUserId?: string;
     onTaskCreated?: () => void;
@@ -42,7 +42,10 @@ interface MyTasksModalProps {
     defaultTankId?: number;
     defaultIncubatorId?: number;
     defaultChamberId?: string;
+    defaultRefrigeratorId?: number;
+    defaultZoneId?: string;
     id?: string;
+    embedded?: boolean;
 }
 
 const MyTasksModal: React.FC<MyTasksModalProps> = ({
@@ -62,11 +65,14 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     defaultTankId,
     defaultIncubatorId,
     defaultChamberId,
+    defaultRefrigeratorId,
     id,
+    embedded = false,
 }) => {
     const isUserRole = userRole?.toLowerCase() === "user";
     const isIvfVariant = variant === "ivf";
     const isIncubatorVariant = variant === "incubator";
+    const isRefrigeratorVariant = variant === "refrigerator";
     const [showInputRow, setShowInputRow] = useState(false);
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(
@@ -121,7 +127,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         setValidationErrors({});
         // Reset form with current user as default and pre-fill patientId/canisterNumber if provided
         setNewTask({
-            patientId: isIvfVariant ? "" : defaultPatientId || "",
+            patientId: (isIvfVariant || isRefrigeratorVariant) ? "" : defaultPatientId || "",
             canisterNumber: (isIvfVariant || isIncubatorVariant) ? defaultCanisterNumber || "" : "",
             taskName: "",
             description: "",
@@ -142,10 +148,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             assigneeId: TASK_FIELD_ERRORS.assigneeId,
         };
 
-        // CGT uses patient_id; IVF and incubator variants use canister_number (display-only)
+        // CGT uses patient_id; IVF and incubator variants use canister_number; refrigerator has no extra required ID
         if (isIvfVariant || isIncubatorVariant) {
             requiredFields.canisterNumber = TASK_FIELD_ERRORS.canisterNumber;
-        } else {
+        } else if (!isRefrigeratorVariant) {
             requiredFields.patientId = TASK_FIELD_ERRORS.patientId;
         }
 
@@ -182,7 +188,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 task_name: newTask.taskName.trim(),
                 description: newTask.description.trim(),
                 assignee_id: newTask.assigneeId || currentUserId,
-                patient_id: (isIvfVariant || isIncubatorVariant)
+                patient_id: (isIvfVariant || isIncubatorVariant || isRefrigeratorVariant)
                     ? undefined
                     : newTask.patientId.trim() || undefined,
                 tank_id: isIvfVariant ? normalizedTankId : undefined,
@@ -192,6 +198,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         : undefined,
                 incubator_id: isIncubatorVariant ? defaultIncubatorId : undefined,
                 chamber_id: isIncubatorVariant ? defaultChamberId : undefined,
+                refrigerator_id: isRefrigeratorVariant ? defaultRefrigeratorId : undefined,
                 due_date: newTask.dueDate
                     ? new Date(newTask.dueDate).toISOString()
                     : undefined,
@@ -303,12 +310,12 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         setEditedTask(null);
     };
 
-    // Fetch users list when modal opens
+    // Fetch users list when modal opens (or on mount in embedded mode)
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen || embedded) {
             fetchUsers();
         }
-    }, [isOpen]);
+    }, [isOpen, embedded]);
 
     const fetchUsers = async () => {
         setLoadingUsers(true);
@@ -521,20 +528,205 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         return new Set();
     };
 
+    const taskTitle =
+        variant === "track"
+            ? "My Tasks (Track & Trace)"
+            : variant === "ivf"
+              ? "My Tasks (Cryocan Quality Tracking)"
+              : variant === "incubator"
+                ? "My Tasks (Incubator)"
+                : variant === "refrigerator"
+                  ? "Tasks"
+                  : "My Tasks";
+
+    if (embedded) {
+        return (
+            <>
+            <div className="flex flex-col h-full overflow-hidden">
+                {/* Header with ADD button */}
+                <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}>
+                    <div>
+                        <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>{taskTitle}</span>
+                        <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Assign and track work items</span>
+                    </div>
+                    {onAdd && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleAddClick(); }}
+                            className="flex items-center gap-1 px-3 py-1 bg-primary hover:bg-primary-light text-white text-xs font-medium rounded-md transition-colors"
+                        >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            ADD
+                        </button>
+                    )}
+                </div>
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+                    <div className="flex flex-col gap-3 p-4">
+                        {visibleTasks.length === 0 && !showInputRow && (
+                            <div className="text-center text-gray-500 text-sm py-4">No tasks yet</div>
+                        )}
+                        {visibleTasks.map((task) => {
+                            const isEditing = editingTaskId === task.id;
+                            const displayTask = isEditing && editedTask ? editedTask : task;
+                            const canEdit = canEditTask(task);
+                            const editableFields = getEditableFields(task);
+                            const priorityAccent = task.priority === "High" ? "bg-red-50/40" : task.priority === "Medium" ? "bg-orange-50/40" : "bg-green-50/40";
+                            return (
+                                <div key={task.id} className={`border rounded-xl p-3 shadow-sm transition-all ${isEditing ? "border-primary bg-purple-50" : `border-gray-200 ${priorityAccent} hover:shadow-md`}`}>
+                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${task.priority === "High" ? "bg-red-100 text-red-700" : task.priority === "Medium" ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>{task.priority}</span>
+                                            {isEditing && editableFields.has("status") ? (
+                                                <select value={displayTask.status} onChange={(e) => handleEditInputChange("status", e.target.value as any)} className="px-2 py-0.5 text-xs font-semibold border rounded-full focus:outline-none">
+                                                    <option value="Not started">Not started</option>
+                                                    <option value="In progress">In progress</option>
+                                                    <option value="Done">Done</option>
+                                                    <option value="Cancelled">Cancelled</option>
+                                                </select>
+                                            ) : (
+                                                <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${task.status === "Done" ? "bg-green-100 text-green-800" : task.status === "In progress" ? "bg-blue-100 text-blue-800" : task.status === "Cancelled" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"}`}>{task.status}</span>
+                                            )}
+                                        </div>
+                                        {canEdit && (
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                {isEditing ? (
+                                                    <>
+                                                        <button onClick={handleSaveEdit} disabled={isEditSaving} className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border transition-colors ${isEditSaving ? "text-gray-400 bg-gray-100 border-gray-200" : "text-green-700 bg-green-50 border-green-300 hover:bg-green-100"}`}>
+                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                                            {isEditSaving ? "..." : "Save"}
+                                                        </button>
+                                                        <button onClick={handleCancelEdit} className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50">
+                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                            Cancel
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button onClick={() => { setEditingTaskId(task.id); setEditedTask({ ...task }); }} className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded hover:border-primary hover:text-primary">
+                                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" /></svg>
+                                                        Edit
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {isEditing && editableFields.has("taskName") ? (
+                                        <input type="text" value={displayTask.taskName || ""} onChange={(e) => handleEditInputChange("taskName", e.target.value)} className="w-full px-2 py-1 text-sm font-semibold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 mb-1" />
+                                    ) : (
+                                        <p className="text-sm font-semibold text-[#333] mb-0.5">{task.taskName}</p>
+                                    )}
+                                    {isEditing && editableFields.has("description") ? (
+                                        <input type="text" value={displayTask.description || ""} onChange={(e) => handleEditInputChange("description", e.target.value)} className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 mb-1 text-gray-600" />
+                                    ) : (
+                                        <p className="text-xs text-gray-500 mb-2">{task.description}</p>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Assigned to</p>
+                                            <p className="text-xs text-gray-700 truncate">{task.assignedTo || "—"}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Due</p>
+                                            <p className="text-xs text-gray-700">{task.dueDate || "—"}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
+            {/* Add Task modal overlay — shown when ADD is clicked in embedded mode */}
+            {showInputRow && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+                            <h3 className="text-sm font-bold text-gray-800">New Task</h3>
+                            <button onClick={handleCancelAdd} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div className="p-5 overflow-y-auto max-h-[70vh]">
+                            <style>{`
+                              input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%); }
+                              input[type="date"]:not(:placeholder-shown) { color: var(--color-primary); font-weight: 500; }
+                              input[type="date"] { color-scheme: light; }
+                            `}</style>
+                            {validationErrors.submit && (
+                                <div className="mb-3 px-3 py-2 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded">
+                                    {validationErrors.submit}
+                                </div>
+                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {!isRefrigeratorVariant && (
+                                    <div>
+                                        <label className="block text-xs font-medium text-primary mb-1">
+                                            {isIncubatorVariant ? "Incubator ID" : isIvfVariant ? "Canister ID" : "Patient ID"}
+                                        </label>
+                                        <input type="text" value={(isIvfVariant || isIncubatorVariant) ? newTask.canisterNumber : newTask.patientId} readOnly className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 cursor-not-allowed focus:outline-none" />
+                                    </div>
+                                )}
+                                <div className={!isRefrigeratorVariant ? "" : "sm:col-span-2"}>
+                                    <label className="block text-xs font-medium text-primary mb-1">Task Name</label>
+                                    <input type="text" value={newTask.taskName} onChange={(e) => handleInputChange("taskName", e.target.value)} placeholder="Task Name" className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 ${validationErrors.taskName ? "border-red-400" : "border-gray-300"}`} />
+                                    {validationErrors.taskName && <p className="text-xs text-red-500 mt-0.5">{validationErrors.taskName}</p>}
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-medium text-primary mb-1">Description</label>
+                                    <input type="text" value={newTask.description} onChange={(e) => handleInputChange("description", e.target.value)} placeholder="Description" className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 ${validationErrors.description ? "border-red-400" : "border-gray-300"}`} />
+                                    {validationErrors.description && <p className="text-xs text-red-500 mt-0.5">{validationErrors.description}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-primary mb-1">Assigned by</label>
+                                    <input type="text" value={newTask.assigneeBy} disabled className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-100 text-gray-400 cursor-not-allowed" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-primary mb-1">Assign to</label>
+                                    <select value={newTask.assigneeId || ""} onChange={(e) => { const u = users.find(u => u.user_id === e.target.value); handleInputChange("assigneeId", e.target.value); handleInputChange("assignedTo", u ? `${u.first_name} ${u.last_name}`.trim() : ""); }} disabled={loadingUsers} className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 ${validationErrors.assigneeBy ? "border-red-400" : "border-gray-300"}`}>
+                                        <option value="">Select a user</option>
+                                        {users.map((u) => <option key={u.user_id} value={u.user_id}>{u.first_name} {u.last_name}</option>)}
+                                    </select>
+                                    {validationErrors.assigneeBy && <p className="text-xs text-red-500 mt-0.5">{validationErrors.assigneeBy}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-primary mb-1">Due Date</label>
+                                    <input type="date" value={newTask.dueDate} onChange={(e) => handleInputChange("dueDate", e.target.value)} min={new Date().toISOString().split("T")[0]} className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 ${validationErrors.dueDate ? "border-red-400" : "border-gray-300"}`} />
+                                    {validationErrors.dueDate && <p className="text-xs text-red-500 mt-0.5">{validationErrors.dueDate}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-primary mb-1">Priority</label>
+                                    <select value={newTask.priority} onChange={(e) => handleInputChange("priority", e.target.value)} className={`w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 font-semibold ${newTask.priority === "High" ? "bg-red-50 text-red-800" : newTask.priority === "Medium" ? "bg-orange-50 text-orange-800" : "bg-green-50 text-green-800"}`}>
+                                        <option value="Low">Low</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="High">High</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
+                            <button onClick={handleSaveAdd} disabled={isSaving} className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${isSaving ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-primary text-white hover:bg-primary-light"}`}>
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                {isSaving ? "Saving..." : "Save"}
+                            </button>
+                            <button onClick={handleCancelAdd} className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            </>
+        );
+    }
+
     return (
         <AlertCard
             isOpen={isOpen}
             onClose={onClose}
             id={id}
-            title={
-                variant === "track"
-                    ? "My Tasks (Track & Trace)"
-                    : variant === "ivf"
-                      ? "My Tasks (Cryocan Quality Tracking)"
-                      : variant === "incubator"
-                        ? "My Tasks (Incubator)"
-                        : "My Tasks"
-            }
+            title={taskTitle}
             description="Manage and track your assigned tasks"
             icon={
                 <img
@@ -718,7 +910,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-xs font-medium text-primary mb-1">
-                                    {isIncubatorVariant ? "Incubator ID" : isIvfVariant ? "Canister ID" : "Patient ID"}
+                                    {isIncubatorVariant ? "Incubator ID" : isIvfVariant ? "Canister ID" : isRefrigeratorVariant ? "Refrigerator ID" : "Patient ID"}
                                 </label>
                                 <input
                                     type="text"
