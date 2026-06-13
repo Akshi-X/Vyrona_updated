@@ -1,0 +1,55 @@
+version: '3.8'
+services:
+  backend:                          # ← changed from 'app'
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: mgscale-devcontainer
+    command: sleep infinity
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace:cached
+      - devcontainer-bashhistory:/root/commandhistory
+    environment:
+      - TERM=xterm-256color
+    depends_on:                     # ← added, wait for postgres/redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  postgres:
+    image: postgres:15
+    container_name: mgscale-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mygrape}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}   # ← added fallback
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d mygrape" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: mgscale-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  smtp4dev:
+    image: rnwood/smtp4dev:latest
+    container_name: mgscale-smtp4dev
+    ports:
+      - "5000:80"
+      - "2525:25"
+      - "110:110"
+volumes:
+  postgres_data:
+  devcontainer-bashhistory:

@@ -1,0 +1,3 @@
+azure-functions
+azure-eventhub
+pydantic-settings>=2.0.0

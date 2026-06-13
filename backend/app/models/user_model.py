@@ -5,6 +5,7 @@ from sqlalchemy.orm import relationship
 
 from ..config.database import Base
 from ..constants.enums import ApprovalStatus, UserRole
+from ..models.IVF.hospital_branch_model import HospitalBranch
 
 
 class User(Base):
@@ -12,61 +13,116 @@ class User(Base):
 
     # Primary Key - Custom generated user_id (USR-XXXXXX format)
     user_id = sqlalchemy.Column(sqlalchemy.String, primary_key=True, index=True)
-    
+
     # Basic User Information
     first_name = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     last_name = sqlalchemy.Column(sqlalchemy.String, nullable=False)
-    email = sqlalchemy.Column(sqlalchemy.String, unique=True, nullable=False, index=True)
+    email = sqlalchemy.Column(
+        sqlalchemy.String, unique=True, nullable=False, index=True
+    )
     password_hash = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     phone_number = sqlalchemy.Column(sqlalchemy.String(20), nullable=True)
-    
+
     # Role and Company
     # Schema validator normalizes any case input to title case before reaching database
     # ENUM ensures database-level validation (Admin, Manager, User, Pharma_admin, Mygrape_admin)
-    role = sqlalchemy.Column(SQLEnum(UserRole, values_callable=lambda obj: [e.value for e in obj], name='user_role'), nullable=False, index=True)
+    role = sqlalchemy.Column(
+        SQLEnum(
+            UserRole,
+            values_callable=lambda obj: [e.value for e in obj],
+            name="user_role",
+        ),
+        nullable=False,
+        index=True,
+    )
     pharma_id = sqlalchemy.Column(Integer, ForeignKey("pharma.id"), nullable=True)
-    
+
     # Hospital/IVF fields (for hospital users)
-    branch_id = sqlalchemy.Column(Integer, ForeignKey("hospital_branches.branch_id"), nullable=True, index=True)
-    department = sqlalchemy.Column(sqlalchemy.String(100), nullable=True, index=True)  # CGT, IVF, Oncology, etc.
-    hospital_id = sqlalchemy.Column(Integer, nullable=True)  # Denormalized for quick access
-    
+    branch_id = sqlalchemy.Column(
+        Integer, ForeignKey("hospital_branches.branch_id"), nullable=True, index=True
+    )
+    department = sqlalchemy.Column(
+        sqlalchemy.String(100), nullable=True, index=True
+    )  # CGT, IVF, Oncology, etc.
+    hospital_id = sqlalchemy.Column(
+        Integer, nullable=True
+    )  # Denormalized for quick access
+
     # Account Status
-    status = sqlalchemy.Column(sqlalchemy.Boolean, default=False)  # Account active/inactive
-    approved_status = sqlalchemy.Column(SQLEnum(ApprovalStatus, values_callable=lambda obj: [e.value for e in obj], name='approval_status'), default=ApprovalStatus.PENDING)
-    
+    status = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False
+    )  # Account active/inactive
+    approved_status = sqlalchemy.Column(
+        SQLEnum(
+            ApprovalStatus,
+            values_callable=lambda obj: [e.value for e in obj],
+            name="approval_status",
+        ),
+        default=ApprovalStatus.PENDING,
+    )
+
     # Approval Audit Trail
-    approved_by = sqlalchemy.Column(sqlalchemy.String, nullable=True)  # User ID of approver
+    approved_by = sqlalchemy.Column(
+        sqlalchemy.String, nullable=True
+    )  # User ID of approver
     approved_on = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)  # When approved
-    
+
     # Security - Account Locking (Brute Force Protection)
-    is_locked = sqlalchemy.Column(sqlalchemy.Boolean, default=False)  # Is account locked
-    lock_expiry = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True), nullable=True)  # When lock expires (30 min)
-    login_attempts = sqlalchemy.Column(sqlalchemy.Integer, default=0)  # Failed login counter
-    
+    is_locked = sqlalchemy.Column(
+        sqlalchemy.Boolean, default=False
+    )  # Is account locked
+    lock_expiry = sqlalchemy.Column(
+        sqlalchemy.DateTime(timezone=True), nullable=True
+    )  # When lock expires (30 min)
+    login_attempts = sqlalchemy.Column(
+        sqlalchemy.Integer, default=0
+    )  # Failed login counter
+
     # Password Security
-    last_password_changed = sqlalchemy.Column(sqlalchemy.DateTime, default=lambda: datetime.now(timezone.utc))
-    last_password_reset_request = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)  # Audit: last reset request
-    password_reset_count = sqlalchemy.Column(sqlalchemy.Integer, default=0)  # Audit: total reset attempts
-    
+    last_password_changed = sqlalchemy.Column(
+        sqlalchemy.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    last_password_reset_request = sqlalchemy.Column(
+        sqlalchemy.DateTime, nullable=True
+    )  # Audit: last reset request
+    password_reset_count = sqlalchemy.Column(
+        sqlalchemy.Integer, default=0
+    )  # Audit: total reset attempts
+
     # Session Management
-    session_timeout = sqlalchemy.Column(sqlalchemy.Integer, default=30)  # Minutes (custom per user)
-    last_login = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)  # Last successful login
-    
+    session_timeout = sqlalchemy.Column(
+        sqlalchemy.Integer, default=30
+    )  # Minutes (custom per user)
+    last_login = sqlalchemy.Column(
+        sqlalchemy.DateTime, nullable=True
+    )  # Last successful login
+
     # Onboarding
-    onboarding_completed = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False, default=True)  # True = has seen/skipped onboarding; default True for all existing users
+    onboarding_completed = sqlalchemy.Column(
+        sqlalchemy.Boolean, nullable=False, default=True
+    )  # True = has seen/skipped onboarding; default True for all existing users
 
     # Invite token (used when an admin invites a user via email link)
-    invite_token = sqlalchemy.Column(sqlalchemy.String, nullable=True, unique=True, index=True)
-    invite_token_expires_at = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True), nullable=True)
+    invite_token = sqlalchemy.Column(
+        sqlalchemy.String, nullable=True, unique=True, index=True
+    )
+    invite_token_expires_at = sqlalchemy.Column(
+        sqlalchemy.DateTime(timezone=True), nullable=True
+    )
 
     # Audit Trail
-    created_by = sqlalchemy.Column(sqlalchemy.String, nullable=True)  # Who created this user
+    created_by = sqlalchemy.Column(
+        sqlalchemy.String, nullable=True
+    )  # Who created this user
     updated_by = sqlalchemy.Column(sqlalchemy.String, nullable=True)  # Who last updated
-    created_at = sqlalchemy.Column(sqlalchemy.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = sqlalchemy.Column(
+        sqlalchemy.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     updated_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
-    
+
     # Relationships
     otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
-    pharma_company = relationship("Pharma", foreign_keys="[User.pharma_id]", back_populates="users")
+    pharma_company = relationship(
+        "Pharma", foreign_keys="[User.pharma_id]", back_populates="users"
+    )
     branch = relationship("HospitalBranch", foreign_keys="[User.branch_id]")

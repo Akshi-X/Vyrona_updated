@@ -1,7 +1,9 @@
 FrontEnd/.env
 .cursor/
-.github/
 .cursor/mygrape_rule
 .DS_Store
 .secrets
+.env
+.devcontainer/.env
+logs/
 n-task.csv
