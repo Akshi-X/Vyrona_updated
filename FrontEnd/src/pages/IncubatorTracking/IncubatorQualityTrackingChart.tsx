@@ -180,7 +180,9 @@ interface IncubatorQualityTrackingChartProps {
   incubatorId: number;
   chamberId: string;
   incubatorCode?: string;
+  selectedKpiKey?: string | null;
   onLatestValues?: (vals: Record<string, number | string>) => void;
+  onKpiTabsLoaded?: (tabs: Array<{ id: string; label: string; unit: string }>) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +192,9 @@ export default function IncubatorQualityTrackingChart({
   incubatorId,
   chamberId,
   incubatorCode,
+  selectedKpiKey,
   onLatestValues,
+  onKpiTabsLoaded,
 }: IncubatorQualityTrackingChartProps) {
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
@@ -295,6 +299,14 @@ export default function IncubatorQualityTrackingChart({
     setError(null);
   }, [incubatorId, chamberId]);
 
+  // Sync activeTab from external selectedKpiKey (e.g. KPI tile clicked in visualizer)
+  useEffect(() => {
+    if (!selectedKpiKey) return;
+    if (kpiTabs.some((tab) => tab.id === selectedKpiKey) && activeTab !== selectedKpiKey) {
+      setActiveTab(selectedKpiKey);
+    }
+  }, [selectedKpiKey, kpiTabs, activeTab]);
+
   // Fetch KPI config for tabs and threshold lines
   useEffect(() => {
     ivfService
@@ -334,6 +346,7 @@ export default function IncubatorQualityTrackingChart({
         setKpiTabs(tabs);
         setActiveTab((current) => (tabs.some((t) => t.id === current) ? current : tabs[0]?.id ?? ''));
         setHasLoadedKpiConfig(true);
+        onKpiTabsLoaded?.(tabs);
       })
       .catch(() => {
         if (!isMountedRef.current) return;
@@ -342,6 +355,7 @@ export default function IncubatorQualityTrackingChart({
         setKpiTabs(tabs);
         setActiveTab(tabs[0]?.id ?? '');
         setHasLoadedKpiConfig(true);
+        onKpiTabsLoaded?.(tabs);
       });
   }, [incubatorId, chamberId]);
 
@@ -424,6 +438,24 @@ export default function IncubatorQualityTrackingChart({
             return isStaticRange ? merged : merged.slice(-MAX_READINGS_CAP);
           });
           setHasReceivedData(true);
+
+          if (onLatestValues) {
+            const latest: Record<string, number | string> = {};
+            entries.forEach(([kpiName, points]) => {
+              const validPts = (points || []).filter(
+                (p) => typeof p?.timestamp === 'string' && p.timestamp && (p.value != null || p.avg != null)
+              );
+              if (!validPts.length) return;
+              validPts.sort(
+                (a, b) => (parseTimestamp(a.timestamp!)?.getTime() ?? 0) - (parseTimestamp(b.timestamp!)?.getTime() ?? 0)
+              );
+              const last = validPts[validPts.length - 1];
+              const resolved = (typeof last.avg === 'number' && Number.isFinite(last.avg) ? last.avg : null)
+                ?? (typeof last.value === 'number' && Number.isFinite(last.value) ? last.value : null);
+              if (resolved != null) latest[kpiName] = resolved;
+            });
+            if (Object.keys(latest).length > 0) onLatestValues(latest);
+          }
         }
       })
       .catch(() => {})

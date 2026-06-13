@@ -17,6 +17,7 @@ from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.incubator_model import Incubator
+from ...models.IVF.refrigerator_model import Refrigerator
 from ...utils.ivf_helpers import decrypt_sensitive_ivf_value, encrypt_sensitive_ivf_value
 
 logger = logging.getLogger(__name__)
@@ -319,6 +320,44 @@ class IVFService:
             return {"branches": branches_list, "total": total}
         except Exception as e:
             raise Exception(f"Error fetching active incubators: {str(e)}")
+
+    def get_active_refrigerators(
+        self,
+        hospital_id: Optional[int] = None,
+        branch_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Get active refrigerators grouped by branch."""
+        try:
+            stmt = (
+                select(Refrigerator, HospitalBranch.branch_id, HospitalBranch.branch_name)
+                .join(HospitalBranch, Refrigerator.branch_id == HospitalBranch.branch_id)
+                .where(Refrigerator.is_active == True)
+            )
+            if hospital_id is not None:
+                stmt = stmt.where(Refrigerator.hospital_id == hospital_id)
+            if branch_id is not None:
+                stmt = stmt.where(Refrigerator.branch_id == branch_id)
+
+            results = self.db.execute(stmt).fetchall()
+
+            branches_dict: Dict[int, Any] = {}
+            total = 0
+            for refrigerator, b_id, b_name in results:
+                if b_id not in branches_dict:
+                    branches_dict[b_id] = {"branch_id": b_id, "branch_name": b_name or "Unknown", "refrigerators": []}
+                branches_dict[b_id]["refrigerators"].append({
+                    "refrigerator_id": refrigerator.refrigerator_id,
+                    "refrigerator_code": refrigerator.refrigerator_code,
+                    "external_id": refrigerator.external_id,
+                    "type": refrigerator.type,
+                    "updated_at": refrigerator.updated_at,
+                })
+                total += 1
+
+            branches_list = sorted(branches_dict.values(), key=lambda x: x["branch_name"])
+            return {"branches": branches_list, "total": total}
+        except Exception as e:
+            raise Exception(f"Error fetching active refrigerators: {str(e)}")
 
     def get_embryo_transfer_crylocks(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
         """

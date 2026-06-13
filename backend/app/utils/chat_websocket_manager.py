@@ -91,26 +91,19 @@ class ChatConnectionManager:
         if connection_id in self.active_connections:
             self.active_connections[connection_id].setdefault("subscribed_tanks", set()).discard(tank_id)
 
-    async def broadcast_to_tank(self, tank_id: str, message_data: dict, sender_tank_id: int, db):
+    async def broadcast_to_tank(self, tank_id: str, message_data: dict):
         """Broadcast message to connections subscribed to this tank (IVF flow)"""
         if not self.active_connections:
             return
-        
-        from app.models.IVF.tank_model import Tank
-        tank = db.query(Tank).filter(Tank.id == tank_id).first()
-        if not tank or tank.tank_id != sender_tank_id:
-            return
-        
         disconnected = []
         for connection_id, conn_data in list(self.active_connections.items()):
             subscribed_tanks = conn_data.get("subscribed_tanks", set())
-            if tank_id in subscribed_tanks:
+            if str(tank_id) in {str(t) for t in subscribed_tanks}:
                 try:
                     await conn_data["websocket"].send_json(message_data)
                 except Exception as e:
-                    logger.error(f"Error sending message to {connection_id}: {e}", exc_info=True)
+                    logger.error(f"Error sending tank message to {connection_id}: {e}", exc_info=True)
                     disconnected.append(connection_id)
-        
         for conn_id in disconnected:
             self.disconnect(conn_id)
 
@@ -135,6 +128,30 @@ class ChatConnectionManager:
                     await conn_data["websocket"].send_json(message_data)
                 except Exception as e:
                     logger.error(f"Error sending incubator message to {connection_id}: {e}", exc_info=True)
+                    disconnected.append(connection_id)
+        for conn_id in disconnected:
+            self.disconnect(conn_id)
+
+    def subscribe_to_refrigerator(self, connection_id: str, refrigerator_id: str):
+        """Subscribe connection to a specific refrigerator's messages."""
+        if connection_id in self.active_connections:
+            self.active_connections[connection_id].setdefault("subscribed_refrigerators", set()).add(str(refrigerator_id))
+
+    def unsubscribe_from_refrigerator(self, connection_id: str, refrigerator_id: str):
+        """Unsubscribe connection from a specific refrigerator's messages."""
+        if connection_id in self.active_connections:
+            self.active_connections[connection_id].setdefault("subscribed_refrigerators", set()).discard(str(refrigerator_id))
+
+    async def broadcast_to_refrigerator(self, refrigerator_id: str, message_data: dict):
+        """Broadcast message to all connections subscribed to this refrigerator."""
+        if not self.active_connections:
+            return
+        disconnected = []
+        for connection_id, conn_data in list(self.active_connections.items()):
+            if str(refrigerator_id) in conn_data.get("subscribed_refrigerators", set()):
+                try:
+                    await conn_data["websocket"].send_json(message_data)
+                except Exception:
                     disconnected.append(connection_id)
         for conn_id in disconnected:
             self.disconnect(conn_id)

@@ -720,6 +720,8 @@ class QualityService:
         tank_id: Optional[int] = None,
         incubator_id: Optional[int] = None,
         chamber_id: Optional[str] = None,
+        refrigerator_id: Optional[int] = None,
+        zone_id: Optional[str] = None,
         kpi_name: str = "",
         alert_name: Optional[str] = None,
         min_val: Optional[float] = None,
@@ -730,7 +732,7 @@ class QualityService:
         unack_escalation_threshold: Optional[int] = None,
         status: bool = True,
     ) -> KpiConfig:
-        """Create a KpiConfig row for a tank or incubator."""
+        """Create a KpiConfig row for a tank, incubator, or refrigerator."""
         if tank_id is not None:
             self.validate_tank_belongs_to_branch(tank_id, branch_id)
         row = KpiConfig(
@@ -739,6 +741,8 @@ class QualityService:
             tank_id=tank_id,
             incubator_id=incubator_id,
             chamber_id=chamber_id,
+            refrigerator_id=refrigerator_id,
+            zone_id=zone_id,
             kpi_name=kpi_name.strip(),
             alert_name=alert_name.strip() if alert_name else None,
             min=min_val,
@@ -771,7 +775,9 @@ class QualityService:
         row = self.db.query(KpiConfig).filter(KpiConfig.id == config_id).first()
         if not row:
             return None
-        if branch_id is not None:
+        if branch_id is not None and row.tank_id is not None:
+            # Skip tank validation for incubator / refrigerator rows
+            # (tank_id is NULL on those); device scoping is enforced upstream.
             self.validate_tank_belongs_to_branch(row.tank_id, branch_id)
         if kpi_name is not None:
             row.kpi_name = kpi_name.strip()
@@ -804,7 +810,9 @@ class QualityService:
         row = self.db.query(KpiConfig).filter(KpiConfig.id == config_id).first()
         if not row:
             return False
-        if branch_id is not None:
+        if branch_id is not None and row.tank_id is not None:
+            # Skip tank validation for incubator / refrigerator rows
+            # (tank_id is NULL on those); device scoping is enforced upstream.
             self.validate_tank_belongs_to_branch(row.tank_id, branch_id)
         self.db.delete(row)
         self.db.flush()
@@ -1003,6 +1011,98 @@ class QualityService:
                     tank_id=None,
                     incubator_id=incubator_id,
                     chamber_id=chamber_id,
+                    kpi_name=kpi_name,
+                    alert_name=alert_name,
+                    min=min_val,
+                    max=max_val,
+                    unit=unit,
+                    alert_type=alert_type_val,
+                    cooldown_minutes=cooldown_val if cooldown_val is not None else 60,
+                    unack_escalation_threshold=escalation_threshold,
+                    status=bool(status_val),
+                )
+                self.db.add(row)
+                self.db.flush()
+                created += 1
+        return {"updated": updated, "created": created}
+
+    def bulk_upsert_kpi_config_for_refrigerator(
+        self,
+        refrigerator_id: int,
+        configs: List[Dict],
+        hospital_id: int,
+        branch_id: int,
+    ) -> Dict:
+        """
+        For each config: if a row exists for (refrigerator_id, kpi_name, alert_name) update it;
+        otherwise create. Returns {"updated": count, "created": count}.
+        """
+        updated = 0
+        created = 0
+        for cfg in configs:
+            kpi_name = (cfg.get("kpi_name") or "").strip()
+            if not kpi_name:
+                continue
+            alert_name = cfg.get("alert_name")
+            if alert_name is not None and isinstance(alert_name, str):
+                alert_name = alert_name.strip() or None
+            def _to_float(v):
+                if v is None:
+                    return None
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return None
+            min_val = _to_float(cfg.get("min"))
+            max_val = _to_float(cfg.get("max"))
+            unit = (cfg.get("unit") or "").strip() or None
+            alert_type_val = (cfg.get("alert_type") or "").strip() or None
+            status_val = cfg.get("status")
+            if status_val is None:
+                status_val = alert_type_val in ("critical", "soft")
+            cooldown_val = cfg.get("cooldown_minutes")
+            try:
+                cooldown_val = int(cooldown_val) if cooldown_val is not None else None
+            except (TypeError, ValueError):
+                cooldown_val = None
+            escalation_threshold = cfg.get("unack_escalation_threshold")
+            try:
+                escalation_threshold = int(escalation_threshold) if escalation_threshold is not None else None
+            except (TypeError, ValueError):
+                escalation_threshold = None
+
+            query = self.db.query(KpiConfig).filter(
+                KpiConfig.refrigerator_id == refrigerator_id,
+                KpiConfig.kpi_name == kpi_name,
+                KpiConfig.zone_id.is_(None),
+            )
+            if alert_name is None:
+                query = query.filter(KpiConfig.alert_name.is_(None))
+            else:
+                query = query.filter(KpiConfig.alert_name == alert_name)
+
+            existing = query.first()
+            if existing:
+                existing.min = min_val
+                existing.max = max_val
+                existing.alert_type = alert_type_val
+                existing.status = bool(status_val)
+                if unit is not None:
+                    existing.unit = unit
+                if cooldown_val is not None:
+                    existing.cooldown_minutes = cooldown_val
+                existing.unack_escalation_threshold = escalation_threshold
+                self.db.flush()
+                updated += 1
+            else:
+                row = KpiConfig(
+                    hospital_id=hospital_id,
+                    branch_id=branch_id,
+                    tank_id=None,
+                    incubator_id=None,
+                    chamber_id=None,
+                    refrigerator_id=refrigerator_id,
+                    zone_id=None,
                     kpi_name=kpi_name,
                     alert_name=alert_name,
                     min=min_val,
@@ -1452,6 +1552,57 @@ class QualityService:
             )
             self.db.rollback()
             return None
+
+    def get_last_n_readings_per_kpi_refrigerator(
+        self, refrigerator_id: int, n: int
+    ) -> Optional[dict]:
+        """Last N readings per KPI for a refrigerator (mirrors incubator variant)."""
+        db = self.db
+        row_number = (
+            func.row_number()
+            .over(partition_by=Readings.kpi_config_id, order_by=Readings.timestamp.desc())
+            .label("rn")
+        )
+        subquery = (
+            db.query(Readings.id, row_number)
+            .filter(Readings.refrigerator_id == refrigerator_id)
+            .subquery()
+        )
+        valid_ids = db.query(subquery.c.id).filter(subquery.c.rn <= n).subquery()
+        results = (
+            db.query(Readings.kpi_config_id, Readings.kpi_value, Readings.timestamp, KpiConfig.kpi_name, KpiConfig.unit)
+            .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
+            .filter(Readings.id.in_(valid_ids))
+            .order_by(Readings.kpi_config_id, Readings.timestamp.desc())
+            .all()
+        )
+        if not results:
+            return None
+        kpis = defaultdict(list)
+        for row in results:
+            ts = row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp)
+            kpis[row.kpi_config_id].append({"name": row.kpi_name, "value": float(row.kpi_value), "unit": row.unit or "", "timestamp": ts})
+        return {"refrigerator_id": refrigerator_id, "kpis": [r for readings in kpis.values() for r in readings]}
+
+    def get_readings_per_kpi_since_refrigerator(
+        self, refrigerator_id: int, since: datetime
+    ) -> Optional[dict]:
+        """All KPI readings for a refrigerator since a timestamp."""
+        db = self.db
+        results = (
+            db.query(Readings.kpi_value, Readings.timestamp, KpiConfig.kpi_name, KpiConfig.unit)
+            .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
+            .filter(Readings.refrigerator_id == refrigerator_id, Readings.timestamp >= since)
+            .order_by(Readings.timestamp.desc())
+            .all()
+        )
+        if not results:
+            return None
+        kpis = []
+        for row in results:
+            ts = row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp)
+            kpis.append({"name": row.kpi_name, "value": float(row.kpi_value), "unit": row.unit or "", "timestamp": ts})
+        return {"refrigerator_id": refrigerator_id, "kpis": kpis}
 
     def get_tank_kpi_history_from_readings(
         self, tank_id: int, tank_code: str, limit: int = 50
