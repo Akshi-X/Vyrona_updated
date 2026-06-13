@@ -15,6 +15,8 @@ class CriticalAlertBase(BaseModel):
     tank_id: Optional[int] = Field(None, description="Reference to tank (tank-level monitoring)")
     incubator_id: Optional[int] = Field(None, description="Reference to incubator (incubator tracking)")
     chamber_id: Optional[str] = Field(None, description="Chamber within the incubator (optional)")
+    refrigerator_id: Optional[int] = Field(None, description="Reference to refrigerator (refrigerator tracking)")
+    zone_id: Optional[str] = Field(None, description="Zone within the refrigerator: 'freezer' or 'fridge'")
     hospital_id: int = Field(..., description="Hospital ID for scoping and compliance")
     branch_id: int = Field(..., description="Branch ID for scoping and compliance")
     alert_type: AlertType = Field(..., description="Type of alert: Deviation alert, Quality alert, Refill log alert")
@@ -31,6 +33,7 @@ class CriticalAlertResponse(CriticalAlertBase):
     alert_id: str = Field(..., description="UUID for alert identification")
     tank_code: Optional[str] = Field(None, description="Tank code (e.g., 'T1')")
     incubator_code: Optional[str] = Field(None, description="Incubator code")
+    refrigerator_code: Optional[str] = Field(None, description="Refrigerator code")
     branch_name: Optional[str] = Field(None, description="Branch name")
     status: AlertStatus = Field(default=AlertStatus.ACTIVE, description="Status: Active, Acknowledged")
     acknowledged_by: Optional[str] = Field(None, description="User ID who acknowledged the alert")
@@ -104,4 +107,12 @@ class IncubatorAlertsResponse(BaseModel):
     incubator_code: Optional[str] = Field(None, description="Incubator code")
     chamber_id: Optional[str] = Field(None, description="Chamber filter applied (None = all chambers)")
     alerts: List[CriticalAlertResponse] = Field(..., description="List of alerts for this incubator")
+    total_count: int = Field(..., description="Total number of alerts")
+
+
+class RefrigeratorAlertsResponse(BaseModel):
+    """Schema for refrigerator-specific alerts"""
+    refrigerator_id: int = Field(..., description="Refrigerator ID")
+    refrigerator_code: Optional[str] = Field(None, description="Refrigerator code")
+    alerts: List[CriticalAlertResponse] = Field(..., description="List of alerts for this refrigerator")
     total_count: int = Field(..., description="Total number of alerts")

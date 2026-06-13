@@ -87,6 +87,10 @@ class CriticalAlert(Base):
     # Incubator Reference (for incubator tracking; mutually exclusive with tank_id)
     incubator_id = Column(Integer, ForeignKey("incubators.incubator_id"), nullable=True, index=True)
     chamber_id = Column(String(255), nullable=True)
+
+    # Refrigerator Reference (for refrigerator tracking; mutually exclusive with tank_id/incubator_id)
+    refrigerator_id = Column(Integer, ForeignKey("refrigerators.refrigerator_id"), nullable=True, index=True)
+    zone_id = Column(String(255), nullable=True)
     hospital_id = Column(Integer, ForeignKey("hospitals.hospital_id"), nullable=False, index=True, comment="Hospital ID for scoping and compliance")
     branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id"), nullable=False, index=True, comment="Branch ID for scoping and compliance")
     
@@ -117,6 +121,7 @@ class CriticalAlert(Base):
     # Relationships
     tank = relationship("Tank", backref="critical_alerts")
     incubator = relationship("Incubator", backref="critical_alerts")
+    refrigerator = relationship("Refrigerator", backref="critical_alerts")
     hospital = relationship("Hospital", backref="critical_alerts")
     branch = relationship("HospitalBranch", backref="critical_alerts")
     

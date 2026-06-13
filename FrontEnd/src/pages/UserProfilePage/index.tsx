@@ -40,7 +40,7 @@ const UserProfilePage: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const navigate = useNavigate();
   const isOnboarding = useOnboardingMode();
-  const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token } = useAuth();
+  const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token, onboardingCompleted } = useAuth();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
  
  
@@ -490,7 +490,7 @@ const UserProfilePage: React.FC = () => {
       <div className="pt-[calc(63px+1rem)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="space-y-8">
- 
+
         {/* Basic Information Section */}
         <div id="onboarding-profile-basic-info" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
@@ -662,7 +662,28 @@ const UserProfilePage: React.FC = () => {
             </div>
           )}
         </div>
- 
+
+        {onboardingCompleted && !isOnboarding && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 flex items-center justify-between gap-6">
+            <div className="flex items-center gap-5 min-w-0">
+              <img src="/genie/explaining_casual.webp" alt="" className="w-40 h-40 object-contain shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900">You know your way around mgSCALE</p>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">All onboarding levels completed. Drop back in anytime to revisit a workflow, explore advanced features, or walk a new team member through the tour.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate("/onboarding/dashboard")}
+              className="shrink-0 flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              Go to Onboarding
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Support Activity Section */}
         <div id="onboarding-profile-support-activity" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">

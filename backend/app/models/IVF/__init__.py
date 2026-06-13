@@ -3,6 +3,7 @@ from .hospital_model import Hospital
 from .hospital_branch_model import HospitalBranch
 from .tank_model import Tank
 from .incubator_model import Incubator
+from .refrigerator_model import Refrigerator
 from .canister_ln2_log_model import CanisterLn2Log
 from .ivf_telemetry_data_model import IVFTelemetryData
 from .ivf_quality_log_model import IVFQualityLog
@@ -15,6 +16,9 @@ from .reservoir_log_model import ReservoirLog
 from .ln2_refill_detection_model import Ln2RefillDetection
 from .ivf_cycle_model import IvfCycle
 from .ivf_cycle_log_model import IvfCycleLog
+from .ivf_oocyte_grade_model import IvfOocyteGrade
+from .ivf_oocyte_image_model import IvfOocyteImage
+from .ivf_cycle_report_model import IvfCycleReport
 
 # Register UIRouteVariant so Hospital.ui_variants relationship resolves (same Base registry).
 # Without this, any code that touches Hospital (e.g. CriticalAlert -> ... -> Hospital) fails with

@@ -179,6 +179,12 @@ class Settings(BaseSettings):
     ARC_API_TOKEN: Optional[str] = None  # Token ID for ARC IVF Storage API authentication
     ARC_IVF_TOKEN_ID: Optional[str] = None  # Alias for ARC_API_TOKEN (for backward compatibility)
     ARC_AUTORUN: bool = False  # Enable daily ARC IVF autorun at midnight when true
+    # Azure Blob Storage (Optional - for IVF media uploads)
+    # Azurite dev string: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;
+    #   AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OqIqqr+ReMvs4yMBqWjl5Rr2N5YDM0j2YMk6;
+    #   BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;
+    AZURE_STORAGE_CONNECTION_STRING: Optional[str] = None
+    AZURE_STORAGE_BLOB_CONTAINER: str = "ivf-media"
     # Twilio (Optional - for WhatsApp notifications)
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None
