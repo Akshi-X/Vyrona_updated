@@ -1,38 +1,122 @@
 [
     {
         "id": "q5-1",
-        "prompt": "What does the Active Tank Status panel help you monitor?",
+        "prompt": "How does mgSCALE detect when a container has been refilled?",
         "choices": [
-            "Patient sample locations",
-            "Current LN2 levels across all active containers",
-            "Temperature deviations only",
-            "Pending lab orders"
+            "By manual entry from the technician after each refill",
+            "Automatically, using sensor data from the container",
+            "Via a scheduled daily report from the branch manager",
+            "Through a QR code scan at the refill station"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
     },
     {
         "id": "q5-2",
-        "prompt": "What information is captured in the Recent Activity Log for each refill?",
+        "prompt": "A new detection card appears for tank T-08. After reviewing it, you confirm the reading is accurate. Which button records this as an official refill event?",
         "choices": [
-            "Only the date and container ID",
-            "Who performed the refill, when, amount added, and notes",
-            "Sensor readings at time of refill",
-            "Patient consent records"
+            "View History",
+            "Dismiss",
+            "Add Log",
+            "Confirm Threshold"
         ],
-        "correctIndex": 1,
-        "points": 20
+        "correctIndex": 2,
+        "points": 15
     },
     {
         "id": "q5-3",
-        "prompt": "What does the Reservoir Logs section track?",
+        "prompt": "A sensor flags a refill on tank T-11, but the LN2 weight reading appears inaccurate. What is the correct action from the pending detection card?",
         "choices": [
-            "Individual container refills by technician",
-            "Bulk LN2 orders and deliveries for each branch reservoir",
-            "Alert thresholds for each tank",
-            "WebSocket connection status"
+            "Add it as a confirmed log and raise a support ticket later",
+            "Dismiss the detection to remove it from the pending queue",
+            "Delete the container record and re-register it",
+            "Ignore it — the system will auto-clear stale detections"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
+    },
+    {
+        "id": "q5-4",
+        "prompt": "Which fields must be completed manually when confirming a refill in the Add Log form?",
+        "choices": [
+            "Container code and LN2 weight",
+            "Date, time, and reservoir name",
+            "Who performed the refill and any notes",
+            "Branch and sensor reading"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q5-5",
+        "prompt": "A branch manager needs to verify who refilled tank T-03 last Friday and how much LN2 was added. Which section shows this information?",
+        "choices": [
+            "Refill Detected cards",
+            "Recent Activity Log",
+            "Active Tank Status",
+            "Reservoir Logs"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "q5-6",
+        "prompt": "Why are certain containers flagged in the Active Tank Status panel?",
+        "choices": [
+            "They have an unresolved sensor error",
+            "They have not been assigned to a technician",
+            "They are approaching the minimum LN2 threshold",
+            "They have exceeded the maximum refill frequency"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q5-7",
+        "prompt": "Tank T-11 is highlighted in the Active Tank Status panel. What does this indicate?",
+        "choices": [
+            "A refill is already in progress for this container",
+            "The container has a pending sensor calibration request",
+            "The container's LN2 level has dropped below the minimum threshold",
+            "The container has exceeded its maximum refill frequency"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q5-8",
+        "prompt": "You want to review the complete refill history of tank T-05 — every date, technician, and quantity on record. How do you open this view?",
+        "choices": [
+            "Click the tank row in the Refill Detected section",
+            "Filter the Recent Activity Log by tank code",
+            "Click the View button on the tank row in Active Tank Status",
+            "Download the CSV from Reservoir Logs"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q5-9",
+        "prompt": "Your clinic receives a bulk LN2 delivery for the Mumbai branch reservoir. Where in the Refill Log should this be recorded?",
+        "choices": [
+            "Add a new card in the Refill Detected section",
+            "Log it against each affected container in the Recent Activity Log",
+            "Record it in the Reservoir Logs section under the Mumbai branch",
+            "Update the LN2 threshold in Alert Configuration"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q5-10",
+        "prompt": "What should you update in Reservoir Logs once a bulk LN2 delivery arrives at a branch?",
+        "choices": [
+            "The minimum LN2 threshold for that branch reservoir",
+            "The container count assigned to that reservoir",
+            "The technician responsible for accepting the delivery",
+            "The received date to complete the order record"
+        ],
+        "correctIndex": 3,
+        "points": 15
     }
 ]

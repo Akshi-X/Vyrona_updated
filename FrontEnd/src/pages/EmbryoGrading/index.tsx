@@ -247,8 +247,8 @@ export default function EmbryoGradingPage() {
         setError(null);
         const data = await ivfService.listCycles();
         setCycles(data);
-      } catch (err: any) {
-        setError(err?.message || 'Failed to load cycles');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load cycles');
       } finally {
         setLoading(false);
       }
@@ -573,14 +573,14 @@ export default function EmbryoGradingPage() {
           </div>
 
           {/* Right — Grading + Needs Attention on top, Recent Activity below */}
-          <div className="flex flex-col gap-4 min-h-0 overflow-hidden">
+          <div className="flex flex-col gap-4 min-h-0">
 
             {/* Top row: Grading Overview + Needs Attention */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
 
               {/* Center — Grading Overview + Trend */}
               <div className="flex flex-col gap-3">
-                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="bg-white border border-gray-200 rounded-2xl ">
                   <div className="px-4 py-3.5 border-b border-gray-100">
                     <p className="text-sm font-bold text-gray-900">Grading Overview</p>
                     <p className="text-[11px] text-gray-400 mt-0.5">Embryo quality distribution across all active cycles</p>
