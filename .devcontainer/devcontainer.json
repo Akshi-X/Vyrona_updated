@@ -1,0 +1,37 @@
+{
+  "name": "MGScale Dev",
+  "dockerComposeFile": "docker-compose.devcontainer.yml",
+  "service": "backend",
+  "workspaceFolder": "/workspace",
+  "postCreateCommand": "cd /workspace/backend && poetry config virtualenvs.in-project true && poetry install --only=main && cd /workspace/FrontEnd && npm install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        "charliermarsh.ruff",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        }
+      }
+    }
+  },
+  "forwardPorts": [8000, 5173, 5432, 6379, 5000],
+  "portsAttributes": {
+    "8000": { "label": "FastAPI Backend" },
+    "5173": { "label": "Vite Frontend" },
+    "5000": { "label": "smtp4dev UI" },
+    "5432": { "label": "Postgres" },
+    "6379": { "label": "Redis" }
+  },
+  "shutdownAction": "stopCompose"
+}
