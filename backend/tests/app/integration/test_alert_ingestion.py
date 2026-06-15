@@ -8,7 +8,8 @@ from app.config.database import SessionLocal
 
 # Endpoints
 INGESTION_URL = "http://localhost:7072/api/tive/webhook"
-SMTP_API_URL = "http://localhost:5000/api/Messages"
+SMTP_API_URL = "http://localhost:5005/api/Messages"
+
 
 @pytest.fixture
 def db():
