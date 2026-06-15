@@ -31,6 +31,18 @@ def fix_missing_columns():
         conn.execute(text(
             "ALTER TABLE critical_alerts ADD COLUMN IF NOT EXISTS acknowledgment_reason TEXT;"
         ))
+        conn.execute(text(
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS refrigerator_id INTEGER;"
+        ))
+        conn.execute(text(
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS zone_id VARCHAR(255);"
+        ))
+        conn.execute(text(
+            "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS refrigerator_id INTEGER;"
+        ))
+        conn.execute(text(
+            "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS zone_id VARCHAR(255);"
+        ))
         conn.commit()
 
 
