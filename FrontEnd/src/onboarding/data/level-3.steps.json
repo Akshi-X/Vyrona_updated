@@ -116,7 +116,7 @@
         "requireClick": false,
         "scrollIntoView": true,
         "startPage": "/onboarding/ivf-track-shipment/161",
-        "genieImage": "/genie/explaining_with_numbers.webp"
+        "genieImage": "/genie/ln2_tape.webp"
     },
     {
         "id": "ct3-kpi-evap-rate",
@@ -226,7 +226,7 @@
         "placement": "top",
         "requireClick": false,
         "startPage": "/onboarding/ivf-track-shipment/161",
-        "genieImage": "/genie/explaining_with_numbers.webp"
+        "genieImage": "/genie/chart_explain.webp"
     },
     {
         "id": "ct3-chart-tab-ln2",
@@ -301,7 +301,7 @@
         "requireClick": false,
         "prevDisable": true,
         "startPage": "/onboarding/ivf-track-shipment/161",
-        "genieImage": "/genie/explaining_caution.webp"
+        "genieImage": "/genie/alerts.webp"
     },
     {
         "id": "ct3-ivf-alert-ack-click",
@@ -339,6 +339,7 @@
         "content": "The alert has been acknowledged and moved out of the active queue. Acknowledged alerts remain visible in the log for audit purposes — nothing is ever deleted. Close this panel to continue.",
         "placement": "bottom_middle",
         "is_wide": true,
+        "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
         "startPage": "/onboarding/ivf-track-shipment/161",
@@ -437,7 +438,8 @@
         "title": "My Tasks Panel",
         "icon": "CheckSquare",
         "content": "This panel lists all tasks linked to this container. Each row shows the task name, assignee, due date, priority, and status — giving you a full picture of what needs to be done.",
-        "placement": "left",
+        "placement": "bottom_middle",
+        "is_wide": true,
         "requireClick": false,
         "prevDisable": true,
         "startPage": "/onboarding/ivf-track-shipment/161",

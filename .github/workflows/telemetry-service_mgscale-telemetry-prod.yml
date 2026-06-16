@@ -1,0 +1,21 @@
+name: Deploy Azure Function (Flex, nozip)
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "telemetry-service/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/reusable-azure-function-python.yml
+    with:
+      function_app_name: mgscale-telemetry-prod
+      function_app_path: telemetry-service
+      python_version: "3.11"
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+
+

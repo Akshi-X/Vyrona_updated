@@ -126,6 +126,10 @@ class Settings(BaseSettings):
     SMTP_USERNAME: Optional[str] = None  # e.g., "
     SMTP_PASSWORD: Optional[str] = None  # e.g., "your-app-password-here"
 
+    # Fixed OTP mode for local/docker development
+    FIXED_OTP_MODE: bool = False
+    FIXED_OTP_CODE: str = "123456"
+
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True

@@ -13,24 +13,24 @@
     },
     {
         "id": "q5-2",
-        "prompt": "What does clicking 'Add Log' on a detection card do?",
+        "prompt": "A new detection card appears for tank T-08. After reviewing it, you confirm the reading is accurate. Which button records this as an official refill event?",
         "choices": [
-            "Deletes the detection from the pending queue",
-            "Marks the container as due for a refill",
-            "Converts the detection into a confirmed refill record",
-            "Sends an alert to the branch manager for approval"
+            "View History",
+            "Dismiss",
+            "Add Log",
+            "Confirm Threshold"
         ],
         "correctIndex": 2,
         "points": 15
     },
     {
         "id": "q5-3",
-        "prompt": "Which details does the Add Log form pre-fill from the sensor detection?",
+        "prompt": "A sensor flags a refill on tank T-11, but the LN2 weight reading appears inaccurate. What is the correct action from the pending detection card?",
         "choices": [
-            "Only the container code and branch",
-            "Tank, reservoir, date, time, and LN2 weight",
-            "Technician name, date, and reservoir only",
-            "Date, time, and branch name only"
+            "Add it as a confirmed log and raise a support ticket later",
+            "Dismiss the detection to remove it from the pending queue",
+            "Delete the container record and re-register it",
+            "Ignore it — the system will auto-clear stale detections"
         ],
         "correctIndex": 1,
         "points": 15
@@ -49,12 +49,12 @@
     },
     {
         "id": "q5-5",
-        "prompt": "What does the Recent Activity Log record for each confirmed refill event?",
+        "prompt": "A branch manager needs to verify who refilled tank T-03 last Friday and how much LN2 was added. Which section shows this information?",
         "choices": [
-            "Only the container ID and refill date",
-            "Who performed the refill, when, amount of LN2 added, and notes",
-            "Sensor readings captured at the time of refill",
-            "Patient details linked to the stored samples"
+            "Refill Detected cards",
+            "Recent Activity Log",
+            "Active Tank Status",
+            "Reservoir Logs"
         ],
         "correctIndex": 1,
         "points": 15
@@ -73,38 +73,38 @@
     },
     {
         "id": "q5-7",
-        "prompt": "What information does each row in the Active Tank Status panel display?",
+        "prompt": "Tank T-11 is highlighted in the Active Tank Status panel. What does this indicate?",
         "choices": [
-            "Container code, assigned technician, and last alert date",
-            "Container code, branch, current LN2 level vs. L2 threshold, and days since last refill",
-            "Branch, reservoir volume, and pending order status",
-            "Container code and current temperature reading only"
+            "A refill is already in progress for this container",
+            "The container has a pending sensor calibration request",
+            "The container's LN2 level has dropped below the minimum threshold",
+            "The container has exceeded its maximum refill frequency"
         ],
-        "correctIndex": 1,
+        "correctIndex": 2,
         "points": 15
     },
     {
         "id": "q5-8",
-        "prompt": "What does the Refill History panel show for a selected container?",
+        "prompt": "You want to review the complete refill history of tank T-05 — every date, technician, and quantity on record. How do you open this view?",
         "choices": [
-            "Only the most recent refill date and technician name",
-            "Sensor trend graphs for the past 30 days",
-            "Last refill date, who performed it, quantity added, reservoir used, and current status",
-            "Pending detections specific to that container"
+            "Click the tank row in the Refill Detected section",
+            "Filter the Recent Activity Log by tank code",
+            "Click the View button on the tank row in Active Tank Status",
+            "Download the CSV from Reservoir Logs"
         ],
         "correctIndex": 2,
         "points": 15
     },
     {
         "id": "q5-9",
-        "prompt": "What does the Reservoir Logs section track?",
+        "prompt": "Your clinic receives a bulk LN2 delivery for the Mumbai branch reservoir. Where in the Refill Log should this be recorded?",
         "choices": [
-            "Individual LN2 top-ups performed by lab technicians",
-            "Bulk LN2 orders and deliveries for each branch reservoir",
-            "Monthly compliance reports submitted per branch",
-            "Sensor calibration records for each reservoir"
+            "Add a new card in the Refill Detected section",
+            "Log it against each affected container in the Recent Activity Log",
+            "Record it in the Reservoir Logs section under the Mumbai branch",
+            "Update the LN2 threshold in Alert Configuration"
         ],
-        "correctIndex": 1,
+        "correctIndex": 2,
         "points": 15
     },
     {

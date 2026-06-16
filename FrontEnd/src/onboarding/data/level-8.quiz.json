@@ -1,38 +1,122 @@
 [
     {
         "id": "q8-1",
-        "prompt": "What can you do from the Users page?",
+        "prompt": "What does the Users page let Admins manage?",
         "choices": [
-            "Configure LN2 alert thresholds",
-            "View, filter, and manage user access across your clinic",
-            "Download monthly KPI reports",
-            "Monitor live sensor readings"
+            "LN2 alert thresholds and KPI configurations",
+            "Monthly KPI summaries and critical alert reports",
+            "Everyone who has access to the clinic's mgSCALE account — their roles, branches, and invite status",
+            "Live sensor readings and refill detection events"
         ],
-        "correctIndex": 1,
-        "points": 20
+        "correctIndex": 2,
+        "points": 15
     },
     {
         "id": "q8-2",
-        "prompt": "What do the User Filters allow you to narrow by?",
+        "prompt": "What does the Role filter on the Users page help you audit?",
         "choices": [
-            "Date range and alert severity",
-            "Role and branch",
-            "Tank code and LN2 level",
-            "Outcome and actor type"
+            "Which branches have the most active users",
+            "Who holds elevated access (Admin or Manager) across the clinic",
+            "Which users have pending invites",
+            "How many logins occurred per branch this month"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
     },
     {
         "id": "q8-3",
-        "prompt": "Which roles can invite new users from the Users page?",
+        "prompt": "What does the Branch filter on the Users page show?",
         "choices": [
-            "All users regardless of role",
-            "Admins",
-            "Only Mygrape super-admins",
-            "Managers only"
+            "Only Admin accounts assigned to a specific branch",
+            "All branches ranked by number of active users",
+            "Users assigned to a specific branch, helping you focus on one site at a time",
+            "Branches where invite links are still pending"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q8-4",
+        "prompt": "What does each row in the Users table show?",
+        "choices": [
+            "Tank codes, LN2 levels, and last refill dates per user",
+            "Identity, access level, branch assignment, account standing, and last login activity",
+            "Support ticket history and notification preferences",
+            "Monthly report downloads and filter usage per user"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
+    },
+    {
+        "id": "q8-5",
+        "prompt": "What information does the Add User invite form require?",
+        "choices": [
+            "Name, phone number, and department",
+            "Email, role, and branch (branch required only for standard Users)",
+            "Employee ID, role, and start date",
+            "Email and a password set by the administrator"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "q8-6",
+        "prompt": "What happens when you select the User role in the invite modal?",
+        "choices": [
+            "The form auto-fills the branch from the administrator's branch",
+            "An additional Branch field appears, which is required for standard Users",
+            "The invite is sent immediately without further input",
+            "The form locks email validation to the clinic's domain"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "q8-7",
+        "prompt": "How long does the invite link sent to a new user remain valid?",
+        "choices": [
+            "24 hours",
+            "3 days",
+            "One week",
+            "30 days"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q8-8",
+        "prompt": "What should you do if a user misses their invite link?",
+        "choices": [
+            "Delete the user record and create a new invite",
+            "Ask the user to register directly on the login page",
+            "Contact the support team to re-issue the link",
+            "Use the Resend Invite option in the Users table to issue a fresh link"
+        ],
+        "correctIndex": 3,
+        "points": 15
+    },
+    {
+        "id": "q8-9",
+        "prompt": "Who can see all branches in the Users page Branch filter?",
+        "choices": [
+            "Only Admins",
+            "All users regardless of role",
+            "Managers and Admins",
+            "Admins and the Mygrape support team"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q8-10",
+        "prompt": "What does the platform validate before allowing an invite to be sent?",
+        "choices": [
+            "That the email domain matches the clinic's registered domain",
+            "That the role is appropriate for the branch size",
+            "The format of the email address",
+            "That the branch has available user slots"
+        ],
+        "correctIndex": 2,
+        "points": 15
     }
 ]
