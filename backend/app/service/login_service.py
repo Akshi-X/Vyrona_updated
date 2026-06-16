@@ -62,5 +62,7 @@ def handle_login(email: str, password: str, remember_me: bool, db: Session) -> d
             "otp_expiry": None  # Frontend uses fixed 10-minute countdown to avoid timezone issues
         }
     except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"OTP send failed: {e}", exc_info=True)
         raise OTPSendFailedException(email=user.email, reason=str(e))
 

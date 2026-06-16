@@ -1,0 +1,20 @@
+name: Deploy Azure Function (Flex, nozip)
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "tive-ingestion-function/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/reusable-azure-function-python.yml
+    with:
+      function_app_name: mgscale-ingestion-dev
+      function_app_path: tive-ingestion-function
+      python_version: "3.11"
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+
