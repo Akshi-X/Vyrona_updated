@@ -8,7 +8,7 @@ import { TourProvider, useTour } from "@reactour/tour";
 import { OnboardingModeProvider } from "../../contexts/OnboardingModeContext";
 import { disableOnboardingMocks, enableOnboardingMocks } from "../../onboarding/mockApi";
 import OnboardingOverlay from "./OnboardingOverlay";
-import { TourNavStoreProvider, useTourNavContext, type TourNavContextValue } from "../../contexts/TourNavContext";
+import { TourNavStoreProvider, useTourNavContext, type TourNavState } from "../../contexts/TourNavContext";
 import TourStepHeading from "./TourStepHeading";
 import {
     GeniePreloaderProvider,
@@ -25,7 +25,7 @@ function GeniePreloaderGate({ children }: { children: React.ReactNode }) {
 }
 
 // ── Shared nav buttons used by both default and wide layouts ──────────────────
-function TourNavButtons({ nav }: { nav: NonNullable<TourNavContextValue["nav"]> }) {
+function TourNavButtons({ nav }: { nav: TourNavState }) {
     return (
         <div className="space-y-2 border-t border-slate-100 pt-3 mt-3">
             {nav.requiresClick && (
@@ -150,8 +150,8 @@ function TourProviderWithDynamicStyles({ children }: { children: React.ReactNode
             disableInteraction={false}
             disableDotsNavigation={true}
             disableKeyboardNavigation={true}
-            onClickMask={() => {}}
-            onClickClose={() => {}}
+            onClickMask={() => { }}
+            onClickClose={() => { }}
             components={{
                 Content: TourContent,
                 Navigation: TourNavigation,
@@ -257,9 +257,9 @@ export default function OnboardingShell() {
                                     </div>
                                 </div>
                             )}
-                        {/* Kept outside the hideSidebar conditional so React never remounts it on
+                            {/* Kept outside the hideSidebar conditional so React never remounts it on
                             layout changes — preserves isOpen state when navigating to no-sidebar routes. */}
-                        <OnboardingOverlay />
+                            <OnboardingOverlay />
                         </GeniePreloaderGate>
                     </TourProviderWithDynamicStyles>
                 </TourNavStoreProvider>
