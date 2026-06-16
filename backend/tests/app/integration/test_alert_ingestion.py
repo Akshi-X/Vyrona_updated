@@ -1,10 +1,13 @@
 import pytest
 import requests
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import text
 
 from app.config.database import SessionLocal
+from unittest.mock import patch
+from app.service.IVF.critical_alert_service import CriticalAlertService
+from app.models.readings_model import Readings
 
 # Endpoints
 INGESTION_URL = "http://localhost:7072/api/tive/webhook"
@@ -36,61 +39,29 @@ def db():
 @pytest.fixture(autouse=True)
 def setup_teardown_environment(db):
     """
-    Ensures Branch 26, Tank 94, and test-user94@mygrape.com are cleanly set up
+    Ensures Branch 9926, Tank 94, and test-user94@mygrape.com are cleanly set up
     """
-    print("\n[Setup] Ensuring tanks columns exist...")
-    for stmt in [
-        "ALTER TABLE tanks ADD COLUMN IF NOT EXISTS empty_weight_kg NUMERIC(10,4)",
-        "ALTER TABLE tanks ADD COLUMN IF NOT EXISTS full_weight_kg NUMERIC(10,4)",
-        "ALTER TABLE tanks ADD COLUMN IF NOT EXISTS static_evap_rate_l_per_day NUMERIC(8,4)",
-        "ALTER TABLE tanks ADD COLUMN IF NOT EXISTS tive_device_id VARCHAR(64)",
-    ]:
-        db.execute(text(stmt))
-    db.commit()
 
-    print("\n[Setup] Ensuring ln2_iot_devices columns exist...")
-    alter_statements = [
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS closed_noise_margin_kg_per_h NUMERIC(8,4) DEFAULT 0.027",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS open_rate_min_kg_per_h NUMERIC(8,4) DEFAULT 0.0",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS refill_threshold_kg NUMERIC(10,4) DEFAULT 1.0",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS window_minutes INTEGER DEFAULT 1",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS window_min_points INTEGER DEFAULT 1",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS consecutive_windows_for_state INTEGER DEFAULT 1",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS spike_tolerance_kg NUMERIC(8,4) DEFAULT 0.8",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS spike_max_duration_s INTEGER DEFAULT 90",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS lid_weight_min_kg NUMERIC(8,4) DEFAULT 0.45",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS lid_weight_max_kg NUMERIC(8,4) DEFAULT 0.65",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS lid_confirm_stable_points INTEGER DEFAULT 4",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS low_level_threshold_kg NUMERIC(10,4) DEFAULT 5.0",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS low_level_consecutive_readings INTEGER DEFAULT 10",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS canister_weight_kg NUMERIC(8,4) DEFAULT 0.31",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS canister_tolerance_kg NUMERIC(8,4) DEFAULT 0.05",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS product_change_max_kg NUMERIC(8,4) DEFAULT 0.08",
-        "ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS precaution_level_pct NUMERIC(6,2) DEFAULT 15.0"
-    ]
-    for stmt in alter_statements:
-        db.execute(text(stmt))
-    db.commit()
 
     # print("\n[Setup] Cleaning any leftover test data...")
     # clean_test_records(db)
 
-    print("[Setup] Provisioning Hospital 26, Branch 26, Device, Tank 94, ln2_iot_devices, test IVF User, and KPI configurations...")
+    print("[Setup] Provisioning Hospital 9926, Branch 9926, Device, Tank 94, ln2_iot_devices, test IVF User, and KPI configurations...")
     
-    # 1. Create Hospital 26
+    # 1. Create Hospital 9926
     db.execute(text("""
         INSERT INTO hospitals (hospital_id, hospital_name, created_at, updated_at, is_email_notifify, is_whatsapp_notify)
-        VALUES (26, 'Test Hospital 26', NOW(), NOW(), true, true)
+        VALUES (9926, 'Test Hospital 9926', NOW(), NOW(), true, true)
         ON CONFLICT (hospital_id) DO UPDATE SET
             hospital_name = EXCLUDED.hospital_name,
             is_email_notifify = EXCLUDED.is_email_notifify,
             is_whatsapp_notify = EXCLUDED.is_whatsapp_notify;
     """))
 
-    # 2. Create Branch 26 (linked to Hospital 26)
+    # 2. Create Branch 9926 (linked to Hospital 9926)
     db.execute(text("""
         INSERT INTO hospital_branches (branch_id, hospital_id, branch_name, created_at, updated_at)
-        VALUES (26, 26, 'Main Branch 26', NOW(), NOW())
+        VALUES (9926, 9926, 'Main Branch 9926', NOW(), NOW())
         ON CONFLICT (branch_id) DO UPDATE SET
             hospital_id = EXCLUDED.hospital_id,
             branch_name = EXCLUDED.branch_name;
@@ -100,19 +71,19 @@ def setup_teardown_environment(db):
     db.execute(text("DELETE FROM devices WHERE device_code IN ('IOT1234567', 'IOT1234568');"))
     device_res = db.execute(text("""
         INSERT INTO devices (branch_id, device_code, created_at, updated_at)
-        VALUES (26, 'IOT1234567', NOW(), NOW())
+        VALUES (9926, 'IOT1234567', NOW(), NOW())
         RETURNING id;
     """))
     device_id = device_res.scalar()
 
     device_res_97 = db.execute(text("""
         INSERT INTO devices (branch_id, device_code, created_at, updated_at)
-        VALUES (26, 'IOT1234568', NOW(), NOW())
+        VALUES (9926, 'IOT1234568', NOW(), NOW())
         RETURNING id;
     """))
     device_id_97 = device_res_97.scalar()
 
-    # 4. Create Tank 94, 95, and 97 (linked to Branch 26) with all weights and Tive IDs
+    # 4. Create Tank 94, 95, and 97 (linked to Branch 9926) with all weights and Tive IDs
     db.execute(text("""
         INSERT INTO tanks (
             tank_id, branch_id, tank_code, is_active, status, capacity_liters,
@@ -120,7 +91,7 @@ def setup_teardown_environment(db):
             created_at, updated_at
         )
         VALUES (
-            94, 26, 'T94', true, 'safe', 47.0,
+            94, 9926, 'T94', true, 'safe', 47.0,
             22.1560, 57.5000, 0.3700, 'K7654321',
             NOW(), NOW()
         )
@@ -144,7 +115,7 @@ def setup_teardown_environment(db):
             created_at, updated_at
         )
         VALUES (
-            95, 26, 'T95', true, 'safe', 47.0,
+            95, 9926, 'T95', true, 'safe', 47.0,
             22.1560, 57.5000, 0.3700, 'K7654322',
             NOW(), NOW()
         )
@@ -168,7 +139,7 @@ def setup_teardown_environment(db):
             created_at, updated_at
         )
         VALUES (
-            97, 26, 'T97', true, 'safe', 47.0,
+            97, 9926, 'T97', true, 'safe', 47.0,
             22.1560, 57.5000, 0.3700, 'K7654324',
             NOW(), NOW()
         )
@@ -258,13 +229,13 @@ def setup_teardown_environment(db):
             updated_at = EXCLUDED.updated_at;
     """))
 
-    # 6. Create test user (User role, IVF department, Branch 26) to receive notifications
+    # 6. Create test user (User role, IVF department, Branch 9926) to receive notifications
     db.execute(text("""
         INSERT INTO users (
             user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, created_at, updated_at
         )
         VALUES (
-            'usr-test-94', 'test-user94@mygrape.com', 'dummy_hash_for_testing', 'Test', 'User', 'User', true, 'approved', 26, 26, 'IVF', false, NOW(), NOW()
+            'usr-test-94', 'test-user94@mygrape.com', 'dummy_hash_for_testing', 'Test', 'User', 'User', true, 'approved', 9926, 9926, 'IVF', false, NOW(), NOW()
         )
         ON CONFLICT (email) DO UPDATE SET
             user_id = EXCLUDED.user_id,
@@ -297,22 +268,22 @@ def setup_teardown_environment(db):
     # Insert only if rows don't exist yet
     db.execute(text("""
         INSERT INTO kpi_config (hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        SELECT 26, 26, 94, 'temp_internal', 'Internal Temperature', -196.0000, -150.0000, '°C', 'critical', 1, true
+        SELECT 9926, 9926, 94, 'temp_internal', 'Internal Temperature', -196.0000, -150.0000, '°C', 'critical', 1, true
         WHERE NOT EXISTS (SELECT 1 FROM kpi_config WHERE tank_id = 94 AND kpi_name = 'temp_internal');
     """))
     db.execute(text("""
         INSERT INTO kpi_config (hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        SELECT 26, 26, 94, 'shock', 'Shock Detection', 0.0000, 2.0000, 'g', 'critical', 1, true
+        SELECT 9926, 9926, 94, 'shock', 'Shock Detection', 0.0000, 2.0000, 'g', 'critical', 1, true
         WHERE NOT EXISTS (SELECT 1 FROM kpi_config WHERE tank_id = 94 AND kpi_name = 'shock');
     """))
     db.execute(text("""
         INSERT INTO kpi_config (hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        SELECT 26, 26, 95, 'temp_internal', 'Internal Temperature', -196.0000, -150.0000, '°C', 'critical', 1, true
+        SELECT 9926, 9926, 95, 'temp_internal', 'Internal Temperature', -196.0000, -150.0000, '°C', 'critical', 1, true
         WHERE NOT EXISTS (SELECT 1 FROM kpi_config WHERE tank_id = 95 AND kpi_name = 'temp_internal');
     """))
     db.execute(text("""
         INSERT INTO kpi_config (hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        SELECT 26, 26, 95, 'shock', 'Shock Detection', 0.0000, 2.0000, 'g', 'critical', 1, true
+        SELECT 9926, 9926, 95, 'shock', 'Shock Detection', 0.0000, 2.0000, 'g', 'critical', 1, true
         WHERE NOT EXISTS (SELECT 1 FROM kpi_config WHERE tank_id = 95 AND kpi_name = 'shock');
     """))
 
@@ -330,7 +301,7 @@ def setup_teardown_environment(db):
     for kpi_name, alert_name, min_val, max_val, unit in kpi_configs_to_seed:
         db.execute(text("""
             INSERT INTO kpi_config (hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-            VALUES (26, 26, 97, :kpi_name, :alert_name, :min_val, :max_val, :unit, 'critical', 1, true)
+            VALUES (9926, 9926, 97, :kpi_name, :alert_name, :min_val, :max_val, :unit, 'critical', 1, true)
         """), {"kpi_name": kpi_name, "alert_name": alert_name, "min_val": min_val, "max_val": max_val, "unit": unit})
 
     db.commit()
@@ -406,7 +377,7 @@ def clean_test_records(db):
 def test_custom_iot_alert_flow(db):
     """
     Test CUSTOM_IOT weight sensor ingestion flow:
-    - Registers device IOT1234567 under Branch 26 and maps it to Tank 94.
+    - Registers device IOT1234567 under Branch 9926 and maps it to Tank 94.
     - Sends a payload with low weight (10.0 kg, below sensor_min_kg).
     - Verifies that:
       1. ln2_iot_raw_data gets created.
@@ -543,7 +514,7 @@ def test_tive_alert_flow(db):
     print(f"KPI Configs: {config_check}")
 
     hosp_check = db.execute(text("""
-        SELECT hospital_id, is_email_notifify FROM hospitals WHERE hospital_id = 26
+        SELECT hospital_id, is_email_notifify FROM hospitals WHERE hospital_id = 9926
     """)).fetchone()
     print(f"Hospital email enabled: {hosp_check}")
 
@@ -881,7 +852,7 @@ def test_tive_alert_escalation_flow(db):
     db.execute(text("DELETE FROM users WHERE email IN ('test-user-esc@mygrape.com', 'test-admin-esc@mygrape.com', 'test-user94@mygrape.com');"))
     db.commit()
 
-    # 2. Provision Tank 96 (linked to Branch 26) with all weights and Tive ID
+    # 2. Provision Tank 96 (linked to Branch 9926) with all weights and Tive ID
     db.execute(text("""
         INSERT INTO tanks (
             tank_id, branch_id, tank_code, is_active, status, capacity_liters,
@@ -889,7 +860,7 @@ def test_tive_alert_escalation_flow(db):
             created_at, updated_at
         )
         VALUES (
-            96, 26, 'T96', true, 'safe', 47.0,
+            96, 9926, 'T96', true, 'safe', 47.0,
             22.1560, 57.5000, 0.3700, 'K7654323',
             NOW(), NOW()
         )
@@ -907,13 +878,13 @@ def test_tive_alert_escalation_flow(db):
     """))
     db.commit()
 
-    # 3. Create two users for branch 26
+    # 3. Create two users for branch 9926
     db.execute(text("""
         INSERT INTO users (
             user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, created_at, updated_at
         )
         VALUES (
-            'usr-test-esc-u', 'test-user-esc@mygrape.com', 'dummy_hash', 'Esc', 'User', 'User', true, 'approved', 26, 26, 'IVF', false, NOW(), NOW()
+            'usr-test-esc-u', 'test-user-esc@mygrape.com', 'dummy_hash', 'Esc', 'User', 'User', true, 'approved', 9926, 9926, 'IVF', false, NOW(), NOW()
         )
         ON CONFLICT (email) DO UPDATE SET
             user_id = EXCLUDED.user_id,
@@ -930,7 +901,7 @@ def test_tive_alert_escalation_flow(db):
             user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, created_at, updated_at
         )
         VALUES (
-            'usr-test-esc-a', 'test-admin-esc@mygrape.com', 'dummy_hash', 'Esc', 'Admin', 'Admin', true, 'approved', 26, 26, 'IVF', false, NOW(), NOW()
+            'usr-test-esc-a', 'test-admin-esc@mygrape.com', 'dummy_hash', 'Esc', 'Admin', 'Admin', true, 'approved', 9926, 9926, 'IVF', false, NOW(), NOW()
         )
         ON CONFLICT (email) DO UPDATE SET
             user_id = EXCLUDED.user_id,
@@ -947,7 +918,7 @@ def test_tive_alert_escalation_flow(db):
     # 4. Create and configure KPI config for Tank 96 with a 1-minute cooldown and unack_escalation_threshold = 1
     db.execute(text("""
         INSERT INTO kpi_config (hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, unack_escalation_threshold, status)
-        SELECT 26, 26, 96, 'temp_internal', 'Internal Temperature', -196.0000, -150.0000, '°C', 'critical', 1, 1, true
+        SELECT 9926, 9926, 96, 'temp_internal', 'Internal Temperature', -196.0000, -150.0000, '°C', 'critical', 1, 1, true
         WHERE NOT EXISTS (SELECT 1 FROM kpi_config WHERE tank_id = 96 AND kpi_name = 'temp_internal');
     """))
     db.execute(text("""
@@ -1254,7 +1225,7 @@ def test_lid_state_open_alert_flow(db):
     db.execute(text("DELETE FROM kpi_config WHERE tank_id = 97 AND kpi_name = 'ln2_lid_state';"))
     db.execute(text("""
         INSERT INTO kpi_config (hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        VALUES (26, 26, 97, 'ln2_lid_state', 'Lid Open/Closed State', 0.0000, 0.0000, 'state', 'critical', 1, true);
+        VALUES (9926, 9926, 97, 'ln2_lid_state', 'Lid Open/Closed State', 0.0000, 0.0000, 'state', 'critical', 1, true);
     """))
     db.commit()
 
@@ -1473,3 +1444,509 @@ def test_lid_state_open_alert_flow(db):
     print("OK: Email dispatched for second lid_state alert after cooldown.")
 
     print("\nLID STATE OPEN ALERT FLOW TEST PASSED (all 4 phases)")
+
+def test_email_content_check(db):
+    """
+    Verify that the email sent via smtp4dev correctly injects the
+    dynamic values (Tank Code, Hospital Name, Alert Name, and Value).
+    """
+    print("\n--- TEST: EMAIL CONTENT VERIFICATION ---")
+    
+    # 1. Start with a clean slate
+    clear_smtp4dev()
+    
+    # 2. Trigger an alert (Using a mock payload that violates a threshold)
+    now = datetime.now(timezone.utc)
+    payload = {
+        "EntityName": "K7654321", # This maps to Tank 94
+        "EntryTimeEpoch": int(now.timestamp() * 1000),
+        "EntryTimeUtc": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+        "Cellular": {"SignalStrength": None, "Dbm": None},
+        "Temperature": {"Celsius": 22.0, "Fahrenheit": 71.6},
+        "ExternalTemperature": {"Celsius": None, "Fahrenheit": None},
+        "ProbeTemperature": {"Celsius": 20.0, "Fahrenheit": 68.0}, # Violates the -150 max threshold!
+        "Pressure": {"Psi": None, "Atmospheric": None},
+        "Humidity": {"Percentage": 64.2},
+        "Weather": {"Temperature": {"Celsius": None, "Fahrenheit": None}, "Wind": None},
+        "Accelerometer": {"G": 1.0, "X": 0.0, "Y": 0.0, "Z": 0.0},
+        "Light": {"Lux": 0.0},
+        "MinLight": {"Lux": None},
+        "MaxLight": {"Lux": None},
+        "Battery": {"Percentage": 100.0, "Estimation": "N/A", "IsCharging": False},
+        "Shock": {"G": 1.0, "X": None, "Y": None, "Z": None},
+        "ShockTime": None,
+    }
+    headers = {"Content-Type": "application/json"}
+    requests.post(INGESTION_URL, json=payload, headers=headers, timeout=10)
+    
+    # 3. Wait for the background worker (telemetry-service) to process it
+    print("Waiting 5s for the background worker to send the email...")
+    time.sleep(5)
+    
+    # 4. Fetch the inbox from smtp4dev
+    res = requests.get(f"{SMTP_API_URL}?pageSize=10").json()
+    msgs = res.get("results", res) if isinstance(res, dict) else res
+    
+    assert len(msgs) > 0, "Failed: No email was delivered to smtp4dev."
+    
+    # 5. Inspect the metadata
+    latest_msg = msgs[0]
+    msg_id = latest_msg["id"]
+    subject = latest_msg["subject"]
+    
+    # Check Subject
+    assert "Critical Alert" in subject, f"Unexpected Subject: {subject}"
+    assert "T94" in subject, "Subject did not contain the Tank Code"
+
+    # 6. Fetch the raw HTML body of the email
+    html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html")
+    html_content = html_res.text
+    
+    # 7. Assert that the HTML correctly injected the dynamic data!
+    assert "Internal Temperature" in html_content, "Missing Alert KPI Name in HTML"
+    assert "Main Branch 9926" in html_content, "Missing Branch Name in HTML"
+    
+    # Assert on the specific deviation message format you requested
+    expected_message = "Internal Temperature is deviated to 20.00 in Main Branch 9926 branch for T94 tank"
+    assert expected_message in html_content, f"Missing exact deviation message: {expected_message}"
+    
+    print("OK: Email content was successfully verified!")
+
+def test_midnight_cooldown_check(db):
+    """
+    Test the critical alert cooldown logic directly to verify it accurately 
+    handles crossovers at midnight (e.g., 11:58 PM to 12:02 AM the next day).
+    """
+    print("\n--- TEST: MIDNIGHT COOLDOWN CROSSOVER ---")
+
+    # 1. Setup: Clean records for Tank 94 to start with a clean slate
+    db.execute(text("DELETE FROM critical_alerts WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM readings WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM ivf_telemetry_data WHERE tank_id = 94;"))
+    db.commit()
+
+    # 2. Configure KPI config for Tank 94 with a 3-minute cooldown
+    db.execute(text("""
+        UPDATE kpi_config 
+        SET cooldown_minutes = 3, min = -196.0000, max = -150.0000, alert_type = 'critical', status = true
+        WHERE tank_id = 94 AND kpi_name = 'temp_internal';
+    """))
+    db.commit()
+
+    # Clear smtp4dev before the test starts
+    try:
+        clear_smtp4dev()
+    except Exception:
+        pass
+
+    seen_email_ids = set()
+    headers = {"Content-Type": "application/json"}
+
+    # --- payload helper ---
+    # --- payload helper ---
+    def get_payload(simulated_time: datetime):
+        # Convert the IST simulated_time to UTC for the payload's expected formats
+        utc_time = simulated_time.astimezone(timezone.utc)
+        return {
+            "EntityName": "K7654321",
+            "EntryTimeEpoch": int(utc_time.timestamp() * 1000),
+            "EntryTimeUtc": utc_time.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+            "Cellular": {"SignalStrength": None, "Dbm": None},
+            "Temperature": {"Celsius": 22.0, "Fahrenheit": 71.6},
+            "ExternalTemperature": {"Celsius": None, "Fahrenheit": None},
+            "ProbeTemperature": {"Celsius": -10.0, "Fahrenheit": 14.0},
+            "Pressure": {"Psi": None, "Atmospheric": None},
+            "Humidity": {"Percentage": 64.2},
+            "Weather": {"Temperature": {"Celsius": None, "Fahrenheit": None}, "Wind": None},
+            "Accelerometer": {"G": 1.0, "X": 0.0, "Y": 0.0, "Z": 0.0},
+            "Light": {"Lux": 0.0},
+            "MinLight": {"Lux": None},
+            "MaxLight": {"Lux": None},
+            "Battery": {"Percentage": 100.0, "Estimation": "N/A", "IsCharging": False},
+            "Shock": {"G": 1.0, "X": None, "Y": None, "Z": None},
+            "ShockTime": None,
+            "TiltAngle": {"Degrees": None},
+            "Shipment": None,
+            "AccountId": 9104,
+            "DeviceId": "865918077678290",
+            "DeviceName": "K7654321",
+            "ShipmentId": "TEST-SHIP-94",
+            "PublicShipmentId": None,
+            "PostSeqNum": None,
+            "PostTotalCount": None,
+            "IsLastItemInPostingBatch": True,
+            "Location": {
+                "Name": None, "Latitude": 12.9716, "Longitude": 77.5946, "FormattedAddress": None,
+                "Address": None, "LocationMethod": None, "Accuracy": None, "AccuracyConfidence": None,
+                "GeolocationSourceName": None, "IsGpsLocationAvailable": True, "IsCellLocationAvailable": None,
+                "IsWifiLocationAvailable": None, "IsCompositeLocationAvailable": None, "CellTowerUsedCount": None,
+                "WifiAccessPointUsedCount": None
+            }
+        }
+
+    # --- email helper ---
+    def get_new_emails(seen_ids):
+        new_emails = []
+        try:
+            res = requests.get(f"{SMTP_API_URL}?pageSize=1000", timeout=5).json()
+            msgs = res.get("results", res) if isinstance(res, dict) else res
+            for msg in msgs:
+                msg_id = msg.get("id")
+                if msg_id and msg_id not in seen_ids:
+                    to_addr = msg.get("to") or ""
+                    subject = msg.get("subject") or ""
+                    if "test-user94@mygrape.com" in to_addr and "Critical Alert" in subject:
+                        # fetch the full message's HTML body from the correct endpoint
+                        html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html", timeout=5)
+                        msg["html"] = html_res.text if html_res.status_code == 200 else ""
+                        new_emails.append(msg)
+        except Exception as e:
+            print(f"Error checking smtp4dev: {e}")
+        return new_emails
+
+    ist_tz = timezone(timedelta(hours=5, minutes=30))
+
+    # --- SIMULATE 11:58 PM IST (First Alert) ---
+    time_1 = datetime(2026, 6, 15, 23, 58, 0, tzinfo=ist_tz)
+    print(f"Simulating Time 1 (First Payload): {time_1.isoformat()}")
+    
+    resp = requests.post(INGESTION_URL, json=get_payload(time_1), headers=headers, timeout=10)
+    assert resp.status_code == 200, f"Webhook ingestion failed: {resp.status_code} - {resp.text}"
+
+    # Verify first alert is created
+    alert_created_1 = False
+    for _ in range(10):
+        time.sleep(1)
+        db.rollback()
+        alert_count = db.execute(text("SELECT COUNT(*) FROM critical_alerts WHERE tank_id = 94")).scalar()
+        if alert_count == 1:
+            alert_created_1 = True
+            break
+    assert alert_created_1, "First critical alert was not generated"
+    print("OK: First alert generated successfully.")
+
+    # Verify email was dispatched for first alert and check timestamp!
+    email_found_1 = False
+    for _ in range(10):
+        time.sleep(1)
+        new_emails = get_new_emails(seen_email_ids)
+        if new_emails:
+            email_found_1 = True
+            msg = new_emails[0]
+            html_body = msg.get("html", "")
+            
+            # The email should display the timestamp in IST
+            expected_time_str = time_1.strftime("%Y-%m-%d %H:%M:%S IST")
+            assert expected_time_str in html_body, f"Expected timestamp '{expected_time_str}' not found in email body"
+            print(f"OK: First email found with correct timestamp: {expected_time_str}")
+
+            for e in new_emails:
+                seen_email_ids.add(e["id"])
+            time.sleep(2)
+            more_emails = get_new_emails(seen_email_ids)
+            for e in more_emails:
+                seen_email_ids.add(e["id"])
+            break
+    assert email_found_1, "Email was not dispatched for the first payload"
+
+    # --- SIMULATE 11:59 PM IST (Within 3-min Cooldown) ---
+    time_2 = datetime(2026, 6, 15, 23, 59, 0, tzinfo=ist_tz)
+    print(f"Simulating Time 2 (Within Cooldown): {time_2.isoformat()}")
+    
+    resp = requests.post(INGESTION_URL, json=get_payload(time_2), headers=headers, timeout=10)
+    assert resp.status_code == 200, f"Webhook ingestion failed: {resp.status_code} - {resp.text}"
+
+    # Wait a bit and verify that alert count is still 1
+    time.sleep(3)
+    db.rollback()
+    alert_count = db.execute(text("SELECT COUNT(*) FROM critical_alerts WHERE tank_id = 94")).scalar()
+    assert alert_count == 1, f"Expected 1 alert during cooldown, but got {alert_count}"
+    print("OK: No new alert generated during cooldown.")
+
+    # Verify no new email was dispatched during cooldown
+    new_emails = get_new_emails(seen_email_ids)
+    assert len(new_emails) == 0, f"Expected no new email during cooldown, but found {len(new_emails)}"
+    print("OK: No new email found in smtp4dev during cooldown.")
+
+    # Shift the first alert's timestamp to 4 minutes ago to simulate cooldown ending!
+    print("Simulating cooldown ending by shifting the timestamp of the first alert by 4 minutes...")
+    db.execute(text("""
+        UPDATE critical_alerts 
+        SET created_at = NOW() - INTERVAL '4 minutes',
+            occurred_at = NOW() - INTERVAL '4 minutes',
+            updated_at = NOW() - INTERVAL '4 minutes'
+        WHERE tank_id = 94;
+    """))
+    db.commit()
+
+    # --- SIMULATE 12:02 AM IST NEXT DAY (After 3-min Cooldown) ---
+    time_3 = datetime(2026, 6, 16, 0, 2, 0, tzinfo=ist_tz)
+    print(f"Simulating Time 3 (Next Day, After Cooldown): {time_3.isoformat()}")
+    
+    resp = requests.post(INGESTION_URL, json=get_payload(time_3), headers=headers, timeout=10)
+    assert resp.status_code == 200, f"Webhook ingestion failed: {resp.status_code} - {resp.text}"
+
+    # Verify second alert is created
+    alert_created_2 = False
+    for _ in range(10):
+        time.sleep(1)
+        db.rollback()
+        alert_count = db.execute(text("SELECT COUNT(*) FROM critical_alerts WHERE tank_id = 94")).scalar()
+        if alert_count == 2:
+            alert_created_2 = True
+            break
+    assert alert_created_2, f"Second critical alert was not generated after cooldown. Total count is {alert_count}"
+    print("OK: Second alert generated successfully after cooldown ended.")
+
+    # Verify email was dispatched for the second alert and check timestamp!
+    email_found_2 = False
+    for _ in range(10):
+        time.sleep(1)
+        new_emails = get_new_emails(seen_email_ids)
+        if new_emails:
+            email_found_2 = True
+            msg = new_emails[0]
+            html_body = msg.get("html", "")
+            
+            # The email should display the timestamp in IST
+            expected_time_str = time_3.strftime("%Y-%m-%d %H:%M:%S IST")
+            assert expected_time_str in html_body, f"Expected timestamp '{expected_time_str}' not found in email body"
+            print(f"OK: Second email found with correct timestamp: {expected_time_str}")
+
+            for e in new_emails:
+                seen_email_ids.add(e["id"])
+            break
+    assert email_found_2, "Email was not dispatched for the third payload (after cooldown ended)"
+
+    print("\nMIDNIGHT COOLDOWN CROSSOVER TEST PASSED")
+
+
+def _get_tive_payload(probe_temp_c: float) -> dict:
+    """TIVE IVF payload for K7654321 (Tank 94). ProbeTemperature drives the
+    temp_internal KPI; Shock/Accelerometer are held at a safe 1.0G so only
+    temp_internal can deviate."""
+    now = datetime.now(timezone.utc)
+    return {
+        "EntityName": "K7654321",
+        "EntryTimeEpoch": int(now.timestamp() * 1000),
+        "EntryTimeUtc": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+        "Cellular": {"SignalStrength": None, "Dbm": None},
+        "Temperature": {"Celsius": 22.0, "Fahrenheit": 71.6},
+        "ExternalTemperature": {"Celsius": None, "Fahrenheit": None},
+        "ProbeTemperature": {"Celsius": probe_temp_c, "Fahrenheit": None},
+        "Pressure": {"Psi": None, "Atmospheric": None},
+        "Humidity": {"Percentage": 64.2},
+        "Weather": {"Temperature": {"Celsius": None, "Fahrenheit": None}, "Wind": None},
+        "Accelerometer": {"G": 1.0, "X": 0.0, "Y": 0.0, "Z": 0.0},
+        "Light": {"Lux": 0.0},
+        "MinLight": {"Lux": None},
+        "MaxLight": {"Lux": None},
+        "Battery": {"Percentage": 100.0, "Estimation": "N/A", "IsCharging": False},
+        "Shock": {"G": 1.0, "X": None, "Y": None, "Z": None},
+        "ShockTime": None,
+        "TiltAngle": {"Degrees": None},
+        "Shipment": None,
+        "AccountId": 9104,
+        "DeviceId": "865918077678289",
+        "DeviceName": "K7654321",
+        "ShipmentId": "TEST-SHIP-94",
+        "PublicShipmentId": None,
+        "PostSeqNum": None,
+        "PostTotalCount": None,
+        "IsLastItemInPostingBatch": True,
+        "Location": {
+            "Name": None, "Latitude": 12.9716, "Longitude": 77.5946, "FormattedAddress": None,
+            "Address": None, "LocationMethod": None, "Accuracy": None, "AccuracyConfidence": None,
+            "GeolocationSourceName": None, "IsGpsLocationAvailable": True, "IsCellLocationAvailable": None,
+            "IsWifiLocationAvailable": None, "IsCompositeLocationAvailable": None, "CellTowerUsedCount": None,
+            "WifiAccessPointUsedCount": None
+        }
+    }
+
+
+def get_new_emails(seen_ids):
+    """Module-level helper: return Critical Alert emails for test-user94 not in seen_ids."""
+    new_emails = []
+    try:
+        res = requests.get(f"{SMTP_API_URL}?pageSize=1000", timeout=5).json()
+        msgs = res.get("results", res) if isinstance(res, dict) else res
+        for msg in msgs:
+            msg_id = msg.get("id")
+            if msg_id and msg_id not in seen_ids:
+                to_addr = msg.get("to") or ""
+                subject = msg.get("subject") or ""
+                if "test-user94@mygrape.com" in to_addr and "Critical Alert" in subject:
+                    new_emails.append(msg)
+    except Exception as e:
+        print(f"Error checking smtp4dev: {e}")
+    return new_emails
+
+
+def _snapshot_seen_email_ids():
+    """Clear smtp4dev and snapshot any straggler ids so only THIS test's emails count."""
+    time.sleep(3)
+    try:
+        clear_smtp4dev()
+    except Exception:
+        pass
+    try:
+        res = requests.get(f"{SMTP_API_URL}?pageSize=1000", timeout=5).json()
+        msgs = res.get("results", res) if isinstance(res, dict) else res
+        return {m.get("id") for m in msgs if m.get("id")}
+    except Exception:
+        return set()
+
+
+def _poll_temp_internal_reading(db, select_cols="r.deviation"):
+    """Poll up to 10s for the latest temp_internal reading on Tank 94."""
+    reading = None
+    for _ in range(10):
+        time.sleep(1)
+        db.rollback()
+        reading = db.execute(text(f"""
+            SELECT {select_cols} FROM readings r
+            JOIN kpi_config kc ON r.kpi_config_id = kc.id
+            WHERE r.tank_id = 94 AND kc.kpi_name = 'temp_internal'
+            ORDER BY r.timestamp DESC LIMIT 1
+        """)).fetchone()
+        if reading is not None:
+            break
+    return reading
+
+
+def test_kpi_within_threshold(db):
+    print("\n--- TEST: WITHIN THRESHOLD (NO ALERT, NO EMAIL) ---")
+
+    db.execute(text("DELETE FROM critical_alerts WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM readings WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM ivf_telemetry_data WHERE tank_id = 94;"))
+    db.execute(text("""
+        UPDATE kpi_config SET min = -196.0000, max = -150.0000, alert_type = 'critical', status = true, cooldown_minutes = 1
+        WHERE tank_id = 94 AND kpi_name = 'temp_internal';
+    """))
+    db.commit()
+
+    seen_email_ids = _snapshot_seen_email_ids()
+    headers = {"Content-Type": "application/json"}
+
+    # ProbeTemperature = -180°C is within [-196, -150] -> no deviation
+    resp = requests.post(INGESTION_URL, json=_get_tive_payload(-180.0), headers=headers, timeout=10)
+    assert resp.status_code == 200, f"Webhook ingestion failed: {resp.status_code} - {resp.text}"
+
+    reading = _poll_temp_internal_reading(db)
+    assert reading is not None, "temp_internal reading was not created"
+    assert reading[0] is False, "Reading was incorrectly marked as deviation"
+
+    time.sleep(3)
+    db.rollback()
+    alert_count = db.execute(text("SELECT COUNT(*) FROM critical_alerts WHERE tank_id = 94")).scalar()
+    assert alert_count == 0, f"Expected 0 alerts, got {alert_count}"
+
+    new_emails = get_new_emails(seen_email_ids)
+    assert len(new_emails) == 0, f"Expected 0 emails, got {len(new_emails)}"
+    print("OK: Within threshold test passed.")
+
+
+def test_kpi_soft_alert(db):
+    print("\n--- TEST: SOFT ALERT (READING + LOW SEVERITY ALERT, NO EMAIL) ---")
+
+    db.execute(text("DELETE FROM critical_alerts WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM readings WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM ivf_telemetry_data WHERE tank_id = 94;"))
+    db.execute(text("""
+        UPDATE kpi_config SET min = -196.0000, max = -150.0000, alert_type = 'soft', status = true, cooldown_minutes = 1
+        WHERE tank_id = 94 AND kpi_name = 'temp_internal';
+    """))
+    db.commit()
+
+    seen_email_ids = _snapshot_seen_email_ids()
+    headers = {"Content-Type": "application/json"}
+
+    # ProbeTemperature = 20°C breaches the -150 max -> deviation under a 'soft' config
+    resp = requests.post(INGESTION_URL, json=_get_tive_payload(20.0), headers=headers, timeout=10)
+    assert resp.status_code == 200, f"Webhook ingestion failed: {resp.status_code} - {resp.text}"
+
+    reading = _poll_temp_internal_reading(db)
+    assert reading is not None, "temp_internal reading was not created"
+    assert reading[0] is True, "Reading was not marked as deviation"
+
+    alert = None
+    for _ in range(12):
+        time.sleep(1)
+        db.rollback()
+        alert = db.execute(text("SELECT severity FROM critical_alerts WHERE tank_id = 94 ORDER BY created_at DESC LIMIT 1")).fetchone()
+        if alert is not None:
+            break
+    assert alert is not None, "Alert was not created for soft alert"
+    assert alert[0] == 'Low', f"Expected severity 'Low', got {alert[0]}"
+
+    new_emails = get_new_emails(seen_email_ids)
+    assert len(new_emails) == 0, f"Expected 0 emails for soft alert, got {len(new_emails)}"
+    print("OK: Soft alert test passed.")
+
+
+def test_kpi_no_alert(db):
+    print("\n--- TEST: NO ALERT (READING ONLY, NO ALERT, NO EMAIL) ---")
+
+    db.execute(text("DELETE FROM critical_alerts WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM readings WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM ivf_telemetry_data WHERE tank_id = 94;"))
+    db.execute(text("""
+        UPDATE kpi_config SET min = -196.0000, max = -150.0000, alert_type = 'no_alert', status = true, cooldown_minutes = 1
+        WHERE tank_id = 94 AND kpi_name = 'temp_internal';
+    """))
+    db.commit()
+
+    seen_email_ids = _snapshot_seen_email_ids()
+    headers = {"Content-Type": "application/json"}
+
+    # Value breaches thresholds, but 'no_alert' forces deviation to stay False
+    resp = requests.post(INGESTION_URL, json=_get_tive_payload(20.0), headers=headers, timeout=10)
+    assert resp.status_code == 200, f"Webhook ingestion failed: {resp.status_code} - {resp.text}"
+
+    reading = _poll_temp_internal_reading(db)
+    assert reading is not None, "temp_internal reading was not created"
+    assert reading[0] is False, "Reading deviation should be False for no_alert"
+
+    time.sleep(3)
+    db.rollback()
+    alert_count = db.execute(text("SELECT COUNT(*) FROM critical_alerts WHERE tank_id = 94")).scalar()
+    assert alert_count == 0, f"Expected 0 alerts for no_alert, got {alert_count}"
+
+    new_emails = get_new_emails(seen_email_ids)
+    assert len(new_emails) == 0, f"Expected 0 emails for no_alert, got {len(new_emails)}"
+    print("OK: No alert test passed.")
+
+
+def test_kpi_disabled(db):
+    print("\n--- TEST: DISABLED STATUS (READING ONLY, DEVIATION=TRUE, NO ALERT, NO EMAIL) ---")
+
+    db.execute(text("DELETE FROM critical_alerts WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM readings WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM ivf_telemetry_data WHERE tank_id = 94;"))
+    db.execute(text("""
+        UPDATE kpi_config SET min = -196.0000, max = -150.0000, alert_type = 'critical', status = false, cooldown_minutes = 1
+        WHERE tank_id = 94 AND kpi_name = 'temp_internal';
+    """))
+    db.commit()
+
+    seen_email_ids = _snapshot_seen_email_ids()
+    headers = {"Content-Type": "application/json"}
+
+    # Value breaches thresholds -> deviation=True, but status=false suppresses the alert
+    resp = requests.post(INGESTION_URL, json=_get_tive_payload(20.0), headers=headers, timeout=10)
+    assert resp.status_code == 200, f"Webhook ingestion failed: {resp.status_code} - {resp.text}"
+
+    reading = _poll_temp_internal_reading(db, select_cols="r.deviation, r.deviation_alert_sent")
+    assert reading is not None, "temp_internal reading was not created"
+    assert reading[0] is True, "Reading deviation should be True when outside threshold"
+    assert reading[1] is False, "deviation_alert_sent should be False when status=false"
+
+    time.sleep(3)
+    db.rollback()
+    alert_count = db.execute(text("SELECT COUNT(*) FROM critical_alerts WHERE tank_id = 94")).scalar()
+    assert alert_count == 0, f"Expected 0 alerts for disabled status, got {alert_count}"
+
+    new_emails = get_new_emails(seen_email_ids)
+    assert len(new_emails) == 0, f"Expected 0 emails for disabled status, got {len(new_emails)}"
+    print("OK: Disabled status test passed.")
