@@ -2,64 +2,121 @@
     {
         "id": "dash-q1",
         "prompt": "Does mgSCALE alert you when something goes beyond set threshold??",
-        "choices": ["Yes", "No", "Yes, sometimes", "No, it only monitors."],
+        "choices": [
+            "Yes",
+            "No",
+            "Yes, sometimes",
+            "No, it only monitors."
+        ],
         "correctIndex": 0,
         "points": 15
     },
     {
         "id": "dash-q2",
         "prompt": "Where do you review alerts that need immediate attention?",
-        "choices": ["Tasks", "Critical Alerts", "Settings", "Profile"],
+        "choices": [
+            "Tasks",
+            "Critical Alerts",
+            "Settings",
+            "Profile"
+        ],
         "correctIndex": 1,
         "points": 15
     },
     {
         "id": "dash-q3",
         "prompt": "Does mgSCALE tell you which factor is causing more problem with the tanks?",
-        "choices": ["Yes", "No, it doesn't", "Yes, but only sometimes", "No, it only monitors."],
+        "choices": [
+            "Yes",
+            "No, it doesn't",
+            "Yes, but only sometimes",
+            "No, it only monitors."
+        ],
         "correctIndex": 0,
-        "points": 10
+        "points": 15
     },
     {
         "id": "dash-q6",
         "prompt": "What does the Container Performance grid help you monitor?",
-        "choices": ["User login history", "Quality deviations and top deviation drivers", "Invoice totals", "Sensor firmware versions"],
+        "choices": [
+            "User login history",
+            "Quality deviations and top deviation drivers",
+            "Invoice totals",
+            "Sensor firmware versions"
+        ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "dash-q7",
         "prompt": "What does the Incubator Performance grid display?",
-        "choices": ["Shipment routes", "Quality deviations and top deviation drivers for incubators", "User login activity", "Billing summaries"],
+        "choices": [
+            "Shipment routes",
+            "Quality deviations and top deviation drivers for incubators",
+            "User login activity",
+            "Billing summaries"
+        ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "dash-q8",
         "prompt": "Which section lets you launch Cryocan Quality Tracking or Embryo Grading?",
-        "choices": ["Volume grid", "Quality Tracking card", "Shipment board", "Incubator Performance"],
+        "choices": [
+            "Volume grid",
+            "Quality Tracking card",
+            "Shipment board",
+            "Incubator Performance"
+        ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "dash-q9",
         "prompt": "What does the Deviation Distribution chart show?",
-        "choices": ["User login history", "Deviations by site across metrics like LN2, Temperature, and Shock Detection", "Invoice totals per branch", "Shipment delivery times"],
+        "choices": [
+            "User login history",
+            "Deviations by site across metrics like LN2, Temperature, and Shock Detection",
+            "Invoice totals per branch",
+            "Shipment delivery times"
+        ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "dash-q4",
         "prompt": "What is a good first action when an alert is raised?",
-        "choices": ["Ignore it", "Check alert details", "Delete alert configuration", "Disable sensors"],
+        "choices": [
+            "Ignore it",
+            "Check alert details",
+            "Delete alert configuration",
+            "Disable sensors"
+        ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
     },
     {
         "id": "dash-q5",
         "prompt": "Why are KPI cards useful?",
-        "choices": ["They replace the database", "They provide at-a-glance insights", "They send invoices", "They approve users"],
+        "choices": [
+            "They replace the database",
+            "They provide at-a-glance insights",
+            "They send invoices",
+            "They approve users"
+        ],
         "correctIndex": 1,
-        "points": 10
+        "points": 15
+    },
+    {
+        "id": "dash-q10",
+        "prompt": "What does the Site Level Information table on the dashboard allow you to do?",
+        "choices": [
+            "Submit billing requests for each site",
+            "Monitor real-time key metrics for every laboratory site in one view",
+            "Configure alert thresholds for all branches at once",
+            "Download a PDF report of all site activity"
+        ],
+        "correctIndex": 1,
+        "points": 15
     }
 ]

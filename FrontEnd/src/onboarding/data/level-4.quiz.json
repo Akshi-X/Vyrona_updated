@@ -1,38 +1,122 @@
 [
     {
         "id": "q4-1",
-        "prompt": "What is the purpose of setting a cooldown period on a KPI alert?",
+        "prompt": "Before you can view or edit a container's KPI thresholds in Alert Configuration, what must you do first?",
         "choices": [
-            "To delay the alert until the next day",
-            "To prevent repeated notifications for the same ongoing breach",
-            "To increase the alert threshold automatically",
-            "To disable the alert after it fires once"
+            "Enable notification channels in your profile settings",
+            "Select a branch and pick a container from the list",
+            "Download the current config as a backup",
+            "Create a new alert rule template"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
     },
     {
         "id": "q4-2",
-        "prompt": "Which alert type should be used for a sensor value that requires immediate action if breached?",
+        "prompt": "What two notification channels can you enable for alert delivery in Alert Configuration?",
         "choices": [
-            "Soft alert",
-            "Warning alert",
-            "Critical alert",
-            "Info alert"
+            "SMS and Push Notification",
+            "Email and WhatsApp",
+            "Email and Slack",
+            "WhatsApp and In-App only"
         ],
-        "correctIndex": 2,
-        "points": 20
+        "correctIndex": 1,
+        "points": 15
     },
     {
         "id": "q4-3",
-        "prompt": "How can you apply the same alert thresholds to multiple containers at once?",
+        "prompt": "Your operations manager needs to receive a WhatsApp message the moment a container temperature exceeds the safe threshold. Which alert type should you select for the Temperature KPI?",
         "choices": [
-            "Edit each container individually",
-            "Use the branch filter to show all containers, then select multiple and apply in bulk",
-            "Contact support to update thresholds",
-            "Thresholds can only be set per hospital, not per container"
+            "Soft Alert",
+            "Threshold Override",
+            "Critical Alert",
+            "In-App Notification"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q4-4",
+        "prompt": "After a temperature breach, the same alert keeps firing every few minutes and is flooding the team's WhatsApp. Which setting in Alert Configuration controls how long to wait before sending the next notification for the same ongoing breach?",
+        "choices": [
+            "Alert Threshold",
+            "Notification Channel",
+            "Alert Severity",
+            "Cooldown Period"
+        ],
+        "correctIndex": 3,
+        "points": 15
+    },
+    {
+        "id": "q4-5",
+        "prompt": "After selecting a container in Alert Configuration, what does the KPI panel show?",
+        "choices": [
+            "The container's refill history and reservoir logs",
+            "The 7 KPI parameters you can configure thresholds and alert rules for",
+            "A live sensor feed with real-time readings",
+            "The notification history for that container"
         ],
         "correctIndex": 1,
-        "points": 20
+        "points": 15
+    },
+    {
+        "id": "q4-6",
+        "prompt": "A technician wants alerts to fire when LN2 drops below the safe limit and also receive notifications on WhatsApp. What two things must be configured in Alert Configuration?",
+        "choices": [
+            "The report type and export format",
+            "The LN2 Level threshold and the WhatsApp notification channel",
+            "The cooldown period and the branch filter",
+            "The alert severity and the refill log entry"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "q4-7",
+        "prompt": "You're setting up a Battery Level alert. You want only an in-app warning when the battery gets low — no WhatsApp message. Which alert type fits this use case?",
+        "choices": [
+            "Critical Alert",
+            "Soft Alert",
+            "Threshold Override",
+            "Notification Mute"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "q4-8",
+        "prompt": "A container is being moved to a new storage rack. You want an alert if it gets dropped or roughly handled beyond a set impact level. Which KPI should you configure in Alert Configuration?",
+        "choices": [
+            "Lid State",
+            "Evaporation Rate",
+            "Battery Level",
+            "Shock Detection"
+        ],
+        "correctIndex": 3,
+        "points": 15
+    },
+    {
+        "id": "q4-9",
+        "prompt": "An overnight audit found that a container was briefly opened and closed with no record of it. You want this to trigger an alert automatically in future. Which KPI alert should you enable in Alert Configuration?",
+        "choices": [
+            "Evaporation Rate",
+            "Battery Level",
+            "Lid State",
+            "Temperature"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "q4-10",
+        "prompt": "After adjusting KPI thresholds for a container in Alert Configuration, what is required for the changes to take effect?",
+        "choices": [
+            "The configuration saves automatically when you leave the page",
+            "Click Save to commit the changes to that container's alert rules",
+            "A branch manager must approve the changes before they apply",
+            "The system applies changes at midnight in a scheduled sync"
+        ],
+        "correctIndex": 1,
+        "points": 15
     }
 ]

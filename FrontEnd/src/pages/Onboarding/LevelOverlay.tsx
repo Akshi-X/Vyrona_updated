@@ -266,8 +266,8 @@ const levelConfig = levels.find((level) => level.id === levelId);
     // ── Completion screen ────────────────────────────────────────────────────
     if (isCompleted || quizResult === "pass") {
         const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
-        const finalScore = progress?.highScore ?? 0;
-        const pct = maxScore > 0 ? Math.round((finalScore / maxScore) * 100) : 0;
+        const latestScore = quizResult === "pass" ? lastScore : (progress?.currentScore ?? 0);
+        const pct = maxScore > 0 ? Math.round((latestScore / maxScore) * 100) : 0;
         const completion = levelConfig?.completion;
 
         return (
@@ -294,9 +294,14 @@ const levelConfig = levels.find((level) => level.id === levelId);
                         <div>
                             <p className="text-[11px] text-slate-400 uppercase tracking-[0.2em]">Quiz Score</p>
                             <p className="mt-0.5 text-3xl font-bold text-slate-900">
-                                {finalScore}
+                                {latestScore}
                                 <span className="ml-1 text-base font-normal text-slate-400">/ {maxScore}</span>
                             </p>
+                            {(progress?.highScore ?? 0) > latestScore && (
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                    Best: <span className="font-semibold text-slate-600">{progress?.highScore} pts</span>
+                                </p>
+                            )}
                         </div>
                         <p className="text-2xl font-bold text-slate-700">{pct}%</p>
                     </div>
