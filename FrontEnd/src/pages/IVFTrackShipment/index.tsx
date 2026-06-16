@@ -69,7 +69,7 @@ export default function IVFTrackShipmentPage() {
     const [exporting, setExporting] = useState(false);
     const [useNewCryocan, 
         // setUseNewCryocan
-    ] = useState(false);
+    ] = useState(true);
     const [systemActivity, setSystemActivity] = useState<ActivityLogRecord[]>([]);
     const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
     const qualityChartRef = useRef<HTMLDivElement>(null);
