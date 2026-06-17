@@ -3,7 +3,7 @@ from datetime import date, datetime, time
 from typing import Any, Dict, List, Optional
 import logging
 
-from sqlalchemy import and_, case, desc, func, or_, select
+from sqlalchemy import and_, case, desc, func, lateral, or_, select, true
 from sqlalchemy.orm import Session
 
 from ...models.kpi_config_model import KpiConfig
@@ -166,46 +166,74 @@ class IVFService:
             - total: Total number of active tanks across all branches
         """
         try:
-            
-            
-            # Subquery: latest deviation per (tank_id, kpi_config_id)
-            readings_subq = (
+            # Build the active-tank ID set upfront so both subqueries are scoped to only
+            # the relevant rows — prevents full-table scans on readings and ln2_logs.
+            active_tank_ids = (
+                select(Tank.tank_id)
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .where(Tank.is_active == True)
+            )
+            if hospital_id is not None:
+                active_tank_ids = active_tank_ids.where(HospitalBranch.hospital_id == hospital_id)
+            if branch_id is not None:
+                active_tank_ids = active_tank_ids.where(Tank.branch_id == branch_id)
+
+            # Drive from kpi_config (small table) so we can do one targeted index
+            # lookup per (tank_id, kpi_config_id) pair instead of sorting the full
+            # readings table. kpi_config has ~tanks × KPIs rows; readings has 30M rows.
+            kpi_pairs = (
                 select(
-                    Readings.tank_id,
-                    Readings.kpi_config_id,
-                    Readings.deviation
+                    KpiConfig.tank_id,
+                    KpiConfig.id.label("kpi_config_id"),
                 )
-                .distinct(Readings.tank_id, Readings.kpi_config_id)
-                .order_by(Readings.tank_id, Readings.kpi_config_id, desc(Readings.timestamp))
-                .subquery()
+                .where(KpiConfig.tank_id.in_(active_tank_ids))
+                .subquery("kpi_pairs")
             )
 
-            # Aggregate deviations per tank
+            # LATERAL: for each (tank_id, kpi_config_id) pair, fetch the single latest
+            # reading using the (tank_id, kpi_config_id, timestamp) index — O(log N) each.
+            latest_r = (
+                select(Readings.deviation)
+                .where(
+                    Readings.tank_id == kpi_pairs.c.tank_id,
+                    Readings.kpi_config_id == kpi_pairs.c.kpi_config_id,
+                )
+                .order_by(desc(Readings.timestamp))
+                .limit(1)
+                .lateral("latest_r")
+            )
+
+            # Deviation count per tank across all KPIs (latest reading each)
             deviations_subq = (
                 select(
-                    readings_subq.c.tank_id,
+                    kpi_pairs.c.tank_id,
                     func.count()
-                    .filter(readings_subq.c.deviation == True)
+                    .filter(latest_r.c.deviation == True)
                     .label("total_deviations")
                 )
-                .group_by(readings_subq.c.tank_id)
+                .outerjoin(latest_r, true())
+                .group_by(kpi_pairs.c.tank_id)
                 .subquery()
             )
 
-            # Latest refill log (date/time) per tank
+            # Latest refill per tank — scoped to active tanks, collapsed to a single subquery
+            # via DISTINCT ON (supported by idx_ln2_log_tank_latest_refill).
             latest_refill_subq = (
                 select(
                     CanisterLn2Log.tank_id,
                     CanisterLn2Log.refill_date,
-                    CanisterLn2Log.refill_time
+                    CanisterLn2Log.refill_time,
                 )
-                .where(CanisterLn2Log.refill_date.isnot(None))
+                .where(
+                    CanisterLn2Log.refill_date.isnot(None),
+                    CanisterLn2Log.tank_id.in_(active_tank_ids),
+                )
                 .distinct(CanisterLn2Log.tank_id)
                 .order_by(
                     CanisterLn2Log.tank_id,
                     desc(CanisterLn2Log.refill_date),
                     desc(CanisterLn2Log.refill_time),
-                    desc(CanisterLn2Log.created_at)
+                    desc(CanisterLn2Log.created_at),
                 )
                 .subquery()
             )
@@ -226,17 +254,13 @@ class IVFService:
                 .where(Tank.is_active == True)
             )
 
-            # Optional filters
             if hospital_id is not None:
                 stmt = stmt.where(HospitalBranch.hospital_id == hospital_id)
-
             if branch_id is not None:
                 stmt = stmt.where(Tank.branch_id == branch_id)
-
             if branch_name is not None:
                 stmt = stmt.where(HospitalBranch.branch_name == branch_name)
 
-            # Execute
             results = self.db.execute(stmt).fetchall()
 
             # Group by branch
