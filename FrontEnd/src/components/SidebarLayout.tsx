@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import VariantRoute from './VariantRoute';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -16,7 +17,11 @@ export default function SidebarLayout() {
 
   return (
     <div className="bg-surface flex w-full min-h-screen overflow-x-hidden">
-      <Sidebar onLogout={() => setShowLogoutConfirm(true)} />
+      <VariantRoute
+        routePath="/_sidebar"
+        defaultComponent={<Sidebar onLogout={() => setShowLogoutConfirm(true)} />}
+        componentProps={{ onLogout: () => setShowLogoutConfirm(true) }}
+      />
       <div className="flex-1 ml-0 md:ml-60 min-w-0">
         <Outlet />
       </div>
