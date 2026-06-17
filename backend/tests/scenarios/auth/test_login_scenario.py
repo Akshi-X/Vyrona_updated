@@ -18,7 +18,7 @@ def test_login_flow(setup_hospital_user):
 
     payload = {
         "email": user.email,
-        "password": "easyPeasy1!"
+        "password": "Scuba123!"
     }
 
     response = client.post(

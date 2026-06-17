@@ -79,6 +79,7 @@ _PATCH_IVF_DASH_SVC  = "app.service.IVF.ivf_dashboard_service.datetime"
 @pytest.fixture
 def dashboard_client():
     """Dedicated TestClient for dashboard tests."""
+    app.dependency_overrides.clear()
     return TestClient(app)
 
 
@@ -1041,7 +1042,7 @@ def test_TC_AUTH03_non_ivf_department_returns_403(dashboard_client, dashboard_en
     Assert: Verify that all requests are rejected with a 403 status code.
     """
     print("\n" + "=" * 60)
-    print("TC-AUTH03: Non-IVF department (OPD/Admin) → 403 on all IVF routes")
+    print("TC-AUTH03: Non-IVF department (OPD/Admin) -> 403 on all IVF routes")
     print("=" * 60)
 
     db = dashboard_env["db"]
@@ -1078,7 +1079,7 @@ def test_TC_AUTH03_non_ivf_department_returns_403(dashboard_client, dashboard_en
             assert resp.status_code == 403, (f"TC-AUTH03 FAILED on {url}: got {resp.status_code}, expected 403. "
                                              "department=OPD must not access IVF routes even with role=Admin.")
 
-        print("\n✓ PASSED — All IVF routes correctly return 403 for non-IVF department")
+        print("\nPASSED - All IVF routes correctly return 403 for non-IVF department")
 
     finally:
         _cleanup(db, [real_alert])
@@ -1228,7 +1229,7 @@ def test_TC_AUTH05_admin_from_any_branch_sees_all_hospital_deviations(dashboard_
     user_c = UserModel(
         user_id=str(uuid.uuid4()),
         email=f"{uuid.uuid4()}@test.com",
-        password_hash=get_password_hash("easyPeasy1!"),
+        password_hash=get_password_hash("Scuba123!"),
         first_name="Branch",
         last_name="Admin",
         role="Admin",
@@ -1463,7 +1464,7 @@ def test_TC_AUTH08_user_role_sees_only_assigned_branch_alerts(dashboard_client, 
     user_a = UserModel(
         user_id=str(uuid.uuid4()),
         email=f"{uuid.uuid4()}@test.com",
-        password_hash=get_password_hash("easyPeasy1!"),
+        password_hash=get_password_hash("Scuba123!"),
         first_name="Branch",
         last_name="User",
         role="User",
@@ -1572,7 +1573,7 @@ def test_TC_AUTH09_user_role_branch_scopes_deviations_graph(dashboard_client, da
     user_a = UserModel(
         user_id=str(uuid.uuid4()),
         email=f"{uuid.uuid4()}@test.com",
-        password_hash=get_password_hash("easyPeasy1!"),
+        password_hash=get_password_hash("Scuba123!"),
         first_name="Branch",
         last_name="User",
         role="User",
@@ -1647,9 +1648,6 @@ def test_TC_AUTH09_user_role_branch_scopes_deviations_graph(dashboard_client, da
             db.commit()
         except Exception:
             db.rollback()
-        db.delete(tank_b)
-        db.delete(branch_b)
-        db.commit()
 
 
 def test_TC_AUTH10_admin_ivf_top_deviation_driver_returns_highest_driver(dashboard_client, dashboard_env):

@@ -94,7 +94,7 @@ class TestScenario_Authentication:
         print("SCENARIO 2: Invalid email format")
         print("=" * 60)
 
-        payload = {"email": "not-a-valid-email", "password": "easyPeasy1!"}
+        payload = {"email": "not-a-valid-email", "password": "Scuba123!"}
         print(f"Email    : {payload['email']}")
         print(f"Password : {payload['password']}")
 
@@ -192,7 +192,7 @@ class TestScenario_Authentication:
         print(f"Email : {user.email}")
 
         # Step 1 — login to trigger OTP and get user_id
-        login_payload = {"email": user.email, "password": "easyPeasy1!"}
+        login_payload = {"email": user.email, "password": "Scuba123!"}
         login_response = client.post("/api/login", json=login_payload)
 
         print("\nSTEP 1: LOGIN")
@@ -249,7 +249,7 @@ class TestScenario_Authentication:
         print(f"Email : {user.email}")
 
         # Step 1 — login to trigger OTP
-        login_payload = {"email": user.email, "password": "easyPeasy1!"}
+        login_payload = {"email": user.email, "password": "Scuba123!"}
         login_response = client.post("/api/login", json=login_payload)
 
         print("\nSTEP 1: LOGIN")
@@ -308,7 +308,7 @@ class TestScenario_Authentication:
         user = data["user"]
         print(f"Email : {user.email}")
 
-        login_payload = {"email": user.email, "password": "easyPeasy1!"}
+        login_payload = {"email": user.email, "password": "Scuba123!"}
         login_response = client.post("/api/login", json=login_payload)
 
         print("\nLOGIN")
@@ -372,7 +372,7 @@ class TestScenario_Authentication:
         user = data["user"]
         print(f"Email : {user.email}")
 
-        payload = {"email": user.email, "password": "easyPeasy1!"}
+        payload = {"email": user.email, "password": "Scuba123!"}
 
         for attempt in range(1, 11):
             response = client.post("/api/login", json=payload)
@@ -414,7 +414,7 @@ class TestScenario_Authentication:
         user = data["user"]
         print(f"Email : {user.email}")
 
-        login_payload = {"email": user.email, "password": "easyPeasy1!"}
+        login_payload = {"email": user.email, "password": "Scuba123!"}
 
         for attempt in range(1, 11):
             print(f"\n  ── Round {attempt} ──")
@@ -480,7 +480,7 @@ class TestScenario_UserRegistrationAndInvite:
             "email": "bademail@@invalid",
             "first_name": "Test",
             "last_name": "User",
-            "password": "easyPeasy1!",
+            "password": "Scuba123!",
         }
         print(f"Email    : {payload['email']}")
         print(f"First Name : {payload['first_name']}")
@@ -557,9 +557,11 @@ class TestScenario_UserRegistrationAndInvite:
             "branch_name": "Main Branch",
         }
         CREATE_INVITE_URL = "/api/hospital/users/invite"
-        create_response = client.post(
-            CREATE_INVITE_URL, json=create_payload, headers=headers
-        )
+        from unittest.mock import patch
+        with patch("app.service.user_service.send_invite_email"):
+            create_response = client.post(
+                CREATE_INVITE_URL, json=create_payload, headers=headers
+            )
 
         print("\nSTEP 1: CREATE INVITE")
         print(f"Status : {create_response.status_code}")
@@ -596,8 +598,8 @@ class TestScenario_UserRegistrationAndInvite:
                 "token": invite_token,
                 "first_name": "Invited",
                 "last_name": f"User {attempt}",
-                "password": "easyPeasy1!",
-                "confirm_password": "easyPeasy1!",
+                "password": "Scuba123!",
+                "confirm_password": "Scuba123!",
             }
             response = client.post(REGISTER_URL, json=accept_payload)
 

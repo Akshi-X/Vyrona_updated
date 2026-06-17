@@ -620,15 +620,19 @@ def test_tive_alert_flow(db):
                         pass
 
                 if "test-user94@mygrape.com" in to_addr and "Critical Alert" in subject:
-                    email_dispatched = True
-                    print(f"OK: Found dispatched email: '{subject}' to {to_addr}")
-                    break
+                    # Payload sent ProbeTemperature=-10.0 -> temp_internal excursion
+                    html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html", timeout=5)
+                    html_content = html_res.text if html_res.status_code == 200 else ""
+                    if "Internal Temperature is deviated to -10" in html_content:
+                        email_dispatched = True
+                        print(f"OK: Found dispatched email with correct content: '{subject}' to {to_addr}")
+                        break
             if email_dispatched:
                 break
         except Exception as e:
             print(f"Error polling smtp4dev: {e}")
 
-    assert email_dispatched, "No critical alert email found in smtp4dev inbox for test-user94@mygrape.com"
+    assert email_dispatched, "No Internal Temperature critical alert email found in smtp4dev inbox for test-user94@mygrape.com"
     print("OK: IVF Email dispatched and received by smtp4dev successfully!")
 
 
@@ -726,7 +730,10 @@ def test_tive_alert_cooldown_flow(db):
                     to_addr = msg.get("to") or ""
                     subject = msg.get("subject") or ""
                     if "test-user94@mygrape.com" in to_addr and "Critical Alert" in subject:
-                        new_emails.append(msg)
+                        # Payload sent ProbeTemperature=-10.0 -> temp_internal excursion
+                        html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html", timeout=5)
+                        if html_res.status_code == 200 and "Internal Temperature is deviated to -10" in html_res.text:
+                            new_emails.append(msg)
         except Exception as e:
             print(f"Error checking smtp4dev: {e}")
         return new_emails
@@ -981,7 +988,7 @@ def test_tive_alert_escalation_flow(db):
         }
 
     # --- email helper ---
-    def get_emails_for(email_address, seen_ids):
+    def get_emails_for(email_address, seen_ids, content_keyword=None):
         new_emails = []
         try:
             res = requests.get(f"{SMTP_API_URL}?pageSize=1000", timeout=5).json()
@@ -991,6 +998,10 @@ def test_tive_alert_escalation_flow(db):
                 if msg_id and msg_id not in seen_ids:
                     to_addr = msg.get("to") or ""
                     if email_address in to_addr:
+                        if content_keyword:
+                            html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html", timeout=5)
+                            if html_res.status_code != 200 or content_keyword not in html_res.text:
+                                continue
                         new_emails.append(msg)
         except Exception as e:
             print(f"Error checking smtp4dev: {e}")
@@ -1017,7 +1028,8 @@ def test_tive_alert_escalation_flow(db):
     email_found_user_1 = False
     for _ in range(10):
         time.sleep(1)
-        user_emails = get_emails_for("test-user-esc@mygrape.com", seen_email_ids)
+        # Payload sent ProbeTemperature=-10.0 -> temp_internal excursion
+        user_emails = get_emails_for("test-user-esc@mygrape.com", seen_email_ids, "Internal Temperature is deviated to -10")
         if user_emails:
             email_found_user_1 = True
             for msg in user_emails:
@@ -1063,7 +1075,8 @@ def test_tive_alert_escalation_flow(db):
     email_found_admin_2 = False
     for _ in range(10):
         time.sleep(1)
-        admin_emails = get_emails_for("test-admin-esc@mygrape.com", seen_email_ids)
+        # Escalation email is about the temp_internal KPI for Tank 96
+        admin_emails = get_emails_for("test-admin-esc@mygrape.com", seen_email_ids, "Internal Temperature")
         if admin_emails:
             email_found_admin_2 = True
             for msg in admin_emails:
@@ -1268,8 +1281,9 @@ def test_lid_state_open_alert_flow(db):
                     to_addr = msg.get("to") or ""
                     subject = msg.get("subject") or ""
                     if "test-user94@mygrape.com" in to_addr and "Critical Alert" in subject:
+                        # Payload sent lid_state=2 (OPEN) -> ln2_lid_state OPEN alert
                         html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html", timeout=5)
-                        if html_res.status_code == 200 and "Lid Open/Closed State" in html_res.text:
+                        if html_res.status_code == 200 and "Lid Open/Closed State is OPEN" in html_res.text:
                             new_emails.append(msg)
         except Exception as e:
             print(f"Error checking smtp4dev: {e}")
@@ -1598,8 +1612,11 @@ def test_midnight_cooldown_check(db):
                     if "test-user94@mygrape.com" in to_addr and "Critical Alert" in subject:
                         # fetch the full message's HTML body from the correct endpoint
                         html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html", timeout=5)
-                        msg["html"] = html_res.text if html_res.status_code == 200 else ""
-                        new_emails.append(msg)
+                        html_text = html_res.text if html_res.status_code == 200 else ""
+                        msg["html"] = html_text
+                        # Payload sent ProbeTemperature=-10.0 -> temp_internal excursion
+                        if "Internal Temperature is deviated to -10" in html_text:
+                            new_emails.append(msg)
         except Exception as e:
             print(f"Error checking smtp4dev: {e}")
         return new_emails

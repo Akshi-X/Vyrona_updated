@@ -91,7 +91,7 @@ def setup_hospital_user():
         user = User(
             user_id=str(uuid.uuid4()),
             email=f"{uuid.uuid4()}@test.com",
-            password_hash=get_password_hash("easyPeasy1!"),
+            password_hash=get_password_hash("Scuba123!"),
             first_name="Test",
             last_name="User",
             role=role,
@@ -164,7 +164,7 @@ def setup_kpi_environment():
     user = User(
         user_id=str(uuid.uuid4()),
         email=f"{uuid.uuid4()}@test.com",
-        password_hash=get_password_hash("easyPeasy1!"),
+        password_hash=get_password_hash("Scuba123!"),
         first_name="KPI",
         last_name="Tester",
         role="Admin",
