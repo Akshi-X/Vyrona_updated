@@ -43,4 +43,11 @@ class Readings(Base):
         Index("idx_readings_kpi_config_timestamp", "kpi_config_id", "timestamp"),
         Index("idx_readings_incubator_chamber_ts", "incubator_id", "chamber_id", "timestamp"),
         Index("idx_readings_refrigerator_zone_ts", "refrigerator_id", "zone_id", "timestamp"),
+        # Supports LATERAL LIMIT 1 per (tank_id, kpi_config_id) — active_canisters deviation subquery
+        # and get_last_n_readings_per_kpi LATERAL LIMIT N
+        Index("idx_readings_tank_kpi_ts", "tank_id", "kpi_config_id", "timestamp"),
+        # Covering index for the time-bucket aggregation query (get_tank_kpi_history_aggregated).
+        # Allows an Index Only Scan: tank_id+timestamp range scan without touching the heap,
+        # pulling kpi_config_id and kpi_value from the index leaf pages directly.
+        Index("idx_readings_tank_ts_covering", "tank_id", "timestamp", "kpi_config_id", "kpi_value"),
     )
