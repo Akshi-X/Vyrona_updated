@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from fastapi.responses import Response
-from sqlalchemy import and_, func, text
+from sqlalchemy import and_, desc, func, lateral, select, text, true
 from sqlalchemy.orm import Session
 
 from app.config.database import SessionLocal
@@ -1120,63 +1120,63 @@ class QualityService:
 
     def get_last_n_readings_per_kpi(self, tank_id: int, n: int):
         db = self.db
-        row_number = (
-            func.row_number()
-            .over(
-                partition_by=Readings.kpi_config_id, order_by=Readings.timestamp.desc()
+
+        tank = db.query(Tank.tank_id, Tank.tank_code).filter(Tank.tank_id == tank_id).first()
+        if not tank:
+            return None
+
+        # Drive from kpi_config (small set: ~KPIs per tank) so each lateral call
+        # does a targeted index lookup using idx_readings_tank_kpi_ts instead of
+        # sorting all readings for this tank with ROW_NUMBER().
+        kpi_cfg = (
+            select(KpiConfig.id.label("kpi_config_id"), KpiConfig.kpi_name, KpiConfig.unit)
+            .where(KpiConfig.tank_id == tank_id)
+            .subquery("kpi_cfg")
+        )
+
+        last_n = (
+            select(Readings.kpi_value, Readings.timestamp)
+            .where(
+                Readings.tank_id == tank_id,
+                Readings.kpi_config_id == kpi_cfg.c.kpi_config_id,
             )
-            .label("rn")
+            .order_by(desc(Readings.timestamp))
+            .limit(n)
+            .lateral("last_n")
         )
 
-        subquery = (
-            db.query(Readings.id, row_number)
-            .filter(Readings.tank_id == tank_id)
-            .subquery()
-        )
-
-        valid_ids = db.query(subquery.c.id).filter(subquery.c.rn <= n).subquery()
-
-        results = (
-            db.query(
-                Readings.kpi_config_id,
-                Readings.kpi_value,
-                Readings.timestamp,
-                KpiConfig.kpi_name,
-                KpiConfig.unit,
-                Tank.tank_id,
-                Tank.tank_code,
+        stmt = (
+            select(
+                kpi_cfg.c.kpi_config_id,
+                kpi_cfg.c.kpi_name,
+                kpi_cfg.c.unit,
+                last_n.c.kpi_value,
+                last_n.c.timestamp,
             )
-            .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
-            .join(Tank, Readings.tank_id == Tank.tank_id)
-            .filter(Readings.id.in_(valid_ids))
-            .order_by(Readings.kpi_config_id, Readings.timestamp.desc())
-            .all()
+            .outerjoin(last_n, true())
+            .order_by(kpi_cfg.c.kpi_config_id, desc(last_n.c.timestamp))
         )
+
+        results = db.execute(stmt).fetchall()
 
         if not results:
             return None
 
-        # Shape response grouped by KPI config id (latest first per KPI config)
         kpis = defaultdict(list)
-        tank_info = {"tank_id": results[0].tank_id, "tank_code": results[0].tank_code}
-
         for row in results:
-            ts = (
-                row.timestamp.isoformat()
-                if hasattr(row.timestamp, "isoformat")
-                else str(row.timestamp)
-            )
-            kpis[row.kpi_config_id].append(
-                {
-                    "name": row.kpi_name,
-                    "value": float(row.kpi_value),
-                    "unit": row.unit or "",
-                    "timestamp": ts,
-                }
-            )
+            if row.kpi_value is None:
+                continue
+            ts = row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp)
+            kpis[row.kpi_config_id].append({
+                "name": row.kpi_name,
+                "value": float(row.kpi_value),
+                "unit": row.unit or "",
+                "timestamp": ts,
+            })
 
         return {
-            **tank_info,
+            "tank_id": tank.tank_id,
+            "tank_code": tank.tank_code,
             "kpis": [reading for readings in kpis.values() for reading in readings],
         }
 
@@ -1237,27 +1237,58 @@ class QualityService:
         No limit; suitable for large ranges (1H / 24H / 7D) so chart gets few points from DB.
         """
         bucket_seconds = bucket_minutes * 60
-        # PostgreSQL: floor epoch to bucket boundary, then to_timestamp
-        sql = text("""
-            SELECT
-                to_timestamp(
-                    floor(extract(epoch from r.timestamp AT TIME ZONE 'UTC') / :bucket_sec) * :bucket_sec
-                ) AT TIME ZONE 'UTC' AS bucket_start,
-                k.kpi_name,
-                k.unit,
-                AVG(r.kpi_value)::double precision AS avg_value,
-                MIN(r.kpi_value)::double precision AS min_value,
-                MAX(r.kpi_value)::double precision AS max_value,
-                COUNT(*)::integer AS sample_count
-            FROM readings r
-            JOIN kpi_config k ON r.kpi_config_id = k.id
-            WHERE r.tank_id = :tank_id
-              AND r.timestamp >= :since
-              AND (:until IS NULL OR r.timestamp <= :until)
-            GROUP BY bucket_start, k.id, k.kpi_name, k.unit
-            ORDER BY bucket_start ASC
-        """)
+        # Aggregate over readings first (no join), then join kpi_config on the small
+        # result set — reduces the internal sort from all readings rows to ~buckets×KPIs.
+        # kpi_value cast to float8 before aggregation (Numeric arithmetic is ~3x slower).
+        # Two templates to avoid the (:until IS NULL OR ...) OR-condition that blocks
+        # the planner from using a tight two-sided range on idx_readings_tank_ts_covering.
+        if until is not None:
+            sql = text("""
+                SELECT agg.bucket_start, k.kpi_name, k.unit,
+                       agg.avg_value, agg.min_value, agg.max_value, agg.sample_count
+                FROM (
+                    SELECT
+                        to_timestamp(
+                            floor(extract(epoch from r.timestamp AT TIME ZONE 'UTC') / :bucket_sec) * :bucket_sec
+                        ) AT TIME ZONE 'UTC' AS bucket_start,
+                        r.kpi_config_id,
+                        AVG(r.kpi_value::double precision) AS avg_value,
+                        MIN(r.kpi_value::double precision) AS min_value,
+                        MAX(r.kpi_value::double precision) AS max_value,
+                        COUNT(*)::integer AS sample_count
+                    FROM readings r
+                    WHERE r.tank_id = :tank_id
+                      AND r.timestamp >= :since
+                      AND r.timestamp <= :until
+                    GROUP BY bucket_start, r.kpi_config_id
+                ) agg
+                JOIN kpi_config k ON agg.kpi_config_id = k.id
+                ORDER BY agg.bucket_start ASC
+            """)
+        else:
+            sql = text("""
+                SELECT agg.bucket_start, k.kpi_name, k.unit,
+                       agg.avg_value, agg.min_value, agg.max_value, agg.sample_count
+                FROM (
+                    SELECT
+                        to_timestamp(
+                            floor(extract(epoch from r.timestamp AT TIME ZONE 'UTC') / :bucket_sec) * :bucket_sec
+                        ) AT TIME ZONE 'UTC' AS bucket_start,
+                        r.kpi_config_id,
+                        AVG(r.kpi_value::double precision) AS avg_value,
+                        MIN(r.kpi_value::double precision) AS min_value,
+                        MAX(r.kpi_value::double precision) AS max_value,
+                        COUNT(*)::integer AS sample_count
+                    FROM readings r
+                    WHERE r.tank_id = :tank_id
+                      AND r.timestamp >= :since
+                    GROUP BY bucket_start, r.kpi_config_id
+                ) agg
+                JOIN kpi_config k ON agg.kpi_config_id = k.id
+                ORDER BY agg.bucket_start ASC
+            """)
         try:
+            self.db.execute(text("SET LOCAL work_mem = '64MB'"))
             rows = self.db.execute(
                 sql,
                 {
