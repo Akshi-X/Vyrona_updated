@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import VariantRoute from './VariantRoute';
+import VariantRoute, { useHasVariant } from './VariantRoute';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmDialog from './ConfirmDialog';
 
 export default function SidebarLayout() {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const hasVariantSidebar = useHasVariant('/_sidebar');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
@@ -16,13 +17,13 @@ export default function SidebarLayout() {
   };
 
   return (
-    <div className="bg-surface flex w-full min-h-screen overflow-x-hidden">
+    <div className="bg-surface flex w-full min-h-screen">
       <VariantRoute
         routePath="/_sidebar"
         defaultComponent={<Sidebar onLogout={() => setShowLogoutConfirm(true)} />}
         componentProps={{ onLogout: () => setShowLogoutConfirm(true) }}
       />
-      <div className="flex-1 ml-0 md:ml-60 min-w-0">
+      <div className={`flex-1 min-w-0 overflow-x-hidden ${!hasVariantSidebar ? 'md:ml-60' : ''}`}>
         <Outlet />
       </div>
 
