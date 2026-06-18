@@ -15,8 +15,8 @@ import { ivfService } from '../../../services/ivfService';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
 const KPI_TABS = [
-  { id: 'freezer_temperature',      label: 'Freezer',      unit: '°C', accent: '#1a7abb', ring: 'rgba(26,122,187,0.10)' },
-  { id: 'refrigerator_temperature', label: 'Refrigerator', unit: '°C', accent: '#7a22c8', ring: 'rgba(122,34,200,0.10)' },
+  { id: 'temp_external', label: 'Temperature',       unit: '°C', accent: '#1a7abb', ring: 'rgba(26,122,187,0.10)' },
+  { id: 'probe_temp',    label: 'Probe Temperature', unit: '°C', accent: '#7a22c8', ring: 'rgba(122,34,200,0.10)' },
 ] as const;
 
 type TabId = (typeof KPI_TABS)[number]['id'];
@@ -33,6 +33,7 @@ type DataPoint = { timestamp: string; value: number };
 type Props = {
   refrigeratorId: number;
   kpiKey: string;
+  zoneId?: string | null;
   onClose: () => void;
 };
 
@@ -45,8 +46,8 @@ function parseTimestamp(ts: string): Date | null {
   } catch { return null; }
 }
 
-export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, onClose }: Props) {
-  const [activeTab, setActiveTab] = useState<TabId>(kpiKey as TabId ?? 'freezer_temperature');
+export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zoneId, onClose }: Props) {
+  const [activeTab, setActiveTab] = useState<TabId>(kpiKey as TabId ?? 'temp_external');
   const [range, setRange]         = useState<RangeId>('24H');
   const [series, setSeries]       = useState<DataPoint[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -58,7 +59,7 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, onCl
     setError(null);
     const minutes = TIME_RANGES.find((r) => r.id === range)?.minutes ?? 1440;
     ivfService
-      .getRefrigeratorKpiHistory(refrigeratorId, minutes)
+      .getRefrigeratorKpiHistory(refrigeratorId, minutes, zoneId ?? undefined)
       .then((res) => {
         const raw = res.kpi_series?.[activeTab] ?? [];
         setSeries(raw.map((p) => ({ timestamp: p.timestamp, value: p.value })));
@@ -165,7 +166,7 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, onCl
                     cursor: 'pointer', transition: 'all 0.15s',
                   }}
                 >
-                  {t.id === 'freezer_temperature' ? <Snowflake size={12} /> : <Thermometer size={12} />}
+                  {t.id === 'temp_external' ? <Thermometer size={12} /> : <Snowflake size={12} />}
                   {t.label}
                 </button>
               );
