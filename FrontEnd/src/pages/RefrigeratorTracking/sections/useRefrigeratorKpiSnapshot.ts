@@ -4,18 +4,18 @@ import { authUtils } from '../../../utils/auth';
 import { ivfService } from '../../../services/ivfService';
 
 const REFRIGERATOR_KPI_ORDER = [
-  'freezer_temperature',
-  'refrigerator_temperature',
+  'temp_external',
+  'probe_temp',
 ] as const;
 
 const KPI_LABELS: Record<string, string> = {
-  freezer_temperature: 'Freezer Temperature',
-  refrigerator_temperature: 'Refrigerator Temperature',
+  temp_external: 'Temperature',
+  probe_temp: 'Probe Temperature',
 };
 
 const KPI_UNITS: Record<string, string> = {
-  freezer_temperature: '°C',
-  refrigerator_temperature: '°C',
+  temp_external: '°C',
+  probe_temp: '°C',
 };
 
 const parseTimestampToMs = (timestamp?: string): number | null => {
@@ -56,7 +56,7 @@ const formatTimeAgo = (nowTs: number, timestampMs: number | null): string | null
 };
 
 export type RefrigeratorSensorTile = {
-  id: 'freezer_temperature' | 'refrigerator_temperature';
+  id: 'temp_external' | 'probe_temp';
   label: string;
   value: string;
   timestamp: string | null;
@@ -74,18 +74,20 @@ type LatestKpi = {
 
 export type RefrigeratorKpiSnapshot = {
   sensorTiles: RefrigeratorSensorTile[];
-  freezerTemp: number | null;
-  fridgeTemp: number | null;
+  tempExternal: number | null;
+  probeTemp: number | null;
   isInitialLoading: boolean;
 };
 
 type UseRefrigeratorKpiSnapshotOptions = {
   refrigeratorId?: string;
+  zoneId?: string | null;
   enabled?: boolean;
 };
 
 export function useRefrigeratorKpiSnapshot({
   refrigeratorId,
+  zoneId,
   enabled = true,
 }: UseRefrigeratorKpiSnapshotOptions): RefrigeratorKpiSnapshot {
   const normalizedRefrigeratorId = refrigeratorId != null ? String(refrigeratorId) : undefined;
@@ -144,7 +146,7 @@ export function useRefrigeratorKpiSnapshot({
     }
 
     ivfService
-      .getRefrigeratorZoneLatest(idNum)
+      .getRefrigeratorZoneLatest(idNum, zoneId ?? undefined)
       .then((rows) => {
         if (!isMountedRef.current) return;
         const now = Date.now();
@@ -163,7 +165,7 @@ export function useRefrigeratorKpiSnapshot({
       .finally(() => {
         if (isMountedRef.current) setIsInitialLoading(false);
       });
-  }, [normalizedRefrigeratorId, enabled]);
+  }, [normalizedRefrigeratorId, zoneId, enabled]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -178,6 +180,7 @@ export function useRefrigeratorKpiSnapshot({
       const idNum = Number(normalizedRefrigeratorId);
       ws.send(JSON.stringify({
         refrigerator_id: Number.isFinite(idNum) ? idNum : normalizedRefrigeratorId,
+        ...(zoneId != null ? { zone_id: zoneId } : {}),
       }));
     };
 
@@ -209,7 +212,9 @@ export function useRefrigeratorKpiSnapshot({
         const messageMatches =
           data.refrigerator_id == null ||
           String(data.refrigerator_id) === normalizedRefrigeratorId;
-        if (messageMatches && incomingKpis.length) updateLatest(incomingKpis);
+        const zoneMatches =
+          zoneId == null || data.zone_id == null || data.zone_id === zoneId;
+        if (messageMatches && zoneMatches && incomingKpis.length) updateLatest(incomingKpis);
       } catch {}
     };
 
@@ -224,17 +229,21 @@ export function useRefrigeratorKpiSnapshot({
       } catch {}
       wsRef.current = null;
     };
-  }, [normalizedRefrigeratorId, token, enabled]);
+  }, [normalizedRefrigeratorId, zoneId, token, enabled]);
 
   const sensorTiles = useMemo<RefrigeratorSensorTile[]>(() => {
-    return REFRIGERATOR_KPI_ORDER.map((id) => {
+    const dynamicKeys = Object.keys(latestByName);
+    const orderedKeys = dynamicKeys.length > 0
+      ? dynamicKeys
+      : Array.from(REFRIGERATOR_KPI_ORDER);
+    return orderedKeys.map((id) => {
       const latest = latestByName[id];
       const value = latest ? latest.value : null;
       const tsMs = latest ? latest.tsMs : null;
       return {
-        id,
-        label: KPI_LABELS[id],
-        value: formatKpiValue(value, latest?.unit || KPI_UNITS[id]),
+        id: id as 'temp_external' | 'probe_temp',
+        label: KPI_LABELS[id] ?? id,
+        value: formatKpiValue(value, latest?.unit || KPI_UNITS[id] || '°C'),
         timestamp: formatTimeAgo(nowTs, tsMs),
         isMissing: value == null,
         history: kpiHistoryRef.current[id]?.slice() ?? [],
@@ -244,8 +253,8 @@ export function useRefrigeratorKpiSnapshot({
 
   return {
     sensorTiles,
-    freezerTemp: latestByName['freezer_temperature']?.value ?? null,
-    fridgeTemp: latestByName['refrigerator_temperature']?.value ?? null,
+    tempExternal: latestByName['temp_external']?.value ?? null,
+    probeTemp: latestByName['probe_temp']?.value ?? null,
     isInitialLoading,
   };
 }

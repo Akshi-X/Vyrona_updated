@@ -1032,10 +1032,13 @@ class QualityService:
         configs: List[Dict],
         hospital_id: int,
         branch_id: int,
+        zone_id: Optional[str] = None,
+        zone_name: Optional[str] = None,
     ) -> Dict:
         """
-        For each config: if a row exists for (refrigerator_id, kpi_name, alert_name) update it;
-        otherwise create. Returns {"updated": count, "created": count}.
+        For each config: if a row exists for (refrigerator_id, zone_id, kpi_name, alert_name) update it;
+        otherwise create. zone_id=None targets the zone-less (legacy) configs.
+        Returns {"updated": count, "created": count}.
         """
         updated = 0
         created = 0
@@ -1074,8 +1077,11 @@ class QualityService:
             query = self.db.query(KpiConfig).filter(
                 KpiConfig.refrigerator_id == refrigerator_id,
                 KpiConfig.kpi_name == kpi_name,
-                KpiConfig.zone_id.is_(None),
             )
+            if zone_id is not None:
+                query = query.filter(KpiConfig.zone_id == zone_id)
+            else:
+                query = query.filter(KpiConfig.zone_id.is_(None))
             if alert_name is None:
                 query = query.filter(KpiConfig.alert_name.is_(None))
             else:
@@ -1092,6 +1098,8 @@ class QualityService:
                 if cooldown_val is not None:
                     existing.cooldown_minutes = cooldown_val
                 existing.unack_escalation_threshold = escalation_threshold
+                if zone_name is not None:
+                    existing.zone_name = zone_name
                 self.db.flush()
                 updated += 1
             else:
@@ -1102,7 +1110,8 @@ class QualityService:
                     incubator_id=None,
                     chamber_id=None,
                     refrigerator_id=refrigerator_id,
-                    zone_id=None,
+                    zone_id=zone_id,
+                    zone_name=zone_name,
                     kpi_name=kpi_name,
                     alert_name=alert_name,
                     min=min_val,
@@ -1584,21 +1593,104 @@ class QualityService:
             self.db.rollback()
             return None
 
+    def get_refrigerator_kpi_config(
+        self, refrigerator_id: int, refrigerator_code: str, zone_id: Optional[str] = None
+    ) -> dict:
+        """Return KPI limits config for a refrigerator (optionally scoped to a zone)."""
+        from app.models.IVF.refrigerator_model import Refrigerator
+        try:
+            refrigerator = self.db.query(Refrigerator).filter(Refrigerator.refrigerator_id == refrigerator_id).first()
+            branch = None
+            if refrigerator and refrigerator.branch_id is not None:
+                branch = (
+                    self.db.query(HospitalBranch)
+                    .filter(HospitalBranch.branch_id == refrigerator.branch_id)
+                    .first()
+                )
+
+            q = self.db.query(KpiConfig).filter(KpiConfig.refrigerator_id == refrigerator_id)
+            if zone_id is not None:
+                q = q.filter(KpiConfig.zone_id == zone_id)
+            rows = q.all()
+
+            kpi_limits: dict = {}
+            for r in rows:
+                alert_type = (r.alert_type or "").strip() or None
+                if not bool(r.status) and alert_type is None:
+                    continue
+                kpi_limits.setdefault(r.kpi_name, {})[r.alert_name] = {
+                    "min": float(r.min) if r.min is not None else None,
+                    "max": float(r.max) if r.max is not None else None,
+                    "alert_type": alert_type,
+                }
+            return {
+                "refrigerator_id": refrigerator_id,
+                "refrigerator_code": refrigerator_code,
+                "zone_id": zone_id,
+                "branch_id": refrigerator.branch_id if refrigerator else None,
+                "branch_name": branch.branch_name if branch else None,
+                "kpi_limits": kpi_limits,
+            }
+        except Exception as e:
+            logger.error(f"Error retrieving KPI config for refrigerator {refrigerator_id}: {e}")
+            self.db.rollback()
+            return {
+                "refrigerator_id": refrigerator_id,
+                "refrigerator_code": refrigerator_code,
+                "zone_id": zone_id,
+                "branch_id": None,
+                "branch_name": None,
+                "kpi_limits": {},
+            }
+
+    def get_refrigerator_zones(self, refrigerator_id: int) -> List[dict]:
+        """
+        Return the N zones for a refrigerator, driven by refrigerator.zone_count.
+        zone_id values are fixed as "zone_1" … "zone_N".  zone_name is the
+        user-assigned label stored in kpi_config, defaulting to "Zone N" when
+        no KPI config has been saved for that zone yet.
+        """
+        from app.models.IVF.refrigerator_model import Refrigerator
+        try:
+            ref = self.db.query(Refrigerator).filter(Refrigerator.refrigerator_id == refrigerator_id).first()
+            zone_count = (ref.zone_count or 0) if ref else 0
+            if zone_count == 0:
+                return []
+            # Fetch user-assigned names from kpi_config in one query
+            existing = (
+                self.db.query(KpiConfig.zone_id, KpiConfig.zone_name)
+                .filter(
+                    KpiConfig.refrigerator_id == refrigerator_id,
+                    KpiConfig.zone_id.isnot(None),
+                    KpiConfig.alert_name.is_(None),
+                )
+                .distinct()
+                .all()
+            )
+            name_map = {r.zone_id: (r.zone_name or r.zone_id) for r in existing if r.zone_id}
+            return [
+                {"zone_id": f"zone_{i}", "zone_name": name_map.get(f"zone_{i}") or f"Zone {i}"}
+                for i in range(1, zone_count + 1)
+            ]
+        except Exception as e:
+            logger.error(f"Error retrieving zones for refrigerator {refrigerator_id}: {e}")
+            self.db.rollback()
+            return []
+
     def get_last_n_readings_per_kpi_refrigerator(
-        self, refrigerator_id: int, n: int
+        self, refrigerator_id: int, n: int, zone_id: Optional[str] = None
     ) -> Optional[dict]:
-        """Last N readings per KPI for a refrigerator (mirrors incubator variant)."""
+        """Last N readings per KPI for a refrigerator (mirrors incubator variant). Optionally scoped to a zone."""
         db = self.db
         row_number = (
             func.row_number()
             .over(partition_by=Readings.kpi_config_id, order_by=Readings.timestamp.desc())
             .label("rn")
         )
-        subquery = (
-            db.query(Readings.id, row_number)
-            .filter(Readings.refrigerator_id == refrigerator_id)
-            .subquery()
-        )
+        base_q = db.query(Readings.id, row_number).filter(Readings.refrigerator_id == refrigerator_id)
+        if zone_id is not None:
+            base_q = base_q.filter(Readings.zone_id == zone_id)
+        subquery = base_q.subquery()
         valid_ids = db.query(subquery.c.id).filter(subquery.c.rn <= n).subquery()
         results = (
             db.query(Readings.kpi_config_id, Readings.kpi_value, Readings.timestamp, KpiConfig.kpi_name, KpiConfig.unit)
@@ -1613,27 +1705,110 @@ class QualityService:
         for row in results:
             ts = row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp)
             kpis[row.kpi_config_id].append({"name": row.kpi_name, "value": float(row.kpi_value), "unit": row.unit or "", "timestamp": ts})
-        return {"refrigerator_id": refrigerator_id, "kpis": [r for readings in kpis.values() for r in readings]}
+        return {"refrigerator_id": refrigerator_id, "zone_id": zone_id, "kpis": [r for readings in kpis.values() for r in readings]}
 
     def get_readings_per_kpi_since_refrigerator(
-        self, refrigerator_id: int, since: datetime
+        self, refrigerator_id: int, since: datetime, zone_id: Optional[str] = None
     ) -> Optional[dict]:
-        """All KPI readings for a refrigerator since a timestamp."""
+        """All KPI readings for a refrigerator since a timestamp. Optionally scoped to a zone."""
         db = self.db
-        results = (
+        q = (
             db.query(Readings.kpi_value, Readings.timestamp, KpiConfig.kpi_name, KpiConfig.unit)
             .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
             .filter(Readings.refrigerator_id == refrigerator_id, Readings.timestamp >= since)
-            .order_by(Readings.timestamp.desc())
-            .all()
         )
+        if zone_id is not None:
+            q = q.filter(Readings.zone_id == zone_id)
+        results = q.order_by(Readings.timestamp.desc()).all()
         if not results:
             return None
         kpis = []
         for row in results:
             ts = row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp)
             kpis.append({"name": row.kpi_name, "value": float(row.kpi_value), "unit": row.unit or "", "timestamp": ts})
-        return {"refrigerator_id": refrigerator_id, "kpis": kpis}
+        return {"refrigerator_id": refrigerator_id, "zone_id": zone_id, "kpis": kpis}
+
+    def get_refrigerator_kpi_history_aggregated(
+        self,
+        refrigerator_id: int,
+        zone_id: Optional[str],
+        since: datetime,
+        bucket_minutes: int,
+        until: Optional[datetime] = None,
+    ) -> Optional[dict]:
+        """Aggregated KPI history for a refrigerator zone (mirrors get_incubator_kpi_history_aggregated)."""
+        bucket_seconds = bucket_minutes * 60
+        sql = text("""
+            SELECT
+                to_timestamp(
+                    floor(extract(epoch from r.timestamp AT TIME ZONE 'UTC') / :bucket_sec) * :bucket_sec
+                ) AT TIME ZONE 'UTC' AS bucket_start,
+                k.kpi_name,
+                k.unit,
+                AVG(r.kpi_value)::double precision AS avg_value,
+                MIN(r.kpi_value)::double precision AS min_value,
+                MAX(r.kpi_value)::double precision AS max_value,
+                COUNT(*)::integer AS sample_count
+            FROM readings r
+            JOIN kpi_config k ON r.kpi_config_id = k.id
+            WHERE r.refrigerator_id = :refrigerator_id
+              AND (:zone_id IS NULL OR r.zone_id = :zone_id)
+              AND r.timestamp >= :since
+              AND (:until IS NULL OR r.timestamp <= :until)
+            GROUP BY bucket_start, k.id, k.kpi_name, k.unit
+            ORDER BY bucket_start ASC
+        """)
+        try:
+            rows = self.db.execute(
+                sql,
+                {
+                    "refrigerator_id": refrigerator_id,
+                    "zone_id": zone_id,
+                    "since": since,
+                    "until": until,
+                    "bucket_sec": bucket_seconds,
+                },
+            ).fetchall()
+        except Exception as e:
+            logger.error(f"Error in get_refrigerator_kpi_history_aggregated: {e}", exc_info=True)
+            self.db.rollback()
+            return None
+        if not rows:
+            return None
+        kpis = []
+        for row in rows:
+            ts = (
+                row.bucket_start.isoformat()
+                if hasattr(row.bucket_start, "isoformat")
+                else str(row.bucket_start)
+            )
+            kpis.append(
+                {
+                    "name": row.kpi_name or "",
+                    "value": float(row.avg_value) if row.avg_value is not None else 0,
+                    "avg": float(row.avg_value) if row.avg_value is not None else 0,
+                    "min": float(row.min_value) if row.min_value is not None else None,
+                    "max": float(row.max_value) if row.max_value is not None else None,
+                    "count": int(row.sample_count) if row.sample_count is not None else 0,
+                    "unit": row.unit or "",
+                    "timestamp": ts,
+                }
+            )
+        return {"refrigerator_id": refrigerator_id, "zone_id": zone_id, "kpis": kpis}
+
+    def get_latest_refrigerator_kpi_timestamp(
+        self, refrigerator_id: int, zone_id: Optional[str] = None
+    ) -> Optional[datetime]:
+        """Return latest readings.timestamp for a refrigerator zone (None when no data)."""
+        try:
+            q = self.db.query(func.max(Readings.timestamp)).filter(Readings.refrigerator_id == refrigerator_id)
+            if zone_id is not None:
+                q = q.filter(Readings.zone_id == zone_id)
+            return q.scalar()
+        except Exception as e:
+            logger.error(f"Error getting latest KPI timestamp for refrigerator {refrigerator_id} zone {zone_id}: {e}")
+            self.db.rollback()
+            return None
 
     def get_tank_kpi_history_from_readings(
         self, tank_id: int, tank_code: str, limit: int = 50
@@ -2222,6 +2397,32 @@ def append_incubator_kpi_snapshot_to_db(
     push_incubator_kpi_to_redis(
         incubator_id, incubator_code, chamber_id, {"kpis": kpis_with_ts}, publish=True
     )
+
+
+def push_refrigerator_kpi_to_redis(
+    refrigerator_id: int, refrigerator_code: str, zone_id: Optional[str],
+    payload: dict, publish: bool = True
+) -> None:
+    """Push refrigerator KPI snapshot to Redis (history list + optionally publish for live graph)."""
+    try:
+        r = get_redis()
+        data = dict(payload)
+        data["refrigerator_id"] = refrigerator_id
+        data["refrigerator_code"] = refrigerator_code
+        data["zone_id"] = zone_id
+        data["type"] = "refrigerator_kpi"
+        msg = json.dumps(data)
+        key_suffix = zone_id or "default"
+        history_key = f"refrigerator_kpi_history:{refrigerator_id}:{key_suffix}"
+        r.lpush(history_key, msg)
+        r.ltrim(history_key, 0, 49)
+        if publish:
+            r.publish("refrigerator_kpi_readings_channel", msg)
+        logger.debug(
+            f"Pushed refrigerator KPI to Redis for {refrigerator_code} zone {zone_id} (id={refrigerator_id})"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to push refrigerator KPI to Redis: {e}")
 
 
 def push_incubator_kpi_to_redis(

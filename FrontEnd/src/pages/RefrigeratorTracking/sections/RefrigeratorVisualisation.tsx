@@ -51,8 +51,8 @@ export type RefrigeratorVisualisationProps = {
   selectedSensorId?: string | null;
   onSensorSelect?: (sensorId: string) => void;
 
-  freezerTemp?: number | null;
-  fridgeTemp?: number | null;
+  tempExternal?: number | null;
+  probeTemp?: number | null;
   hasAlert?: boolean;
   doorStatus?: 'open' | 'closed';
 
@@ -66,6 +66,7 @@ export type RefrigeratorVisualisationProps = {
   refrigeratorCode?: string;
   refrigeratorId?: number;
   branchName?: string;
+  zoneId?: string | null;
 };
 
 // ── Activity log helpers (mirrored from CryocanVisualisation) ─────────────────
@@ -540,6 +541,7 @@ export default function RefrigeratorVisualisation({
   currentUserName = '',
   currentUserId = '',
   refrigeratorId,
+  zoneId,
 }: RefrigeratorVisualisationProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<{
@@ -1064,9 +1066,9 @@ export default function RefrigeratorVisualisation({
               sensorTiles.map((tile) => {
                 const isSelected = selectedSensorId === tile.id;
                 const isAlert = hasAlert && !tile.isMissing;
-                const isFreezer = tile.id === 'freezer_temperature';
-                const accent = isAlert ? '#dc2626' : (isFreezer ? '#1a7abb' : '#7a22c8');
-                const ring = isAlert ? 'rgba(220,38,38,0.12)' : (isFreezer ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)');
+                const isProbe = tile.id === 'probe_temp';
+                const accent = isAlert ? '#dc2626' : (isProbe ? '#7a22c8' : '#1a7abb');
+                const ring = isAlert ? 'rgba(220,38,38,0.12)' : (isProbe ? 'rgba(122,34,200,0.12)' : 'rgba(26,122,187,0.12)');
                 return (
                   <button
                     key={tile.id}
@@ -1097,7 +1099,7 @@ export default function RefrigeratorVisualisation({
                         </div>
                       </div>
                       <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', border: '1px solid #e6d6ee', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `inset 0 0 0 6px ${ring}`, color: accent, flexShrink: 0 }}>
-                        {isFreezer ? <Snowflake size={18} /> : <Thermometer size={18} />}
+                        {isProbe ? <Snowflake size={18} /> : <Thermometer size={18} />}
                       </div>
                     </div>
                     <div className="rfg-kpi-orb" style={{ position: 'absolute', right: -20, bottom: -18, width: 140, height: 70, borderRadius: '50%', border: '1px solid rgba(170,140,190,0.35)', opacity: 0.7 }} />
@@ -1342,6 +1344,7 @@ export default function RefrigeratorVisualisation({
       <RefrigeratorKpiChartModal
         refrigeratorId={refrigeratorId}
         kpiKey={kpiModalKey}
+        zoneId={zoneId}
         onClose={() => setKpiModalKey(null)}
       />
     )}
