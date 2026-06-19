@@ -36,6 +36,7 @@ import type { RefrigeratorSensorTile } from './useRefrigeratorKpiSnapshot';
 import StakeholderChatBox from '../../../components/StakeholderChatBox';
 import MyTasksModal, { type MyTask } from '../../../components/MyTasksModal';
 import RefrigeratorKpiChartModal from './RefrigeratorKpiChartModal';
+import ColdStorageRoom from './ColdStorageRoom';
 
 /**
  * Procedural 3D refrigerator. Two stacked glass-door compartments: top =
@@ -67,6 +68,9 @@ export type RefrigeratorVisualisationProps = {
   refrigeratorId?: number;
   branchName?: string;
   zoneId?: string | null;
+
+  type?: 'default' | 'cold_storage';
+  isLoadingType?: boolean;
 };
 
 // ── Activity log helpers (mirrored from CryocanVisualisation) ─────────────────
@@ -542,6 +546,8 @@ export default function RefrigeratorVisualisation({
   currentUserId = '',
   refrigeratorId,
   zoneId,
+  type = 'default',
+  isLoadingType = false,
 }: RefrigeratorVisualisationProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<{
@@ -1135,32 +1141,51 @@ export default function RefrigeratorVisualisation({
         </div>
       </aside>
 
-      {/* Center 3D viewer */}
+      {/* Center 3D viewer / Room visualization */}
       <section
         data-refrigerator-3d-mount
         className="relative min-h-0 overflow-hidden"
         style={{ borderRadius: 20, border: '1px solid #d8c6e8', background: 'linear-gradient(160deg, #f3eaf9 0%, #ede0f5 40%, #e4d4f0 100%)', boxShadow: '0 8px 20px -12px #4011531f, 0 2px 6px #4011530a' }}
         aria-label="Refrigerator 3D visualisation"
       >
-        {/* Radial vignette — brighter centre, darker corners */}
-        <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 70% 65% at 50% 50%, rgba(255,255,255,0.62) 0%, transparent 72%)' }} />
-        {/* Floor gradient */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%', zIndex: 0, pointerEvents: 'none', background: 'linear-gradient(0deg, rgba(220,195,240,0.4) 0%, transparent 100%)' }} />
-        <div ref={mountRef} className="absolute inset-0" />
-
-        {/* Top-left: live status + meta info */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none" style={{ zIndex: 2 }}>
-          {/* Connected status */}
-          <div className="flex items-center gap-2 bg-white/85 backdrop-blur-sm rounded-xl border border-white/70 shadow-sm px-3 py-2">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${sensorTiles.some((t) => !t.isMissing) ? 'bg-emerald-400 animate-pulse' : 'bg-gray-300'}`} />
-            <span className="text-[11px] font-bold text-gray-700">
-              {sensorTiles.some((t) => !t.isMissing) ? 'Connected Live' : 'No Signal'}
-            </span>
+        {isLoadingType ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-transparent to-white/5">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+              <span className="text-sm font-medium text-gray-600">Loading refrigerator...</span>
+            </div>
           </div>
-        </div>
+        ) : type === 'cold_storage' ? (
+          <ColdStorageRoom
+            sensorTiles={sensorTiles}
+            selectedSensorId={selectedSensorId}
+            onSensorSelect={onSensorSelect}
+          />
+        ) : (
+          <>
+            {/* Radial vignette — brighter centre, darker corners */}
+            <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 70% 65% at 50% 50%, rgba(255,255,255,0.62) 0%, transparent 72%)' }} />
+            {/* Floor gradient */}
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%', zIndex: 0, pointerEvents: 'none', background: 'linear-gradient(0deg, rgba(220,195,240,0.4) 0%, transparent 100%)' }} />
+            <div ref={mountRef} className="absolute inset-0" />
+          </>
+        )}
 
-        {/* Top-right: status badge */}
-        <div className="absolute top-3 right-3 pointer-events-none">
+        {type !== 'cold_storage' && (
+          <>
+            {/* Top-left: live status + meta info */}
+            <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none" style={{ zIndex: 2 }}>
+              {/* Connected status */}
+              <div className="flex items-center gap-2 bg-white/85 backdrop-blur-sm rounded-xl border border-white/70 shadow-sm px-3 py-2">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${sensorTiles.some((t) => !t.isMissing) ? 'bg-emerald-400 animate-pulse' : 'bg-gray-300'}`} />
+                <span className="text-[11px] font-bold text-gray-700">
+                  {sensorTiles.some((t) => !t.isMissing) ? 'Connected Live' : 'No Signal'}
+                </span>
+              </div>
+            </div>
+
+            {/* Top-right: status badge */}
+            <div className="absolute top-3 right-3 pointer-events-none">
           {hasAlert ? (
             <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-red-200 rounded-xl px-2.5 py-1.5 shadow-sm">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
@@ -1178,63 +1203,63 @@ export default function RefrigeratorVisualisation({
               </svg>
               <span className="text-[11px] font-semibold text-gray-700">Normal</span>
             </div>
-          ) : (
-            <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl px-2.5 py-1.5 shadow-sm">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L3 7v6c0 5.25 3.75 10.15 9 11.35C17.25 23.15 21 18.25 21 13V7L12 2z" fill="#9ca3af" />
-              </svg>
-              <span className="text-[11px] font-semibold text-gray-500">No signal</span>
-            </div>
-          )}
-        </div>
-
-        {/* Mid-left: Storage Guidelines card */}
-        <div className="absolute left-3 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
-          <div className="bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]">
-            <div className="text-[8px] font-bold tracking-widest uppercase mb-1.5" style={{ color: '#5f3b73' }}>Storage Guidelines</div>
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[9px] text-gray-500">Fridge</span>
-                <span className="text-[9px] font-bold" style={{ color: '#7a22c8' }}>2 – 8 °C</span>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl px-2.5 py-1.5 shadow-sm">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L3 7v6c0 5.25 3.75 10.15 9 11.35C17.25 23.15 21 18.25 21 13V7L12 2z" fill="#9ca3af" />
+                </svg>
+                <span className="text-[11px] font-semibold text-gray-500">No signal</span>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[9px] text-gray-500">Freezer</span>
-                <span className="text-[9px] font-bold" style={{ color: '#1a7abb' }}>≤ −20 °C</span>
+            )}
+            </div>
+
+            {/* Mid-left: Storage Guidelines card */}
+            <div className="absolute left-3 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
+              <div className="bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]">
+                <div className="text-[8px] font-bold tracking-widest uppercase mb-1.5" style={{ color: '#5f3b73' }}>Storage Guidelines</div>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] text-gray-500">Fridge</span>
+                    <span className="text-[9px] font-bold" style={{ color: '#7a22c8' }}>2 – 8 °C</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] text-gray-500">Freezer</span>
+                    <span className="text-[9px] font-bold" style={{ color: '#1a7abb' }}>≤ −20 °C</span>
+                  </div>
+                  <div className="w-full border-t border-gray-100 my-1" />
+                  {['Separate shelf zones', 'No rear-wall contact', 'Quarterly inventory audit'].map((t) => (
+                    <div key={t} className="flex items-start gap-1">
+                      <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
+                        <circle cx="12" cy="12" r="12" fill="#22c55e" />
+                        <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="text-[9px] text-gray-600 leading-tight">{t}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="w-full border-t border-gray-100 my-1" />
-              {['Separate shelf zones', 'No rear-wall contact', 'Quarterly inventory audit'].map((t) => (
-                <div key={t} className="flex items-start gap-1">
-                  <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
-                    <circle cx="12" cy="12" r="12" fill="#22c55e" />
-                    <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span className="text-[9px] text-gray-600 leading-tight">{t}</span>
-                </div>
-              ))}
             </div>
-          </div>
-        </div>
 
-        {/* Mid-right: Daily SOP card */}
-        <div className="absolute right-3 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
-          <div className="bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]">
-            <div className="text-[8px] font-bold tracking-widest uppercase mb-1.5" style={{ color: '#1a4d7a' }}>Daily SOP</div>
-            <div className="flex flex-col gap-1">
-              {['Log temp morning and evening', 'Record any excursions', 'Minimise door-open cycles', 'Check door seals monthly', 'Allow items to equilibrate'].map((t) => (
-                <div key={t} className="flex items-start gap-1">
-                  <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
-                    <circle cx="12" cy="12" r="12" fill="#22c55e" />
-                    <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span className="text-[9px] text-gray-600 leading-tight">{t}</span>
+            {/* Mid-right: Daily SOP card */}
+            <div className="absolute right-3 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
+              <div className="bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]">
+                <div className="text-[8px] font-bold tracking-widest uppercase mb-1.5" style={{ color: '#1a4d7a' }}>Daily SOP</div>
+                <div className="flex flex-col gap-1">
+                  {['Log temp morning and evening', 'Record any excursions', 'Minimise door-open cycles', 'Check door seals monthly', 'Allow items to equilibrate'].map((t) => (
+                    <div key={t} className="flex items-start gap-1">
+                      <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
+                        <circle cx="12" cy="12" r="12" fill="#22c55e" />
+                        <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="text-[9px] text-gray-600 leading-tight">{t}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Bottom: scrolling tips strip */}
-        <style>{`
+            {/* Bottom: scrolling tips strip */}
+            <style>{`
 @keyframes rfg-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @keyframes rfgKpiFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 @keyframes rfgKpiSheen { 0% { transform: translateX(0) rotate(12deg); opacity: 0.3; } 50% { transform: translateX(8px) rotate(12deg); opacity: 0.6; } 100% { transform: translateX(0) rotate(12deg); opacity: 0.3; } }
@@ -1245,18 +1270,20 @@ export default function RefrigeratorVisualisation({
 .rfg-kpi-card .rfg-kpi-curve { animation: rfgKpiFloat 7.4s ease-in-out infinite; }
 .rfg-kpi-card .rfg-kpi-wave  { animation: rfgKpiFloat 8.2s ease-in-out infinite reverse; }
 `}</style>
-        <div className="absolute bottom-0 inset-x-0 bg-white/65 backdrop-blur-sm border-t border-white py-2 flex items-center gap-3 overflow-hidden">
-          <span className="shrink-0 text-[9px] font-bold tracking-widest bg-primary text-white uppercase pl-3 pr-1">Tips</span>
-          <div className="overflow-hidden flex-1">
-            <div style={{ display: 'flex', gap: '2.5rem', whiteSpace: 'nowrap', animation: 'rfg-marquee 70s linear infinite' }}>
-              {[...FRIDGE_TIPS, ...FRIDGE_TIPS].map((tip, i) => (
-                <span key={i} className="text-[11px] text-gray-500 shrink-0">
-                  <span className="text-primary/30 mr-2">◆</span>{tip}
-                </span>
-              ))}
+            <div className="absolute bottom-0 inset-x-0 bg-white/65 backdrop-blur-sm border-t border-white py-2 flex items-center gap-3 overflow-hidden">
+              <span className="shrink-0 text-[9px] font-bold tracking-widest bg-primary text-white uppercase pl-3 pr-1">Tips</span>
+              <div className="overflow-hidden flex-1">
+                <div style={{ display: 'flex', gap: '2.5rem', whiteSpace: 'nowrap', animation: 'rfg-marquee 70s linear infinite' }}>
+                  {[...FRIDGE_TIPS, ...FRIDGE_TIPS].map((tip, i) => (
+                    <span key={i} className="text-[11px] text-gray-500 shrink-0">
+                      <span className="text-primary/30 mr-2">◆</span>{tip}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </section>
 
       {/* Right: System Activity (top) + Tasks (bottom) */}

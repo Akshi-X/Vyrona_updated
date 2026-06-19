@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid3x3, Settings, LogOut, FileText, Users, User } from 'lucide-react';
+import { Grid3x3, Settings, LogOut, FileText, Users, User, Refrigerator } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface SidebarProps {
@@ -31,6 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
   const navItems = [
     { id: 'dashboard', icon: Grid3x3, label: 'Dashboard', path: '/dashboard' },
     { id: 'alerts', icon: Settings, label: 'Alert Config', path: '/alert-setting' },
+    { id: 'refrigerator', icon: Refrigerator, label: 'Refrigerator Tracking', path: '/refrigerator-tracking' },
     { id: 'reports', icon: FileText, label: 'Reports', path: '/reports' },
     { id: 'users', icon: Users, label: 'Users', path: '/users' },
   ];
