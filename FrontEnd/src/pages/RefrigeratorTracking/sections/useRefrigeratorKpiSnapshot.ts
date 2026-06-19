@@ -109,7 +109,7 @@ export function useRefrigeratorKpiSnapshot({
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
     const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
-    return `${baseUrl.replace(/^http/, 'ws')}/api/kpi/ws`;
+    return `${baseUrl.replace(/^http/, 'ws')}/api/ivf/quality/refrigerator-kpi-ws`;
   };
 
   const updateLatest = (incoming: LatestKpi[]) => {
