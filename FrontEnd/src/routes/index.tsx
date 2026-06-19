@@ -219,6 +219,15 @@ const RefrigeratorTrackingWithAuth = () => (
 );
 
 /**
+ * Refrigerator selection page - /refrigerator-tracking (list of all refrigerators)
+ */
+const RefrigeratorSelectionWithAuth = () => (
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
+        <RefrigeratorSelectionPage />
+    </RoleBasedRoute>
+);
+
+/**
  * Alert Setting with role-based access
  * IVF Admins, Managers, and Users can access this
  */
@@ -332,7 +341,7 @@ export const router = createBrowserRouter([
             { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
             { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
             { path: "/refrigerator-tracking/:refrigeratorId", element: <RefrigeratorTrackingWithAuth /> },
-            { path: "/refrigerator-tracking", element: <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}><RefrigeratorSelectionPage /></RoleBasedRoute> },
+            { path: "/refrigerator-tracking", element: <RefrigeratorSelectionWithAuth /> },
             { path: "/database", element: <DatabaseWithAuth /> },
             {
                 path: "/reports",

@@ -86,8 +86,8 @@ export default function ColdStorageRoom({ sensorTiles = [], selectedSensorId, on
                   <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400' : 'bg-gray-300'}`} />
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className="text-[8px] text-gray-500">Active</span>
-                  <span className="text-[8px] font-bold text-gray-700">{tile.tempValue}°C</span>
+                  <span className="text-[8px] text-gray-500">Value</span>
+                  <span className="text-[8px] font-bold text-gray-700">{tile.value}</span>
                 </div>
                 <div className="text-[7px] text-gray-400 mt-0.5">Signal: {isActive ? 'Strong ✓' : 'Lost'}</div>
               </div>
