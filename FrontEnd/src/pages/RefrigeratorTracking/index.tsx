@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Snowflake } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
+import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import { shipmentService } from '../../services/shipmentService';
 import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { activityLogService, type ActivityLogRecord } from '../../services/activityLogService';
@@ -32,6 +33,8 @@ export default function RefrigeratorTrackingPage() {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
   const [criticalAlerts, setCriticalAlerts] = useState<IVFAlert[]>([]);
+  const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
+  const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [systemActivity, setSystemActivity] = useState<ActivityLogRecord[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentUserName, setCurrentUserName] = useState('');
@@ -100,12 +103,22 @@ export default function RefrigeratorTrackingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refrigeratorIdNum, hasRefrigeratorId]);
 
-  useEffect(() => {
+  const fetchCriticalAlerts = async () => {
     if (!hasRefrigeratorId) return;
-    ivfAlertsService
-      .getRefrigeratorAlerts(refrigeratorIdNum)
-      .then((res) => setCriticalAlerts(res.alerts || []))
-      .catch(() => setCriticalAlerts([]));
+    setLoadingAlerts(true);
+    try {
+      const res = await ivfAlertsService.getRefrigeratorAlerts(refrigeratorIdNum);
+      setCriticalAlerts(res.alerts || []);
+    } catch {
+      setCriticalAlerts([]);
+    } finally {
+      setLoadingAlerts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCriticalAlerts();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refrigeratorIdNum, hasRefrigeratorId]);
 
   useEffect(() => {
@@ -139,9 +152,12 @@ export default function RefrigeratorTrackingPage() {
 
   const pageActions = (
     <div className="flex items-center gap-6">
-      <div className="relative group flex flex-col items-center">
+      <div
+        className="relative group flex flex-col items-center cursor-pointer"
+        onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}
+      >
         <img
-          className="w-[25px] h-[25px] cursor-pointer"
+          className="w-[25px] h-[25px]"
           alt="Critical Alerts"
           src={CriticalAlertsIcon}
         />
@@ -210,6 +226,7 @@ export default function RefrigeratorTrackingPage() {
   }
 
   return (
+    <>
     <PageLayout title="Refrigerator Tracking" description="Monitor temperature, alerts and tasks for IVF storage units" lucideIcon={Snowflake} actions={pageActions}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
         <div className="flex items-center gap-1 text-sm">
@@ -279,5 +296,33 @@ export default function RefrigeratorTrackingPage() {
         />
       </div>
     </PageLayout>
+
+    <CriticalAlertsModal
+      isOpen={showCriticalAlerts}
+      onClose={() => setShowCriticalAlerts(false)}
+      alerts={criticalAlerts.map((a) => ({
+        id: a.alert_id,
+        type: a.alert_type,
+        severity: a.severity === 'High' ? 'High' : a.severity === 'Medium' ? 'Medium' : 'Low',
+        patientId: a.refrigerator_code ?? `Refrigerator ${a.refrigerator_id}`,
+        branchName: (a as typeof a & { branch_name?: string }).branch_name,
+        dedupKey: (a as typeof a & { dedup_key?: string }).dedup_key,
+        message: a.message,
+        timestamp: new Date(a.occurred_at + 'Z').toLocaleString(),
+        status: a.status === 'Active' ? 'Active' : 'Acknowledged',
+        acknowledgementReason: a.acknowledgment_reason,
+      }))}
+      loading={loadingAlerts}
+      patientIdLabel=""
+      onAcknowledge={async (alertId, reason) => {
+        await ivfAlertsService.acknowledgeAlert(alertId, reason);
+        fetchCriticalAlerts();
+      }}
+      onAcknowledgeAll={async (alertIds, reason) => {
+        await ivfAlertsService.acknowledgeAlerts(alertIds, reason);
+        fetchCriticalAlerts();
+      }}
+    />
+    </>
   );
 }
