@@ -1,7 +1,7 @@
 
 from sqlalchemy import text
 from .redis_client import get_redis_client
-from shared.alert_api_client import trigger_immediate_alert_email, check_and_create_alerts
+from shared.alert_api_client import trigger_immediate_alert_email, check_and_create_alerts, check_and_create_refrigerator_kpi_alerts
 
 import json
 import logging
@@ -541,6 +541,12 @@ def save_refrigerator_kpi_readings(
         publish_refrigerator_kpi_readings_to_redis(refrigerator_id, refrigerator_code, zone_id, kpi_readings)
     except Exception as e:
         logger.error(f"Failed to publish refrigerator KPI readings to Redis: {e}")
+
+    try:
+        check_and_create_refrigerator_kpi_alerts(refrigerator_id, zone_id)
+        logger.info(f"Triggered alert check for refrigerator_id={refrigerator_id}, zone_id={zone_id}")
+    except Exception as e:
+        logger.error(f"Failed to trigger refrigerator alert check: {e}")
 
     return True
 
