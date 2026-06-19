@@ -13,6 +13,8 @@ services:
       - vscode-server:/root/.vscode-server
     environment:
       - TERM=xterm-256color
+    ports:
+      - "8000:8000"
     depends_on:                     # ← added, wait for postgres/redis
       postgres:
         condition: service_healthy
