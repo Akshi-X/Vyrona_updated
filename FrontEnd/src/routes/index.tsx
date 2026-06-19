@@ -25,6 +25,7 @@ import EmbryoShell from "../pages/EmbryoGrading/EmbryoShell";
 import IncubatorTrackingDashboardPage from "../pages/IncubatorTracking";
 import IncubatorDetailPage from "../pages/IncubatorTracking/IncubatorDetailPage";
 import RefrigeratorTrackingPage from "../pages/RefrigeratorTracking";
+import RefrigeratorSelectionPage from "../pages/RefrigeratorTracking/RefrigeratorSelectionPage";
 import SidebarLayout from "../components/SidebarLayout";
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
@@ -331,7 +332,7 @@ export const router = createBrowserRouter([
             { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
             { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
             { path: "/refrigerator-tracking/:refrigeratorId", element: <RefrigeratorTrackingWithAuth /> },
-            { path: "/refrigerator-tracking", element: <RefrigeratorTrackingWithAuth /> },
+            { path: "/refrigerator-tracking", element: <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}><RefrigeratorSelectionPage /></RoleBasedRoute> },
             { path: "/database", element: <DatabaseWithAuth /> },
             {
                 path: "/reports",

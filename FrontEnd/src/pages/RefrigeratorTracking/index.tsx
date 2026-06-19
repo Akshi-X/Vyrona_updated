@@ -13,13 +13,6 @@ import { useRefrigeratorKpiSnapshot } from './sections/useRefrigeratorKpiSnapsho
 
 type RefrigeratorZone = { zone_id: string; zone_name: string };
 
-type RefrigeratorListItem = {
-  refrigerator_id: number;
-  refrigerator_code: string | null;
-  branch_id: number;
-  branch_name: string;
-};
-
 export default function RefrigeratorTrackingPage() {
   const { refrigeratorId: refrigeratorIdParam } = useParams<{ refrigeratorId: string }>();
   const refrigeratorIdNum = refrigeratorIdParam ? parseInt(refrigeratorIdParam, 10) : NaN;
@@ -28,6 +21,8 @@ export default function RefrigeratorTrackingPage() {
 
   const [refrigeratorCode, setRefrigeratorCode] = useState<string>('-');
   const [branchName, setBranchName] = useState<string>('-');
+  const [refrigeratorType, setRefrigeratorType] = useState<'default' | 'cold_storage' | null>(null);
+  const [isLoadingType, setIsLoadingType] = useState(true);
   const [zones, setZones] = useState<RefrigeratorZone[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
@@ -37,10 +32,6 @@ export default function RefrigeratorTrackingPage() {
   const [currentUserName, setCurrentUserName] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
 
-  const [refrigeratorList, setRefrigeratorList] = useState<RefrigeratorListItem[] | null>(null);
-  const [listLoading, setListLoading] = useState(false);
-  const [listError, setListError] = useState<string | null>(null);
-
   const { sensorTiles, tempExternal, probeTemp } = useRefrigeratorKpiSnapshot({
     refrigeratorId: hasRefrigeratorId ? refrigeratorIdParam : undefined,
     zoneId: selectedZoneId,
@@ -48,55 +39,46 @@ export default function RefrigeratorTrackingPage() {
   });
 
   useEffect(() => {
-    userService.getProfile().then((p) => {
+    if (!hasRefrigeratorId) {
+      navigate('/refrigerator-tracking', { replace: true });
+      return;
+    }
+  }, [hasRefrigeratorId, navigate]);
+
+  useEffect(() => {
+    userService.getProfile().then ((p) => {
       setCurrentUserName(`${p.first_name ?? ''} ${p.last_name ?? ''}`.trim());
       setCurrentUserId(p.user_id ?? '');
     }).catch(() => {});
   }, []);
 
-  // When no refrigerator id is in the URL, load the list. If there's exactly
-  // one, redirect into it; otherwise show the picker grid.
-  useEffect(() => {
-    if (hasRefrigeratorId) return;
-    setListLoading(true);
-    setListError(null);
-    shipmentService.getActiveRefrigerators()
-      .then((res) => {
-        const flat: RefrigeratorListItem[] = res.branches.flatMap((b) =>
-          b.refrigerators.map((r) => ({
-            refrigerator_id: r.refrigerator_id,
-            refrigerator_code: r.refrigerator_code,
-            branch_id: b.branch_id,
-            branch_name: b.branch_name,
-          })),
-        );
-        if (flat.length === 1) {
-          navigate(`/refrigerator-tracking/${flat[0].refrigerator_id}`, { replace: true });
-          return;
-        }
-        setRefrigeratorList(flat);
-      })
-      .catch((e: any) => setListError(e?.message || 'Failed to load refrigerators'))
-      .finally(() => setListLoading(false));
-  }, [hasRefrigeratorId, navigate]);
-
   useEffect(() => {
     if (!hasRefrigeratorId) return;
+    setIsLoadingType(true);
     shipmentService.getActiveRefrigerators().then((res) => {
       for (const branch of res.branches) {
         const found = branch.refrigerators.find((r) => r.refrigerator_id === refrigeratorIdNum);
         if (found) {
           setRefrigeratorCode(found.refrigerator_code || `R${refrigeratorIdNum}`);
           setBranchName(branch.branch_name);
+          if (found.type === 'cold_storage') {
+            setRefrigeratorType('cold_storage');
+          } else {
+            setRefrigeratorType('default');
+          }
           const foundZones = found.zones ?? [];
           setZones(foundZones);
           if (foundZones.length > 0 && selectedZoneId === null) {
             setSelectedZoneId(foundZones[0].zone_id);
           }
+          setIsLoadingType(false);
           return;
         }
       }
-    }).catch(() => {});
+      setIsLoadingType(false);
+    }).catch(() => {
+      setIsLoadingType(false);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refrigeratorIdNum, hasRefrigeratorId]);
 
@@ -154,60 +136,6 @@ export default function RefrigeratorTrackingPage() {
       </div>
     </div>
   );
-
-  // ── No id in URL: show the picker (or wait while we redirect to the only one) ──
-  if (!hasRefrigeratorId) {
-    return (
-      <PageLayout title="Refrigerator Tracking" description="Monitor temperature, alerts and tasks for Refridgerator storage units" lucideIcon={Snowflake} actions={pageActions}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
-          <div className="flex items-center gap-1 text-sm">
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="text-gray-500 font-semibold hover:text-gray-700 transition-colors"
-            >
-              Dashboard
-            </button>
-            <span className="text-gray-500">/</span>
-            <span className="text-black font-semibold">Refrigerator Tracking</span>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          {listLoading && (
-            <div className="text-sm text-gray-500">Loading refrigerators…</div>
-          )}
-          {listError && (
-            <div className="text-sm text-red-600">{listError}</div>
-          )}
-          {!listLoading && !listError && refrigeratorList && refrigeratorList.length === 0 && (
-            <div className="rounded-xl border border-line bg-surface p-8 text-center text-sm text-gray-500">
-              No active refrigerators found for your hospital.
-            </div>
-          )}
-          {!listLoading && refrigeratorList && refrigeratorList.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {refrigeratorList.map((r) => (
-                <button
-                  key={r.refrigerator_id}
-                  type="button"
-                  onClick={() => navigate(`/refrigerator-tracking/${r.refrigerator_id}`)}
-                  className="text-left rounded-xl border border-line bg-white px-4 py-3 hover:border-primary hover:bg-primary/5 transition-colors"
-                >
-                  <div className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">
-                    {r.branch_name}
-                  </div>
-                  <div className="mt-1 text-lg font-bold text-gray-900">
-                    {r.refrigerator_code || `Refrigerator ${r.refrigerator_id}`}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </PageLayout>
-    );
-  }
 
   return (
     <PageLayout title="Refrigerator Tracking" description="Monitor temperature, alerts and tasks for IVF storage units" lucideIcon={Snowflake} actions={pageActions}>
@@ -276,6 +204,8 @@ export default function RefrigeratorTrackingPage() {
           refrigeratorId={hasRefrigeratorId ? refrigeratorIdNum : undefined}
           branchName={branchName !== '-' ? branchName : undefined}
           zoneId={selectedZoneId}
+          type={refrigeratorType || 'default'}
+          isLoadingType={isLoadingType}
         />
       </div>
     </PageLayout>
