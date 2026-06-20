@@ -223,11 +223,13 @@ if not os.path.exists(STATIC_DIR):
     os.makedirs(STATIC_DIR)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Create uploads directory for feedback attachments
+# Create uploads directories
 if not os.path.exists(FEEDBACK_UPLOAD_DIR):
     os.makedirs(FEEDBACK_UPLOAD_DIR, exist_ok=True)
+os.makedirs("uploads/ivf/oocytes", exist_ok=True)
+os.makedirs("uploads/ivf/reports", exist_ok=True)
 
-# Mount uploads directory for feedback attachments
+# Mount uploads directory (feedback attachments + IVF oocyte images)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Include API routes

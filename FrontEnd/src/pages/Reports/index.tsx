@@ -59,18 +59,44 @@ const escapeCsvValue = (value: string | number | null | undefined) => {
     return text;
 };
 
+const parseUtcDateTime = (value: string): Date | null => {
+    if (!value) return null;
+    const hasTimezone = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(value);
+    const normalized = hasTimezone ? value : `${value}Z`;
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const getLocaleDateTimeParts = (value: string) => {
     if (!value) return { date: "", time: "" };
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return { date: value, time: "" };
+    const date = parseUtcDateTime(value);
+    if (!date) return { date: value, time: "" };
     return {
         date: date.toLocaleDateString(),
         time: date.toLocaleTimeString(),
     };
 };
 
+const formatLocaleDateTime = (value?: string | null) => {
+    if (!value) return "";
+    const date = parseUtcDateTime(value);
+    if (!date) return value;
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+};
+
 const formatLocaleDate = (value?: string | null) => {
     if (!value) return "";
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+    if (match) {
+        const localDate = new Date(
+            Number(match[1]),
+            Number(match[2]) - 1,
+            Number(match[3]),
+        );
+        if (!Number.isNaN(localDate.getTime())) {
+            return localDate.toLocaleDateString();
+        }
+    }
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
     return date.toLocaleDateString();
@@ -471,6 +497,7 @@ export default function ReportsPage() {
     const [totalCount, setTotalCount] = useState(0);
     const [pageSize, setPageSize] = useState(20);
     const [tankOptions, setTankOptions] = useState<string[]>([]);
+    const [downloadingCsv, setDownloadingCsv] = useState(false);
 
     const isIvfUser = (department || "").toUpperCase() === "IVF";
     const canViewActivityLogs = ["admin", "manager"].includes(
@@ -755,167 +782,261 @@ export default function ReportsPage() {
         setActivitySearchInput("");
     };
 
-    const downloadCsv = () => {
-        if (activeRowsCount === 0) return;
+    const downloadCsv = async () => {
+        if (totalCount === 0 || downloadingCsv) return;
 
-        let headers: string[] = [];
-        let rows: Array<Array<string | number | null | undefined>> = [];
-        let filename = "report.csv";
-        let reportTypeForLog = "unknown";
-        const filtersForLog: Record<string, any> = {};
+        const EXPORT_PAGE_SIZE = 200;
+        const fetchAllPages = async <T,>(
+            fetchPage: (pageNum: number) => Promise<{ items: T[]; total: number }>,
+        ): Promise<T[]> => {
+            const collected: T[] = [];
+            let pageNum = 1;
+            while (true) {
+                const { items, total } = await fetchPage(pageNum);
+                collected.push(...items);
+                if (collected.length >= total || items.length === 0) break;
+                pageNum++;
+            }
+            return collected;
+        };
 
-        if (filters.reportType === "monthly-summary") {
-            headers = ["KPI Config", "Alerts Sent", "KPI Deviations"];
-            rows = monthlySummaryRows.map((row) => [
-                row.kpi_name,
-                row.alerts_sent,
-                row.deviations_found,
-            ]);
-            const monthLabel = reportMonthLabel || "summary";
-            filename = `monthly-summary-${monthLabel}.csv`;
-            reportTypeForLog = "ivf.monthly_summary";
-            filtersForLog.month = filters.month;
-        } else if (filters.reportType === "critical-alerts") {
-            headers = [
-                "Occurred Date",
-                "Occurred Time",
-                "Severity",
-                "Status",
-                "Tank Code",
-                "Message",
-            ];
-            rows = sortedAlertRows.map((row) => [
-                getLocaleDateTimeParts(row.occurred_at).date,
-                getLocaleDateTimeParts(row.occurred_at).time,
-                row.severity,
-                row.status,
-                row.tank_code || row.branch_name || "N/A",
-                row.message,
-            ]);
-            filename = "critical-alerts.csv";
-            reportTypeForLog = "ivf.critical_alerts";
-            filtersForLog.start_date = filters.dateFrom;
-            filtersForLog.end_date = filters.dateTo;
-            if (filters.alertStatus !== "All") {
-                filtersForLog.status = filters.alertStatus;
-            }
-            if (filters.severity !== "All") {
-                filtersForLog.severity = filters.severity;
-            }
-            if (filters.tankCodes.length > 0) {
-                filtersForLog.tank_codes = filters.tankCodes;
-            }
-        } else if (filters.reportType === "refill-logs") {
-            headers = [
-                "Refill Date",
-                "Refill Time",
-                "Tank Code",
-                "Branch",
-                "Refilled By",
-                "Description",
-                "Reservoir",
-                "LN2 Ordered Date",
-                "LN2 Received Date",
-            ];
-            rows = sortedRefillLogRows.map((row) => [
-                formatLocaleDate(row.refill_date) || "-",
-                formatLocaleTime(row.refill_time) || "-",
-                row.tank_code || "-",
-                row.branch_name || "-",
-                row.refilled_by || "-",
-                row.description || "-",
-                row.reservoir || "-",
-                formatLocaleDate(row.ln2_ordered_date) || "-",
-                formatLocaleDate(row.ln2_received_date) || "-",
-            ]);
-            filename = "refill-logs.csv";
-            reportTypeForLog = "ivf.refill_logs";
-            filtersForLog.start_date = filters.dateFrom;
-            filtersForLog.end_date = filters.dateTo;
-            if (filters.refillStatus !== "All") {
-                filtersForLog.status = filters.refillStatus;
-            }
-            if (filters.tankCodes.length > 0) {
-                filtersForLog.tank_codes = filters.tankCodes;
-            }
-        } else if (filters.reportType === "activity-logs") {
-            headers = [
-                "Timestamp",
-                "Action",
-                "Actor",
-                "Actor Type",
-                "Target",
-                "Outcome",
-                "Metadata",
-            ];
-            rows = activityLogRows.map((row) => [
-                row.created_at,
-                row.action,
-                formatActorLabel(row),
-                row.actor_type,
-                formatTargetLabel(row),
-                row.outcome,
-                formatMetadataSummary(row.metadata),
-            ]);
-            filename = "activity-logs.csv";
-            reportTypeForLog = "activity_logs";
-            if (filters.dateFrom) filtersForLog.date_from = filters.dateFrom;
-            if (filters.dateTo) filtersForLog.date_to = filters.dateTo;
-            if (filters.actions.length > 0) filtersForLog.actions = filters.actions;
-            if (filters.outcome !== "All") filtersForLog.outcome = filters.outcome;
-            if (filters.actorType !== "All") filtersForLog.actor_type = filters.actorType;
-            if (filters.search) filtersForLog.search = filters.search;
-        } else if (filters.reportType === "embryo-tracking") {
-            headers = [
-                "Timestamp",
-                "Event",
-                "Cycle ID",
-                "HIS ID",
-                "Actor",
-                "Outcome",
-                "Details",
-            ];
-            rows = activityLogRows.map((row) => [
-                row.created_at,
-                ACTION_LABELS[row.action] || row.action,
-                row.metadata?.cycle_id ?? row.target_id ?? "-",
-                row.metadata?.his_id ?? row.target_label ?? "-",
-                formatActorLabel(row),
-                row.outcome,
-                formatMetadataSummary(row.metadata),
-            ]);
-            filename = "embryo-tracking.csv";
-            reportTypeForLog = "ivf.embryo_tracking";
-            if (filters.dateFrom) filtersForLog.date_from = filters.dateFrom;
-            if (filters.dateTo) filtersForLog.date_to = filters.dateTo;
-            if (filters.actions.length > 0) filtersForLog.actions = filters.actions;
-            if (filters.actorType !== "All") filtersForLog.actor_type = filters.actorType;
-        }
+        setDownloadingCsv(true);
+        try {
+            let headers: string[] = [];
+            let rows: Array<Array<string | number | null | undefined>> = [];
+            let filename = "report.csv";
+            let reportTypeForLog = "unknown";
+            const filtersForLog: Record<string, unknown> = {};
 
-        ivfReportsService
-            .logReportDownload({
-                report_type: reportTypeForLog,
-                filters: filtersForLog,
-            })
-            .catch(() => {
-                // Avoid blocking user download if audit logging fails.
+            if (filters.reportType === "monthly-summary") {
+                const allRows = await fetchAllPages<MonthlySummaryRow>(async (pageNum) => {
+                    const response = await ivfReportsService.getMonthlySummary({
+                        month: filters.month || undefined,
+                        page: pageNum,
+                        page_size: EXPORT_PAGE_SIZE,
+                    });
+                    return {
+                        items: response.rows || [],
+                        total: response.total_count ?? response.total_kpis ?? 0,
+                    };
+                });
+                headers = ["KPI Config", "Alerts Sent", "KPI Deviations"];
+                rows = allRows.map((row) => [
+                    row.kpi_name,
+                    row.alerts_sent,
+                    row.deviations_found,
+                ]);
+                const monthLabel = reportMonthLabel || "summary";
+                filename = `monthly-summary-${monthLabel}.csv`;
+                reportTypeForLog = "ivf.monthly_summary";
+                filtersForLog.month = filters.month;
+            } else if (filters.reportType === "critical-alerts") {
+                const allRows = await fetchAllPages<CriticalAlertReportRow>(async (pageNum) => {
+                    const response = await ivfReportsService.getCriticalAlertsReport({
+                        start_date: filters.dateFrom || undefined,
+                        end_date: filters.dateTo || undefined,
+                        status: filters.alertStatus === "All" ? undefined : filters.alertStatus,
+                        severity: filters.severity === "All" ? undefined : filters.severity,
+                        tank_codes: filters.tankCodes,
+                        page: pageNum,
+                        page_size: EXPORT_PAGE_SIZE,
+                    });
+                    return { items: response.alerts || [], total: response.total_count ?? 0 };
+                });
+                const sortedAll = [...allRows].sort((a, b) => {
+                    const aTime = new Date(a.occurred_at).getTime();
+                    const bTime = new Date(b.occurred_at).getTime();
+                    return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
+                });
+                headers = [
+                    "Occurred Date",
+                    "Occurred Time",
+                    "Severity",
+                    "Status",
+                    "Tank Code",
+                    "Message",
+                ];
+                rows = sortedAll.map((row) => {
+                    const parts = getLocaleDateTimeParts(row.occurred_at);
+                    return [
+                        parts.date,
+                        parts.time,
+                        row.severity,
+                        row.status,
+                        row.tank_code || row.branch_name || "N/A",
+                        row.message,
+                    ];
+                });
+                filename = "critical-alerts.csv";
+                reportTypeForLog = "ivf.critical_alerts";
+                filtersForLog.start_date = filters.dateFrom;
+                filtersForLog.end_date = filters.dateTo;
+                if (filters.alertStatus !== "All") {
+                    filtersForLog.status = filters.alertStatus;
+                }
+                if (filters.severity !== "All") {
+                    filtersForLog.severity = filters.severity;
+                }
+                if (filters.tankCodes.length > 0) {
+                    filtersForLog.tank_codes = filters.tankCodes;
+                }
+            } else if (filters.reportType === "refill-logs") {
+                const allRows = await fetchAllPages<RefillLogReportRow>(async (pageNum) => {
+                    const response = await ivfReportsService.getRefillLogsReport({
+                        start_date: filters.dateFrom || undefined,
+                        end_date: filters.dateTo || undefined,
+                        status: filters.refillStatus === "All" ? undefined : filters.refillStatus,
+                        tank_codes: filters.tankCodes,
+                        page: pageNum,
+                        page_size: EXPORT_PAGE_SIZE,
+                    });
+                    return { items: response.logs || [], total: response.total_count ?? 0 };
+                });
+                const sortedAll = [...allRows].sort((a, b) => {
+                    const aKey = `${a.refill_date ?? ""}T${a.refill_time ?? ""}`;
+                    const bKey = `${b.refill_date ?? ""}T${b.refill_time ?? ""}`;
+                    return bKey.localeCompare(aKey);
+                });
+                headers = [
+                    "Refill Date",
+                    "Refill Time",
+                    "Tank Code",
+                    "Branch",
+                    "Refilled By",
+                    "Description",
+                    "Reservoir",
+                    "LN2 Ordered Date",
+                    "LN2 Received Date",
+                ];
+                rows = sortedAll.map((row) => [
+                    formatLocaleDate(row.refill_date) || "-",
+                    formatLocaleTime(row.refill_time) || "-",
+                    row.tank_code || "-",
+                    row.branch_name || "-",
+                    row.refilled_by || "-",
+                    row.description || "-",
+                    row.reservoir || "-",
+                    formatLocaleDate(row.ln2_ordered_date) || "-",
+                    formatLocaleDate(row.ln2_received_date) || "-",
+                ]);
+                filename = "refill-logs.csv";
+                reportTypeForLog = "ivf.refill_logs";
+                filtersForLog.start_date = filters.dateFrom;
+                filtersForLog.end_date = filters.dateTo;
+                if (filters.refillStatus !== "All") {
+                    filtersForLog.status = filters.refillStatus;
+                }
+                if (filters.tankCodes.length > 0) {
+                    filtersForLog.tank_codes = filters.tankCodes;
+                }
+            } else if (filters.reportType === "activity-logs") {
+                const allRows = await fetchAllPages<ActivityLogRecord>(async (pageNum) => {
+                    const response = await activityLogService.getActivityLogs({
+                        actions: filters.actions.length > 0 ? filters.actions : undefined,
+                        outcome: filters.outcome === "All" ? undefined : filters.outcome,
+                        actor_type: filters.actorType === "All" ? undefined : filters.actorType,
+                        search: filters.search || undefined,
+                        date_from: filters.dateFrom || undefined,
+                        date_to: filters.dateTo || undefined,
+                        page: pageNum,
+                        page_size: EXPORT_PAGE_SIZE,
+                    });
+                    return { items: response.logs || [], total: response.total_count ?? 0 };
+                });
+                headers = [
+                    "Timestamp",
+                    "Action",
+                    "Actor",
+                    "Actor Type",
+                    "Target",
+                    "Outcome",
+                    "Metadata",
+                ];
+                rows = allRows.map((row) => [
+                    formatLocaleDateTime(row.created_at),
+                    row.action,
+                    formatActorLabel(row),
+                    row.actor_type,
+                    formatTargetLabel(row),
+                    row.outcome,
+                    formatMetadataSummary(row.metadata),
+                ]);
+                filename = "activity-logs.csv";
+                reportTypeForLog = "activity_logs";
+                if (filters.dateFrom) filtersForLog.date_from = filters.dateFrom;
+                if (filters.dateTo) filtersForLog.date_to = filters.dateTo;
+                if (filters.actions.length > 0) filtersForLog.actions = filters.actions;
+                if (filters.outcome !== "All") filtersForLog.outcome = filters.outcome;
+                if (filters.actorType !== "All") filtersForLog.actor_type = filters.actorType;
+                if (filters.search) filtersForLog.search = filters.search;
+            } else if (filters.reportType === "embryo-tracking") {
+                const allRows = await fetchAllPages<ActivityLogRecord>(async (pageNum) => {
+                    const response = await activityLogService.getActivityLogs({
+                        action_prefix: filters.actions.length === 0 ? "ivf_cycle." : undefined,
+                        actions: filters.actions.length > 0 ? filters.actions : undefined,
+                        actor_type: filters.actorType === "All" ? undefined : filters.actorType,
+                        date_from: filters.dateFrom || undefined,
+                        date_to: filters.dateTo || undefined,
+                        page: pageNum,
+                        page_size: EXPORT_PAGE_SIZE,
+                    });
+                    return { items: response.logs || [], total: response.total_count ?? 0 };
+                });
+                headers = [
+                    "Timestamp",
+                    "Event",
+                    "Cycle ID",
+                    "HIS ID",
+                    "Actor",
+                    "Outcome",
+                    "Details",
+                ];
+                rows = allRows.map((row) => [
+                    formatLocaleDateTime(row.created_at),
+                    ACTION_LABELS[row.action] || row.action,
+                    row.metadata?.cycle_id ?? row.target_id ?? "-",
+                    row.metadata?.his_id ?? row.target_label ?? "-",
+                    formatActorLabel(row),
+                    row.outcome,
+                    formatMetadataSummary(row.metadata),
+                ]);
+                filename = "embryo-tracking.csv";
+                reportTypeForLog = "ivf.embryo_tracking";
+                if (filters.dateFrom) filtersForLog.date_from = filters.dateFrom;
+                if (filters.dateTo) filtersForLog.date_to = filters.dateTo;
+                if (filters.actions.length > 0) filtersForLog.actions = filters.actions;
+                if (filters.actorType !== "All") filtersForLog.actor_type = filters.actorType;
+            }
+
+            ivfReportsService
+                .logReportDownload({
+                    report_type: reportTypeForLog,
+                    filters: filtersForLog,
+                })
+                .catch(() => {
+                    // Avoid blocking user download if audit logging fails.
+                });
+
+            const csvLines = [
+                headers.map(escapeCsvValue).join(","),
+                ...rows.map((row) => row.map(escapeCsvValue).join(",")),
+            ];
+            const blob = new Blob([csvLines.join("\n")], {
+                type: "text/csv;charset=utf-8;",
             });
-
-        const csvLines = [
-            headers.map(escapeCsvValue).join(","),
-            ...rows.map((row) => row.map(escapeCsvValue).join(",")),
-        ];
-        const blob = new Blob([csvLines.join("\n")], {
-            type: "text/csv;charset=utf-8;",
-        });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            setError((err as Error)?.message || "Failed to export report");
+        } finally {
+            setDownloadingCsv(false);
+        }
     };
 
     if (!isAuthenticated) {
@@ -1310,14 +1431,15 @@ export default function ReportsPage() {
                                 type="button"
                                 onClick={downloadCsv}
                                 disabled={
-                                    activeRowsCount === 0 ||
+                                    totalCount === 0 ||
+                                    downloadingCsv ||
                                     (filters.reportType === "activity-logs" || filters.reportType === "embryo-tracking"
                                         ? !canViewActivityLogs
                                         : !isIvfUser)
                                 }
                                 className="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Download CSV
+                                {downloadingCsv ? "Preparing..." : "Download CSV"}
                             </button>
                         </div>
 

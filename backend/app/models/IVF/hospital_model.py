@@ -27,6 +27,9 @@ class Hospital(Base):
     incubators = relationship(
         "Incubator", back_populates="hospital", cascade="all, delete-orphan"
     )
+    refrigerators = relationship(
+        "Refrigerator", back_populates="hospital", cascade="all, delete-orphan"
+    )
     ui_variants = relationship(
         "UIRouteVariant", back_populates="hospital", cascade="all, delete-orphan"
     )

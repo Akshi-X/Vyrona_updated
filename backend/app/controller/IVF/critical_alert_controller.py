@@ -20,6 +20,7 @@ from app.schemas.IVF.critical_alert_schema import (
     AcknowledgeAlertsRequest,
     AcknowledgeAlertsResponse,
     IncubatorAlertsResponse,
+    RefrigeratorAlertsResponse,
     TankAlertsResponse,
     HospitalAlertsResponse
 )
@@ -78,6 +79,27 @@ def get_incubator_alerts(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting incubator alerts: {str(e)}")
+
+
+@router.get("/refrigerator/{refrigerator_id}", response_model=RefrigeratorAlertsResponse)
+def get_refrigerator_alerts(
+    refrigerator_id: int = Path(..., description="Refrigerator ID"),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """Get all alerts for a specific refrigerator."""
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        hospital_id = getattr(getattr(request.state, "current_user", None), "hospital_id", None) if request else None
+        service = CriticalAlertService(db)
+        result = service.get_refrigerator_alerts(refrigerator_id, branch_id=branch_id, hospital_id=hospital_id)
+        return result
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting refrigerator alerts: {str(e)}")
 
 
 @router.get("/hospital", response_model=HospitalAlertsResponse)
@@ -173,7 +195,9 @@ def acknowledge_alert(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        message = str(e)
+        status_code = 404 if "not found" in message.lower() else 400
+        raise HTTPException(status_code=status_code, detail=message)
     except Exception as e:
         # Check if it's an AppException
         if isinstance(e, AppException):

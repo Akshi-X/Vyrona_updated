@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Alert Config Test Report</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; }
+        .header { background: #0f172a; padding: 24px 40px; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { color: #f8fafc; font-size: 20px; font-weight: 600; }
+        .header .meta { color: #64748b; font-size: 12px; text-align: right; line-height: 1.8; }
+        .summary { display: flex; gap: 16px; padding: 20px 40px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+        .summary-card { flex: 1; background: #f8fafc; border-radius: 8px; padding: 14px 18px; border: 1px solid #e2e8f0; }
+        .summary-card .num { font-size: 28px; font-weight: 700; }
+        .summary-card .lbl { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+        .num-total { color: #334155; } .num-passed { color: #16a34a; } .num-failed { color: #dc2626; } .num-skipped { color: #d97706; }
+        .container { padding: 28px 40px; display: flex; flex-direction: column; gap: 20px; }
+        .class-block { background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
+        .class-header { background: #1e293b; padding: 14px 20px; }
+        .class-header h2 { color: #f1f5f9; font-size: 15px; font-weight: 600; }
+        .class-doc { color: #94a3b8; font-size: 12px; margin-top: 5px; line-height: 1.6; }
+        .class-stats { display: flex; gap: 8px; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        thead tr { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+        th { color: #64748b; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 16px; text-align: left; }
+        td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: top; font-size: 13px; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: #fafafa; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .passed  { background: #dcfce7; color: #15803d; }
+        .failed  { background: #fee2e2; color: #b91c1c; }
+        .skipped { background: #fef3c7; color: #b45309; }
+        .test-name { font-weight: 500; color: #1e293b; font-size: 13px; }
+        .test-desc { color: #64748b; font-size: 12px; margin-top: 4px; line-height: 1.6; font-style: italic; }
+        .dur { color: #94a3b8; font-size: 12px; white-space: nowrap; }
+        .expand-btn { cursor: pointer; font-size: 11px; color: #3b82f6; background: none; border: none; padding: 0; margin-top: 8px; display: inline-block; }
+        .expand-btn:hover { text-decoration: underline; }
+        .drawer { display: none; margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 10px; }
+        .drawer.open { display: block; }
+        .log-section { margin-bottom: 10px; }
+        .log-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 4px; }
+        .log-box { background: #0f172a; color: #94a3b8; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; padding: 12px 14px; border-radius: 6px; white-space: pre-wrap; line-height: 1.7; max-height: 250px; overflow-y: auto; }
+        .log-error { color: #fca5a5; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Alert Config — Test Report</h1>
+      <div class="meta">
+        <p>Generated: 2026-05-26 16:13:07</p>
+        <p>Classes: 1</p>
+      </div>
+    </div>
+    <div class="summary">
+      <div class="summary-card">
+        <div class="num num-total">25</div>
+        <div class="lbl">Total</div>
+      </div>
+      <div class="summary-card">
+        <div class="num num-passed">25</div>
+        <div class="lbl">Passed</div>
+      </div>
+      <div class="summary-card">
+        <div class="num num-failed">0</div>
+        <div class="lbl">Failed</div>
+      </div>
+      <div class="summary-card">
+        <div class="num num-skipped">0</div>
+        <div class="lbl">Skipped</div>
+      </div>
+    </div>
+    <div class="container">
+      <div class="class-block">
+        <div class="class-header">
+          <h2>General</h2>
+          <div class="class-stats">
+            <span class="badge passed">✓ 25 passed</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:100px">Result</th>
+              <th>Test / Description</th>
+              <th style="width:90px">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_M01_current_month_deviation_count</div>
+                <div class="test-desc">TC-M01 | P0
+GIVEN  May has 3 flagged deviations; April had 7
+WHEN   Admin/IVF user views the dashboard in May
+THEN   quality-deviations-flagged returns 3, not 7 or 10.
+Monthly filter must exclude April's alerts entirely.</div>
+                <div class="expand-btn" id="btn-d-General-0" onclick="toggleDrawer('d-General-0')">▶ show logs</div>
+                <div class="drawer" id="d-General-0">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-M01: Current month deviation count (filter excludes prior months)
+============================================================
+
+Seeding 3 May alerts and 7 April alerts for tank_id=1704
+
+QUALITY DEVIATIONS RESPONSE
+Status : 200
+Body   : {&quot;total_quality_deviations&quot;:3,&quot;ln2_level_deviations&quot;:0,&quot;last_updated&quot;:&quot;2026-05-26T16:12:56.192295&quot;,&quot;status&quot;:&quot;success&quot;}
+
+ flagged : 3
+
+✓ PASSED — Monthly filter correctly returns 3 (May only)
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:12:56,208 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '2d4a7e72-932e-44d5-856a-e02046ec9298', 'id': '2d4a7e72-932e-44d5-856a-e02046ec9298', 'user_id': '2d4a7e72-932e-44d5-856a-e02046ec9298', 'email': 'bd728f47-d8b3-45d1-b645-b423ea7dc4fe@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2031', 'branch_id': '2076', 'department': 'IVF', 'token_type': 'access', 'identity': '2d4a7e72-932e-44d5-856a-e02046ec9298', 'exp': datetime.datetime(2026, 5, 27, 16, 12, 55, 767063, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 12, 55, 767070, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.23s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_M02_deviation_graph_bars_match_monthly_count</div>
+                <div class="test-desc">TC-M02 | P0
+GIVEN  3 deviations seeded for May
+WHEN   Admin/IVF user views the deviations-graph endpoint
+THEN   Sum of all bar segments = 3 for the current month.
+Graph bars must stay consistent with the flagged count card.</div>
+                <div class="expand-btn" id="btn-d-General-1" onclick="toggleDrawer('d-General-1')">▶ show logs</div>
+                <div class="drawer" id="d-General-1">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-M02: Deviation graph bar sum matches monthly count
+============================================================
+
+Seeding 3 May alerts for tank_id=1705
+
+DEVIATION GRAPH RESPONSE
+Status : 200
+Body   : {&quot;available_heading&quot;:[&quot;KPI Main Branch&quot;],&quot;data&quot;:[{&quot;branch_name&quot;:&quot;KPI Main Branch&quot;,&quot;alert_name&quot;:&quot;Deviation alert&quot;,&quot;deviation_count&quot;:3}]}
+
+ bar total : 3
+
+✓ PASSED — Graph bar sum correctly equals 3
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:12:56,698 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '552199fd-551d-42e2-8aa7-09b203ab6218', 'id': '552199fd-551d-42e2-8aa7-09b203ab6218', 'user_id': '552199fd-551d-42e2-8aa7-09b203ab6218', 'email': '37fe1ae1-86de-44d7-9485-12eec9bdcb9e@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2032', 'branch_id': '2077', 'department': 'IVF', 'token_type': 'access', 'identity': '552199fd-551d-42e2-8aa7-09b203ab6218', 'exp': datetime.datetime(2026, 5, 27, 16, 12, 56, 667203, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 12, 56, 667209, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.03s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_M03_monthly_label_updates_on_month_rollover</div>
+                <div class="test-desc">TC-M03 | P1
+GIVEN  Dashboard open on May 31 with no June data
+WHEN   Date rolls to June 1 and one June deviation is seeded
+THEN   Response label contains 'June'; deviation count = 1 (June only).
+Stats must reset to the new month on rollover.</div>
+                <div class="expand-btn" id="btn-d-General-2" onclick="toggleDrawer('d-General-2')">▶ show logs</div>
+                <div class="drawer" id="d-General-2">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-M03: Monthly label updates on month rollover (May → June)
+============================================================
+
+Seeding 1 June alert for tank_id=1706
+
+QUALITY DEVIATIONS RESPONSE (pinned to June 1)
+Status : 200
+Body   : {&quot;total_quality_deviations&quot;:1,&quot;ln2_level_deviations&quot;:0,&quot;last_updated&quot;:&quot;2026-05-26T16:12:57.163002&quot;,&quot;status&quot;:&quot;success&quot;}
+
+ label   : None
+ ℹ Label field absent — skipping label check
+ flagged : 1
+
+✓ PASSED — Stats correctly reset to June with count = 1
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:12:57,169 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '16d1ddaa-d547-44e6-9cbc-a3f678e0166c', 'id': '16d1ddaa-d547-44e6-9cbc-a3f678e0166c', 'user_id': '16d1ddaa-d547-44e6-9cbc-a3f678e0166c', 'email': 'e397291a-d521-4f1d-94e0-ba41abefad99@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2033', 'branch_id': '2078', 'department': 'IVF', 'token_type': 'access', 'identity': '16d1ddaa-d547-44e6-9cbc-a3f678e0166c', 'exp': datetime.datetime(2026, 5, 27, 16, 12, 57, 121858, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 12, 57, 121870, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.04s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_M04_volume_counts_unchanged_on_month_rollover</div>
+                <div class="test-desc">TC-M04 | P1
+GIVEN  Total containers and cryolocks are all-time counts
+WHEN   Month rolls May → June
+THEN   Both volume endpoints return identical values —
+       they must never be monthly-filtered.</div>
+                <div class="expand-btn" id="btn-d-General-3" onclick="toggleDrawer('d-General-3')">▶ show logs</div>
+                <div class="drawer" id="d-General-3">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-M04: Volume counts unchanged on month rollover (May → June)
+============================================================
+
+Fetching volumes at May 31 23:55 ...
+ May  volumes : {'containers': {'total_containers': 1}, 'cryolocks': {'total_embryos': 0, 'total_cryolocks': 0, 'total_embryos_cryolocks': 0}}
+Fetching volumes at June 1 00:05 ...
+ June volumes : {'containers': {'total_containers': 1}, 'cryolocks': {'total_embryos': 0, 'total_cryolocks': 0, 'total_embryos_cryolocks': 0}}
+
+✓ PASSED — Volume counts are identical across month boundary
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:12:57,618 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/total-containers &quot;HTTP/1.1 200 OK&quot;
+2026-05-26 16:12:57,627 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/total-embryos-cryolocks &quot;HTTP/1.1 200 OK&quot;
+2026-05-26 16:12:57,638 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/total-containers &quot;HTTP/1.1 200 OK&quot;
+2026-05-26 16:12:57,646 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/total-embryos-cryolocks &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/total-containers &quot;HTTP/1.1 200 OK&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/total-embryos-cryolocks &quot;HTTP/1.1 200 OK&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/total-containers &quot;HTTP/1.1 200 OK&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/total-embryos-cryolocks &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': 'b9280519-1821-4dfb-90a5-bc31345e11f6', 'id': 'b9280519-1821-4dfb-90a5-bc31345e11f6', 'user_id': 'b9280519-1821-4dfb-90a5-bc31345e11f6', 'email': 'edd5895f-b838-47e6-b645-77e87ad523a7@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2034', 'branch_id': '2079', 'department': 'IVF', 'token_type': 'access', 'identity': 'b9280519-1821-4dfb-90a5-bc31345e11f6', 'exp': datetime.datetime(2026, 5, 27, 16, 12, 57, 597958, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 12, 57, 597964, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.04s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_A01_badge_equals_active_alert_count</div>
+                <div class="test-desc">TC-A01 | P0
+GIVEN  3 Active alerts + 1 Acknowledged alert for this hospital
+WHEN   Admin/IVF user hits /alerts/hospital
+THEN   Active count = 3  (Acknowledged must be excluded).
+Badge must count Active alerts only.</div>
+                <div class="expand-btn" id="btn-d-General-4" onclick="toggleDrawer('d-General-4')">▶ show logs</div>
+                <div class="drawer" id="d-General-4">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-A01: Badge equals active alert count (Acknowledged excluded)
+============================================================
+
+Seeding 3 Active + 1 Acknowledged alerts for tank_id=1708
+
+ALERTS HOSPITAL RESPONSE
+Status : 200
+Body   : {&quot;alerts&quot;:[{&quot;tank_id&quot;:1708,&quot;incubator_id&quot;:null,&quot;chamber_id&quot;:null,&quot;hospital_id&quot;:2035,&quot;branch_id&quot;:2080,&quot;alert_type&quot;:&quot;Deviation alert&quot;,&quot;source&quot;:&quot;KPI&quot;,&quot;severity&quot;:&quot;High&quot;,&quot;message&quot;:&quot;Test alert seeded by dashboard consistency tests&quot;,&quot;triggered_by&quot;:&quot;system&quot;,&quot;occurred_at&quot;:&quot;2025-05-15T20:00:00&quot;,&quot;dedup_key&quot;:&quot;1
+
+ active count : 3
+
+✓ PASSED — Active count = 3, Acknowledged alert correctly excluded
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:12:58,027 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': 'cf843ae9-e819-4b16-bc24-141db8d02a85', 'id': 'cf843ae9-e819-4b16-bc24-141db8d02a85', 'user_id': 'cf843ae9-e819-4b16-bc24-141db8d02a85', 'email': '8b01a658-f1d2-489c-bd20-5b03708100df@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2035', 'branch_id': '2080', 'department': 'IVF', 'token_type': 'access', 'identity': 'cf843ae9-e819-4b16-bc24-141db8d02a85', 'exp': datetime.datetime(2026, 5, 27, 16, 12, 57, 995231, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 12, 57, 995237, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.04s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_A02_badge_increments_on_new_deviation</div>
+                <div class="test-desc">TC-A02 | P0
+GIVEN  4 Active alerts  (badge = 4)
+WHEN   A new Active alert is inserted  (system trigger simulation)
+THEN   Next read of /alerts/hospital returns active count = 5.
+Badge must increment when a new active alert is inserted.</div>
+                <div class="expand-btn" id="btn-d-General-5" onclick="toggleDrawer('d-General-5')">▶ show logs</div>
+                <div class="drawer" id="d-General-5">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-A02: Badge increments on new deviation (4 → 5)
+============================================================
+
+Seeding 4 Active alerts for tank_id=1709
+
+ Baseline active count : 4
+
+Inserting 1 new Active alert ...
+
+ALERTS HOSPITAL RESPONSE (after new alert)
+Status : 200
+Body   : {&quot;alerts&quot;:[{&quot;tank_id&quot;:1709,&quot;incubator_id&quot;:null,&quot;chamber_id&quot;:null,&quot;hospital_id&quot;:2036,&quot;branch_id&quot;:2081,&quot;alert_type&quot;:&quot;Deviation alert&quot;,&quot;source&quot;:&quot;KPI&quot;,&quot;severity&quot;:&quot;High&quot;,&quot;message&quot;:&quot;Test alert seeded by dashboard consistency tests&quot;,&quot;triggered_by&quot;:&quot;system&quot;,&quot;occurred_at&quot;:&quot;2025-05-15T20:00:00&quot;,&quot;dedup_key&quot;:&quot;1
+
+ active count after insert : 5
+
+✓ PASSED — Badge correctly incremented from 4 → 5
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:12:58,472 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+2026-05-26 16:12:58,491 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': 'a5b3e352-3786-4c92-81ee-0780951f08cc', 'id': 'a5b3e352-3786-4c92-81ee-0780951f08cc', 'user_id': 'a5b3e352-3786-4c92-81ee-0780951f08cc', 'email': '7bcf2c8e-e3b6-43bc-bcb6-9f9c9b398ac0@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2036', 'branch_id': '2081', 'department': 'IVF', 'token_type': 'access', 'identity': 'a5b3e352-3786-4c92-81ee-0780951f08cc', 'exp': datetime.datetime(2026, 5, 27, 16, 12, 58, 429314, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 12, 58, 429332, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.07s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_A03_badge_decrements_on_acknowledgement</div>
+                <div class="test-desc">TC-A03 | P1
+GIVEN  4 Active alerts
+WHEN   Admin/IVF user acknowledges one via POST /alerts/acknowledge
+THEN   Active count drops to 3 on the next read.
+Acknowledged alerts must be excluded from the active badge.</div>
+                <div class="expand-btn" id="btn-d-General-6" onclick="toggleDrawer('d-General-6')">▶ show logs</div>
+                <div class="drawer" id="d-General-6">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-A03: Badge decrements on acknowledgement (4 → 3)
+============================================================
+
+Seeding 4 Active alerts for tank_id=1710
+
+ Baseline active count : 4
+
+Acknowledging alert_id=f62ac7fe-dba1-40b9-8ba9-c1b6475e3efd ...
+
+ACKNOWLEDGE RESPONSE
+Status : 200
+Body   : {&quot;alert_id&quot;:&quot;f62ac7fe-dba1-40b9-8ba9-c1b6475e3efd&quot;,&quot;status&quot;:&quot;Acknowledged&quot;,&quot;message&quot;:&quot;Alert acknowledged successfully&quot;,&quot;acknowledged_at&quot;:&quot;2026-05-26T16:12:58.937705&quot;,&quot;acknowledgment_reason&quot;:&quot;Resolved during TC-A03&quot;}
+
+ active count after ack : 3
+
+✓ PASSED — Badge correctly decremented from 4 → 3 after acknowledgement
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:12:58,926 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+2026-05-26 16:12:58,952 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 200 OK&quot;
+2026-05-26 16:12:58,966 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 200 OK&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '3eb4f976-7a32-463c-bdd4-60a563d23969', 'id': '3eb4f976-7a32-463c-bdd4-60a563d23969', 'user_id': '3eb4f976-7a32-463c-bdd4-60a563d23969', 'email': '7025f96d-7125-4f74-a23c-1f0520cb7349@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2037', 'branch_id': '2082', 'department': 'IVF', 'token_type': 'access', 'identity': '3eb4f976-7a32-463c-bdd4-60a563d23969', 'exp': datetime.datetime(2026, 5, 27, 16, 12, 58, 884823, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 12, 58, 884830, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.09s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_A04_badge_hidden_when_all_alerts_acknowledged</div>
+                <div class="test-desc">TC-A04 | P1
+GIVEN  All 4 alerts are Acknowledged
+WHEN   Admin/IVF user hits /alerts/hospital
+THEN   Active count = 0  (no stale badge count).
+When all alerts are acknowledged the badge must be hidden (count = 0).</div>
+                <div class="expand-btn" id="btn-d-General-7" onclick="toggleDrawer('d-General-7')">▶ show logs</div>
+                <div class="drawer" id="d-General-7">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-A04: Badge hidden when all alerts are acknowledged (count = 0)
+============================================================
+
+Seeding 4 Acknowledged alerts for tank_id=1711
+
+ALERTS HOSPITAL RESPONSE
+Status : 200
+Body   : {&quot;alerts&quot;:[{&quot;tank_id&quot;:1711,&quot;incubator_id&quot;:null,&quot;chamber_id&quot;:null,&quot;hospital_id&quot;:2038,&quot;branch_id&quot;:2083,&quot;alert_type&quot;:&quot;Deviation alert&quot;,&quot;source&quot;:&quot;KPI&quot;,&quot;severity&quot;:&quot;High&quot;,&quot;message&quot;:&quot;Test alert seeded by dashboard consistency tests&quot;,&quot;triggered_by&quot;:&quot;system&quot;,&quot;occurred_at&quot;:&quot;2025-05-15T13:00:00&quot;,&quot;dedup_key&quot;:&quot;1
+
+ active count : 0
+
+✓ PASSED — Active count = 0, badge correctly hidden
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:12:59,422 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': 'bc841ad7-2df7-4c7d-afab-774869b9551b', 'id': 'bc841ad7-2df7-4c7d-afab-774869b9551b', 'user_id': 'bc841ad7-2df7-4c7d-afab-774869b9551b', 'email': 'bd4acefe-fedc-4f0e-90d7-67b61f412037@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2038', 'branch_id': '2083', 'department': 'IVF', 'token_type': 'access', 'identity': 'bc841ad7-2df7-4c7d-afab-774869b9551b', 'exp': datetime.datetime(2026, 5, 27, 16, 12, 59, 362762, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 12, 59, 362774, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.07s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_AUTH01_expired_jwt_returns_401</div>
+                <div class="test-desc">TC-AUTH01 | P0
+GIVEN  A JWT whose exp claim is 1 hour in the past
+WHEN   Any IVF dashboard endpoint is called with that token
+THEN   All endpoints must return 401 Unauthorized.
+
+Ensures the JWT middleware validates expiry and does not fall through
+to the service layer with a stale token.</div>
+                <div class="expand-btn" id="btn-d-General-8" onclick="toggleDrawer('d-General-8')">▶ show logs</div>
+                <div class="drawer" id="d-General-8">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-AUTH01: Expired JWT returns 401 on all IVF dashboard routes
+============================================================
+
+Calling GET /api/ivf/dashboard/metrics/quality-deviations-flagged with expired token ...
+Status : 401  Body : {&quot;error_code&quot;:&quot;ERR_1062&quot;,&quot;message&quot;:&quot;Your session has expired. Please login again&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:12:59.846366&quot;}
+
+Calling GET /api/ivf/alerts/hospital with expired token ...
+Status : 401  Body : {&quot;error_code&quot;:&quot;ERR_1062&quot;,&quot;message&quot;:&quot;Your session has expired. Please login again&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:12:59.851432&quot;}
+
+Calling GET /api/ivf/dashboard/metrics/deviations-graph with expired token ...
+Status : 401  Body : {&quot;error_code&quot;:&quot;ERR_1062&quot;,&quot;message&quot;:&quot;Your session has expired. Please login again&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:12:59.856087&quot;}
+
+✓ PASSED — All endpoints correctly reject expired JWT with 401
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:12:59,848 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 401 Unauthorized&quot;
+2026-05-26 16:12:59,853 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 401 Unauthorized&quot;
+2026-05-26 16:12:59,857 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 401 Unauthorized&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 401 Unauthorized&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 401 Unauthorized&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 401 Unauthorized&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '9371bd92-38fa-4d52-9e4d-60e1d61595c6', 'id': '9371bd92-38fa-4d52-9e4d-60e1d61595c6', 'user_id': '9371bd92-38fa-4d52-9e4d-60e1d61595c6', 'email': 'c792b215-ee89-4585-ba10-4049925d9390@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2039', 'branch_id': '2084', 'department': 'IVF', 'token_type': 'access', 'identity': '9371bd92-38fa-4d52-9e4d-60e1d61595c6', 'exp': datetime.datetime(2026, 5, 27, 16, 12, 59, 837925, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 12, 59, 837932, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_AUTH02_no_auth_header_returns_401</div>
+                <div class="test-desc">TC-AUTH02 | P0
+GIVEN  A request with no Authorization header whatsoever
+WHEN   Any IVF dashboard endpoint is called
+THEN   All endpoints must return 401 Unauthorized (not 500 or 200).
+
+Ensures unauthenticated requests are rejected at the middleware layer.</div>
+                <div class="expand-btn" id="btn-d-General-9" onclick="toggleDrawer('d-General-9')">▶ show logs</div>
+                <div class="drawer" id="d-General-9">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-AUTH02: No Authorization header → 401 on all IVF dashboard routes
+============================================================
+
+Calling GET /api/ivf/dashboard/metrics/quality-deviations-flagged with no token ...
+Status : 401  Body : {&quot;error_code&quot;:&quot;ERR_1061&quot;,&quot;message&quot;:&quot;Invalid authentication token&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.260259&quot;}
+
+Calling GET /api/ivf/alerts/hospital with no token ...
+Status : 401  Body : {&quot;error_code&quot;:&quot;ERR_1061&quot;,&quot;message&quot;:&quot;Invalid authentication token&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.265269&quot;}
+
+Calling GET /api/ivf/dashboard/metrics/deviations-graph with no token ...
+Status : 401  Body : {&quot;error_code&quot;:&quot;ERR_1061&quot;,&quot;message&quot;:&quot;Invalid authentication token&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.270607&quot;}
+
+Calling POST /api/ivf/alerts/acknowledge with no token ...
+Status : 401  Body : {&quot;error_code&quot;:&quot;ERR_1061&quot;,&quot;message&quot;:&quot;Invalid authentication token&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.276106&quot;}
+
+✓ PASSED — All endpoints correctly reject missing Authorization header with 401
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:00,262 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 401 Unauthorized&quot;
+2026-05-26 16:13:00,267 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 401 Unauthorized&quot;
+2026-05-26 16:13:00,272 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 401 Unauthorized&quot;
+2026-05-26 16:13:00,278 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 401 Unauthorized&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 401 Unauthorized&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 401 Unauthorized&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 401 Unauthorized&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 401 Unauthorized&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '3a9e6f8a-905c-400b-a2d7-b3b0cd1e99b4', 'id': '3a9e6f8a-905c-400b-a2d7-b3b0cd1e99b4', 'user_id': '3a9e6f8a-905c-400b-a2d7-b3b0cd1e99b4', 'email': '39e3413b-02c2-47a6-8498-c2a33aa85492@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2040', 'branch_id': '2085', 'department': 'IVF', 'token_type': 'access', 'identity': '3a9e6f8a-905c-400b-a2d7-b3b0cd1e99b4', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 0, 253075, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 0, 253082, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_AUTH03_non_ivf_department_returns_403</div>
+                <div class="test-desc">TC-AUTH03 | P0
+GIVEN  A valid JWT for a user whose department = 'OPD' (not IVF)
+WHEN   Any /api/ivf/* endpoint is called
+THEN   All endpoints must return 403 Forbidden.
+
+RBAC rule: department=IVF is required to access IVF dashboard routes.
+Any other department — even with role=Admin — must be denied.</div>
+                <div class="expand-btn" id="btn-d-General-10" onclick="toggleDrawer('d-General-10')">▶ show logs</div>
+                <div class="drawer" id="d-General-10">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-AUTH03: Non-IVF department (OPD/Admin) → 403 on all IVF routes
+============================================================
+
+Calling GET /api/ivf/dashboard/metrics/quality-deviations-flagged with OPD department token ...
+Status : 403  Body : {&quot;error_code&quot;:&quot;ERR_9005&quot;,&quot;message&quot;:&quot;Access denied - IVF department required&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.687509&quot;,&quot;department&quot;:&quot;OPD&quot;,&quot;required_department&quot;:&quot;IVF&quot;}
+
+FULL RESPONSE:
+{&quot;error_code&quot;:&quot;ERR_9005&quot;,&quot;message&quot;:&quot;Access denied - IVF department required&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.687509&quot;,&quot;department&quot;:&quot;OPD&quot;,&quot;required_department&quot;:&quot;IVF&quot;}
+
+Calling GET /api/ivf/alerts/hospital with OPD department token ...
+Status : 403  Body : {&quot;error_code&quot;:&quot;ERR_9005&quot;,&quot;message&quot;:&quot;Access denied - IVF department required&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.696293&quot;,&quot;department&quot;:&quot;OPD&quot;,&quot;required_department&quot;:&quot;IVF&quot;}
+
+FULL RESPONSE:
+{&quot;error_code&quot;:&quot;ERR_9005&quot;,&quot;message&quot;:&quot;Access denied - IVF department required&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.696293&quot;,&quot;department&quot;:&quot;OPD&quot;,&quot;required_department&quot;:&quot;IVF&quot;}
+
+Calling GET /api/ivf/dashboard/metrics/deviations-graph with OPD department token ...
+Status : 403  Body : {&quot;error_code&quot;:&quot;ERR_9005&quot;,&quot;message&quot;:&quot;Access denied - IVF department required&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.704200&quot;,&quot;department&quot;:&quot;OPD&quot;,&quot;required_department&quot;:&quot;IVF&quot;}
+
+FULL RESPONSE:
+{&quot;error_code&quot;:&quot;ERR_9005&quot;,&quot;message&quot;:&quot;Access denied - IVF department required&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.704200&quot;,&quot;department&quot;:&quot;OPD&quot;,&quot;required_department&quot;:&quot;IVF&quot;}
+
+Calling POST /api/ivf/alerts/acknowledge with OPD department token ...
+Status : 403  Body : {&quot;error_code&quot;:&quot;ERR_9005&quot;,&quot;message&quot;:&quot;Access denied - IVF department required&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.718310&quot;,&quot;department&quot;:&quot;OPD&quot;,&quot;required_department&quot;:&quot;IVF&quot;}
+
+FULL RESPONSE:
+{&quot;error_code&quot;:&quot;ERR_9005&quot;,&quot;message&quot;:&quot;Access denied - IVF department required&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:00.718310&quot;,&quot;department&quot;:&quot;OPD&quot;,&quot;required_department&quot;:&quot;IVF&quot;}
+
+✓ PASSED — All IVF routes correctly return 403 for non-IVF department
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:00,689 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 403 Forbidden&quot;
+2026-05-26 16:13:00,698 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 403 Forbidden&quot;
+2026-05-26 16:13:00,705 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 403 Forbidden&quot;
+2026-05-26 16:13:00,719 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 403 Forbidden&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 403 Forbidden&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 403 Forbidden&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 403 Forbidden&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 403 Forbidden&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': 'd0bb3aba-ff69-4d78-9cba-a66ae90b3b39', 'id': 'd0bb3aba-ff69-4d78-9cba-a66ae90b3b39', 'user_id': 'd0bb3aba-ff69-4d78-9cba-a66ae90b3b39', 'email': '87c4d084-9b44-4ad6-aee2-1c9ee77ba702@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2041', 'branch_id': '2086', 'department': 'IVF', 'token_type': 'access', 'identity': 'd0bb3aba-ff69-4d78-9cba-a66ae90b3b39', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 0, 667438, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 0, 667446, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.05s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_AUTH04_cross_hospital_data_isolation</div>
+                <div class="test-desc">TC-AUTH04 | P0
+GIVEN  Hospital A has 3 Active alerts; Hospital B has 5 Active alerts
+WHEN   An Admin/IVF user of Hospital A calls /alerts/hospital
+THEN   Active count = 3  (Hospital B's 5 alerts must be invisible).
+
+Ensures hospital_id scoping in the service layer — no cross-tenant leakage.
+
+NOTE: This test requires two independent KPI environments. It uses
+setup_kpi_environment twice via two separate DB sessions seeded with
+different hospital rows. If your conftest only supports one hospital
+per test session, adapt setup_kpi_environment to accept a hospital_name
+parameter and call it twice with distinct names.</div>
+                <div class="expand-btn" id="btn-d-General-11" onclick="toggleDrawer('d-General-11')">▶ show logs</div>
+                <div class="drawer" id="d-General-11">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-AUTH04: Cross-hospital isolation — A cannot see B's alerts
+============================================================
+
+Seeding 3 Active alerts for Hospital A (2042) ...
+Seeding 5 Active alerts for Hospital B (2043) ...
+
+ALERTS HOSPITAL RESPONSE (Hospital A token)
+Status : 200  Body : {&quot;alerts&quot;:[{&quot;tank_id&quot;:1715,&quot;incubator_id&quot;:null,&quot;chamber_id&quot;:null,&quot;hospital_id&quot;:2042,&quot;branch_id&quot;:2087,&quot;alert_type&quot;:&quot;Deviation alert&quot;,&quot;source&quot;:&quot;KPI&quot;,&quot;severity&quot;:&quot;High&quot;,&quot;message&quot;:&quot;Test alert seeded by dashboard consistency tests&quot;,&quot;triggered_by&quot;:&quot;system&quot;,&quot;occurred_at&quot;:&quot;2026-05-10T11:00:00&quot;,&quot;dedup_key&quot;:&quot;1
+
+ active count seen by Hospital A : 3
+
+✓ PASSED — Hospital A sees exactly 3 alerts; Hospital B's data is isolated
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:01,210 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '46d47ce0-45c9-45b1-b556-01357a6cca8d', 'id': '46d47ce0-45c9-45b1-b556-01357a6cca8d', 'user_id': '46d47ce0-45c9-45b1-b556-01357a6cca8d', 'email': 'fa5608c5-b9e1-4506-ba01-5e8bbd1359d4@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2042', 'branch_id': '2087', 'department': 'IVF', 'token_type': 'access', 'identity': '46d47ce0-45c9-45b1-b556-01357a6cca8d', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 1, 137012, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 1, 137018, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.08s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_AUTH05_admin_from_any_branch_sees_all_hospital_deviations</div>
+                <div class="test-desc">TC-AUTH05 | P0
+GIVEN  Two branches (A and C) under the same hospital with deviations seeded
+WHEN   An Admin user belonging to Branch C calls /alerts/hospital
+THEN   The Admin must see deviations from across the entire hospital (A + C).
+
+Ensures an Admin from any branch in the hospital has hospital-wide visibility.</div>
+                <div class="expand-btn" id="btn-d-General-12" onclick="toggleDrawer('d-General-12')">▶ show logs</div>
+                <div class="drawer" id="d-General-12">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-AUTH05: Admin from any branch sees all hospital deviations
+============================================================
+
+ active count seen by Branch C Admin : 5
+
+✓ PASSED — Admin from Branch C sees deviations across the hospital (total = 5)
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:01,907 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': 'b8ff15c9-bfec-4bef-87a6-e30029ee0f3e', 'id': 'b8ff15c9-bfec-4bef-87a6-e30029ee0f3e', 'user_id': 'b8ff15c9-bfec-4bef-87a6-e30029ee0f3e', 'email': '49f0df75-22c4-4a0d-bead-b9fcfb481096@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2044', 'branch_id': '2089', 'department': 'IVF', 'token_type': 'access', 'identity': 'b8ff15c9-bfec-4bef-87a6-e30029ee0f3e', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 1, 581024, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 1, 581030, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.36s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_AUTH06_missing_hospital_or_branch_claim_returns_401</div>
+                <div class="test-desc">TC-AUTH06 | P0
+GIVEN  A token missing hospital_id or branch_id
+WHEN   An IVF dashboard endpoint is called
+THEN   The request must return 401 Unauthorized.</div>
+                <div class="expand-btn" id="btn-d-General-13" onclick="toggleDrawer('d-General-13')">▶ show logs</div>
+                <div class="drawer" id="d-General-13">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+✓ PASSED — Tokens missing hospital_id or branch_id return 401
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:02,314 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 401 Unauthorized&quot;
+2026-05-26 16:13:02,319 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 401 Unauthorized&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 401 Unauthorized&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/quality-deviations-flagged &quot;HTTP/1.1 401 Unauthorized&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '41023ca2-282e-4905-b5ce-9a50ec200784', 'id': '41023ca2-282e-4905-b5ce-9a50ec200784', 'user_id': '41023ca2-282e-4905-b5ce-9a50ec200784', 'email': '867c8f1d-97c0-42a9-b527-7d27b05c7c00@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2045', 'branch_id': '2091', 'department': 'IVF', 'token_type': 'access', 'identity': '41023ca2-282e-4905-b5ce-9a50ec200784', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 2, 305623, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 2, 305630, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_AUTH07_manager_role_sees_hospital_wide_alerts</div>
+                <div class="test-desc">TC-AUTH07 | P0
+GIVEN  A Manager token in Hospital A
+WHEN   /api/ivf/alerts/hospital is called
+THEN   The Manager must see alerts from all branches in the hospital.</div>
+                <div class="expand-btn" id="btn-d-General-14" onclick="toggleDrawer('d-General-14')">▶ show logs</div>
+                <div class="drawer" id="d-General-14">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+✓ PASSED — Manager role sees hospital-wide deviations
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:02,713 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '3a03ba30-cb15-45c1-a10f-c80c99f96a2b', 'id': '3a03ba30-cb15-45c1-a10f-c80c99f96a2b', 'user_id': '3a03ba30-cb15-45c1-a10f-c80c99f96a2b', 'email': 'bd03695f-ea74-4b9d-9d86-b60520d7022d@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2046', 'branch_id': '2092', 'department': 'IVF', 'token_type': 'access', 'identity': '3a03ba30-cb15-45c1-a10f-c80c99f96a2b', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 2, 669617, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 2, 669623, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.05s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_AUTH08_user_role_sees_only_assigned_branch_alerts</div>
+                <div class="test-desc">TC-AUTH08 | P0
+GIVEN  A User role belonging to Branch A and active alerts in Branch A and Branch B
+WHEN   /api/ivf/alerts/hospital is called
+THEN   The User must only see active alerts from their assigned branch.</div>
+                <div class="expand-btn" id="btn-d-General-15" onclick="toggleDrawer('d-General-15')">▶ show logs</div>
+                <div class="drawer" id="d-General-15">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+✓ PASSED — User role sees only active alerts from their own branch
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:03,427 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '5e6acaaf-c01e-41c3-bdc4-066ed059658a', 'id': '5e6acaaf-c01e-41c3-bdc4-066ed059658a', 'user_id': '5e6acaaf-c01e-41c3-bdc4-066ed059658a', 'email': 'd3a69619-a26a-49db-a05a-4a47f42104d9@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2047', 'branch_id': '2094', 'department': 'IVF', 'token_type': 'access', 'identity': '5e6acaaf-c01e-41c3-bdc4-066ed059658a', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 3, 102514, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 3, 102522, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.34s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_AUTH09_user_role_branch_scopes_deviations_graph</div>
+                <div class="test-desc">TC-AUTH09 | P0
+GIVEN  A User role in Branch A and deviations seeded in Branch A and Branch B
+WHEN   /api/ivf/dashboard/metrics/deviations-graph is called
+THEN   The User must only receive graph data for Branch A.</div>
+                <div class="expand-btn" id="btn-d-General-16" onclick="toggleDrawer('d-General-16')">▶ show logs</div>
+                <div class="drawer" id="d-General-16">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+✓ PASSED — User role deviations graph is scoped to assigned branch
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:04,127 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '7add3a17-8406-4057-a0be-afaa8d276ef1', 'id': '7add3a17-8406-4057-a0be-afaa8d276ef1', 'user_id': '7add3a17-8406-4057-a0be-afaa8d276ef1', 'email': '93d6e7bc-e344-4cc9-a088-6b333e47ea7f@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2048', 'branch_id': '2096', 'department': 'IVF', 'token_type': 'access', 'identity': '7add3a17-8406-4057-a0be-afaa8d276ef1', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 3, 806101, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 3, 806107, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.35s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_AUTH10_admin_ivf_top_deviation_driver_returns_highest_driver</div>
+                <div class="test-desc">TC-AUTH10 | P1
+GIVEN  An Admin role in IVF and KPI deviation alerts seeded for internal, external,
+       and shock drivers across the current month
+WHEN   /api/ivf/dashboard/metrics/top-deviation-driver is called
+THEN   The response must return the driver with the highest deviation count
+       and include all driver counts in the payload.</div>
+                <div class="expand-btn" id="btn-d-General-17" onclick="toggleDrawer('d-General-17')">▶ show logs</div>
+                <div class="drawer" id="d-General-17">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-AUTH10: Admin/IVF top deviation driver returns highest current-month driver
+============================================================
+
+TOP DEVIATION DRIVER RESPONSE
+Status : 200
+Body   : {&quot;driver_name&quot;:&quot;External Temperature&quot;,&quot;count&quot;:4,&quot;all_drivers&quot;:{&quot;External Temperature&quot;:4,&quot;Internal Temperature&quot;:2,&quot;Shock&quot;:3},&quot;last_updated&quot;:&quot;2026-05-26T16:13:04.580611&quot;,&quot;status&quot;:&quot;success&quot;}
+
+✓ PASSED — Admin/IVF top deviation driver returns the highest current-month driver
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:04,590 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/top-deviation-driver &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/top-deviation-driver &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '7038bce0-aab1-4ccd-8876-3298b39a5cb6', 'id': '7038bce0-aab1-4ccd-8876-3298b39a5cb6', 'user_id': '7038bce0-aab1-4ccd-8876-3298b39a5cb6', 'email': 'e4cb58f4-dd4f-4fb2-8109-ae6c0d3bc254@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2049', 'branch_id': '2098', 'department': 'IVF', 'token_type': 'access', 'identity': '7038bce0-aab1-4ccd-8876-3298b39a5cb6', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 4, 524518, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 4, 524524, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.08s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_ACK01_double_acknowledge_is_idempotent_or_400</div>
+                <div class="test-desc">TC-ACK01 | P1
+GIVEN  One Active alert that has already been acknowledged once
+WHEN   The same alert_id is acknowledged a second time
+THEN   The response is 200/204 (idempotent) OR 400/409 (reject re-ack).
+       Either way, the active count must not go negative and must remain 0.
+
+The test accepts both behaviours — the important invariant is that
+a double-acknowledge never corrupts state (negative count, 500 error,
+or the alert flipping back to Active).</div>
+                <div class="expand-btn" id="btn-d-General-18" onclick="toggleDrawer('d-General-18')">▶ show logs</div>
+                <div class="drawer" id="d-General-18">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-ACK01: Double-acknowledge is idempotent or rejected (count stays 0)
+============================================================
+
+First ack status  : 200  Body : {&quot;alert_id&quot;:&quot;8dd3afe3-8a4f-4c40-b3e2-6e4f5b6ff4be&quot;,&quot;status&quot;:&quot;Acknowledged&quot;,&quot;message&quot;:&quot;Alert acknowledged successfully&quot;,&quot;acknowledged_at&quot;:&quot;2026-05-26T16:13:04.983376&quot;,&quot;acknowledgment_reason&quot;:&quot;First ack — TC-ACK01&quot;}
+Second ack status : 400  Body : {&quot;error_code&quot;:&quot;HTTP_400&quot;,&quot;message&quot;:&quot;Alert 8dd3afe3-8a4f-4c40-b3e2-6e4f5b6ff4be is already acknowledged&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:04.998785&quot;}
+
+ active count after double-ack : 0
+
+✓ PASSED — Double-acknowledge handled safely; active count remains 0
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:04,991 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 200 OK&quot;
+2026-05-26 16:13:04,998 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/alerts/acknowledge: Alert 8dd3afe3-8a4f-4c40-b3e2-6e4f5b6ff4be is already acknowledged
+2026-05-26 16:13:05,000 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 400 Bad Request&quot;
+2026-05-26 16:13:05,010 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 200 OK&quot;
+[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/alerts/acknowledge: Alert 8dd3afe3-8a4f-4c40-b3e2-6e4f5b6ff4be is already acknowledged
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 400 Bad Request&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '4eae2a3b-b543-4478-a1bc-18dbdf60c1ee', 'id': '4eae2a3b-b543-4478-a1bc-18dbdf60c1ee', 'user_id': '4eae2a3b-b543-4478-a1bc-18dbdf60c1ee', 'email': '85db0452-d857-4f6e-befc-ef5c666703b4@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2050', 'branch_id': '2099', 'department': 'IVF', 'token_type': 'access', 'identity': '4eae2a3b-b543-4478-a1bc-18dbdf60c1ee', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 4, 969702, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 4, 969708, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.04s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_ACK04_concurrent_ack_race_is_idempotent_or_rejected</div>
+                <div class="test-desc">TC-ACK04 | P0
+GIVEN  Two concurrent acknowledge requests for the same alert_id
+WHEN   both requests are executed
+THEN   One request must succeed and the other must be idempotent or rejected,
+       and the active count must remain 0.</div>
+                <div class="expand-btn" id="btn-d-General-19" onclick="toggleDrawer('d-General-19')">▶ show logs</div>
+                <div class="drawer" id="d-General-19">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+Concurrent ack statuses: [200, 400]
+
+ active count after concurrent ack race : 0
+
+✓ PASSED — Concurrent ack race did not corrupt state
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:05,410 - app.middleware.exception_handler - WARNING - HTTP 400 on /api/ivf/alerts/acknowledge: Alert b1aa0736-b758-4f8f-8eca-2882a1decc90 is already acknowledged
+2026-05-26 16:13:05,415 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 400 Bad Request&quot;
+2026-05-26 16:13:05,416 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 200 OK&quot;
+2026-05-26 16:13:05,426 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 400 on /api/ivf/alerts/acknowledge: Alert b1aa0736-b758-4f8f-8eca-2882a1decc90 is already acknowledged
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 400 Bad Request&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 200 OK&quot;
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/alerts/hospital &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '44e79294-19f5-4f66-9790-7d7e714536de', 'id': '44e79294-19f5-4f66-9790-7d7e714536de', 'user_id': '44e79294-19f5-4f66-9790-7d7e714536de', 'email': '99f5bd41-38e2-4044-9eef-c66caba7d0bd@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2051', 'branch_id': '2100', 'department': 'IVF', 'token_type': 'access', 'identity': '44e79294-19f5-4f66-9790-7d7e714536de', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 5, 375805, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 5, 375811, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.05s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_ACK02_nonexistent_alert_id_returns_404</div>
+                <div class="test-desc">TC-ACK02 | P0
+GIVEN  A random UUID that was never seeded as an alert
+WHEN   POST /alerts/acknowledge is called with that alert_id
+THEN   Response must be 404 Not Found.
+
+Ensures the service does a DB lookup and fails gracefully rather
+than silently succeeding or returning a 500.</div>
+                <div class="expand-btn" id="btn-d-General-20" onclick="toggleDrawer('d-General-20')">▶ show logs</div>
+                <div class="drawer" id="d-General-20">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-ACK02: Acknowledging non-existent alert_id → 404
+============================================================
+
+Sending acknowledge for phantom alert_id = 22ad872b-1c09-42bb-91c4-49c205d2fd35
+Status : 404  Body : {&quot;error_code&quot;:&quot;HTTP_404&quot;,&quot;message&quot;:&quot;Alert with ID 22ad872b-1c09-42bb-91c4-49c205d2fd35 not found&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:05.797850&quot;}
+
+✓ PASSED — Non-existent alert_id correctly returns 404
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:05,797 - app.middleware.exception_handler - WARNING - HTTP 404 on /api/ivf/alerts/acknowledge: Alert with ID 22ad872b-1c09-42bb-91c4-49c205d2fd35 not found
+2026-05-26 16:13:05,799 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 404 Not Found&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:322 HTTP 404 on /api/ivf/alerts/acknowledge: Alert with ID 22ad872b-1c09-42bb-91c4-49c205d2fd35 not found
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 404 Not Found&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '7a9d77e3-e004-4ba8-a1d3-10e212c2b947', 'id': '7a9d77e3-e004-4ba8-a1d3-10e212c2b947', 'user_id': '7a9d77e3-e004-4ba8-a1d3-10e212c2b947', 'email': '69a8da5d-9d1d-47ea-b390-d25ce09843f4@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2052', 'branch_id': '2101', 'department': 'IVF', 'token_type': 'access', 'identity': '7a9d77e3-e004-4ba8-a1d3-10e212c2b947', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 5, 783780, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 5, 783788, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.01s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_ACK03_missing_alert_id_rejected_with_422</div>
+                <div class="test-desc">TC-ACK03 | P1
+GIVEN  A request body missing the required alert_id field
+WHEN   POST /alerts/acknowledge is called
+THEN   Response must be 422 (alert_id is a required field).
+
+NOTE: acknowledgment_reason is Optional[str] in the schema — empty string
+and omitted field are both accepted by design. Only alert_id is enforced.</div>
+                <div class="expand-btn" id="btn-d-General-21" onclick="toggleDrawer('d-General-21')">▶ show logs</div>
+                <div class="drawer" id="d-General-21">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-ACK03: Missing alert_id → 422
+============================================================
+
+Case 1 — alert_id field omitted ...
+Status : 422  Body : {&quot;error_code&quot;:&quot;ERR_6007&quot;,&quot;message&quot;:&quot;Field required&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:06.169413&quot;}
+
+Case 2 — completely empty body ...
+Status : 422  Body : {&quot;error_code&quot;:&quot;ERR_6007&quot;,&quot;message&quot;:&quot;Field required&quot;,&quot;status&quot;:&quot;Failed&quot;,&quot;timestamp&quot;:&quot;2026-05-26T16:13:06.177169&quot;}
+
+✓ PASSED — Missing alert_id and empty body correctly rejected with 422
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:06,168 - app.middleware.exception_handler - WARNING - Validation error on /api/ivf/alerts/acknowledge
+2026-05-26 16:13:06,171 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 422 Unprocessable Entity&quot;
+2026-05-26 16:13:06,176 - app.middleware.exception_handler - WARNING - Validation error on /api/ivf/alerts/acknowledge
+2026-05-26 16:13:06,178 - httpx - INFO - HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 422 Unprocessable Entity&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:226 Validation error on /api/ivf/alerts/acknowledge
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 422 Unprocessable Entity&quot;
+[33mWARNING [0m app.middleware.exception_handler:exception_handler.py:226 Validation error on /api/ivf/alerts/acknowledge
+[32mINFO    [0m httpx:_client.py:1025 HTTP Request: POST http://testserver/api/ivf/alerts/acknowledge &quot;HTTP/1.1 422 Unprocessable Entity&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': 'cf4cf7da-ae31-4d43-aae3-1180aa73ecbe', 'id': 'cf4cf7da-ae31-4d43-aae3-1180aa73ecbe', 'user_id': 'cf4cf7da-ae31-4d43-aae3-1180aa73ecbe', 'email': '59226b9f-b634-44e1-9244-ec95319773e0@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2053', 'branch_id': '2102', 'department': 'IVF', 'token_type': 'access', 'identity': 'cf4cf7da-ae31-4d43-aae3-1180aa73ecbe', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 6, 157689, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 6, 157695, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.02s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_MT01_user_role_graph_scoped_to_own_branch_tanks</div>
+                <div class="test-desc">TC-MT01 | P1
+GIVEN  Branch A has Tank-1 (2 deviations) and Branch B has Tank-2 (3 deviations)
+       A Role=User JWT is issued for Branch A
+WHEN   That user calls the deviation graph endpoint
+THEN   Bar total = 2  (Branch B's 3 deviations must be excluded).
+
+RBAC rule: role=User scopes the graph to tanks within the user's own branch_id.
+The user must not see data from tanks in other branches of the same hospital.</div>
+                <div class="expand-btn" id="btn-d-General-22" onclick="toggleDrawer('d-General-22')">▶ show logs</div>
+                <div class="drawer" id="d-General-22">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-MT01: Role=User graph scoped to their branch's tanks (not other branches)
+============================================================
+
+Seeding 2 alerts for Branch A / Tank-1 (1731) ...
+
+Seeding 3 alerts for Branch B / Tank-2 (1732) ...
+
+DEVIATION GRAPH RESPONSE (Role=User, Branch A)
+Status : 200  Body : {&quot;available_heading&quot;:[&quot;KPI Main Branch&quot;,&quot;Test Branch B&quot;],&quot;data&quot;:[{&quot;branch_name&quot;:&quot;KPI Main Branch&quot;,&quot;alert_name&quot;:&quot;Deviation alert&quot;,&quot;deviation_count&quot;:2},{&quot;branch_name&quot;:&quot;Test Branch B&quot;,&quot;alert_name&quot;:&quot;Deviation alert&quot;,&quot;deviation_count&quot;:0}]}
+
+ bar total for Role=User (Branch A) : 2
+
+✓ PASSED — Role=User graph correctly scoped to Branch A (total = 2)
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:06,629 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '63050f6d-6b2b-42d9-ae32-920520684be2', 'id': '63050f6d-6b2b-42d9-ae32-920520684be2', 'user_id': '63050f6d-6b2b-42d9-ae32-920520684be2', 'email': 'bb251c8a-993b-4e4d-a6fb-6f76a08e8bfb@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2054', 'branch_id': '2103', 'department': 'IVF', 'token_type': 'access', 'identity': '63050f6d-6b2b-42d9-ae32-920520684be2', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 6, 551910, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 6, 551917, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.10s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_MT03_user_role_cannot_see_deviations_from_multiple_other_branches</div>
+                <div class="test-desc">TC-MT03 | P1
+GIVEN  A Role=User in Branch A and two other branches in the same hospital
+WHEN   The user calls the deviations graph endpoint
+THEN   Only Branch A's deviations must be visible; other branches must be excluded.</div>
+                <div class="expand-btn" id="btn-d-General-23" onclick="toggleDrawer('d-General-23')">▶ show logs</div>
+                <div class="drawer" id="d-General-23">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+✓ PASSED — Role=User cannot see deviations from multiple other branches
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:07,169 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '82c661ac-18c8-4deb-b6b4-e5e184058680', 'id': '82c661ac-18c8-4deb-b6b4-e5e184058680', 'user_id': '82c661ac-18c8-4deb-b6b4-e5e184058680', 'email': '78f5d8e1-caef-48ae-936c-33b67246feab@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2055', 'branch_id': '2105', 'department': 'IVF', 'token_type': 'access', 'identity': '82c661ac-18c8-4deb-b6b4-e5e184058680', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 7, 35781, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 7, 35788, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.23s</td>
+            </tr>
+            <tr>
+              <td>
+                <span class="badge passed">PASSED</span>
+              </td>
+              <td>
+                <div class="test-name">test_TC_MT02_admin_graph_aggregates_all_branches</div>
+                <div class="test-desc">TC-MT02 | P1
+GIVEN  Branch A has Tank-1 (2 deviations) and Branch B has Tank-2 (3 deviations),
+       both under the same hospital
+       A Role=Admin JWT is issued for this hospital
+WHEN   That Admin calls the deviation graph endpoint
+THEN   Bar total = 5  (all branches aggregated, no branch filter applied).
+
+RBAC rule: role=Admin|Manager sees data across ALL branches of the hospital.
+The graph must not silently filter to only the Admin's own branch_id.</div>
+                <div class="expand-btn" id="btn-d-General-24" onclick="toggleDrawer('d-General-24')">▶ show logs</div>
+                <div class="drawer" id="d-General-24">
+                  <div class="log-section">
+                    <div class="log-label">stdout</div>
+                    <div class="log-box">
+============================================================
+TC-MT02: Role=Admin graph aggregates all branches (total = 5)
+============================================================
+
+Seeding 2 alerts for Branch A / Tank-1 (1736) ...
+
+REAL TANK DATA:
+{'_sa_instance_state': &lt;sqlalchemy.orm.state.InstanceState object at 0x7f068e9e2c90&gt;, 'updated_by': None, 'tive_device_id': None, 'created_at': datetime.datetime(2026, 5, 26, 16, 13, 7, 681883), 'branch_id': 2108, 'tank_code': 'Tank-53E8', 'tank_id_arc': None, 'updated_at': datetime.datetime(2026, 5, 26, 16, 13, 7, 681887), 'tank_id': 1736, 'capacity_liters': None, 'is_active': True, 'status': &lt;CanisterStatus.SAFE: 'safe'&gt;, 'created_by': None}
+
+Seeding 3 alerts for Branch B / Tank-2 (1737) ...
+
+DEVIATION GRAPH RESPONSE (Role=Admin, all branches)
+Status : 200  Body : {&quot;available_heading&quot;:[&quot;KPI Main Branch&quot;,&quot;Test Branch B&quot;],&quot;data&quot;:[{&quot;branch_name&quot;:&quot;KPI Main Branch&quot;,&quot;alert_name&quot;:&quot;Deviation alert&quot;,&quot;deviation_count&quot;:2},{&quot;branch_name&quot;:&quot;Test Branch B&quot;,&quot;alert_name&quot;:&quot;Deviation alert&quot;,&quot;deviation_count&quot;:3}]}
+
+ bar total for Role=Admin (all branches) : 5
+
+✓ PASSED — Role=Admin graph correctly aggregates all branches (total = 5)
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">stderr</div>
+                    <div class="log-box">2026-05-26 16:13:07,727 - httpx - INFO - HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 200 OK&quot;
+</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">captured log</div>
+                    <div class="log-box">[32mINFO    [0m httpx:_client.py:1025 HTTP Request: GET http://testserver/api/ivf/dashboard/metrics/deviations-graph?from_ts=1777593600000&amp;to_ts=1780271999000 &quot;HTTP/1.1 200 OK&quot;</div>
+                  </div>
+                  <div class="log-section">
+                    <div class="log-label">setup output</div>
+                    <div class="log-box">
+--- DEBUG DASHBOARD TOKEN ---
+{'sub': '6956cbed-9b80-40a9-a48f-ae4056fe9c79', 'id': '6956cbed-9b80-40a9-a48f-ae4056fe9c79', 'user_id': '6956cbed-9b80-40a9-a48f-ae4056fe9c79', 'email': '7cab7809-e97d-436b-bbc6-38b348a0d29d@test.com', 'role': 'Admin', 'user_role': 'Admin', 'type': 'hospital_user', 'user_type': 'hospital_user', 'hospital_id': '2056', 'branch_id': '2108', 'department': 'IVF', 'token_type': 'access', 'identity': '6956cbed-9b80-40a9-a48f-ae4056fe9c79', 'exp': datetime.datetime(2026, 5, 27, 16, 13, 7, 688844, tzinfo=datetime.timezone.utc), 'iat': datetime.datetime(2026, 5, 26, 16, 13, 7, 688851, tzinfo=datetime.timezone.utc)}
+</div>
+                  </div>
+                </div>
+              </td>
+              <td class="dur">0.07s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <script>
+            function toggleDrawer(id) {
+                const drawer = document.getElementById(id);
+                const btn = document.getElementById('btn-' + id);
+                const isOpen = drawer.classList.contains('open');
+                drawer.classList.toggle('open');
+                btn.textContent = isOpen ? '▶ show logs' : '▼ hide logs';
+            }
+        </script>
+  </body>
+</html>

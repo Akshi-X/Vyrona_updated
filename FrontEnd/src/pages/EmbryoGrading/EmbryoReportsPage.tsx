@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  Download, Printer, Share2, BookmarkPlus, RefreshCw, Check,
+  Download, Printer, Share2, RefreshCw, Check,
   Microscope, Snowflake, Zap, Sun, CircleDot, Circle, MoreHorizontal,
   Layers, CalendarDays, FileText, Pencil, X, Building2,
 } from 'lucide-react';
@@ -67,7 +67,6 @@ const SECTIONS = [
   { id: 'summary',    label: 'Embryo Summary',             defaultOn: true  },
   { id: 'log',        label: 'Embryo Development Log',     defaultOn: true  },
   { id: 'quality',    label: 'Quality Monitoring',         defaultOn: true  },
-  { id: 'trace',      label: 'Track & Trace Timeline',     defaultOn: false },
   { id: 'images',     label: 'Embryo Images',              defaultOn: false },
   { id: 'notes',      label: 'Grading Notes',              defaultOn: false },
   { id: 'doctor',     label: 'Doctor & Lab Information',   defaultOn: false },
@@ -104,6 +103,7 @@ export default function EmbryoReportsPage() {
   );
   const [showLogo, setShowLogo] = useState(true);
   const [showFooter, setShowFooter] = useState(true);
+  const [coverLogo, setCoverLogo] = useState<string | null>(null);
   const [kpiData, setKpiData] = useState<Record<string, Array<{ timestamp: string; value: number }>>>({});
   const [labDetails, setLabDetails] = useState({ clinic: '', labId: '', cultureMedia: '', temperature: '', co2Level: '', embryologist: '', clinician: '', labTechnician: '', verifiedBy: '' });
   const [showLabModal, setShowLabModal] = useState(false);
@@ -266,6 +266,38 @@ export default function EmbryoReportsPage() {
               <input type="checkbox" checked={showFooter} onChange={e => { setTemplate('advanced'); setShowFooter(e.target.checked); }} className="accent-primary w-3.5 h-3.5 cursor-pointer" />
               <span className="text-xs text-gray-700">Show Footer</span>
             </label>
+            <div className="pt-1">
+              <p className="text-[11px] text-gray-500 mb-1.5">Cover Page Logo</p>
+              {coverLogo ? (
+                <div className="flex items-center gap-2">
+                  <img src={coverLogo} alt="Cover logo" className="h-10 w-auto max-w-[100px] rounded border border-gray-200 object-contain bg-white p-1" />
+                  <button
+                    type="button"
+                    onClick={() => setCoverLogo(null)}
+                    className="text-[10px] text-red-500 hover:text-red-600 font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-1.5 w-full border border-dashed border-gray-300 rounded-lg py-2.5 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => setCoverLogo(ev.target?.result as string);
+                      reader.readAsDataURL(file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <span className="text-[11px] text-gray-400 font-medium">+ Upload logo</span>
+                </label>
+              )}
+            </div>
           </div>
         </div>
 
@@ -294,28 +326,13 @@ export default function EmbryoReportsPage() {
         >
           <img src="/cover.png" alt="" className="w-full block" style={{ aspectRatio: '210 / 297', objectFit: 'cover' }} />
           <div className="absolute inset-0 flex flex-col justify-between px-10 py-10">
+            <div className="flex justify-end">
+              {coverLogo && (
+                <img src={coverLogo} alt="Clinic logo" className="h-12 w-auto max-w-[160px] object-contain" />
+              )}
+            </div>
+            <div className="ml-5" />
             <div />
-            <div className="ml-5">
-              <p className="text-[11px] font-bold text-gray-700 uppercase tracking-widest mb-1">Patient Name</p>
-              <p className="text-4xl font-black text-gray-900 leading-tight mb-5">{cycle?.patient_name ?? '—'}</p>
-              <div className="flex items-center gap-8">
-                <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-0.5">HIS No.</p>
-                  <p className="text-base font-black text-gray-900">{detailHis}</p>
-                </div>
-                {cycle?.opu_date && (
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-0.5">OPU Date</p>
-                    <p className="text-base font-black text-gray-900">
-                      {new Date(cycle.opu_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex items-end justify-end">
-              <p className="text-[9px] text-gray-400">by myGrape</p>
-            </div>
           </div>
         </div>
 
@@ -536,48 +553,6 @@ export default function EmbryoReportsPage() {
                 </div>
               )}
 
-              {/* Track & Trace Timeline */}
-              {included.has('trace') && logs.length > 0 && (
-                <div className="mb-5 mt-10" style={{ breakInside: 'avoid' }}>
-                  <p className="text-[9px] font-bold text-primary uppercase tracking-widest mb-2">Track & Trace Timeline</p>
-                  <div className="flex flex-col gap-2">
-                    {logs.map(log => {
-                      const milestones = [
-                        { label: 'D0',   done: !!log.d0_maturity },
-                        { label: 'D1',   done: !!log.d1_pn       },
-                        { label: 'D3',   done: !!log.d3_grade    },
-                        { label: 'D5',   done: !!log.d5_grade    },
-                        { label: 'D6',   done: !!log.d6_grade    },
-                        { label: 'Fate', done: !!log.fate        },
-                      ];
-                      const reached = milestones.filter(m => m.done).length;
-                      return (
-                        <div key={log.log_id} className="flex items-center gap-3 border border-gray-100 rounded-xl px-3 py-2 bg-[#FDFAFF]">
-                          <span className="text-[9px] font-bold text-gray-600 w-8 shrink-0">#{log.oocyte_no}</span>
-                          <div className="flex-1 flex items-center gap-0">
-                            {milestones.map((m, i) => (
-                              <div key={m.label} className="flex items-center flex-1">
-                                <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold shrink-0 ${m.done ? 'bg-primary text-white' : 'bg-gray-200 text-gray-400'}`}>
-                                  {i + 1}
-                                </div>
-                                {i < milestones.length - 1 && (
-                                  <div className={`flex-1 h-0.5 ${milestones[i + 1].done ? 'bg-primary' : 'bg-gray-200'}`} />
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {milestones.map(m => m.label).filter((_, i) => milestones[i].done).map(l => (
-                              <span key={l} className="text-[8px] text-primary font-semibold bg-primary-bg rounded px-1">{l}</span>
-                            ))}
-                          </div>
-                          <span className="text-[9px] text-gray-400 shrink-0">{reached}/{milestones.length} stages</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
 
               {/* Embryo Images */}
@@ -699,7 +674,6 @@ export default function EmbryoReportsPage() {
                     <img src={mGScaleLogo} alt="mGSCALE" className="h-6 w-auto" />
                     <div>
                       <p className="text-[9px] font-bold text-gray-700">mGSCALE</p>
-                      <p className="text-[8px] text-gray-400">by myGrape</p>
                     </div>
                   </div>
                   <div className="text-center text-[9px] text-gray-400">
@@ -739,7 +713,6 @@ export default function EmbryoReportsPage() {
               { icon: Download,     label: 'Download PDF',      action: () => window.print() },
               { icon: Printer,      label: 'Print Report',      action: () => window.print() },
               { icon: Share2,       label: 'Share Report',      action: () => {} },
-              { icon: BookmarkPlus, label: 'Save as Template',  action: () => {} },
             ]).map(a => (
               <button
                 key={a.label}

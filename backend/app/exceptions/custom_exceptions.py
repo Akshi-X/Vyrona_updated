@@ -411,7 +411,7 @@ class TokenException(AppException):
 class InvalidTokenException(TokenException):
     """Invalid or malformed token"""
     
-    def __init__(self):
+    def __init__(self,message=None):
         super().__init__(
             message=ErrorMessages.INVALID_TOKEN,
             error_code=ERROR_CODES["TOKEN_INVALID"],
@@ -643,6 +643,18 @@ class UserRoleRequiredException(AuthorizationException):
             error_code=ERROR_CODES["ACCESS_FORBIDDEN"],
             user_role=user_role,
             required_role="user"
+        )
+
+
+class IVFDepartmentRequiredException(AuthorizationException):
+    """IVF department is required for this endpoint"""
+    
+    def __init__(self, department: str | None = None):
+        super().__init__(
+            message=ErrorMessages.IVF_ACCESS_DENIED,
+            error_code=ERROR_CODES["ACCESS_FORBIDDEN"],
+            department=department,
+            required_department="IVF"
         )
 
 
