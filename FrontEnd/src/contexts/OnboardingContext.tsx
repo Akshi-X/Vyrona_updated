@@ -386,6 +386,7 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
                         ...level,
                         currentScore: 0,
                         lastQuizIndex: 0,
+                        status: "in_progress",
                     },
                 },
                 lastUpdatedAt: nowIso(),

@@ -438,6 +438,24 @@ export default function IncubatorQualityTrackingChart({
             return isStaticRange ? merged : merged.slice(-MAX_READINGS_CAP);
           });
           setHasReceivedData(true);
+
+          if (onLatestValues) {
+            const latest: Record<string, number | string> = {};
+            entries.forEach(([kpiName, points]) => {
+              const validPts = (points || []).filter(
+                (p) => typeof p?.timestamp === 'string' && p.timestamp && (p.value != null || p.avg != null)
+              );
+              if (!validPts.length) return;
+              validPts.sort(
+                (a, b) => (parseTimestamp(a.timestamp!)?.getTime() ?? 0) - (parseTimestamp(b.timestamp!)?.getTime() ?? 0)
+              );
+              const last = validPts[validPts.length - 1];
+              const resolved = (typeof last.avg === 'number' && Number.isFinite(last.avg) ? last.avg : null)
+                ?? (typeof last.value === 'number' && Number.isFinite(last.value) ? last.value : null);
+              if (resolved != null) latest[kpiName] = resolved;
+            });
+            if (Object.keys(latest).length > 0) onLatestValues(latest);
+          }
         }
       })
       .catch(() => {})

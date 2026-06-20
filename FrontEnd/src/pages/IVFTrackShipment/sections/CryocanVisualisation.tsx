@@ -727,6 +727,11 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   const [colorSaving, setColorSaving] = useState(false);
   const [colorSaveError, setColorSaveError] = useState<string | null>(null);
   const [localContents, setLocalContents] = useState<StrawInfo[]>([]);
+  const [containerWidth, setContainerWidth] = useState<number>(
+    typeof window !== "undefined" ? window.innerWidth : 9999
+  );
+  const [leftOpen, setLeftOpen] = useState(false);
+  const [rightOpen, setRightOpen] = useState(false);
 
   useEffect(() => {
     sceneReadyRef.current = sceneReady;
@@ -735,12 +740,23 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     selectedCanisterRef.current = selectedCanister;
   }, [selectedCanister]);
   useEffect(() => {
+    const update = () => setContainerWidth(window.innerWidth);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+
+  useEffect(() => {
+    const effectivePos = containerWidth < 515
+      ? { x: -2.5, y: 0.5, z: 6.1 }
+      : inspectPos;
     inspectOverrideRef.current = {
       enabled: inspectOverride,
-      pos: inspectPos,
-      rotDeg: inspectRotDeg,
+      pos: effectivePos,
+      rotDeg: containerWidth < 515 ? { ...inspectRotDeg, z: 0 } : inspectRotDeg,
     };
-  }, [inspectOverride, inspectPos, inspectRotDeg]);
+  }, [inspectOverride, inspectPos, inspectRotDeg, containerWidth]);
   useEffect(() => {
     viewStageRef.current = viewStage;
     const isInspecting = viewStage === "inspecting";
@@ -812,11 +828,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
     });
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    if ("outputColorSpace" in renderer) {
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-    } else {
-      (renderer as any).outputEncoding = (THREE as any).sRGBEncoding;
-    }
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
     mount.appendChild(renderer.domElement);
@@ -3605,6 +3617,8 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
   const showSensorTiles = sensorTiles.length > 0;
   const showSidebar = !hideSidebar;
   const isInspecting = viewStage === "inspecting";
+  const isNarrow = containerWidth < 1450;
+  const isRightNarrow = containerWidth < 1230;
 
   useEffect(() => {
     const cans = canistersRef.current;
@@ -3876,13 +3890,14 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
         <div
           className="cryo-main-grid"
           style={{
+            position: "relative",
             display: "grid",
             gridTemplateColumns:
-              showSensorTiles && showSidebar
+              showSensorTiles && showSidebar && !isNarrow && !isRightNarrow
                 ? "280px minmax(0, 1fr) 300px"
-                : showSensorTiles
+                : showSensorTiles && !isNarrow
                   ? "280px minmax(0, 1fr)"
-                  : showSidebar
+                  : showSidebar && !isRightNarrow
                     ? "minmax(0, 1fr) 300px"
                     : "minmax(0, 1fr)",
             gap: isEmbedded ? 16 : 18,
@@ -3890,9 +3905,114 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             transition: "grid-template-columns 0.35s ease",
           }}
         >
-          {/* Left column — Live Conditions when idle, Cryolock Details when inspecting */}
+          {/* Left overlay toggle — visible only below 1450 px */}
+          {showSensorTiles && isNarrow && !rightOpen && (
+            <button
+              id="onboarding-cryo-left-toggle"
+              type="button"
+              onClick={() => { setLeftOpen(p => { if (!p) setRightOpen(false); return !p; }); }}
+              style={{
+                position:    "absolute",
+                bottom:      20,
+                left:        leftOpen ? 288 : 10,
+                transform:   "translateX(0)",
+                zIndex:      25,
+                display:     "flex",
+                flexDirection: "row",
+                alignItems:  "center",
+                justifyContent: "center",
+                gap:         5,
+                width:       "auto",
+                padding:     "5px 10px",
+                borderRadius: 10,
+                border:      "1px solid #d8c6e8",
+                background:  "#fff",
+                cursor:      "pointer",
+                boxShadow:   "0 2px 8px #40115318",
+                color:       "#6b1176",
+                transition:  "left 0.3s cubic-bezier(0.4,0,0.2,1)",
+              }}
+            >
+              <svg
+                width="11" height="11" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                style={{
+                  transform:  leftOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.3s ease",
+                }}
+              >
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
+              <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                {leftOpen
+                  ? (isInspecting && selectedCanisterData ? `Hide ${selectedCanisterData.label}` : "Hide Conditions")
+                  : (isInspecting && selectedCanisterData ? selectedCanisterData.label : "Live Conditions")}
+              </span>
+            </button>
+          )}
+
+          {/* Right overlay toggle — visible only below 1230 px */}
+          {showSidebar && isRightNarrow && !leftOpen && (
+            <button
+              id="onboarding-cryo-right-toggle"
+              type="button"
+              onClick={() => { setRightOpen(p => { if (!p) setLeftOpen(false); return !p; }); }}
+              style={{
+                position:    "absolute",
+                bottom:      20,
+                right:       rightOpen ? 288 : 10,
+                zIndex:      25,
+                display:     "flex",
+                flexDirection: "row",
+                alignItems:  "center",
+                justifyContent: "center",
+                gap:         5,
+                width:       "auto",
+                padding:     "5px 10px",
+                borderRadius: 10,
+                border:      "1px solid #d8c6e8",
+                background:  "#fff",
+                cursor:      "pointer",
+                boxShadow:   "0 2px 8px #40115318",
+                color:       "#6b1176",
+                transition:  "right 0.3s cubic-bezier(0.4,0,0.2,1)",
+              }}
+            >
+              <svg
+                width="11" height="11" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                style={{
+                  transform:  rightOpen ? "rotate(0deg)" : "rotate(180deg)",
+                  transition: "transform 0.3s ease",
+                }}
+              >
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
+              <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                {rightOpen ? "Hide Activity" : "Activity"}
+              </span>
+            </button>
+          )}
+
+          {/* Left column — normal grid child above 1450 px, slide-in overlay below */}
           {showSensorTiles && (
-            <div style={{ overflow: "hidden" }}>
+            <div
+              style={isNarrow ? {
+                position:   "absolute",
+                top:        0,
+                left:       0,
+                height:     "100%",
+                zIndex:     20,
+                transform:  leftOpen ? "translateX(0)" : "translateX(-290px)",
+                transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+                boxShadow:  leftOpen ? "4px 0 20px #40115322" : "none",
+              } : {
+                overflow: "hidden",
+              }}
+            >
+
             <div style={{ position: "relative", width: 280, height: isEmbedded ? 520 : 620 }}>
               {/* Inspection panel: canister details + cryolock cards */}
               <div
@@ -4071,6 +4191,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               </div>
               {/* Live Conditions card — shown when not inspecting */}
               <div
+                id="onboarding-cryo-live-conditions"
                 className="cryo-fade-in bg-white flex flex-col"
                 style={{
                   position: "absolute",
@@ -4156,6 +4277,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   return (
                     <button
                       key={tile.id}
+                      id={`onboarding-cryo-tile-${tile.id}`}
                       type="button"
                       onClick={() => onSensorSelect && onSensorSelect(tile.id)}
                       className="text-left kpi-card"
@@ -4302,6 +4424,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
           {/* 3D canvas column */}
           <div
+            id="onboarding-cryo-canvas"
             className="cryo-fade-in relative overflow-hidden"
             style={{
               background: externalTempAlert
@@ -4961,10 +5084,25 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
           {/* Info + controls column */}
           {showSidebar && (
+            <div
+              style={isRightNarrow ? {
+                position:   "absolute",
+                top:        0,
+                right:      0,
+                height:     "100%",
+                zIndex:     20,
+                transform:  rightOpen ? "translateX(0)" : "translateX(310px)",
+                transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+                boxShadow:  rightOpen ? "-4px 0 20px #40115322" : "none",
+              } : {
+                overflow: "hidden",
+              }}
+            >
             <aside
               className="cryo-side-scroll flex flex-col overflow-x-hidden"
               style={{
                 gap: 14,
+                width: 300,
                 height: isEmbedded ? 520 : 620,
                 overflowY: "auto",
                 paddingRight: 4,
@@ -4972,6 +5110,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             >
             {/* System Activity panel */}
             <div
+              id="onboarding-cryo-system-activity"
               className="cryo-fade-in bg-white"
               style={{
                 flexShrink: 0,
@@ -5115,6 +5254,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
             {/* Container Data */}
             <div
+              id="onboarding-cryo-container-data"
               className="cryo-fade-in bg-white"
               style={{
                 flexShrink: 0,
@@ -5281,6 +5421,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             </div>
 
             </aside>
+            </div>
           )}
         </div>
 

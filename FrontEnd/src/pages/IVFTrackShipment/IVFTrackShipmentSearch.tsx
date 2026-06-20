@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import TrackCanisterModal from '../../components/TrackCanisterModal';
 import HamburgerButton from '../../components/HamburgerButton';
 
 export default function IVFTrackShipmentSearchPage() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const isOnboarding = location.pathname.startsWith("/onboarding");
     const [canisterError, setCanisterError] = useState<string | undefined>(undefined);
 
     return (
@@ -17,12 +19,13 @@ export default function IVFTrackShipmentSearchPage() {
                 isOpen={true}
                 onClose={() => {
                     setCanisterError(undefined);
-                    navigate("/dashboard");
+                    navigate(isOnboarding ? "/onboarding/dashboard" : "/dashboard");
                 }}
                 error={canisterError}
                 onTrack={(canisterId) => {
                     setCanisterError(undefined);
-                    navigate(`/ivf-track-shipment/${encodeURIComponent(canisterId)}`);
+                    const prefix = isOnboarding ? "/onboarding" : "";
+                    navigate(`${prefix}/ivf-track-shipment/${encodeURIComponent(canisterId)}`);
                 }}
             />
         </div>

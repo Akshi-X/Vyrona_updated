@@ -51,15 +51,15 @@ def send_otp_to_user(
 ) -> OTP:
     """
     Generate and send OTP to user's email with proper transaction handling.
-
+    
     FIXED_OTP_MODE (Docker):
     - Generates a fixed OTP code (default: 123456)
     - Skips email sending entirely (no SMTP/SendGrid required)
-
+    
     Production Mode:
     - Generates random OTP code
     - Sends via SMTP or SendGrid
-
+    
     If email sending fails, OTP record is rolled back to prevent orphaned OTP codes.
 
     Args:
@@ -81,10 +81,8 @@ def send_otp_to_user(
 
     try:
         # Use fixed OTP in local/docker dev mode so SMTP is not required.
-        otp_code = (
-            settings.FIXED_OTP_CODE if settings.FIXED_OTP_MODE else generate_otp_code()
-        )
-
+        otp_code = settings.FIXED_OTP_CODE if settings.FIXED_OTP_MODE else generate_otp_code()
+        
         # Set expiration time (10 minutes from now)
         print(f"[OTP_SERVICE] STEP 4: Setting OTP expiration time...")
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
@@ -106,8 +104,7 @@ def send_otp_to_user(
         print(f"[OTP_SERVICE] STEP 7: Adding OTP to database and flushing...")
         db.add(otp)
         db.flush()  # Flush but don't commit - validate first
-        print(f"[OTP_SERVICE] STEP 8: OTP flushed successfully")
-
+        
         # Send OTP via email BEFORE committing (only if not in FIXED_OTP_MODE)
         # If email fails, transaction will rollback
         if not settings.FIXED_OTP_MODE:
@@ -119,7 +116,7 @@ def send_otp_to_user(
                 f"FIXED_OTP_MODE enabled: skipping email send. Using fixed OTP '{otp_code}' for {email}. "
                 f"Any OTP can be used to login for testing."
             )
-
+        
         # Email sent successfully (or skipped in FIXED_OTP_MODE), NOW commit the transaction
         db.commit()
         db.refresh(otp)
@@ -131,10 +128,7 @@ def send_otp_to_user(
             action="email.otp_sent",
             outcome=ActivityOutcome.SUCCESS.value,
             actor=build_actor_from_user(user),
-            metadata={
-                "recipient_email": email,
-                "fixed_otp_mode": settings.FIXED_OTP_MODE,
-            },
+            metadata={"recipient_email": email, "fixed_otp_mode": settings.FIXED_OTP_MODE},
             audit_log_disabled=is_audit_log_disabled_for_user(user),
         )
         print(f"[OTP_SERVICE] STEP 14: Activity logged")

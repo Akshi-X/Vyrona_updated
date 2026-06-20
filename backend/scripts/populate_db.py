@@ -55,7 +55,7 @@ HOSPITALS = [
         "is_whatsapp_notify": False,
         "branches": [
             {
-                "branch_name": "ARC Fertility Center - Anna Nagar",
+                "branch_name": "Chennai Main",
                 "district_name": "Chennai",
                 "state_name": "Tamil Nadu",
                 "country_name": "India",
@@ -65,7 +65,7 @@ HOSPITALS = [
                 "longitude": 80.2707,
             },
             {
-                "branch_name": "ARC Fertility Center - Koramangala",
+                "branch_name": "Bangalore",
                 "district_name": "Bangalore Urban",
                 "state_name": "Karnataka",
                 "country_name": "India",
@@ -75,7 +75,7 @@ HOSPITALS = [
                 "longitude": 77.5946,
             },
             {
-                "branch_name": "ARC Fertility Center - Banjara Hills",
+                "branch_name": "Hyderabad",
                 "district_name": "Hyderabad",
                 "state_name": "Telangana",
                 "country_name": "India",
@@ -94,7 +94,7 @@ HOSPITALS = [
         "is_whatsapp_notify": True,
         "branches": [
             {
-                "branch_name": "Apollo Fertility & IVF - Sarita Vihar",
+                "branch_name": "Delhi",
                 "district_name": "New Delhi",
                 "state_name": "Delhi",
                 "country_name": "India",
@@ -104,7 +104,7 @@ HOSPITALS = [
                 "longitude": 77.2090,
             },
             {
-                "branch_name": "Apollo Women's Hospital - Navi Mumbai",
+                "branch_name": "Mumbai",
                 "district_name": "Mumbai",
                 "state_name": "Maharashtra",
                 "country_name": "India",
@@ -123,7 +123,7 @@ HOSPITALS = [
         "is_whatsapp_notify": False,
         "branches": [
             {
-                "branch_name": "Fortis IVF Clinic - Anandapur",
+                "branch_name": "Kolkata",
                 "district_name": "Kolkata",
                 "state_name": "West Bengal",
                 "country_name": "India",
@@ -133,7 +133,7 @@ HOSPITALS = [
                 "longitude": 88.3639,
             },
             {
-                "branch_name": "Fortis Bloom IVF Center - Viman Nagar",
+                "branch_name": "Pune",
                 "district_name": "Pune",
                 "state_name": "Maharashtra",
                 "country_name": "India",
@@ -152,7 +152,7 @@ HOSPITALS = [
         "is_whatsapp_notify": False,
         "branches": [
             {
-                "branch_name": "Max Super Speciality IVF - Sector 19",
+                "branch_name": "Noida",
                 "district_name": "Gautam Buddha Nagar",
                 "state_name": "Uttar Pradesh",
                 "country_name": "India",
@@ -178,8 +178,8 @@ USERS = [
         "pharma_id": None,
         "pharma_name": None,
         "hospital_name": "ARC Fertility Hospitals",
-        "branch_name": "ARC Fertility Center - Anna Nagar",
-        "department": "IVF",
+        "branch_name": "Chennai Main",
+        "department": "IT",
     },
     {
         "first_name": "Branch",
@@ -190,7 +190,7 @@ USERS = [
         "pharma_id": None,
         "pharma_name": None,
         "hospital_name": "ARC Fertility Hospitals",
-        "branch_name": "ARC Fertility Center - Koramangala",
+        "branch_name": "Bangalore",
         "department": "Operations",
     },
     {
@@ -202,7 +202,7 @@ USERS = [
         "pharma_id": None,
         "pharma_name": None,
         "hospital_name": "ARC Fertility Hospitals",
-        "branch_name": "ARC Fertility Center - Banjara Hills",
+        "branch_name": "Hyderabad",
         "department": "Medical",
     },
     {
@@ -214,7 +214,7 @@ USERS = [
         "pharma_id": None,
         "pharma_name": None,
         "hospital_name": "ARC Fertility Hospitals",
-        "branch_name": "ARC Fertility Center - Anna Nagar",
+        "branch_name": "Chennai Main",
         "department": "IVF",
     },
 ]
@@ -404,174 +404,6 @@ def create_users(db: Session, hospital_map: dict, branch_map: dict, pharma_map: 
     logger.info("Users created successfully.")
 
 
-# ── IVF Data Creation ─────────────────────────────────────────────────────────
-
-def create_ivf_data(db: Session, branch_map: dict):
-    from app.models.IVF.tank_model import Tank
-    from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
-    from app.models.IVF.device_model import Device
-    from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
-    from app.models.IVF.canister_ln2_log_model import CanisterLn2Log
-    from app.constants.enums import CanisterStatus, TaskStatus
-
-    logger.info("Creating IVF data...")
-
-    branch_id = branch_map.get(("ARC Fertility Hospitals", "ARC Fertility Center - Anna Nagar"))
-    if not branch_id:
-        logger.warning("Branch 'ARC Fertility Center - Anna Nagar' not found. Skipping IVF data.")
-        return
-
-    # 1. Create Tank
-    tank = Tank(
-        branch_id=branch_id,
-        tank_code="T10",
-        tank_id_arc="5471",
-        capacity_liters=50.0,
-        is_active=True,
-        status=CanisterStatus.SAFE,
-        tive_device_id="J712149",
-        created_by="system",
-        updated_by="system",
-    )
-    db.add(tank)
-    db.flush()
-    logger.info(f"  Created Tank: {tank.tank_code} (id={tank.tank_id})")
-
-    # 2. Create Device
-    device = Device(
-        branch_id=branch_id,
-        device_code="J712149"
-    )
-    db.add(device)
-    db.flush()
-    logger.info(f"  Created Device: {device.device_code} (id={device.id})")
-
-    # 3. Map Tank to IoT Device
-    iot_device = Ln2IotDevice(
-        tank_id=tank.tank_id,
-        device_id=device.id,
-        tank_max_capacity_reading=100.0,
-        tank_min_capacity_reading=10.0
-    )
-    db.add(iot_device)
-    db.flush()
-    logger.info(f"  Created Ln2IotDevice mapping (id={iot_device.id})")
-
-    # 4. Create Patient Cryolock Info
-    cryo_info = PatientCrylockInfo(
-        branch_id=branch_id,
-        tank_id=tank.tank_id,
-        his_number="HIS123456",
-        crylock_number="T10/C5/E1/3",
-        tank_code="T10",
-        canister_number="C5",
-        cane_code="E1",
-        position_number=3,
-        tank_id_arc="5471",
-        in_transit=False,
-        embryo_transfer=False,
-        created_by="system",
-        updated_by="system",
-    )
-    db.add(cryo_info)
-    db.flush()
-    logger.info(f"  Created PatientCrylockInfo: {cryo_info.crylock_number} (id={cryo_info.id})")
-
-    # 5. Create Canister LN2 Log
-    log_entry = CanisterLn2Log(
-        tank_id=tank.tank_id,
-        branch_id=branch_id,
-        ln2_level_before=20.0,
-        ln2_level_after=50.0,
-        remarks="Routine refill",
-        refilled_count=1,
-        opened_count=1,
-        refill_date=datetime.now(timezone.utc).date(),
-        refill_time=datetime.now(timezone.utc).time(),
-        refilled_by="system",
-        description="Routine maintenance refill",
-        status=TaskStatus.DONE,
-        created_by="system",
-        updated_by="system",
-    )
-    db.add(log_entry)
-    db.flush()
-    logger.info(f"  Created CanisterLn2Log (log_id={log_entry.log_id})")
-
-    db.commit()
-    logger.info("IVF data created successfully.")
-
-
-# ── Additional Demo Data ──────────────────────────────────────────────────────
-
-def create_patients_and_shipments(db: Session, pharma_map: dict):
-    from app.models.patient_model import Patient
-    from app.models.shipment_model import Shipment
-    from app.constants.enums import RouteStatus
-    from datetime import datetime, timezone, timedelta
-
-    logger.info("Creating patients and shipments...")
-    
-    pharma_name = "Pharma Company A"
-    pharma_id = pharma_map.get(pharma_name)
-    
-    if not pharma_id:
-        logger.warning(f"Pharma '{pharma_name}' not found. Skipping patients and shipments.")
-        return
-
-    # Create a patient
-    patient_id = "PAT-1001"
-    existing_patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not existing_patient:
-        patient = Patient(
-            id=patient_id,
-            patient_name="John Doe",
-            condition="Oncology",
-            insurance_provider="HealthCorp",
-            insurance_type="Premium",
-            hospital_name="Apollo Hospitals",
-            location="Mumbai",
-            pharma_id=pharma_id,
-            created_by="system",
-            updated_by="system",
-        )
-        db.add(patient)
-        db.flush()
-        logger.info(f"  Created Patient: {patient.patient_name} (id={patient.id})")
-    else:
-        patient = existing_patient
-        logger.info(f"  Patient already exists: {patient.patient_name}")
-
-    # Create a shipment for the patient
-    existing_shipment = db.query(Shipment).filter(Shipment.patient_id == patient_id).first()
-    if not existing_shipment:
-        shipment = Shipment(
-            patient_id=patient.id,
-            pharma_id=pharma_id,
-            source_location="Mumbai Lab",
-            destination_location="Apollo Hospitals Mumbai",
-            source_country="IN",
-            destination_country="IN",
-            source_latitude=19.0760,
-            source_longitude=72.8777,
-            destination_latitude=19.0800,
-            destination_longitude=72.8800,
-            departure_time=datetime.now(timezone.utc) - timedelta(days=1),
-            arrival_time=datetime.now(timezone.utc) + timedelta(days=1),
-            routes_status=RouteStatus.SAFE,
-            created_by="system",
-            updated_by="system",
-        )
-        db.add(shipment)
-        db.flush()
-        logger.info(f"  Created Shipment: (id={shipment.id}) for patient {patient.id}")
-    else:
-        logger.info(f"  Shipment already exists for patient {patient.id}")
-
-    db.commit()
-    logger.info("Patients and shipments created successfully.")
-
-
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 
@@ -581,12 +413,9 @@ def run():
         pharma_map = create_pharma_companies(db)
         hospital_map, branch_map = create_hospitals_and_branches(db)
         create_users(db, hospital_map, branch_map, pharma_map)
-        create_ivf_data(db, branch_map)
-        create_patients_and_shipments(db, pharma_map)
-
 
         logger.info("\n" + "=" * 60)
-        logger.info("DATABASE POPULATION COMPLETE!")
+        logger.info("  ✅ DATABASE POPULATION COMPLETE!")
         logger.info("=" * 60)
         logger.info("\nCreated accounts:")
         for u in USERS:
@@ -594,7 +423,7 @@ def run():
 
     except Exception as e:
         db.rollback()
-        logger.error(f"Population failed: {e}", exc_info=True)
+        logger.error(f"❌ Population failed: {e}", exc_info=True)
         sys.exit(1)
     finally:
         db.close()
