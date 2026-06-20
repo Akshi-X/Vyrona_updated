@@ -75,8 +75,8 @@ const KPI_NAMES = {
     INCUBATOR_PH: "incubator_ph",
     INCUBATOR_VOC: "incubator_voc",
     INCUBATOR_LID_STATE: "incubator_lid_state",
-    REFRIGERATOR_FREEZER_TEMP: "freezer_temperature",
-    REFRIGERATOR_FRIDGE_TEMP: "refrigerator_temperature",
+    REFRIGERATOR_TEMP: "temp_external",
+    REFRIGERATOR_PROBE_TEMP: "probe_temp",
 } as const;
 
 const isActiveAlertType = (alertType?: string | null) =>
@@ -388,10 +388,10 @@ const KPI_FORM_CONFIG: KpiFormConfig[] = [
         tank_type: "incubator",
     },
     {
-        kpi_name: KPI_NAMES.REFRIGERATOR_FREEZER_TEMP,
+        kpi_name: KPI_NAMES.REFRIGERATOR_TEMP,
         alert_name: null,
-        label: "Freezer Temperature",
-        description: "Track freezer compartment temperature for the refrigerator",
+        label: "Temperature",
+        description: "Track ambient temperature for the refrigerator zone",
         icon: <ThermometerSun size={20} />,
         unit: "°C",
         min_available: true,
@@ -407,10 +407,10 @@ const KPI_FORM_CONFIG: KpiFormConfig[] = [
         tank_type: "refrigerator",
     },
     {
-        kpi_name: KPI_NAMES.REFRIGERATOR_FRIDGE_TEMP,
+        kpi_name: KPI_NAMES.REFRIGERATOR_PROBE_TEMP,
         alert_name: null,
-        label: "Refrigerator Temperature",
-        description: "Track refrigerator compartment temperature",
+        label: "Probe Temperature",
+        description: "Track probe sensor temperature for the refrigerator zone",
         icon: <ThermometerSun size={20} />,
         unit: "°C",
         min_available: true,
@@ -701,6 +701,11 @@ export default function AlertSetting() {
     >([]);
     const primaryContainer = selectedContainers[0] ?? null;
     const [selectedChamberId, setSelectedChamberId] = useState<string | null>(null);
+    const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+    const [refrigeratorZones, setRefrigeratorZones] = useState<Array<{ zone_id: string; zone_name: string }>>([]);
+    const [refrigeratorZoneName, setRefrigeratorZoneName] = useState<string>('');
+    // Zone name to persist when saving — comes from the editable text input.
+    const effectiveZoneName: string | null = refrigeratorZoneName.trim() || null;
     // Common = incubator-level (no chamber); only external temp applies at this scope
     const effectiveKpiNames = directionFilter === "refrigerators"
         ? REFRIGERATOR_KPI_NAMES
@@ -1041,21 +1046,40 @@ export default function AlertSetting() {
     // even when selectedChamberId stays null (Common → Common)
     }, [primaryContainer?.tank_id, selectedChamberId, refetchKpiConfig]);
 
-    // Refrigerator KPI config fetch — refrigerator-level (zone_id=null) for
-    // now. When a future zone selector is added, swap `null` for the picked
-    // zone, mirroring the incubator chamber pattern above.
+    // Refrigerator: fetch zones, then load KPI config for the selected zone.
+    useEffect(() => {
+        if (!primaryContainer?.is_refrigerator) {
+            setRefrigeratorZones([]);
+            setSelectedZoneId(null);
+            setRefrigeratorZoneName('');
+            return;
+        }
+        const refId = primaryContainer.refrigerator_id ?? primaryContainer.tank_id;
+        ivfService.getRefrigeratorZones(refId).then((zones) => {
+            setRefrigeratorZones(zones);
+            const first = zones[0] ?? null;
+            setSelectedZoneId(first ? first.zone_id : null);
+            setRefrigeratorZoneName(first ? first.zone_name : '');
+        }).catch(() => {
+            setRefrigeratorZones([]);
+            setSelectedZoneId(null);
+            setRefrigeratorZoneName('');
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [primaryContainer?.tank_id, primaryContainer?.is_refrigerator]);
+
     useEffect(() => {
         if (!primaryContainer?.is_refrigerator) return;
         setConfigLoading(true);
         setConfigError(null);
         refetchKpiConfig(
             primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
-            { isRefrigerator: true, zoneId: null },
+            { isRefrigerator: true, zoneId: selectedZoneId },
         ).catch((e: any) => {
             setConfigError(e?.message || "Failed to fetch KPI config");
             setConfigList([]);
         }).finally(() => setConfigLoading(false));
-    }, [primaryContainer?.tank_id, primaryContainer?.is_refrigerator, refetchKpiConfig]);
+    }, [primaryContainer?.tank_id, primaryContainer?.is_refrigerator, selectedZoneId, refetchKpiConfig]);
 
     useEffect(() => {
         if (primaryContainer) {
@@ -1366,7 +1390,7 @@ export default function AlertSetting() {
             await refetchForPrimary(primaryContainer, {
                 showLoading: true,
                 chamberId: selectedChamberId,
-                zoneId: null,
+                zoneId: selectedZoneId,
             });
         } catch (e: any) {
             setFormError(e?.message || "Create failed");
@@ -1394,7 +1418,7 @@ export default function AlertSetting() {
                 await refetchForPrimary(primaryContainer, {
                     showLoading: true,
                     chamberId: selectedChamberId,
-                    zoneId: null,
+                    zoneId: selectedZoneId,
                 });
             }
         } catch (e: any) {
@@ -1558,7 +1582,9 @@ export default function AlertSetting() {
                 if (primaryContainer?.is_refrigerator) {
                     await ivfService.bulkUpsertKpiConfigForRefrigerator(
                         primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
+                        selectedZoneId,
                         configsToApply,
+                        effectiveZoneName,
                     );
                 } else if (primaryContainer?.is_incubator) {
                     await ivfService.bulkUpsertKpiConfigForIncubator(
@@ -1571,19 +1597,25 @@ export default function AlertSetting() {
                     await ivfService.bulkUpsertKpiConfig(tankIds, configsToApply);
                 }
                 setMultiDraftConfig({});
+                // Re-sync zone names after a refrigerator save (zone_name label may have changed).
+                if (primaryContainer?.is_refrigerator) {
+                    const refId = primaryContainer.refrigerator_id ?? primaryContainer.tank_id;
+                    const freshZones = await ivfService.getRefrigeratorZones(refId).catch(() => refrigeratorZones);
+                    setRefrigeratorZones(freshZones);
+                }
                 // For multi-container, deselect all. For single container, reload config.
                 if (selectedContainers.length > 1) {
                     await refetchForPrimary(selectedContainers[0], {
                         showLoading: true,
                         chamberId: selectedChamberId,
-                        zoneId: null,
+                        zoneId: selectedZoneId,
                     });
                     setSelectedContainers([]);
                 } else if (primaryContainer) {
                     await refetchForPrimary(primaryContainer, {
                         showLoading: true,
                         chamberId: selectedChamberId,
-                        zoneId: null,
+                        zoneId: selectedZoneId,
                     });
                 }
                 toast.success("Changes saved successfully");
@@ -1699,7 +1731,9 @@ export default function AlertSetting() {
                     if (primaryContainer.is_refrigerator) {
                         await ivfService.bulkUpsertKpiConfigForRefrigerator(
                             primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
+                            selectedZoneId,
                             configsToApply,
+                            effectiveZoneName,
                         );
                     } else if (primaryContainer.is_incubator) {
                         await ivfService.bulkUpsertKpiConfigForIncubator(
@@ -1714,11 +1748,17 @@ export default function AlertSetting() {
             }
             setDraftConfig({});
             setMultiDraftConfig({});
+            // Re-sync zone names after refrigerator save (zone_name label may have changed).
+            if (primaryContainer?.is_refrigerator) {
+                const refId = primaryContainer.refrigerator_id ?? primaryContainer.tank_id;
+                const freshZones = await ivfService.getRefrigeratorZones(refId).catch(() => refrigeratorZones);
+                setRefrigeratorZones(freshZones);
+            }
             if (primaryContainer) {
                 await refetchForPrimary(primaryContainer, {
                     showLoading: true,
                     chamberId: selectedChamberId,
-                    zoneId: null,
+                    zoneId: selectedZoneId,
                 });
             }
             toast.success("Changes saved successfully");
@@ -1739,7 +1779,7 @@ export default function AlertSetting() {
                 await refetchForPrimary(primaryContainer, {
                     showLoading: true,
                     chamberId: selectedChamberId,
-                    zoneId: null,
+                    zoneId: selectedZoneId,
                 });
             }
         } catch (e: any) {
@@ -2307,6 +2347,63 @@ export default function AlertSetting() {
                                                             </div>
                                                         </div>
                                                     )}
+                                                {primaryContainer?.is_refrigerator &&
+                                                    refrigeratorZones.length > 0 && (
+                                                        <div className="mb-3">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                                                    Select Zone
+                                                                </p>
+                                                                <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">
+                                                                    {selectedZoneId
+                                                                        ? (refrigeratorZones.find((z) => z.zone_id === selectedZoneId)?.zone_name ?? selectedZoneId)
+                                                                        : "All Zones"}
+                                                                </span>
+                                                            </div>
+                                                            <div className="w-full max-w-sm mx-auto rounded-xl p-3 space-y-2">
+                                                                {refrigeratorZones.map((zone) => {
+                                                                    const active = selectedZoneId === zone.zone_id;
+                                                                    return (
+                                                                        <button
+                                                                            key={zone.zone_id}
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                if (active) {
+                                                                                    setSelectedZoneId(null);
+                                                                                    setRefrigeratorZoneName('');
+                                                                                } else {
+                                                                                    setSelectedZoneId(zone.zone_id);
+                                                                                    setRefrigeratorZoneName(zone.zone_name);
+                                                                                }
+                                                                            }}
+                                                                            className={`w-full h-10 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                                                                                active
+                                                                                    ? "bg-primary text-white scale-105"
+                                                                                    : "bg-white text-gray-500 border border-gray-200 hover:border-primary hover:text-primary hover:scale-105"
+                                                                            }`}
+                                                                        >
+                                                                            {zone.zone_name}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                {/* Zone Name input — create new zone or rename existing (refrigerators only) */}
+                                                {primaryContainer?.is_refrigerator && selectedContainers.length === 1 && (
+                                                    <div className="mb-3">
+                                                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">
+                                                            Zone Name
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={refrigeratorZoneName}
+                                                            onChange={(e) => setRefrigeratorZoneName(e.target.value)}
+                                                            placeholder="e.g. Fridge, Freezer, Zone A"
+                                                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-gray-300"
+                                                        />
+                                                    </div>
+                                                )}
                                                 {/* Multi-container mode OR single container with no config: show all KPI types with empty values */}
                                                 {selectedContainers.length >
                                                     1 ||
@@ -3469,7 +3566,7 @@ export default function AlertSetting() {
                                                                                                 await refetchForPrimary(primaryContainer, {
                                                                                                     showLoading: true,
                                                                                                     chamberId: selectedChamberId,
-                                                                                                    zoneId: null,
+                                                                                                    zoneId: selectedZoneId,
                                                                                                 });
                                                                                             }
                                                                                             toast.success(`Copied to ${selectedTankIds.length} tank(s) successfully`);

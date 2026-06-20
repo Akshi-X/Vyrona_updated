@@ -291,6 +291,45 @@ def check_and_create_kpi_deviation_alerts(
         raise HTTPException(status_code=500, detail=f"Error checking and creating alerts: {str(e)}")
 
 
+class CheckRefrigeratorKpiRequest(BaseModel):
+    refrigerator_id: int
+    zone_id: Optional[str] = None
+
+
+@router.post("/check_kpi_refrigerator")
+def check_and_create_refrigerator_kpi_deviation_alerts(
+    payload: CheckRefrigeratorKpiRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Check unchecked KPI deviation readings for a refrigerator zone and create alerts.
+
+    Request Body:
+    refrigerator_id: the refrigerator id to check.
+    zone_id: optional zone to scope the check.
+
+    Returns:
+    A list of newly created alerts.
+    """
+    try:
+        service = CriticalAlertService(db)
+        alerts = service.check_and_create_alert_for_refrigerator_kpi_deviations(
+            payload.refrigerator_id, payload.zone_id
+        )
+        return CriticalAlertListResponse(
+            acknowledged_count=0,
+            active_count=len(alerts),
+            alerts=alerts,
+            total_count=len(alerts),
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking refrigerator alerts: {str(e)}")
+
+
 @router.post("/check", response_model=CriticalAlertListResponse)
 def check_and_create_alerts(
     tank_code: Optional[str] = Query(None, description="Optional tank code to check (e.g., 'T1'). If not provided, checks all active tanks."),
