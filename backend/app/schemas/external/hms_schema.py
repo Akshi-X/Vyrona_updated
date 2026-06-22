@@ -46,7 +46,7 @@ class HMSCryolockUpdateResponse(BaseModel):
     accepted: int
     created: int
     updated: int
-    moved: int
+    moved: int = 0
     noop: int
     skipped: int
     failed: int
