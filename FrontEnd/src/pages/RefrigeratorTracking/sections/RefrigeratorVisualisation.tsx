@@ -29,7 +29,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { MessageSquare, Snowflake, Thermometer, TrendingUp } from 'lucide-react';
+import { Droplets, MessageSquare, Thermometer, TrendingUp } from 'lucide-react';
 import type { ActivityLogRecord } from '../../../services/activityLogService';
 import { tasksService, type Task } from '../../../services/tasksService';
 import type { RefrigeratorSensorTile } from './useRefrigeratorKpiSnapshot';
@@ -1072,9 +1072,9 @@ export default function RefrigeratorVisualisation({
               sensorTiles.map((tile) => {
                 const isSelected = selectedSensorId === tile.id;
                 const isAlert = hasAlert && !tile.isMissing;
-                const isProbe = tile.id === 'probe_temp';
-                const accent = isAlert ? '#dc2626' : (isProbe ? '#7a22c8' : '#1a7abb');
-                const ring = isAlert ? 'rgba(220,38,38,0.12)' : (isProbe ? 'rgba(122,34,200,0.12)' : 'rgba(26,122,187,0.12)');
+                const isTemp = (tile.id as any) === 'refrigerator_temp';
+                const accent = isAlert ? '#dc2626' : (isTemp ? '#1a7abb' : '#7a22c8');
+                const ring = isAlert ? 'rgba(220,38,38,0.12)' : (isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)');
                 return (
                   <button
                     key={tile.id}
@@ -1105,7 +1105,7 @@ export default function RefrigeratorVisualisation({
                         </div>
                       </div>
                       <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', border: '1px solid #e6d6ee', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `inset 0 0 0 6px ${ring}`, color: accent, flexShrink: 0 }}>
-                        {isProbe ? <Snowflake size={18} /> : <Thermometer size={18} />}
+                        {isTemp ? <Thermometer size={18} /> : <Droplets size={18} />}
                       </div>
                     </div>
                     <div className="rfg-kpi-orb" style={{ position: 'absolute', right: -20, bottom: -18, width: 140, height: 70, borderRadius: '50%', border: '1px solid rgba(170,140,190,0.35)', opacity: 0.7 }} />

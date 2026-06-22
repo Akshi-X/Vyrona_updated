@@ -15,8 +15,8 @@ import { ivfService } from '../../../services/ivfService';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
 const KPI_TABS = [
-  { id: 'temp_external', label: 'Temperature',       unit: '°C', accent: '#1a7abb', ring: 'rgba(26,122,187,0.10)' },
-  { id: 'probe_temp',    label: 'Probe Temperature', unit: '°C', accent: '#7a22c8', ring: 'rgba(122,34,200,0.10)' },
+  { id: 'refrigerator_humidity', label: 'Humidity',      unit: '%',  accent: '#7a22c8', ring: 'rgba(122,34,200,0.10)' },
+  { id: 'refrigerator_temp',     label: 'Temperature',   unit: '°C', accent: '#1a7abb', ring: 'rgba(26,122,187,0.10)' },
 ] as const;
 
 type TabId = (typeof KPI_TABS)[number]['id'];
@@ -166,7 +166,7 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
                     cursor: 'pointer', transition: 'all 0.15s',
                   }}
                 >
-                  {t.id === 'temp_external' ? <Thermometer size={12} /> : <Snowflake size={12} />}
+                  {(t.id as any) === 'temp_external' ? <Thermometer size={12} /> : <Snowflake size={12} />}
                   {t.label}
                 </button>
               );
