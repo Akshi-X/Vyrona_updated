@@ -559,7 +559,7 @@ class BranchListItem(BaseModel):
     """Schema for branch list item (simplified for dropdowns)"""
     branch_id: int = Field(..., description="Branch ID")
     branch_name: str = Field(..., description="Branch name")
-    
+
     class Config:
         from_attributes = True
 
@@ -568,7 +568,29 @@ class BranchListResponse(BaseModel):
     """Response schema for branch list endpoint"""
     branches: List[BranchListItem] = Field(..., description="List of branches")
     total: int = Field(..., description="Total number of branches")
-    
+
+    class Config:
+        from_attributes = True
+
+
+class BranchCoordinatesItem(BaseModel):
+    """Schema for branch coordinates item"""
+    branch_id: int = Field(..., description="Branch ID")
+    branch_name: str = Field(..., description="Branch name")
+    latitude: Optional[float] = Field(None, description="Latitude coordinate")
+    longitude: Optional[float] = Field(None, description="Longitude coordinate")
+    district_name: Optional[str] = Field(None, description="District name")
+    state_name: Optional[str] = Field(None, description="State name")
+
+    class Config:
+        from_attributes = True
+
+
+class BranchCoordinatesResponse(BaseModel):
+    """Response schema for branch coordinates endpoint"""
+    branches: List[BranchCoordinatesItem] = Field(..., description="List of branches with coordinates")
+    total: int = Field(..., description="Total number of branches")
+
     class Config:
         from_attributes = True
 

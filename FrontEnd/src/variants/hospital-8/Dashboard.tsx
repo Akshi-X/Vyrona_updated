@@ -16,6 +16,9 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler } from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import { Bell, TrendingUp, Users, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
@@ -33,6 +36,8 @@ import type { BranchMetrics } from './types/map';
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
 type ActiveRefrigeratorsResponse = Awaited<ReturnType<typeof shipmentService.getActiveRefrigerators>>;
 type FlatRefrigerator = ActiveRefrigeratorsResponse['branches'][number]['refrigerators'][number] & {
@@ -308,53 +313,298 @@ const DashboardHospital8: React.FC = () => {
   }
 
   const dashboardActionIconsWithId = (
-    <div id="onboarding-dashboard-alerts" className="flex flex-col items-center gap-4">
-      <div className="flex flex-col items-center gap-1 cursor-pointer"
-        onClick={() => { fetchRefrigeratorAlerts(); setShowCriticalAlerts(true); }}>
+    <div id="onboarding-dashboard-alerts" className="flex flex-col gap-3 w-64">
+      {/* Alerts Card */}
+      <div
+        onClick={() => { fetchRefrigeratorAlerts(); setShowCriticalAlerts(true); }}
+        className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white border border-gray-100 shadow-sm cursor-pointer hover:shadow-md hover:border-gray-200 transition-all"
+      >
         <div className="relative">
-          <img className="w-7 h-7" alt="Critical Alerts" src={CriticalAlertsIcon} />
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+            <img className="w-4 h-4" alt="Critical Alerts" src={CriticalAlertsIcon} />
+          </div>
           {criticalAlertsCount > 0 && (
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
               <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
             </div>
           )}
         </div>
-        <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Alerts</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-gray-800">Alerts</p>
+          <p className="text-[10px] text-gray-500">View all alerts</p>
+        </div>
+        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+          <ChevronRight className="w-4 h-4 text-white" />
+        </div>
       </div>
-      <div className="flex flex-col items-center gap-1 cursor-pointer"
-        onClick={() => { refreshUnread(); fetchStakeholderChats(); setShowStakeholderChats(true); }}>
+
+      {/* Messages Card */}
+      <div
+        onClick={() => { refreshUnread(); fetchStakeholderChats(); setShowStakeholderChats(true); }}
+        className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white border border-gray-100 shadow-sm cursor-pointer hover:shadow-md hover:border-gray-200 transition-all"
+      >
         <div className="relative">
-          <img className="w-7 h-7" alt="Stakeholder Chats" src={StakeholderChatsIcon} />
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <img className="w-5 h-5" alt="Stakeholder Chats" src={StakeholderChatsIcon} />
+          </div>
           {stakeholderChatCount > 0 && (
-            <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-full border border-white flex items-center justify-center ${stakeholderChatCount > 9 ? 'px-1 min-w-4' : 'w-4 h-4'}`}>
-              <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
+            <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-full border border-white flex items-center justify-center ${stakeholderChatCount > 9 ? 'px-1 min-w-4 text-[9px]' : 'w-4 h-4 text-[10px]'}`}>
+              <span className="font-semibold text-white">{formatCount(stakeholderChatCount)}</span>
             </div>
           )}
         </div>
-        <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Messages</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-gray-800">Messages</p>
+          <p className="text-[10px] text-gray-500">View messages</p>
+        </div>
+        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+          <ChevronRight className="w-4 h-4 text-white" />
+        </div>
       </div>
-      <div className="flex flex-col items-center gap-1 cursor-pointer"
-        onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
+
+      {/* Tasks Card */}
+      <div
+        onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}
+        className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white border border-gray-100 shadow-sm cursor-pointer hover:shadow-md hover:border-gray-200 transition-all"
+      >
         <div className="relative">
-          <img className="w-7 h-7" alt="My Tasks" src={MyTasksIcon} />
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <img className="w-5 h-5" alt="My Tasks" src={MyTasksIcon} />
+          </div>
           {myTasksCount > 0 && (
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
               <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
             </div>
           )}
         </div>
-        <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Tasks</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-gray-800">Tasks</p>
+          <p className="text-[10px] text-gray-500">View all tasks</p>
+        </div>
+        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+          <ChevronRight className="w-4 h-4 text-white" />
+        </div>
+      </div>
+
+      {/* Insight Card */}
+      <div className="relative overflow-hidden rounded-2xl h-64 shadow-md">
+        <img
+          src="/imag.png"
+          alt="Insights"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-black/40" />
+        <div className="relative z-10 p-4 h-full flex flex-col justify-between text-white">
+          <div>
+            <span className="inline-block px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-[10px] font-semibold">
+              Insights
+            </span>
+          </div>
+          <div>
+            <p className="text-4xl font-bold mb-2">98%</p>
+            <p className="text-sm font-semibold leading-snug mb-2">
+              Compliance rate improved by 6% compared to last week.
+            </p>
+            <p className="text-xs text-white/80">
+              This improvement reduced alert violations by 120 and maintained optimal storage conditions.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
 
   return (
     <>
-      <div className="h-screen w-full flex flex-col overflow-hidden flex-1">
-        {/* Main layout: Map + Right sidebar with floating items */}
-        <div className="flex flex-1 gap-0 overflow-hidden">
-          {/* Center - 3D Map with floating items overlay */}
-          <div className="flex-1 relative min-w-0 h-full">
+      <div className="h-screen w-full flex flex-col overflow-hidden flex-1 bg-transparent">
+        {/* Main layout: Left Stats Sidebar + Map + Right floating items */}
+        <div className="flex flex-1 gap-0 overflow-hidden bg-transparent">
+          {/* Left - General Statistics Sidebar */}
+          {!loadingMap && (
+            <div className="shrink-0 h-full overflow-y-auto mt-6 ml-6 space-y-3 max-w-lg ">
+                {/* General Statistics Card - Comprehensive */}
+                <div className="rounded-2xl p-6 w-full">
+                  <div className="mb-4">
+                    <p className="text-3xl text-gray-900 font-bold mb-2 pl-4">General Statistics</p>
+                    <p className="text-sm text-gray-500 pl-4">Overview of alerts, deviations and user activity</p>
+                  </div>
+
+                  {/* 3 Stat Cards */}
+                  <div className="mb-4 grid grid-cols-3 gap-3 rounded-3xl bg-white/90 p-4">
+                    {/* Alerts Card */}
+                    <div className="rounded-2xl bg-purple-100 p-3">
+                      <div className="w-10 h-10 rounded-lg bg-white/60 flex items-center justify-center mb-3 shrink-0">
+                        <Bell className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <p className="text-[10px] text-gray-500 font-semibold uppercase mb-2 tracking-wide">Alerts Sent</p>
+                      <div className="flex items-baseline gap-2 mb-2">
+                        <p className="text-2xl font-bold text-gray-900">{refrigeratorAlerts.length}</p>
+                        <span className="text-xs font-bold text-emerald-600">+8%</span>
+                      </div>
+                      <p className="text-[9px] text-gray-500">Compared to {Math.floor(refrigeratorAlerts.length * 0.92)} alerts last month</p>
+                    </div>
+
+                    {/* Deviations Card */}
+                    <div className="rounded-2xl bg-emerald-100 p-3">
+                      <div className="w-10 h-10 rounded-lg bg-white/60 flex items-center justify-center mb-3 shrink-0">
+                        <TrendingUp className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <p className="text-[9px] text-gray-500 font-semibold uppercase mb-2 tracking-wide">Deviations Captured</p>
+                      <div className="flex items-baseline gap-2 mb-2">
+                        <p className="text-2xl font-bold text-gray-900">2,450</p>
+                        <span className="text-xs font-bold text-emerald-600">+12%</span>
+                      </div>
+                      <p className="text-[9px] text-gray-500">Compared to 2,187 deviations last month</p>
+                    </div>
+
+                    {/* Users Card */}
+                    <div className="rounded-2xl bg-blue-100 p-3">
+                      <div className="w-10 h-10 rounded-lg bg-white/60 flex items-center justify-center mb-3 shrink-0">
+                        <Users className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <p className="text-[10px] text-gray-500 font-semibold uppercase mb-2 tracking-wide">Total Users</p>
+                      <div className="flex items-baseline gap-2 mb-2">
+                        <p className="text-2xl font-bold text-gray-900">45</p>
+                        <span className="text-xs font-bold text-emerald-600">+10%</span>
+                      </div>
+                      <p className="text-[9px] text-gray-500">Compared to 42 users last month</p>
+                    </div>
+                  </div>
+
+                  {/* Distribution Analytics Section */}
+                  <div className=" mt-4">
+                    {/* Bar Chart */}
+                    <div className="mb-4 bg-white/90 rounded-lg p-4">
+                      <p className="text-xs text-gray-700 font-bold mb-3 uppercase tracking-wider">Monthly Deviation Distribution</p>
+                      <div className="flex gap-1">
+                        {/* Y-axis labels */}
+                        <div className="flex flex-col justify-between text-right pr-2 text-[9px] text-gray-500 font-medium" style={{ width: '35px' }}>
+                          {[500, 400, 300, 200, 100, 0].map((v) => (
+                            <span key={v}>{v}</span>
+                          ))}
+                        </div>
+
+                        {/* Chart area with gridlines and bars */}
+                        <div className="flex-1">
+                          {/* Gridlines */}
+                          <div className="relative" style={{ height: '160px' }}>
+                            {[500, 400, 300, 200, 100, 0].map((v) => (
+                              <div
+                                key={v}
+                                className="absolute w-full border-dashed border-t border-gray-300"
+                                style={{
+                                  bottom: `${(v / 500) * 100}%`,
+                                }}
+                              />
+                            ))}
+
+                            {/* Bars */}
+                            <div className="absolute inset-0 flex items-end justify-around gap-3 pb-0">
+                              {[
+                                { month: 'Jan', value: 150, color: '#c8a2d8' },
+                                { month: 'Feb', value: 250, color: '#b885cc' },
+                                { month: 'Mar', value: 260, color: '#a66fc0' },
+                                { month: 'Apr', value: 350, color: '#9659b4' },
+                                { month: 'May', value: 320, color: '#8643a8' },
+                                { month: 'Jun', value: 490, color: '#731e7d' },
+                              ].map((data, i) => (
+                                <div key={i} className="flex flex-col items-center flex-1 h-full justify-end">
+                                  <div
+                                    className="w-full rounded-t-lg transition-all cursor-pointer hover:shadow-md"
+                                    style={{
+                                      height: `${(data.value / 500) * 100}%`,
+                                      backgroundColor: data.color,
+                                    }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* X-axis labels */}
+                          <div className="flex justify-around mt-2 text-[10px] font-medium text-gray-600">
+                            {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((m) => (
+                              <span key={m}>{m}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Summary banner */}
+                      <div className="bg-purple-50/60 rounded-full px-4 py-2 text-center mt-3">
+                        <p className="text-[9px] font-semibold text-primary">Deviation capture is up 12% compared to last month.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Site Level Deviation Distribution */}
+                  <div className="rounded-2xl bg-white/90 p-5 mt-4">
+                    <p className="text-xs text-gray-700 font-bold mb-3 uppercase tracking-wider">Site Level Deviation Distribution</p>
+
+                    <Line
+                      data={{
+                        labels: ['Chennai', 'Hyderabad', 'Mumbai', 'Delhi', 'Kolkata', 'Bangalore'],
+                        datasets: [
+                          {
+                            label: 'Deviations Captured',
+                            data: [145, 210, 98, 280, 190, 320],
+                            borderColor: '#6b1176',
+                            borderWidth: 1.5,
+                            backgroundColor: 'rgba(107, 17, 118, 0.2)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3.5,
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#6b1176',
+                            pointBorderWidth: 1.5,
+                            pointHoverRadius: 5,
+                          },
+                          {
+                            label: 'Active Refrigerators',
+                            data: [8, 12, 5, 16, 11, 18],
+                            borderColor: '#f97316',
+                            borderWidth: 1.5,
+                            borderDash: [4, 4],
+                            fill: false,
+                            tension: 0.4,
+                            pointRadius: 3.5,
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#f97316',
+                            pointBorderWidth: 1.5,
+                            pointHoverRadius: 5,
+                            yAxisID: 'y1',
+                          },
+                        ],
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                          legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: { font: { size: 11 }, padding: 12, usePointStyle: true },
+                          },
+                          tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 8, titleFont: { size: 11 }, bodyFont: { size: 10 } },
+                        },
+                        scales: {
+                          x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+                          y: { type: 'linear', position: 'left', grid: { display: false }, ticks: { display: true, font: { size: 9 }, color: '#999' }, border: { display: false } },
+                          y1: { type: 'linear', position: 'right', grid: { display: false }, ticks: { display: false }, border: { display: false } },
+                        },
+                      }}
+                      height={140}
+                    />
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+          {/* Right - 3D Map with floating items overlay */}
+          <div className="flex-1 relative min-w-0 h-full bg-purple-50">
             {loadingMap ? (
               <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-slate-100 to-slate-50 z-40">
                 <div className="text-center">
@@ -378,116 +628,6 @@ const DashboardHospital8: React.FC = () => {
                 {dashboardActionIconsWithId}
               </div>
             )}
-
-
-            {/* Floating Items - Left Side Overlay */}
-            {!loadingMap && (
-              <div className="absolute top-6 left-6 z-20 space-y-3 max-w-sm overflow-y-auto" style={{ maxHeight: 'calc(100% - 24px)' }}>
-                {/* General Statistics Card - Comprehensive */}
-                <div className="rounded-2xl p-6 w-80">
-                  <p className="text-lg text-gray-600 font-bold mb-4">General statistics</p>
-                  <div className="mb-4">
-                    <p className="text-xs text-gray-500 font-semibold mb-1">total alerts sent</p>
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-3xl font-bold text-gray-900">{refrigeratorAlerts.length}</p>
-                      <span className="text-xs font-bold text-emerald-600">+8%</span>
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-1">Compared to {Math.floor(refrigeratorAlerts.length * 0.92)} alerts last month</p>
-                  </div>
-
-                  <div className="pt-4 mb-4">
-                    <p className="text-xs text-gray-500 font-semibold mb-1">total deviation captured</p>
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-3xl font-bold text-gray-900">2,450</p>
-                      <span className="text-xs font-bold text-emerald-600">+12%</span>
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-1">Compared to 2,187 deviations last month</p>
-                  </div>
-
-                  {/* Distribution Analytics Section */}
-                  <div className="border-t border-gray-200 pt-4 mt-4">
-                    <p className="text-xs text-gray-500 font-semibold mb-3 uppercase tracking-wide">Monthly Deviation Distribution</p>
-
-                    {/* Line Chart with Monthly Data */}
-                    <div className="mb-4">
-                      <div className="h-32 flex items-end justify-around px-1 py-4 gap-2">
-                        {[
-                          { month: 'Jan', deviation: 245, alerts: 12, height: 30, color: '#b485bb' },
-                          { month: 'Feb', deviation: 420, alerts: 18, height: 50, color: '#9959a1' },
-                          { month: 'Mar', deviation: 310, alerts: 14, height: 40, color: '#a770ae' },
-                          { month: 'Apr', deviation: 580, alerts: 24, height: 65, color: '#81358b' },
-                          { month: 'May', deviation: 465, alerts: 20, height: 55, color: '#904d99' },
-                          { month: 'Jun', deviation: 720, alerts: 32, height: 85, color: '#731e7d' },
-                        ].map((data, i) => (
-                          <div key={i} className="flex-1 relative group h-full flex flex-col justify-end">
-                            <div className="w-full rounded-sm transition-all cursor-pointer hover:shadow-lg relative" style={{ height: `${data.height}%`, minHeight: '6px', backgroundColor: data.color }}>
-                              {/* Hover Tooltip - Inside bar for correct positioning */}
-                              <div className="group-hover:visible invisible absolute -top-12 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap pointer-events-none" style={{ zIndex: 50 }}>
-                                <div className="font-semibold">{data.month}</div>
-                                <div>Deviation: {data.deviation}</div>
-                                <div>Alerts: {data.alerts}</div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Monthly Deviation Distribution Summary */}
-                    <div className="bg-purple-50/50 rounded-lg p-3 border border-purple-100/50">
-                      <p className="text-xs text-gray-600 font-semibold mb-2">Site Level Deviation Distribution</p>
-                      <div className="flex items-baseline justify-between">
-                        <div className="flex items-baseline gap-2">
-                          <p className="text-2xl font-bold text-gray-900">{refrigerators.length}</p>
-                          <span className="text-xs font-bold text-emerald-600">+10%</span>
-                        </div>
-                        <p className="text-[10px] text-gray-500">Active refrigerators across all sites</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Monthly Summary List */}
-                  <div className="space-y-1 text-xs border-t border-gray-200 pt-3">
-                    {[
-                      { month: 'January', deviation: 145, alerts: 8 },
-                      { month: 'February', deviation: 210, alerts: 12 },
-                      { month: 'March', deviation: 98, alerts: 5 },
-                      { month: 'April', deviation: 280, alerts: 16 },
-                      { month: 'May', deviation: 190, alerts: 11 },
-                      { month: 'June', deviation: 320, alerts: 18 },
-                    ].map((data, i) => (
-                      <div key={i} className="flex justify-between items-center py-0.5 px-1 hover:bg-purple-50/30 rounded transition-colors">
-                        <span className="text-gray-600 font-medium flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
-                          {data.month}
-                        </span>
-                        <div className="flex gap-3 text-gray-700 font-semibold">
-                          <span className="text-primary">{data.deviation}</span>
-                          <span className="text-orange-600">{data.alerts}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Total Users & Earning Card */}
-                  <div className="mt-4 rounded-xl bg-white border border-gray-100 p-4 shadow-sm">
-                    <div className="space-y-4">
-                    
-                      <div className="">
-                        <p className="text-xs text-gray-400 font-medium mb-2">Total users</p>
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <p className="text-2xl font-bold text-gray-900">97,540</p>
-                          <span className="text-xs font-semibold text-emerald-600">+10%</span>
-                        </div>
-                        <p className="text-[10px] text-gray-400">Compared to 91,540 users last month</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            )}
-
           </div>
         </div>
       </div>
