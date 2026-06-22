@@ -29,7 +29,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { Droplets, MessageSquare, Snowflake, Thermometer, TrendingUp } from 'lucide-react';
+import { Droplets, MessageSquare, Thermometer, TrendingUp } from 'lucide-react';
 import type { ActivityLogRecord } from '../../../services/activityLogService';
 import { tasksService, type Task } from '../../../services/tasksService';
 import type { RefrigeratorSensorTile } from './useRefrigeratorKpiSnapshot';
@@ -1072,7 +1072,7 @@ export default function RefrigeratorVisualisation({
               sensorTiles.map((tile) => {
                 const isSelected = selectedSensorId === tile.id;
                 const isAlert = hasAlert && !tile.isMissing;
-                const isTemp = tile.id === 'refrigerator_temp';
+                const isTemp = (tile.id as any) === 'refrigerator_temp';
                 const accent = isAlert ? '#dc2626' : (isTemp ? '#1a7abb' : '#7a22c8');
                 const ring = isAlert ? 'rgba(220,38,38,0.12)' : (isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)');
                 return (
