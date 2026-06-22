@@ -7,10 +7,10 @@ import type { BranchMetrics, Route } from '../types/map';
 
 interface Map3DContainerProps {
   branches: BranchMetrics[];
-  routes: Route[];
+  routes?: Route[];
   hoveredBranch: number | null;
-  onBranchHover: (branchId: number | null) => void;
-  onBranchClick: (branch: BranchMetrics) => void;
+  onBranchHover?: (branchId: number | null) => void;
+  onBranchClick?: (branch: BranchMetrics) => void;
 }
 
 const INITIAL_VIEW_STATE = {
@@ -59,16 +59,13 @@ const SPIN_ANIMATIONS = `
 
 const Map3DContainer: React.FC<Map3DContainerProps> = ({
   branches,
-  routes,
   hoveredBranch,
-  onBranchHover,
-  onBranchClick,
 }) => {
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const [indiaGeoJson, setIndiaGeoJson] = useState<any>(null);
   const [indiaStatesGeoJson, setIndiaStatesGeoJson] = useState<any>(null);
   const [renderKey, setRenderKey] = useState(0);
-  const deckRef = useRef<DeckGL>(null);
+  const deckRef = useRef<any>(null);
 
   const getScreenCoordinates = (lng: number, lat: number): { x: number; y: number } | null => {
     if (!deckRef.current?.deck) return null;
@@ -147,12 +144,12 @@ const Map3DContainer: React.FC<Map3DContainerProps> = ({
     lineWidthMinPixels: 0,
     getPosition: (d: any) => [d.longitude, d.latitude],
     getRadius: () => 12,
-    getLineColor: COLORS.white,
-    getFillColor: (d: any) => {
+    getLineColor: COLORS.white as any,
+    getFillColor: ((d: any) => {
       if (hoveredBranch === d.originalBranchId) return COLORS.blue;
       if (d.active_alerts > 0) return COLORS.red;
       return COLORS.blue;
-    },
+    }) as any,
     getLineWidth: 0,
   });
 
@@ -295,10 +292,10 @@ const Map3DContainer: React.FC<Map3DContainerProps> = ({
           width: '120%',
           height: '100%',
           position: 'absolute',
-          top: 0,
+          top: '0',
           left: '-10%',
           zIndex: 10,
-        }}
+        } as any}
       />
 
 

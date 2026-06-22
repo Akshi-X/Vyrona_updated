@@ -166,7 +166,7 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
                     cursor: 'pointer', transition: 'all 0.15s',
                   }}
                 >
-                  {t.id === 'temp_external' ? <Thermometer size={12} /> : <Snowflake size={12} />}
+                  {(t.id as any) === 'temp_external' ? <Thermometer size={12} /> : <Snowflake size={12} />}
                   {t.label}
                 </button>
               );

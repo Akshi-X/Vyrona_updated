@@ -39,7 +39,7 @@ import {
   Filler,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { AlertTriangle, Droplets, Snowflake, Thermometer, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Droplets, Thermometer, TrendingUp } from 'lucide-react';
 import type { Task } from '../../../services/tasksService';
 import { ivfService } from '../../../services/ivfService';
 import { useRefrigeratorKpiSnapshot } from '../../../pages/RefrigeratorTracking/sections/useRefrigeratorKpiSnapshot';
@@ -676,7 +676,7 @@ function EmbeddedAlerts({ refrigeratorId }: { refrigeratorId?: number }) {
                 const hiddenCount = older.length;
                 const isExpanded = expandedKeys.has(group.key);
                 const isAcked = !!latest.acknowledged_at;
-                const sevBadge = latest.severity === 'High' || latest.severity === 'Critical'
+                const sevBadge = latest.severity === 'High' || (latest.severity as any) === 'Critical'
                   ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700';
 
                 return (
@@ -786,7 +786,7 @@ function ZoneKpiSection({
         <div className="text-xs text-gray-400 italic">No data</div>
       ) : (
         sensorTiles.map((tile) => {
-          const isTemp = tile.id === 'refrigerator_temp';
+          const isTemp = (tile.id as any) === 'refrigerator_temp';
           const accent = isTemp ? '#1a7abb' : '#7a22c8';
           const ring = isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)';
           return (
