@@ -39,6 +39,7 @@ class KpiConfig(Base):
         index=True,
     )
     zone_id = Column(String(255), nullable=True)
+    zone_name = Column(String(255), nullable=True)
 
     kpi_name = Column(
         String(255),

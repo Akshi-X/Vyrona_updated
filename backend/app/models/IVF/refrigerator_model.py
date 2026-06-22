@@ -15,16 +15,19 @@ class Refrigerator(Base):
     hospital_id = Column(Integer, ForeignKey("hospitals.hospital_id"), nullable=False)
     branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id"), nullable=False)
 
-    # Refrigerator Information. Two fixed zones modeled via zone_id on linked tables
-    # ("freezer" or "fridge") - no zone topology stored on the device row itself.
+    # Refrigerator Information
     refrigerator_code = Column(String(255), nullable=True)
     external_id = Column(String(255), nullable=True, comment="External device/system identifier")
     type = Column(String(255), nullable=True)
+    zone_count = Column(Integer, nullable=True, comment="Number of independently-sensored zones (zone_1 … zone_N)")
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Relationships
     hospital = relationship("Hospital", back_populates="refrigerators")
     branch = relationship("HospitalBranch", back_populates="refrigerators")
+    devices = relationship(
+        "RefrigeratorDevice", back_populates="refrigerator", cascade="all, delete-orphan"
+    )
 
     # Constraints
     __table_args__ = (

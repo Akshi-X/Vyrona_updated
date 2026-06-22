@@ -98,6 +98,23 @@ class ConnectionManager:
                 f"Connection {connection_id} subscribed to incubator_id {incubator_id} chamber {chamber_id}"
             )
 
+    def set_refrigerator_subscription(
+        self,
+        connection_id: str,
+        refrigerator_id: int,
+        zone_id: Optional[str],
+        refrigerator_code: str = None,
+    ):
+        """Set which refrigerator zone this connection is subscribed to."""
+        if connection_id in self.active_connections:
+            self.active_connections[connection_id]["refrigerator_id"] = refrigerator_id
+            self.active_connections[connection_id]["zone_id"] = zone_id
+            if refrigerator_code is not None:
+                self.active_connections[connection_id]["refrigerator_code"] = refrigerator_code
+            logger.info(
+                f"Connection {connection_id} subscribed to refrigerator_id {refrigerator_id} zone {zone_id}"
+            )
+
     def set_live(self, connection_id: str, live: bool):
         """Set whether to send live KPI data to this connection (True = LIVE range only)."""
         if connection_id in self.active_connections:
@@ -203,6 +220,40 @@ class ConnectionManager:
                 disconnected.append(connection_id)
         
         # Remove disconnected clients
+        for conn_id in disconnected:
+            self.disconnect(conn_id)
+
+    async def broadcast_refrigerator(self, data: dict):
+        """
+        Broadcast refrigerator KPI data to connections subscribed to the matching
+        refrigerator_id + zone_id, respecting the live flag.
+        """
+        if not self.active_connections:
+            return
+
+        refrigerator_id_from_data = data.get("refrigerator_id")
+        zone_id_from_data = data.get("zone_id")
+        if refrigerator_id_from_data is None:
+            return
+        try:
+            refrigerator_id_from_data = int(refrigerator_id_from_data)
+        except (TypeError, ValueError):
+            return
+
+        disconnected = []
+        for connection_id, conn_data in list(self.active_connections.items()):
+            if conn_data.get("refrigerator_id") != refrigerator_id_from_data:
+                continue
+            if zone_id_from_data is not None and conn_data.get("zone_id") != zone_id_from_data:
+                continue
+            if not conn_data.get("live", True):
+                continue
+            try:
+                await conn_data["websocket"].send_json(data)
+            except Exception as e:
+                logger.error(f"Error sending refrigerator KPI data to client {connection_id}: {e}")
+                disconnected.append(connection_id)
+
         for conn_id in disconnected:
             self.disconnect(conn_id)
 

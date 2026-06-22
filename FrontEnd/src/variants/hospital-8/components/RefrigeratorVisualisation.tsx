@@ -1,0 +1,1499 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ACESFilmicToneMapping,
+  AmbientLight,
+  BoxGeometry,
+  Color,
+  CylinderGeometry,
+  DirectionalLight,
+  DoubleSide,
+  EdgesGeometry,
+  EquirectangularReflectionMapping,
+  Fog,
+  GridHelper,
+  Group,
+  LineBasicMaterial,
+  LineSegments,
+  Mesh,
+  MeshBasicMaterial,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  PCFSoftShadowMap,
+  PMREMGenerator,
+  PerspectiveCamera,
+  PlaneGeometry,
+  PointLight,
+  Scene,
+  ShadowMaterial,
+  Texture,
+  Vector3,
+  WebGLRenderer,
+} from 'three';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import { AlertTriangle, Droplets, Snowflake, Thermometer, TrendingUp } from 'lucide-react';
+import type { Task } from '../../../services/tasksService';
+import { ivfService } from '../../../services/ivfService';
+import { useRefrigeratorKpiSnapshot } from '../../../pages/RefrigeratorTracking/sections/useRefrigeratorKpiSnapshot';
+
+import { ivfAlertsService, type IVFAlert } from '../../../services/ivfAlertsService';
+import ColdStorageRoom from './ColdStorageRoom';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
+
+/**
+ * Procedural 3D refrigerator. Two stacked glass-door compartments: top =
+ * refrigerator (lavender accent), bottom = freezer (blue accent), charcoal
+ * anodised body, four legs, subtle ground grid. Drag to rotate.
+ *
+ * Geometry/materials are procedural (no GLB), mirroring the cryocan/incubator
+ * approach already in the codebase.
+ */
+
+type RefrigeratorZone = { zone_id: string; zone_name: string };
+
+export type RefrigeratorVisualisationProps = {
+  zones?: RefrigeratorZone[];
+  selectedSensorId?: string | null;
+  onSensorSelect?: (sensorId: string) => void;
+
+  hasAlert?: boolean;
+  doorStatus?: 'open' | 'closed';
+
+  tasks?: Task[];
+  onTaskCreated?: () => void;
+  currentUserName?: string;
+  currentUserId?: string;
+
+  refrigeratorCode?: string;
+  refrigeratorId?: number;
+  branchName?: string;
+
+  type?: 'default' | 'cold_storage';
+  isLoadingType?: boolean;
+};
+
+
+const FRIDGE_TIPS = [
+  'Refrigerator compartment should be maintained between 2 °C and 8 °C for culture media and reagent storage.',
+  'Freezer compartment must remain at −20 °C or below to preserve cryoprotectants and enzymes.',
+  'Inspect door seals monthly — a compromised gasket can cause a measurable daily temperature drift.',
+  'Never place items directly against the rear wall; allow clearance for even air circulation.',
+  'Log any temperature excursion immediately and quarantine affected batches pending assessment.',
+  'Allow warm reagents to reach equilibrium before returning them to the refrigerator after use.',
+  'Perform a full inventory audit quarterly and remove expired or near-expiry items promptly.',
+  'Dedicate separate shelves for culture media, reagents, and cryoprotectants to prevent cross-contamination.',
+  'Avoid frequent door-opening cycles during active lab sessions to minimise thermal fluctuation.',
+  'Ensure the unit is not placed near heat sources or direct sunlight to reduce compressor workload.',
+];
+
+// ── Geometry constants ────────────────────────────────────────────────────────
+const BODY_W = 1.6;
+const BODY_H = 3.0;
+const BODY_D = 1.4;
+// Split: fridge (top) is taller, freezer (bottom) is shorter (~2/3 : 1/3).
+const FRIDGE_H = BODY_H * 0.6;
+const FREEZER_H = BODY_H * 0.4;
+const LEG_H = 0.08;
+const DOOR_THICK = 0.06;
+const DOOR_INSET = 0.04;
+const GLASS_INSET = 0.085;
+
+const FRIDGE_TINT = new Color('#b48cf7'); // lavender
+const FREEZER_TINT = new Color('#5db4ff'); // sky blue
+const BODY_COLOR = new Color('#2b2d34');
+const BODY_ACCENT = new Color('#4a4d57');
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function buildEnvironmentTexture(renderer: WebGLRenderer): Texture {
+  // Procedural sky→ground gradient used for soft reflections on glass + metal.
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, '#dfe6ef');
+  grad.addColorStop(0.5, '#f4f1ec');
+  grad.addColorStop(1.0, '#b6b9c0');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 512, 256);
+
+  const tex = new Texture(canvas);
+  tex.mapping = EquirectangularReflectionMapping;
+  tex.needsUpdate = true;
+  const pmrem = new PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  const env = pmrem.fromEquirectangular(tex).texture;
+  pmrem.dispose();
+  tex.dispose();
+  return env;
+}
+
+function buildCompartment(
+  width: number,
+  height: number,
+  depth: number,
+  tint: Color,
+  isFridge: boolean,
+  bodyMat: MeshStandardMaterial,
+  trimMat: MeshStandardMaterial,
+): {
+  group: Group;
+  doorHit: Mesh;
+  doorGroup: Group;
+  highlightRing: Mesh;
+  interiorLight: PointLight;
+  interiorBack: Mesh;
+  mistMeshes: Mesh[];
+} {
+  const group = new Group();
+
+  // Inner cavity walls (slightly inset)
+  const cavityW = width - 0.18;
+  const cavityH = height - 0.16;
+  const cavityD = depth - 0.16;
+  const interiorMat = new MeshStandardMaterial({
+    color: new Color(tint).lerp(new Color('#0c0c10'), 0.55),
+    roughness: 0.85,
+    metalness: 0.05,
+    side: DoubleSide,
+  });
+  const back = new Mesh(new PlaneGeometry(cavityW, cavityH), interiorMat);
+  back.position.set(0, 0, -cavityD / 2);
+  group.add(back);
+
+  // Subtle inner side walls so the cavity reads as a box, not a card
+  const sideMat = interiorMat.clone();
+  sideMat.color = new Color(tint).lerp(new Color('#101015'), 0.4);
+  const leftWall = new Mesh(new PlaneGeometry(cavityD, cavityH), sideMat);
+  leftWall.position.set(-cavityW / 2, 0, 0);
+  leftWall.rotation.y = Math.PI / 2;
+  group.add(leftWall);
+  const rightWall = new Mesh(new PlaneGeometry(cavityD, cavityH), sideMat);
+  rightWall.position.set(cavityW / 2, 0, 0);
+  rightWall.rotation.y = -Math.PI / 2;
+  group.add(rightWall);
+  const topWall = new Mesh(new PlaneGeometry(cavityW, cavityD), sideMat);
+  topWall.position.set(0, cavityH / 2, 0);
+  topWall.rotation.x = Math.PI / 2;
+  group.add(topWall);
+  const bottomWall = new Mesh(new PlaneGeometry(cavityW, cavityD), sideMat);
+  bottomWall.position.set(0, -cavityH / 2, 0);
+  bottomWall.rotation.x = -Math.PI / 2;
+  group.add(bottomWall);
+
+  // Shelves — 3 for fridge (top), 2 for freezer (bottom)
+  const shelfCount = isFridge ? 3 : 2;
+  const shelfGeom = new BoxGeometry(cavityW * 0.92, 0.018, cavityD * 0.78);
+  const shelfMat = new MeshPhysicalMaterial({
+    color: new Color('#dfe7f2'),
+    roughness: 0.05,
+    metalness: 0.0,
+    transmission: 0.85,
+    transparent: true,
+    opacity: 0.7,
+    thickness: 0.05,
+    ior: 1.45,
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.1,
+    side: DoubleSide,
+  });
+  const shelfSpacing = cavityH / (shelfCount + 1);
+  for (let i = 0; i < shelfCount; i++) {
+    const shelf = new Mesh(shelfGeom, shelfMat);
+    shelf.position.y = cavityH / 2 - shelfSpacing * (i + 1);
+    shelf.position.z = 0.02;
+    group.add(shelf);
+  }
+
+  // ── Shelf contents ────────────────────────────────────────────────────────
+  const vialPalette = isFridge
+    ? ['#c8a4d8', '#90b8e0', '#a8d4a0', '#e0c898', '#d4a0a8']
+    : ['#7ab8e0', '#5aa8d8', '#90c8f0', '#60a8d0', '#a0d0f0'];
+  const vR = isFridge ? 0.042 : 0.026;
+  const vH = isFridge ? 0.13  : 0.09;
+
+  for (let s = 0; s < shelfCount; s++) {
+    const sy  = cavityH / 2 - shelfSpacing * (s + 1);
+    const iy  = sy + 0.009 + vH / 2;
+    // First fridge shelf: 4 vials on the left half + 3 boxes on the right half.
+    // All other shelves: full-width row of vials.
+    const hasBoxes = isFridge && s === 0;
+    const vN    = hasBoxes ? 4 : (isFridge ? 6 : 7);
+    const xSpan = hasBoxes ? cavityW * 0.50 : cavityW * 0.82;
+    const vGap  = xSpan / vN;
+    const vX0   = hasBoxes ? -cavityW * 0.42 + vGap / 2 : -xSpan / 2 + vGap / 2;
+
+    for (let v = 0; v < vN; v++) {
+      const col  = new Color(vialPalette[(v + s) % vialPalette.length]);
+      const vMat = new MeshStandardMaterial({ color: col, roughness: 0.28, metalness: 0.08, transparent: true, opacity: 0.9 });
+      const vial = new Mesh(new CylinderGeometry(vR, vR * 0.92, vH, 10), vMat);
+      vial.position.set(vX0 + v * vGap, iy, 0.10);
+      group.add(vial);
+      const capMat = new MeshStandardMaterial({ color: col.clone().lerp(new Color('#ffffff'), 0.52), roughness: 0.35, metalness: 0.3 });
+      const cap = new Mesh(new CylinderGeometry(vR * 1.08, vR * 1.08, 0.02, 10), capMat);
+      cap.position.set(vX0 + v * vGap, iy + vH / 2 + 0.01, 0.10);
+      group.add(cap);
+    }
+
+    if (hasBoxes) {
+      const bW = 0.09, bH = 0.11, bD = 0.08;
+      const bX0 = cavityW * 0.10;
+      for (let b = 0; b < 3; b++) {
+        const bx  = bX0 + b * (bW + 0.04);
+        const box = new Mesh(new BoxGeometry(bW, bH, bD),
+          new MeshStandardMaterial({ color: new Color('#ccd8e4'), roughness: 0.45, metalness: 0.04 }));
+        box.position.set(bx, sy + 0.009 + bH / 2, 0.10);
+        group.add(box);
+        // Label strip on the front face of each box
+        const lbl = new Mesh(new BoxGeometry(bW * 0.72, 0.012, 0.001),
+          new MeshBasicMaterial({ color: new Color('#8090a4') }));
+        lbl.position.set(bx, sy + 0.009 + bH * 0.6, 0.10 + bD / 2 + 0.001);
+        group.add(lbl);
+      }
+    }
+  }
+
+  // Freezer mist — layered semi-transparent planes that breathe opacity for a cold-fog look.
+  // Only added for the freezer compartment; planes are positioned at varying depths and heights
+  // so the thickest haze sits at the back wall and thins toward the glass door.
+  const mistMeshes: Mesh[] = [];
+  if (!isFridge) {
+    const mistData: Array<{ z: number; yOff: number; hScale: number; baseOpacity: number }> = [
+      { z: -cavityD * 0.38, yOff: 0,              hScale: 0.85, baseOpacity: 0.10 },
+      { z: -cavityD * 0.18, yOff: -cavityH * 0.10, hScale: 0.70, baseOpacity: 0.08 },
+      { z:  0,              yOff: -cavityH * 0.20,  hScale: 0.55, baseOpacity: 0.07 },
+      { z:  cavityD * 0.14, yOff: -cavityH * 0.28,  hScale: 0.42, baseOpacity: 0.05 },
+      { z:  cavityD * 0.25, yOff: -cavityH * 0.32,  hScale: 0.30, baseOpacity: 0.04 },
+    ];
+    mistData.forEach(({ z, yOff, hScale, baseOpacity }, i) => {
+      const mistMat = new MeshBasicMaterial({
+        color: new Color('#b8d8f8'),
+        transparent: true,
+        opacity: baseOpacity,
+        depthWrite: false,
+        side: DoubleSide,
+      });
+      const mist = new Mesh(new PlaneGeometry(cavityW * 0.88, cavityH * hScale), mistMat);
+      mist.position.set(0, yOff, z);
+      mist.renderOrder = 3;
+      mist.userData._mistPhase = i * (Math.PI * 2 / 5);
+      mist.userData._mistBaseOpacity = baseOpacity;
+      group.add(mist);
+      mistMeshes.push(mist);
+    });
+  }
+
+  // Door frame (slim ring around the glass)
+  const frameThick = 0.08;
+  const frameMat = trimMat;
+  const frameTopBot = new BoxGeometry(width - DOOR_INSET * 2, frameThick, DOOR_THICK);
+  const frameSide = new BoxGeometry(frameThick, height - DOOR_INSET * 2 - frameThick * 2, DOOR_THICK);
+
+  const doorGroup = new Group();
+  // Door geometry is pivoted on the LEFT edge so it can swing open later if
+  // door state ever animates. Hinge axis runs along (−width/2, 0, depth/2).
+  const hinge = new Group();
+  hinge.position.set(-width / 2 + DOOR_INSET, 0, depth / 2);
+  doorGroup.add(hinge);
+
+  const frameOffset = width / 2 - DOOR_INSET;
+
+  const top = new Mesh(frameTopBot, frameMat);
+  top.position.set(frameOffset, height / 2 - DOOR_INSET - frameThick / 2, 0);
+  hinge.add(top);
+  const bottom = new Mesh(frameTopBot, frameMat);
+  bottom.position.set(frameOffset, -height / 2 + DOOR_INSET + frameThick / 2, 0);
+  hinge.add(bottom);
+  const left = new Mesh(frameSide, frameMat);
+  left.position.set(frameThick / 2, 0, 0);
+  hinge.add(left);
+  const right = new Mesh(frameSide, frameMat);
+  right.position.set(width - DOOR_INSET * 2 - frameThick / 2, 0, 0);
+  hinge.add(right);
+
+  // Glass pane — alpha-blended so the racks behind read clearly through it.
+  // Using BasicMaterial keeps the pane fully see-through (no shading darkening
+  // it) while a faint tint mimics the lit cavity colour from the reference.
+  const glassW = width - DOOR_INSET * 2 - frameThick * 2 - GLASS_INSET * 2;
+  const glassH = height - DOOR_INSET * 2 - frameThick * 2 - GLASS_INSET * 2;
+  const glassMat = new MeshBasicMaterial({
+    color: new Color(tint).lerp(new Color('#ffffff'), 0.6),
+    transparent: true,
+    opacity: 0.12,
+    side: DoubleSide,
+    depthWrite: false,
+  });
+  const glass = new Mesh(new PlaneGeometry(glassW, glassH), glassMat);
+  glass.position.set(frameThick + GLASS_INSET + glassW / 2, 0, DOOR_THICK / 2 + 0.001);
+  glass.renderOrder = 5;
+  hinge.add(glass);
+
+  // Soft white inner reflection band across the top of the glass — sells the
+  // "lit interior" look from the reference without obscuring the shelves.
+  const reflectMat = new MeshBasicMaterial({
+    color: new Color('#ffffff'),
+    transparent: true,
+    opacity: 0.18,
+    side: DoubleSide,
+    depthWrite: false,
+  });
+  const reflect = new Mesh(new PlaneGeometry(glassW * 0.85, glassH * 0.15), reflectMat);
+  reflect.position.set(frameThick + GLASS_INSET + glassW / 2, glassH * 0.35, DOOR_THICK / 2 + 0.002);
+  reflect.renderOrder = 6;
+  hinge.add(reflect);
+
+  // Invisible hit mesh (placeholder for future interaction)
+  const hitMat = new MeshStandardMaterial({ transparent: true, opacity: 0, depthWrite: false });
+  const doorHit = new Mesh(new PlaneGeometry(width, height), hitMat);
+  doorHit.position.set(0, 0, depth / 2 + DOOR_THICK + 0.05);
+  group.add(doorHit);
+
+  // Handle (vertical bar on the right side of the door)
+  const handleMat = new MeshStandardMaterial({
+    color: new Color('#d6d8de'),
+    roughness: 0.2,
+    metalness: 0.95,
+  });
+  const handleHeight = Math.min(height * 0.4, 1.0);
+  const handle = new Mesh(new CylinderGeometry(0.02, 0.02, handleHeight, 16), handleMat);
+  handle.position.set(width / 2 - 0.12, 0, depth / 2 + DOOR_THICK + 0.04);
+  group.add(handle);
+  const handleTop = new Mesh(new CylinderGeometry(0.022, 0.022, 0.05, 16), handleMat);
+  handleTop.rotation.x = Math.PI / 2;
+  handleTop.position.set(width / 2 - 0.12, handleHeight / 2, depth / 2 + DOOR_THICK + 0.02);
+  group.add(handleTop);
+  const handleBot = new Mesh(new CylinderGeometry(0.022, 0.022, 0.05, 16), handleMat);
+  handleBot.rotation.x = Math.PI / 2;
+  handleBot.position.set(width / 2 - 0.12, -handleHeight / 2, depth / 2 + DOOR_THICK + 0.02);
+  group.add(handleBot);
+
+  // Highlight ring (drawn around the door when this zone is selected)
+  const ringMat = new MeshStandardMaterial({
+    color: new Color(tint),
+    emissive: new Color(tint),
+    emissiveIntensity: 0.0,
+    transparent: true,
+    opacity: 0.0,
+    side: DoubleSide,
+    metalness: 0.0,
+    roughness: 0.6,
+  });
+  const ringPad = 0.02;
+  const ringT = 0.025;
+  const ringW = width + ringPad * 2;
+  const ringH = height + ringPad * 2;
+  const ring = new Group();
+  const ringTop = new Mesh(new BoxGeometry(ringW, ringT, DOOR_THICK * 0.6), ringMat);
+  ringTop.position.set(0, ringH / 2 - ringT / 2, depth / 2 + DOOR_THICK / 2);
+  ring.add(ringTop);
+  const ringBot = new Mesh(new BoxGeometry(ringW, ringT, DOOR_THICK * 0.6), ringMat);
+  ringBot.position.set(0, -ringH / 2 + ringT / 2, depth / 2 + DOOR_THICK / 2);
+  ring.add(ringBot);
+  const ringLeft = new Mesh(new BoxGeometry(ringT, ringH, DOOR_THICK * 0.6), ringMat);
+  ringLeft.position.set(-ringW / 2 + ringT / 2, 0, depth / 2 + DOOR_THICK / 2);
+  ring.add(ringLeft);
+  const ringRight = new Mesh(new BoxGeometry(ringT, ringH, DOOR_THICK * 0.6), ringMat);
+  ringRight.position.set(ringW / 2 - ringT / 2, 0, depth / 2 + DOOR_THICK / 2);
+  ring.add(ringRight);
+  // We grab the first mesh as the "ring" handle for material toggling; all four
+  // children share `ringMat`, so changing it affects all.
+  const highlightRing = ringTop;
+  group.add(ring);
+
+  // Interior point light — illuminates the back wall + shelves
+  const interiorLight = new PointLight(new Color(tint), 0.0, depth * 2.5, 1.4);
+  interiorLight.position.set(0, cavityH / 2 - 0.05, -cavityD / 2 + 0.2);
+  group.add(interiorLight);
+
+  group.add(doorGroup);
+  // Suppress unused-locals on the body material wiring (it's used elsewhere
+  // when the compartment is composed into the cabinet).
+  void bodyMat;
+
+  return { group, doorHit, doorGroup, highlightRing, interiorLight, interiorBack: back, mistMeshes };
+}
+
+
+const INLINE_TIME_RANGES = [
+  { id: '1H'  as const, label: '1H',  minutes: 60    },
+  { id: '24H' as const, label: '24H', minutes: 1440  },
+  { id: '7D'  as const, label: '7D',  minutes: 10080 },
+] as const;
+type InlineRangeId = (typeof INLINE_TIME_RANGES)[number]['id'];
+
+function InlineKpiChart({
+  refrigeratorId,
+  kpiKey,
+  zoneId,
+  accent,
+  unit,
+}: {
+  refrigeratorId: number;
+  kpiKey: string;
+  zoneId: string;
+  accent: string;
+  unit: string;
+}) {
+  const [range, setRange] = useState<InlineRangeId>('24H');
+  const [series, setSeries] = useState<{ timestamp: string; value: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const minutes = INLINE_TIME_RANGES.find((r) => r.id === range)?.minutes ?? 1440;
+    ivfService
+      .getRefrigeratorKpiHistory(refrigeratorId, minutes, zoneId)
+      .then((res) => {
+        const raw = res.kpi_series?.[kpiKey] ?? [];
+        setSeries(raw.map((p: any) => ({ timestamp: p.timestamp, value: p.value })));
+      })
+      .catch(() => setSeries([]))
+      .finally(() => setLoading(false));
+  }, [refrigeratorId, kpiKey, zoneId, range]);
+
+  const labels = useMemo(() => series.map((p) => {
+    try {
+      const norm = p.timestamp.trim().replace(' ', 'T');
+      const withZ = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(norm) ? norm : `${norm}Z`;
+      const d = new Date(withZ);
+      if (isNaN(d.getTime())) return '';
+      if (range === '7D') return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    } catch { return ''; }
+  }), [series, range]);
+
+  const values = useMemo(() => series.map((p) => p.value), [series]);
+
+  const stats = useMemo(() => {
+    if (values.length === 0) return null;
+    return {
+      min: Math.min(...values),
+      max: Math.max(...values),
+      avg: values.reduce((a, b) => a + b, 0) / values.length,
+    };
+  }, [values]);
+
+  const chartData = useMemo(() => ({
+    labels,
+    datasets: [{
+      label: kpiKey,
+      data: values,
+      borderColor: accent,
+      backgroundColor: `${accent}18`,
+      borderWidth: 2,
+      pointRadius: values.length > 80 ? 0 : 2,
+      fill: true,
+      tension: 0.3,
+    }],
+  }), [labels, values, accent, kpiKey]);
+
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false as const,
+    plugins: { legend: { display: false }, tooltip: {
+      backgroundColor: '#1a0a1f', titleColor: '#d4b8e0', bodyColor: '#ffffff', padding: 10,
+      callbacks: { label: (ctx: { parsed: { y: number } }) => `${ctx.parsed.y?.toFixed(2)} ${unit}` },
+    }},
+    scales: {
+      x: { ticks: { maxTicksLimit: 6, font: { size: 9 }, color: '#9ca3af' }, grid: { color: '#f0ecf6' } },
+      y: { ticks: { font: { size: 9 }, color: '#9ca3af', callback: (v: number | string) => `${v}` }, grid: { color: '#f0ecf6' } },
+    },
+  }), [unit]);
+
+  return (
+    <div>
+      <div style={{ padding: '10px 12px 0', minHeight: 120 }}>
+        <div style={{ height: 120, position: 'relative' }}>
+          {loading && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg className="animate-spin" style={{ width: 20, height: 20, color: accent }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            </div>
+          )}
+          {!loading && series.length === 0 && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#9ca3af' }}>No data</div>
+          )}
+          {!loading && series.length > 0 && (
+            <Line data={chartData} options={chartOptions as any} />
+          )}
+        </div>
+      </div>
+      <div style={{ padding: '8px 12px 10px', borderTop: '1px solid #f0e8f4', marginTop: 6 }}>
+        {stats && (
+          <div style={{ display: 'flex', gap: 0, marginBottom: 8 }}>
+            {(['min', 'max', 'avg'] as const).map((key, i) => (
+              <div key={key} style={{ flex: 1, textAlign: 'center', borderRight: i < 2 ? '1px solid #f0e8f4' : undefined, paddingRight: i < 2 ? 8 : 0, paddingLeft: i > 0 ? 8 : 0 }}>
+                <div style={{ fontSize: 8, fontWeight: 600, color: '#a07ab8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{key}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: accent, marginTop: 1 }}>
+                  {stats[key].toFixed(1)}<span style={{ fontSize: 9, color: '#9ca3af', marginLeft: 1 }}>{unit}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 500 }}>Range:</span>
+          <div style={{ display: 'flex', borderRadius: 6, border: '1px solid #e6d6ee', overflow: 'hidden', background: '#fdfbfe' }}>
+            {INLINE_TIME_RANGES.map((r) => (
+              <button key={r.id} type="button" onClick={() => setRange(r.id)} style={{
+                padding: '3px 10px', fontSize: 9, fontWeight: 600,
+                background: range === r.id ? accent : 'transparent',
+                color: range === r.id ? '#fff' : '#6b5a70',
+                border: 'none', cursor: 'pointer',
+              }}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getDateLabel(ts: string): string {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return 'Unknown';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const item = new Date(d); item.setHours(0,0,0,0);
+  if (item.getTime() === today.getTime()) return 'Today';
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  if (item.getTime() === yesterday.getTime()) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatAlertTime(ts: string): string {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts;
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function getSeverityCardClass(sev: string): string {
+  if (sev === 'High' || sev === 'Critical')
+    return 'border-red-200 bg-white [background-image:linear-gradient(135deg,rgba(248,113,113,0.14)_0%,rgba(255,255,255,0.92)_52%,rgba(255,255,255,1)_100%)]';
+  return 'border-orange-200 bg-white [background-image:linear-gradient(135deg,rgba(251,146,60,0.14)_0%,rgba(255,255,255,0.92)_52%,rgba(255,255,255,1)_100%)]';
+}
+
+function SeverityIcon({ severity }: { severity: string }) {
+  const isHigh = severity === 'High' || severity === 'Critical';
+  return (
+    <div className={`flex h-8 w-8 items-center justify-center rounded-xl border ${isHigh ? 'border-red-200 bg-red-50 text-red-600' : 'border-orange-200 bg-orange-50 text-orange-600'}`}>
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        {isHigh ? (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+        ) : (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        )}
+      </svg>
+    </div>
+  );
+}
+
+type AlertGroup = { key: string; alerts: IVFAlert[] };
+
+function EmbeddedAlerts({ refrigeratorId }: { refrigeratorId?: number }) {
+  const [alerts, setAlerts] = useState<IVFAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [ackingIds, setAckingIds] = useState<Set<string>>(new Set());
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+  const fetchAlerts = () => {
+    if (!refrigeratorId) return;
+    setLoading(true);
+    ivfAlertsService
+      .getRefrigeratorAlerts(refrigeratorId)
+      .then((res) => setAlerts(res.alerts || []))
+      .catch(() => setAlerts([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchAlerts(); }, [refrigeratorId]);
+
+  const handleAcknowledge = async (alertId: string) => {
+    setAckingIds((p) => new Set(p).add(alertId));
+    try {
+      await ivfAlertsService.acknowledgeAlert(alertId);
+      fetchAlerts();
+    } catch {} finally {
+      setAckingIds((p) => { const n = new Set(p); n.delete(alertId); return n; });
+    }
+  };
+
+  const toggleExpand = (key: string) => {
+    setExpandedKeys((p) => { const n = new Set(p); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  };
+
+  const grouped = useMemo(() => {
+    const byDate: Record<string, AlertGroup[]> = {};
+    const sorted = [...alerts].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    for (const a of sorted) {
+      const dateKey = getDateLabel(a.created_at);
+      if (!byDate[dateKey]) byDate[dateKey] = [];
+      const groupKey = `${dateKey}__${a.alert_type}__${a.message}__${a.acknowledged_at ? 'acked' : 'active'}`;
+      let group = byDate[dateKey].find((g) => g.key === groupKey);
+      if (!group) { group = { key: groupKey, alerts: [] }; byDate[dateKey].push(group); }
+      group.alerts.push(a);
+    }
+    return byDate;
+  }, [alerts]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (alerts.length === 0) {
+    return <div className="flex-1 flex items-center justify-center text-xs text-gray-400">No alerts</div>;
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto p-3">
+      <div className="space-y-3">
+        {Object.entries(grouped).map(([dateLabel, groups]) => (
+          <div key={dateLabel} className="space-y-2">
+            <div className="inline-flex items-center rounded-full bg-[#f0f0f0] px-2.5 py-0.5 text-[11px] font-medium text-[#3a3a3a]">
+              {dateLabel}
+            </div>
+            <div className="space-y-2">
+              {groups.map((group) => {
+                const latest = group.alerts[0];
+                const older = group.alerts.slice(1);
+                const hiddenCount = older.length;
+                const isExpanded = expandedKeys.has(group.key);
+                const isAcked = !!latest.acknowledged_at;
+                const sevBadge = latest.severity === 'High' || latest.severity === 'Critical'
+                  ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700';
+
+                return (
+                  <div
+                    key={group.key}
+                    className={`rounded-xl border p-3 ${getSeverityCardClass(latest.severity)} ${hiddenCount > 0 ? 'cursor-pointer' : ''}`}
+                    onClick={hiddenCount > 0 ? () => toggleExpand(group.key) : undefined}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="flex flex-col items-center shrink-0">
+                        <SeverityIcon severity={latest.severity} />
+                        {hiddenCount > 0 && !isExpanded && (
+                          <span className="mt-0.5 text-[10px] font-semibold text-primary">+{hiddenCount}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs font-semibold text-gray-800">{latest.alert_type}</span>
+                          <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${sevBadge}`}>{latest.severity}</span>
+                          <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${isAcked ? 'bg-gray-100 text-gray-600' : 'bg-green-50 text-green-700'}`}>
+                            {isAcked ? 'Acknowledged' : 'Active'}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-[#333]">{latest.message}</div>
+                        <div className="mt-1 text-[10px] text-gray-500">{formatAlertTime(latest.created_at)}</div>
+                        {isAcked && latest.acknowledgment_reason && (
+                          <div className="mt-1 flex flex-wrap items-start gap-x-1 text-[10px] text-gray-500">
+                            <span className="font-semibold text-gray-600">Reason:</span>
+                            <span>{latest.acknowledgment_reason}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {hiddenCount > 0 && (
+                          <svg className={`w-3.5 h-3.5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        )}
+                        {!isAcked && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleAcknowledge(latest.alert_id); }}
+                            disabled={ackingIds.has(latest.alert_id)}
+                            className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-primary text-white hover:bg-[#5a0f66] transition-colors disabled:opacity-50 whitespace-nowrap"
+                          >
+                            {ackingIds.has(latest.alert_id) ? '...' : 'Acknowledge'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {isExpanded && hiddenCount > 0 && (
+                      <div className="mt-2 border-t border-gray-200/70 pt-2 space-y-2">
+                        {older.map((a) => (
+                          <div key={a.alert_id} className="flex items-center justify-between gap-2 pl-10">
+                            <div className="min-w-0">
+                              <div className="text-[11px] text-[#333]">{a.message}</div>
+                              <div className="mt-0.5 text-[10px] text-gray-500">{formatAlertTime(a.created_at)}</div>
+                              {a.acknowledged_at && a.acknowledgment_reason && (
+                                <div className="mt-0.5 flex flex-wrap items-start gap-x-1 text-[10px] text-gray-500">
+                                  <span className="font-semibold text-gray-600">Reason:</span>
+                                  <span>{a.acknowledgment_reason}</span>
+                                </div>
+                              )}
+                            </div>
+                            {!a.acknowledged_at && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleAcknowledge(a.alert_id); }}
+                                disabled={ackingIds.has(a.alert_id)}
+                                className="shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-primary text-white hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
+                              >
+                                {ackingIds.has(a.alert_id) ? '...' : 'Acknowledge'}
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ZoneKpiSection({
+  zone,
+  refrigeratorId,
+}: {
+  zone: RefrigeratorZone;
+  refrigeratorId?: number;
+}) {
+  const { sensorTiles } = useRefrigeratorKpiSnapshot({
+    refrigeratorId: refrigeratorId ? String(refrigeratorId) : undefined,
+    zoneId: zone.zone_id,
+    enabled: !!refrigeratorId,
+  });
+
+  return (
+    <div className="flex flex-col gap-2">
+      {sensorTiles.length === 0 ? (
+        <div className="text-xs text-gray-400 italic">No data</div>
+      ) : (
+        sensorTiles.map((tile) => {
+          const isTemp = tile.id === 'refrigerator_temp';
+          const accent = isTemp ? '#1a7abb' : '#7a22c8';
+          const ring = isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)';
+          return (
+            <div
+              key={tile.id}
+              style={{
+                borderRadius: 16,
+                border: `1px solid #e6d6ee`,
+                background: '#fdfbfe',
+                boxShadow: '0 4px 12px rgba(64,17,83,0.06)',
+                overflow: 'hidden',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#8b6c97', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                      {tile.label}
+                    </span>
+                    <span className="inline-flex px-1.5 py-0.5 text-[9px] font-semibold rounded-full bg-primary/10 text-primary border border-primary/20">
+                      {zone.zone_name}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: accent, marginTop: 4 }}>
+                    {tile.value}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
+                    {tile.timestamp ?? '—'}
+                  </div>
+                </div>
+                <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', border: '1px solid #e6d6ee', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `inset 0 0 0 6px ${ring}`, color: accent, flexShrink: 0 }}>
+                  {isTemp ? <Thermometer size={18} /> : <Droplets size={18} />}
+                </div>
+              </div>
+              {refrigeratorId != null && (
+                <InlineKpiChart
+                  refrigeratorId={refrigeratorId}
+                  kpiKey={tile.id}
+                  zoneId={zone.zone_id}
+                  accent={accent}
+                  unit="°C"
+                />
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+export default function RefrigeratorVisualisation({
+  zones = [],
+  selectedSensorId,
+  onSensorSelect,
+  hasAlert,
+  onTaskCreated: _onTaskCreated,
+  currentUserName: _currentUserName = '',
+  currentUserId: _currentUserId = '',
+  refrigeratorId,
+  refrigeratorCode,
+  branchName,
+  type = 'default',
+  isLoadingType = false,
+}: RefrigeratorVisualisationProps) {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const sceneRef = useRef<{
+    renderer: WebGLRenderer;
+    scene: Scene;
+    camera: PerspectiveCamera;
+    rafId: number;
+    onResize: () => void;
+    fridgeLight: PointLight;
+    freezerLight: PointLight;
+  } | null>(null);
+
+  // ── Set up the scene once on mount ─────────────────────────────────────────
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+
+    const renderer = new WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = PCFSoftShadowMap;
+    const { clientWidth, clientHeight } = mount;
+    renderer.setSize(Math.max(clientWidth, 1), Math.max(clientHeight, 1));
+    mount.appendChild(renderer.domElement);
+
+    const scene = new Scene();
+    scene.background = null;
+    // Lavender fog matches cryocan — fades the grid to a soft horizon so the
+    // canvas reads as an infinity plane instead of a finite rectangle.
+    scene.fog = new Fog(0xe8d4f4, 18, 55);
+    const env = buildEnvironmentTexture(renderer);
+    scene.environment = env;
+
+    // Camera — pulled back so the full cabinet fits with headroom; slight
+    // three-quarter angle so both doors and the side bevels are visible.
+    const camera = new PerspectiveCamera(
+      30,
+      Math.max(clientWidth, 1) / Math.max(clientHeight, 1),
+      0.1,
+      100,
+    );
+    camera.position.set(3.8, 2.2, 8.4);
+    const cameraTarget = new Vector3(0, BODY_H / 2 + LEG_H / 2, 0);
+    camera.lookAt(cameraTarget);
+    renderer.domElement.style.cursor = 'grab';
+    renderer.domElement.style.display = 'block';
+    renderer.domElement.style.touchAction = 'none';
+
+    // ── Lights ──
+    const ambient = new AmbientLight(0xffffff, 0.45);
+    scene.add(ambient);
+
+    const key = new DirectionalLight(0xffffff, 1.3);
+    key.position.set(3.5, 5, 4);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.near = 0.5;
+    key.shadow.camera.far = 20;
+    key.shadow.camera.left = -4;
+    key.shadow.camera.right = 4;
+    key.shadow.camera.top = 4;
+    key.shadow.camera.bottom = -4;
+    key.shadow.bias = -0.0005;
+    scene.add(key);
+
+    const fill = new DirectionalLight(new Color('#cfd3df'), 0.45);
+    fill.position.set(-3, 2, 3);
+    scene.add(fill);
+
+    const rim = new DirectionalLight(new Color('#b48cf7'), 0.55);
+    rim.position.set(-2, 3, -3);
+    scene.add(rim);
+
+    // ── Floor (catches shadow only — fog handles the visible "ground") ──
+    const floor = new Mesh(
+      new PlaneGeometry(40, 40),
+      new ShadowMaterial({ opacity: 0.22 }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // ── Infinity grid (cryocan-style: large GridHelper that fades to fog) ──
+    const GRID_SIZE = 80;
+    const GRID_DIVS = 64;
+    const floorGrid = new GridHelper(GRID_SIZE, GRID_DIVS, 0xc4a8dc, 0xc4a8dc);
+    floorGrid.position.y = 0.0;
+    const gridMat = floorGrid.material as LineBasicMaterial | LineBasicMaterial[];
+    (Array.isArray(gridMat) ? gridMat : [gridMat]).forEach((m) => {
+      m.transparent = true;
+      m.opacity = 0.5;
+      m.depthWrite = false;
+    });
+    scene.add(floorGrid);
+
+    // ── Cabinet ──
+    const cabinet = new Group();
+    cabinet.position.y = LEG_H;
+    scene.add(cabinet);
+
+    const bodyMat = new MeshStandardMaterial({
+      color: BODY_COLOR,
+      roughness: 0.45,
+      metalness: 0.7,
+    });
+    const trimMat = new MeshStandardMaterial({
+      color: BODY_ACCENT,
+      roughness: 0.35,
+      metalness: 0.85,
+    });
+
+    // Main body — 6-material BoxGeometry where the front (+Z, group index 4)
+    // is invisible. Without this, the solid front face would block sightlines
+    // through the glass door and you'd never see the racks inside.
+    // BoxGeometry group order: [+X, -X, +Y, -Y, +Z, -Z].
+    const invisibleFront = new MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: DoubleSide,
+    });
+    const body = new Mesh(new BoxGeometry(BODY_W, BODY_H, BODY_D), [
+      bodyMat,         // +X right
+      bodyMat,         // -X left
+      bodyMat,         // +Y top
+      bodyMat,         // -Y bottom
+      invisibleFront,  // +Z front  (cut-out for the doors)
+      bodyMat,         // -Z back
+    ]);
+    body.position.y = BODY_H / 2;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    cabinet.add(body);
+
+    // Top accent strip
+    const topStrip = new Mesh(new BoxGeometry(BODY_W + 0.02, 0.04, BODY_D + 0.02), trimMat);
+    topStrip.position.y = BODY_H + 0.005;
+    cabinet.add(topStrip);
+
+    // Mid divider between fridge and freezer
+    const divider = new Mesh(new BoxGeometry(BODY_W + 0.012, 0.025, BODY_D + 0.012), trimMat);
+    divider.position.y = FREEZER_H;
+    cabinet.add(divider);
+
+    // ── Side / back / top details ──────────────────────────────────────────
+    // Wireframe edges around the whole body — picks up the slate panel seams
+    // and makes the silhouette read better as the cabinet rotates.
+    const bodyEdges = new LineSegments(
+      new EdgesGeometry(new BoxGeometry(BODY_W, BODY_H, BODY_D)),
+      new LineBasicMaterial({ color: new Color('#1a1c20'), transparent: true, opacity: 0.5 }),
+    );
+    bodyEdges.position.y = BODY_H / 2;
+    cabinet.add(bodyEdges);
+
+    // Recessed side panel insets — gives the L/R sides the brushed-aluminium
+    // panel look from the reference instead of a flat plane.
+    const sidePanelMat = new MeshStandardMaterial({
+      color: new Color('#3a3d46'),
+      roughness: 0.35,
+      metalness: 0.85,
+    });
+    const sidePanelW = BODY_D - 0.18;
+    const sidePanelH = BODY_H - 0.22;
+    [-1, 1].forEach((dir) => {
+      const panel = new Mesh(new PlaneGeometry(sidePanelW, sidePanelH), sidePanelMat);
+      panel.position.set(dir * (BODY_W / 2 + 0.0015), BODY_H / 2, 0);
+      panel.rotation.y = dir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      cabinet.add(panel);
+      // Hairline groove around the panel
+      const grooveMat = new LineBasicMaterial({
+        color: new Color('#1a1c20'),
+        transparent: true,
+        opacity: 0.7,
+      });
+      const groove = new LineSegments(
+        new EdgesGeometry(new PlaneGeometry(sidePanelW, sidePanelH)),
+        grooveMat,
+      );
+      groove.position.copy(panel.position);
+      groove.position.x += dir * 0.002;
+      groove.rotation.copy(panel.rotation);
+      cabinet.add(groove);
+    });
+
+    // Vertical hinge column on the LEFT side of each door (matches reference)
+    const hingeColMat = new MeshStandardMaterial({
+      color: new Color('#1f2026'),
+      roughness: 0.4,
+      metalness: 0.8,
+    });
+    const hingeCol = new Mesh(
+      new BoxGeometry(0.06, BODY_H - 0.08, 0.04),
+      hingeColMat,
+    );
+    hingeCol.position.set(-BODY_W / 2 + 0.04, BODY_H / 2, BODY_D / 2 + 0.005);
+    cabinet.add(hingeCol);
+    // Two hinge knuckles (small cylinders) along the column
+    const hingeKnuckleMat = new MeshStandardMaterial({
+      color: new Color('#c8cad0'),
+      roughness: 0.25,
+      metalness: 0.95,
+    });
+    [BODY_H * 0.78, BODY_H * 0.22].forEach((y) => {
+      const knuckle = new Mesh(
+        new CylinderGeometry(0.025, 0.025, 0.07, 16),
+        hingeKnuckleMat,
+      );
+      knuckle.rotation.z = Math.PI / 2;
+      knuckle.position.set(-BODY_W / 2 + 0.04, y, BODY_D / 2 + 0.03);
+      cabinet.add(knuckle);
+    });
+
+    // Back panel: compressor housing (lower box) + ventilation slats
+    const backPanelMat = new MeshStandardMaterial({
+      color: new Color('#22242a'),
+      roughness: 0.55,
+      metalness: 0.5,
+    });
+    const compressor = new Mesh(
+      new BoxGeometry(BODY_W * 0.78, BODY_H * 0.22, 0.18),
+      backPanelMat,
+    );
+    compressor.position.set(0, BODY_H * 0.11, -BODY_D / 2 - 0.09);
+    cabinet.add(compressor);
+    // Heat-exchanger coils on the compressor face
+    const coilMat = new LineBasicMaterial({
+      color: new Color('#8a8c92'),
+      transparent: true,
+      opacity: 0.8,
+    });
+    const coilGroup = new Group();
+    const coilW = BODY_W * 0.62;
+    const coilStep = 0.04;
+    const coilRows = 6;
+    const coilStart = -coilRows * coilStep * 0.5;
+    for (let i = 0; i < coilRows; i++) {
+      // Each row drawn as a thin box rendered as edges for a wire look
+      const row = new LineSegments(
+        new EdgesGeometry(new BoxGeometry(coilW, 0.008, 0.008)),
+        coilMat,
+      );
+      row.position.set(0, coilStart + i * coilStep + BODY_H * 0.11, -BODY_D / 2 - 0.18);
+      coilGroup.add(row);
+    }
+    cabinet.add(coilGroup);
+
+    // Vertical ventilation slats on the back upper area
+    const slatMat = new MeshStandardMaterial({
+      color: new Color('#15171c'),
+      roughness: 0.7,
+      metalness: 0.4,
+    });
+    const slatCount = 8;
+    const slatSpacing = (BODY_W * 0.6) / slatCount;
+    for (let i = 0; i < slatCount; i++) {
+      const slat = new Mesh(
+        new BoxGeometry(0.012, BODY_H * 0.18, 0.025),
+        slatMat,
+      );
+      slat.position.set(
+        -BODY_W * 0.3 + i * slatSpacing + slatSpacing / 2,
+        BODY_H * 0.62,
+        -BODY_D / 2 - 0.013,
+      );
+      cabinet.add(slat);
+    }
+
+    // Branding plate on the back-top
+    const plateMat = new MeshStandardMaterial({
+      color: new Color('#d6d8de'),
+      roughness: 0.4,
+      metalness: 0.6,
+    });
+    const plate = new Mesh(new BoxGeometry(0.55, 0.12, 0.012), plateMat);
+    plate.position.set(0, BODY_H * 0.88, -BODY_D / 2 - 0.007);
+    cabinet.add(plate);
+
+    // Top vent (thin slot near the back of the top surface)
+    const topVent = new Mesh(
+      new BoxGeometry(BODY_W * 0.7, 0.012, 0.06),
+      new MeshStandardMaterial({
+        color: new Color('#0e0f13'),
+        roughness: 0.7,
+        metalness: 0.3,
+      }),
+    );
+    topVent.position.set(0, BODY_H + 0.015, -BODY_D / 2 + 0.18);
+    cabinet.add(topVent);
+
+    // Toe kick / bottom plinth (recessed front skirt above the legs)
+    const plinthMat = new MeshStandardMaterial({
+      color: new Color('#1a1c20'),
+      roughness: 0.5,
+      metalness: 0.5,
+    });
+    const plinth = new Mesh(new BoxGeometry(BODY_W * 0.85, 0.06, 0.04), plinthMat);
+    plinth.position.set(0, 0.04, BODY_D / 2 + 0.005);
+    cabinet.add(plinth);
+
+    // Fridge compartment (top)
+    const fridge = buildCompartment(BODY_W, FRIDGE_H, BODY_D, FRIDGE_TINT, true, bodyMat, trimMat);
+    fridge.group.position.y = FREEZER_H + FRIDGE_H / 2;
+    cabinet.add(fridge.group);
+
+    // Freezer compartment (bottom)
+    const freezer = buildCompartment(BODY_W, FREEZER_H, BODY_D, FREEZER_TINT, false, bodyMat, trimMat);
+    freezer.group.position.y = FREEZER_H / 2;
+    cabinet.add(freezer.group);
+
+    // Legs (four feet)
+    const legMat = new MeshStandardMaterial({
+      color: new Color('#1a1c20'),
+      roughness: 0.5,
+      metalness: 0.6,
+    });
+    const legGeom = new CylinderGeometry(0.06, 0.07, LEG_H, 16);
+    const legX = BODY_W / 2 - 0.12;
+    const legZ = BODY_D / 2 - 0.12;
+    [[legX, legZ], [-legX, legZ], [legX, -legZ], [-legX, -legZ]].forEach(([x, z]) => {
+      const leg = new Mesh(legGeom, legMat);
+      leg.position.set(x, LEG_H / 2, z);
+      leg.castShadow = true;
+      cabinet.add(leg);
+    });
+
+    // ── Interaction: drag-to-rotate ──
+    let dragging = false;
+    let lastX = 0;
+
+    const onDown = (e: PointerEvent) => {
+      dragging = true;
+      lastX = e.clientX;
+      renderer.domElement.style.cursor = 'grabbing';
+      try {
+        renderer.domElement.setPointerCapture(e.pointerId);
+      } catch {
+        // Pointer capture is best-effort; some browsers (older Safari) throw.
+      }
+    };
+    const onUp = (e: PointerEvent) => {
+      dragging = false;
+      renderer.domElement.style.cursor = 'grab';
+      try {
+        renderer.domElement.releasePointerCapture(e.pointerId);
+      } catch {
+        // Mirror onDown: capture release is best-effort.
+      }
+    };
+    const onMove = (e: PointerEvent) => {
+      const x = e.clientX;
+      if (dragging) {
+        cabinet.rotation.y += (x - lastX) * 0.01;
+      }
+      lastX = x;
+    };
+    renderer.domElement.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointermove', onMove);
+
+    // ── Resize ──
+    const onResize = () => {
+      const w = Math.max(mount.clientWidth, 1);
+      const h = Math.max(mount.clientHeight, 1);
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    };
+    const ro = new ResizeObserver(onResize);
+    ro.observe(mount);
+
+    // ── Render loop ──
+    let rafId = 0;
+    let t0 = performance.now();
+    const animate = () => {
+      const now = performance.now();
+      const dt = (now - t0) / 1000;
+      t0 = now;
+      // Adaptive auto-rotate: slow at front (interior visible), fast at sides/back
+      if (!dragging) {
+        // frontness → 1 when front faces camera, 0 at sides/back
+        const frontness = Math.max(0, Math.cos(cabinet.rotation.y));
+        const rotSpeed = 0.0007 + (1 - frontness) * 0.0093;
+        cabinet.rotation.y += rotSpeed;
+      }
+      // Smoothly tween light intensities toward their target values
+      const lerpLight = (l: PointLight) => {
+        const target = (l.userData._target as number | undefined) ?? 1.0;
+        l.intensity += (target - l.intensity) * Math.min(1, dt * 4);
+      };
+      lerpLight(fridge.interiorLight);
+      lerpLight(freezer.interiorLight);
+      // Animate freezer mist — slow breathing opacity simulates cold fog wisps
+      freezer.mistMeshes.forEach((m) => {
+        const phase = (m.userData._mistPhase as number) + now * 0.00035;
+        const base = m.userData._mistBaseOpacity as number;
+        (m.material as MeshBasicMaterial).opacity = base + Math.sin(phase) * base * 0.4;
+      });
+      renderer.render(scene, camera);
+      rafId = requestAnimationFrame(animate);
+    };
+    rafId = requestAnimationFrame(animate);
+
+    // Set steady-state interior light targets (no zone selection)
+    fridge.interiorLight.userData._target = 1.0;
+    freezer.interiorLight.userData._target = 1.0;
+
+    sceneRef.current = {
+      renderer,
+      scene,
+      camera,
+      rafId,
+      onResize,
+      fridgeLight: fridge.interiorLight,
+      freezerLight: freezer.interiorLight,
+    };
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      ro.disconnect();
+      renderer.domElement.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      renderer.dispose();
+      env.dispose();
+      mount.removeChild(renderer.domElement);
+      // Best-effort traversal to free geometry/material
+      scene.traverse((obj) => {
+        const mesh = obj as Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+        const mat = (mesh as Mesh).material as MeshStandardMaterial | MeshStandardMaterial[] | undefined;
+        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+        else if (mat) mat.dispose();
+      });
+    };
+  }, []);
+
+  // ── Alert glow override ────────────────────────────────────────────────────
+  useEffect(() => {
+    const s = sceneRef.current;
+    if (!s) return;
+    if (hasAlert) {
+      s.fridgeLight.color.set('#ff4d6d');
+      s.freezerLight.color.set('#ff4d6d');
+      s.fridgeLight.userData._target = 3.0;
+      s.freezerLight.userData._target = 3.0;
+    } else {
+      s.fridgeLight.color.copy(FRIDGE_TINT);
+      s.freezerLight.color.copy(FREEZER_TINT);
+      s.fridgeLight.userData._target = 1.0;
+      s.freezerLight.userData._target = 1.0;
+    }
+  }, [hasAlert]);
+
+  return (
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 h-full min-h-0">
+
+      {/* Left: Live Conditions (top) + Messages (bottom) */}
+      <aside className="flex flex-col gap-3 min-h-0">
+
+        {/* Live Conditions card — 60% */}
+        <div className="@container min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ flex: '3 1 0%' }}>
+          <div
+            className="flex items-center justify-between px-4 py-3 shrink-0"
+            style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}
+          >
+            <div>
+              <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>Live Conditions</span>
+              <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Click a tile to view trend</span>
+            </div>
+            <TrendingUp size={16} style={{ color: '#6b4a78' }} />
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 grid grid-cols-1 @[650px]:grid-cols-2 gap-4 content-start">
+            {zones.length === 0 ? (
+              <div className="text-xs text-gray-400 italic">No zones configured.</div>
+            ) : (
+              zones.map((zone) => (
+                <ZoneKpiSection
+                  key={zone.zone_id}
+                  zone={zone}
+                  refrigeratorId={refrigeratorId}
+                />
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Alerts card — 40% */}
+        <div className="min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ flex: '2 1 0%' }}>
+          <div
+            className="flex items-center justify-between px-4 py-3 shrink-0"
+            style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}
+          >
+            <div>
+              <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>Critical Alerts</span>
+              <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Alerts requiring attention</span>
+            </div>
+            <AlertTriangle size={16} style={{ color: '#6b4a78' }} />
+          </div>
+          <EmbeddedAlerts refrigeratorId={refrigeratorId} />
+        </div>
+      </aside>
+
+      {/* Center 3D viewer / Room visualization */}
+      <section
+        data-refrigerator-3d-mount
+        className="relative min-h-0 overflow-hidden"
+        style={{ borderRadius: 20, border: '1px solid #d8c6e8', background: 'linear-gradient(160deg, #f3eaf9 0%, #ede0f5 40%, #e4d4f0 100%)', boxShadow: '0 8px 20px -12px #4011531f, 0 2px 6px #4011530a' }}
+        aria-label="Refrigerator 3D visualisation"
+      >
+        {isLoadingType ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-transparent to-white/5">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+              <span className="text-sm font-medium text-gray-600">Loading refrigerator...</span>
+            </div>
+          </div>
+        ) : type === 'cold_storage' ? (
+          <ColdStorageRoom
+            selectedSensorId={selectedSensorId}
+            onSensorSelect={onSensorSelect}
+            refrigeratorCode={refrigeratorCode}
+            branchName={branchName}
+            zoneCount={zones.length}
+          />
+        ) : (
+          <>
+            {/* Radial vignette — brighter centre, darker corners */}
+            <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 70% 65% at 50% 50%, rgba(255,255,255,0.62) 0%, transparent 72%)' }} />
+            {/* Floor gradient */}
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%', zIndex: 0, pointerEvents: 'none', background: 'linear-gradient(0deg, rgba(220,195,240,0.4) 0%, transparent 100%)' }} />
+            <div ref={mountRef} className="absolute inset-0" />
+          </>
+        )}
+
+        {type !== 'cold_storage' && (
+          <>
+            {/* Top-left: live status + meta info */}
+            <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none" style={{ zIndex: 2 }}>
+              {/* Connected status */}
+              <div className="flex items-center gap-2 bg-white/85 backdrop-blur-sm rounded-xl border border-white/70 shadow-sm px-3 py-2">
+                <span className="w-2 h-2 rounded-full shrink-0 bg-emerald-400 animate-pulse" />
+                <span className="text-[11px] font-bold text-gray-700">Connected Live</span>
+              </div>
+            </div>
+
+            {/* Top-right: status badge */}
+            <div className="absolute top-3 right-3 pointer-events-none">
+          {hasAlert ? (
+            <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-red-200 rounded-xl px-2.5 py-1.5 shadow-sm">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L3 7v6c0 5.25 3.75 10.15 9 11.35C17.25 23.15 21 18.25 21 13V7L12 2z" fill="#ef4444" />
+                <line x1="12" y1="8" x2="12" y2="12" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="15.5" r="0.8" fill="white" />
+              </svg>
+              <span className="text-[11px] font-semibold text-red-600">Alert active</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-emerald-200 rounded-xl px-2.5 py-1.5 shadow-sm">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L3 7v6c0 5.25 3.75 10.15 9 11.35C17.25 23.15 21 18.25 21 13V7L12 2z" fill="#22c55e" />
+                <polyline points="8 12 11 15 16 9" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-[11px] font-semibold text-gray-700">Normal</span>
+            </div>
+            )}
+            </div>
+
+            {/* Mid-left: Storage Guidelines card */}
+            <div className="absolute left-3 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
+              <div className="bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]">
+                <div className="text-[8px] font-bold tracking-widest uppercase mb-1.5" style={{ color: '#5f3b73' }}>Storage Guidelines</div>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] text-gray-500">Fridge</span>
+                    <span className="text-[9px] font-bold" style={{ color: '#7a22c8' }}>2 – 8 °C</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] text-gray-500">Freezer</span>
+                    <span className="text-[9px] font-bold" style={{ color: '#1a7abb' }}>≤ −20 °C</span>
+                  </div>
+                  <div className="w-full border-t border-gray-100 my-1" />
+                  {['Separate shelf zones', 'No rear-wall contact', 'Quarterly inventory audit'].map((t) => (
+                    <div key={t} className="flex items-start gap-1">
+                      <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
+                        <circle cx="12" cy="12" r="12" fill="#22c55e" />
+                        <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="text-[9px] text-gray-600 leading-tight">{t}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Mid-right: Daily SOP card */}
+            <div className="absolute right-3 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
+              <div className="bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]">
+                <div className="text-[8px] font-bold tracking-widest uppercase mb-1.5" style={{ color: '#1a4d7a' }}>Daily SOP</div>
+                <div className="flex flex-col gap-1">
+                  {['Log temp morning and evening', 'Record any excursions', 'Minimise door-open cycles', 'Check door seals monthly', 'Allow items to equilibrate'].map((t) => (
+                    <div key={t} className="flex items-start gap-1">
+                      <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
+                        <circle cx="12" cy="12" r="12" fill="#22c55e" />
+                        <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="text-[9px] text-gray-600 leading-tight">{t}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom: scrolling tips strip */}
+            <style>{`
+@keyframes rfg-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes rfgKpiFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes rfgKpiSheen { 0% { transform: translateX(0) rotate(12deg); opacity: 0.3; } 50% { transform: translateX(8px) rotate(12deg); opacity: 0.6; } 100% { transform: translateX(0) rotate(12deg); opacity: 0.3; } }
+.rfg-kpi-card .rfg-kpi-glow  { animation: rfgKpiFloat 4.8s ease-in-out infinite; }
+.rfg-kpi-card .rfg-kpi-orb   { animation: rfgKpiFloat 5.6s ease-in-out infinite reverse; }
+.rfg-kpi-card .rfg-kpi-sheen { animation: rfgKpiSheen 6.2s ease-in-out infinite; }
+.rfg-kpi-card .rfg-kpi-curve { animation: rfgKpiFloat 7.4s ease-in-out infinite; }
+.rfg-kpi-card .rfg-kpi-wave  { animation: rfgKpiFloat 8.2s ease-in-out infinite reverse; }
+`}</style>
+            <div className="absolute bottom-0 inset-x-0 bg-white/65 backdrop-blur-sm border-t border-white py-2 flex items-center gap-3 overflow-hidden">
+              <span className="shrink-0 text-[9px] font-bold tracking-widest bg-primary text-white uppercase pl-3 pr-1">Tips</span>
+              <div className="overflow-hidden flex-1">
+                <div style={{ display: 'flex', gap: '2.5rem', whiteSpace: 'nowrap', animation: 'rfg-marquee 70s linear infinite' }}>
+                  {[...FRIDGE_TIPS, ...FRIDGE_TIPS].map((tip, i) => (
+                    <span key={i} className="text-[11px] text-gray-500 shrink-0">
+                      <span className="text-primary/30 mr-2">◆</span>{tip}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+
+    </div>
+  );
+}

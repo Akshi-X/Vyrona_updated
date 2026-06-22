@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from .kpi_utils import KPI_NAMES, save_kpi_readings
+from .kpi_utils import KPI_NAMES, save_kpi_readings, save_refrigerator_kpi_readings
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -69,6 +69,7 @@ def extract_device_id_from_webhook(webhook_data: Dict[str, Any]) -> Optional[str
         device_id = (
             webhook_data.get("DeviceId")
             or webhook_data.get("deviceId")
+            or webhook_data.get("deviceid")
             or webhook_data.get("Device")
             or webhook_data.get("device")
             or webhook_data.get("TrackerId")
@@ -133,6 +134,123 @@ def find_tank_by_tive_device_id(
     except Exception as e:
         logger.error(f"Error finding tank by tive_device_id: {e}", exc_info=True)
         return None
+
+
+def find_refrigerator_by_device_code(
+    db_session, device_code: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Find refrigerator zone mapping for a given device_code.
+
+    Queries refrigerator_devices to resolve (refrigerator_id, zone_id).
+    Returns dict or None if no mapping exists.
+    """
+    if not device_code:
+        return None
+
+    try:
+        query = text("""
+            SELECT rd.refrigerator_id, rd.zone_id, r.refrigerator_code,
+                   r.hospital_id, r.branch_id
+            FROM refrigerator_devices rd
+            JOIN refrigerators r ON rd.refrigerator_id = r.refrigerator_id
+            WHERE rd.device_code = :device_code
+              AND r.is_active = true
+            LIMIT 1
+        """)
+        result = db_session.execute(query, {"device_code": device_code})
+        row = result.fetchone()
+        if row:
+            return {
+                "refrigerator_id": row[0],
+                "zone_id": row[1],
+                "refrigerator_code": row[2],
+                "hospital_id": row[3],
+                "branch_id": row[4],
+            }
+        return None
+    except Exception as e:
+        logger.error(f"Error finding refrigerator by device_code: {e}", exc_info=True)
+        return None
+
+
+def extract_tive_temperature_kpis(
+    payload_data: Dict[str, Any], timestamp: str
+) -> List[Dict[str, Any]]:
+    """
+    Extract temperature KPIs relevant to refrigerator monitoring from a Tive payload.
+
+    Returns [{timestamp, name, value, unit}] for temp_external and probe_temp.
+    Values that are None are omitted.
+    """
+    kpis = []
+
+    temp_ext = payload_data.get("DeviceTemperature")
+    if temp_ext is None:
+        temp_ext = (payload_data.get("Temperature") or {}).get("External")
+    if temp_ext is not None:
+        kpis.append(
+            {
+                "timestamp": timestamp,
+                "name": "temp_external",
+                "value": temp_ext,
+                "unit": "°C",
+            }
+        )
+
+    probe_temp = payload_data.get("ProbeTemperature")
+    if probe_temp is not None:
+        kpis.append(
+            {
+                "timestamp": timestamp,
+                "name": "probe_temp",
+                "value": probe_temp,
+                "unit": "°C",
+            }
+        )
+
+    return kpis
+
+
+def process_tive_refrigerator(
+    db,
+    device_id: str,
+    webhook_payload: Dict[str, Any],
+    refrigerator_info: Dict[str, Any],
+) -> None:
+    """
+    Process a Tive webhook payload for a refrigerator zone.
+
+    Extracts temp_external and probe_temp, resolves kpi_config for the zone,
+    inserts into readings, and publishes to refrigerator_kpi_readings_channel.
+    """
+    timestamp = (
+        webhook_payload.get("CaptureTime")
+        or webhook_payload.get("Timestamp")
+        or datetime.now().isoformat()
+    )
+
+    kpis = extract_tive_temperature_kpis(webhook_payload, timestamp)
+
+    if not kpis:
+        logger.warning(
+            f"No temperature KPIs extracted for refrigerator device {device_id}. Skipping."
+        )
+        return
+
+    save_refrigerator_kpi_readings(
+        db_session=db,
+        refrigerator_id=refrigerator_info["refrigerator_id"],
+        zone_id=refrigerator_info["zone_id"],
+        refrigerator_code=refrigerator_info["refrigerator_code"],
+        hospital_id=refrigerator_info["hospital_id"],
+        branch_id=refrigerator_info["branch_id"],
+        kpi_readings=kpis,
+    )
+    logger.info(
+        f"Processed refrigerator telemetry for device {device_id}: "
+        f"refrigerator_id={refrigerator_info['refrigerator_id']}, zone_id={refrigerator_info['zone_id']}"
+    )
 
 
 def is_custom_iot_source(webhook_payload: Dict[str, Any]) -> bool:
@@ -360,7 +478,11 @@ def _close_refill_session(
     refill_event_start_ts = None
     refill_event_end_ts = None
 
-    if refill_active and refill_min_smoothed_kg is not None and refill_max_smoothed_kg is not None:
+    if (
+        refill_active
+        and refill_min_smoothed_kg is not None
+        and refill_max_smoothed_kg is not None
+    ):
         refill_amount_kg = max(0.0, refill_max_smoothed_kg - refill_min_smoothed_kg)
         if refill_amount_kg >= cfg.refill_threshold_kg:
             refill_event_triggered = True
@@ -625,7 +747,9 @@ def append_ln2_window_point(
         logger.error(f"Error appending LN2 window point for {device_code}: {e}")
 
 
-def append_ln2_refill_point(device_code: str, timestamp: datetime, mass_kg: float) -> None:
+def append_ln2_refill_point(
+    device_code: str, timestamp: datetime, mass_kg: float
+) -> None:
     """Append (timestamp, mass) to refill-session buffer (synchronous)."""
     try:
         r = get_redis_client()
@@ -800,11 +924,14 @@ def update_ln2_rate_bucket(
         if state and state.get("bucket_start") == bucket_start:
             sum_mass = float(state.get("sum_mass", 0.0)) + mass_kg
             count = int(state.get("count", 0)) + 1
-            r.hset(state_key, mapping={
-                "bucket_start": bucket_start,
-                "sum_mass": str(round(sum_mass, 6)),
-                "count": str(count),
-            })
+            r.hset(
+                state_key,
+                mapping={
+                    "bucket_start": bucket_start,
+                    "sum_mass": str(round(sum_mass, 6)),
+                    "count": str(count),
+                },
+            )
             r.expire(state_key, 86400)
             return
 
@@ -816,7 +943,10 @@ def update_ln2_rate_bucket(
                 if prev_count > 0:
                     avg_mass = prev_sum / prev_count
                     entry = json.dumps(
-                        {"ts": state.get("bucket_start"), "avg_mass": round(avg_mass, 6)}
+                        {
+                            "ts": state.get("bucket_start"),
+                            "avg_mass": round(avg_mass, 6),
+                        }
                     )
                     max_len = _rate_bucket_max_len(bucket_minutes, window_hours)
                     pipe.rpush(bucket_key, entry)
@@ -825,11 +955,14 @@ def update_ln2_rate_bucket(
             except (ValueError, TypeError):
                 pass
 
-        pipe.hset(state_key, mapping={
-            "bucket_start": bucket_start,
-            "sum_mass": str(round(mass_kg, 6)),
-            "count": "1",
-        })
+        pipe.hset(
+            state_key,
+            mapping={
+                "bucket_start": bucket_start,
+                "sum_mass": str(round(mass_kg, 6)),
+                "count": "1",
+            },
+        )
         pipe.expire(state_key, 86400)
         pipe.execute()
     except Exception as e:
@@ -1301,13 +1434,11 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
         append_ln2_window_point(device_code, timestamp, sensor_reading.ln2_mass_kg, cfg)
         window_points = get_ln2_window_points(device_code, cutoff_ts)
 
-        smoothed_mass_kg, smoothed_level_pct, smoothed_volume_l = (
-            compute_smoothed_ln2(
-                window_points,
-                timestamp,
-                cfg,
-                avg_minutes=LN2_LEVEL_AVG_MINUTES,
-            )
+        smoothed_mass_kg, smoothed_level_pct, smoothed_volume_l = compute_smoothed_ln2(
+            window_points,
+            timestamp,
+            cfg,
+            avg_minutes=LN2_LEVEL_AVG_MINUTES,
         )
 
         if explicit_lid_state is not None:
@@ -1321,7 +1452,10 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
                 open_ctr = 0
 
         # 7c. Lid-close candidate tracking (Case C vs D)
-        if explicit_lid_state is None and weight_event.event_type == WeightEventType.LID_CLOSE_CANDIDATE:
+        if (
+            explicit_lid_state is None
+            and weight_event.event_type == WeightEventType.LID_CLOSE_CANDIDATE
+        ):
             lid_candidate_ts = timestamp.isoformat()
             logger.info(
                 f"[LID CANDIDATE] {device_code} — lid-close candidate started at {lid_candidate_ts} "
@@ -1490,15 +1624,17 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
                         refill_event_start_ts,
                         refill_event_end_ts,
                     )
-                    send_refill_detection_to_backend(tank_id=cfg.tank_id, refill_data={"refill_weight": refill_amount_kg}, detected_at=refill_event_end_ts)
+                    send_refill_detection_to_backend(
+                        tank_id=cfg.tank_id,
+                        refill_data={"refill_weight": refill_amount_kg},
+                        detected_at=refill_event_end_ts,
+                    )
                 else:
                     logger.info(
                         "[REFILL EVENT] not triggered for %s (amount=%s)",
                         device_code,
                         refill_amount_kg,
                     )
-
-                
 
             # 9b. Precaution advisory (near threshold + lid just opened)
             if state_step.new_state == LidState.OPEN:
@@ -1560,9 +1696,7 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
         )
 
         # 9c. Low-level alert check (Step 5)
-        low_level = check_low_level_alert(
-            smoothed_mass_kg, low_level_ctr, cfg
-        )
+        low_level = check_low_level_alert(smoothed_mass_kg, low_level_ctr, cfg)
         low_level_ctr = low_level.consecutive_count
 
         low_level_alert_fired = False
@@ -1613,9 +1747,9 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
             "ln2_level_pct": smoothed_level_pct,
             "ln2_volume_l": smoothed_volume_l,
             "sensor_status": sensor_reading.status.value,
-            #"evaporation_rate_kg_per_h": effective_rate_kg_per_h,
+            # "evaporation_rate_kg_per_h": effective_rate_kg_per_h,
             "evaporation_rate_kg_per_h": cfg.static_evap_kg_per_hour,
-            #"evaporation_rate_kg_per_day": effective_rate_kg_per_day,
+            # "evaporation_rate_kg_per_day": effective_rate_kg_per_day,
             "evaporation_rate_kg_per_day": round(cfg.static_evap_kg_per_hour * 24.0, 8),
             "rate_source": rate_source,
             "lid_state": current_state.value,
@@ -3672,7 +3806,6 @@ def transform_webhook_to_ivf_quality_data(
     if "Temperature" in webhook_data and webhook_data["Temperature"]:
         temp_obj = webhook_data["Temperature"]
 
-
         if "External" in temp_obj:
             external_obj = temp_obj["External"]
             if isinstance(external_obj, dict):
@@ -4113,7 +4246,33 @@ def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
             db.commit()
             return 1
 
-        # 4. CGT (patient-based) - only if valid patient_id and shipment_id
+        # 4. Refrigerator zone monitoring (device_code maps to refrigerator_devices)
+        logger.debug(f"Searching refrigerator mapping for device {device_id}: ")
+        refrigerator_info = (
+            find_refrigerator_by_device_code(db, device_id) if device_id else None
+        )
+        if refrigerator_info:
+            logger.info(
+                f"Found refrigerator mapping for device {device_id}: "
+                f"refrigerator_id={refrigerator_info['refrigerator_id']}, zone_id={refrigerator_info['zone_id']}"
+            )
+            try:
+                process_tive_refrigerator(
+                    db, device_id, webhook_payload, refrigerator_info
+                )
+                mark_message_processed(
+                    db, message_id, json.dumps(webhook_payload)[:200]
+                )
+                db.commit()
+                return 1
+            except Exception as e:
+                logger.error(f"Error in refrigerator processing: {e}", exc_info=True)
+                db.rollback()
+                raise
+        logger.info(
+            f"[DEBUG] IVF refrigerator_info from find_refrigerator_by_device_code: {refrigerator_info}"
+        )
+        # 5. CGT (patient-based) - only if valid patient_id and shipment_id
         patient_id = webhook_payload.get("PatientId")
         shipment_id = webhook_payload.get("ShipmentId")
         if patient_id and shipment_id:
