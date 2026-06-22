@@ -24,7 +24,6 @@ import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
-import { shipmentService } from '../../services/shipmentService';
 import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { chatService, type UnreadMessageResponse } from '../../services/chatService';
@@ -38,12 +37,6 @@ import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
-
-type ActiveRefrigeratorsResponse = Awaited<ReturnType<typeof shipmentService.getActiveRefrigerators>>;
-type FlatRefrigerator = ActiveRefrigeratorsResponse['branches'][number]['refrigerators'][number] & {
-  branch_id: number;
-  branch_name: string;
-};
 
 interface StakeholderChat {
   id: string;
@@ -62,7 +55,6 @@ const DashboardHospital8: React.FC = () => {
   const [showMyTasks, setShowMyTasks] = useState(false);
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
 
-  const [refrigerators, setRefrigerators] = useState<FlatRefrigerator[]>([]);
   const [refrigeratorAlerts, setRefrigeratorAlerts] = useState<IVFAlert[]>([]);
   const [loadingRefrigeratorAlerts, setLoadingRefrigeratorAlerts] = useState(false);
 
@@ -216,28 +208,6 @@ const DashboardHospital8: React.FC = () => {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    let cancelled = false;
-    const fetchRefrigerators = async () => {
-      try {
-        const response = await shipmentService.getActiveRefrigerators();
-        if (!cancelled) {
-          const flat: FlatRefrigerator[] = (response?.branches || []).flatMap((branch) =>
-            (branch.refrigerators || []).map((fridge) => ({
-              ...fridge,
-              branch_id: branch.branch_id,
-              branch_name: branch.branch_name,
-            }))
-          );
-          setRefrigerators(flat);
-        }
-      } catch {
-        if (!cancelled) {
-          setRefrigerators([]);
-        }
-      }
-    };
-    fetchRefrigerators();
-    return () => { cancelled = true; };
   }, [isAuthenticated]);
 
   const routes = useMemo(() => mapService.generateRoutesFromBranches(branches), [branches]);
@@ -255,7 +225,7 @@ const DashboardHospital8: React.FC = () => {
 
   const transformedAlerts = refrigeratorAlerts.map((alert) => {
     const severity: 'Low' | 'Medium' | 'High' | 'Critical' =
-      alert.severity === 'Critical' ? 'Critical' : alert.severity === 'High' ? 'High' : alert.severity === 'Medium' ? 'Medium' : 'Low';
+      alert.severity === 'High' ? 'High' : alert.severity === 'Medium' ? 'Medium' : 'Low';
     return {
       id: alert.alert_id,
       type: alert.alert_type,
