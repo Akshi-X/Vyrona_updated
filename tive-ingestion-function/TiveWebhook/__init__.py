@@ -245,51 +245,51 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             status_code=400
         )
 
-    # 3️⃣ Enrich payload
-    payload = normalize_custom_iot_payload_value(payload)
-    enriched_event = {
-        "source": "TIVE",
-        "receivedAt": datetime.utcnow().isoformat(),
-        "payload": payload,
-    }
+    # 3️⃣ Normalize to a list so single objects and arrays are handled uniformly
+    payload_list = payload if isinstance(payload, list) else [payload]
+    if isinstance(payload, list):
+        logging.info(f"Received array payload with {len(payload_list)} item(s)")
 
     # 4️⃣ Send to Event Hub
     try:
         events = []
-        if check_multiple_payloads_for_custom_iot(payload):
-            logging.info(
-                "Multiple IoT events detected in payload, processing each event separately"
-            )
-            device_ids = payload.get("deviceid")
-            payloads = payload.get("payload")
-            lid_states = payload.get("lid_state")
-            # Collect all other keys from the original payload
-            # (excluding deviceid, payload, and lid_state)
-            other_keys = {
-                k: v
-                for k, v in payload.items()
-                if k not in ("deviceid", "payload", "lid_state")
-            }
-            for device_id, single_payload, lid_state in zip(
-                device_ids, payloads, lid_states
-            ):
-                individual_payload = {
-                    **other_keys,
-                    "deviceid": device_id,
-                    "payload": single_payload,
-                    "lid_state": lid_state,
-                }
-                individual_payload = normalize_custom_iot_payload_value(
-                    individual_payload
+        for item in payload_list:
+            item = normalize_custom_iot_payload_value(item)
+            if check_multiple_payloads_for_custom_iot(item):
+                logging.info(
+                    "Multiple IoT events detected in payload, processing each event separately"
                 )
-                single_enriched_event = {
+                device_ids = item.get("deviceid")
+                iot_payloads = item.get("payload")
+                lid_states = item.get("lid_state")
+                other_keys = {
+                    k: v
+                    for k, v in item.items()
+                    if k not in ("deviceid", "payload", "lid_state")
+                }
+                for device_id, iot_payload, lid_state in zip(
+                    device_ids, iot_payloads, lid_states
+                ):
+                    individual_payload = {
+                        **other_keys,
+                        "deviceid": device_id,
+                        "payload": iot_payload,
+                        "lid_state": lid_state,
+                    }
+                    individual_payload = normalize_custom_iot_payload_value(
+                        individual_payload
+                    )
+                    events.append(EventData(json.dumps({
+                        "source": "TIVE",
+                        "receivedAt": datetime.utcnow().isoformat(),
+                        "payload": individual_payload,
+                    })))
+            else:
+                events.append(EventData(json.dumps({
                     "source": "TIVE",
                     "receivedAt": datetime.utcnow().isoformat(),
-                    "payload": individual_payload,
-                }
-                events.append(EventData(json.dumps(single_enriched_event)))
-        else:
-            events.append(EventData(json.dumps(enriched_event)))
+                    "payload": item,
+                })))
 
         producer = EventHubProducerClient.from_connection_string(
             conn_str=config.get_eventhub_connection_string(),
