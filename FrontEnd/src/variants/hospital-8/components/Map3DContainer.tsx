@@ -7,17 +7,17 @@ import type { BranchMetrics, Route } from '../types/map';
 
 interface Map3DContainerProps {
   branches: BranchMetrics[];
-  routes: Route[];
+  routes?: Route[];
   hoveredBranch: number | null;
-  onBranchHover: (branchId: number | null) => void;
-  onBranchClick: (branch: BranchMetrics) => void;
+  onBranchHover?: (branchId: number | null) => void;
+  onBranchClick?: (branch: BranchMetrics) => void;
 }
 
 const INITIAL_VIEW_STATE = {
   longitude: 78.9629,
   latitude: 20.5937,
-  zoom: 4.5,
-  pitch: 30,
+  zoom: 4.0,
+  pitch: 20,
   bearing: 0,
 };
 
@@ -59,16 +59,13 @@ const SPIN_ANIMATIONS = `
 
 const Map3DContainer: React.FC<Map3DContainerProps> = ({
   branches,
-  routes,
   hoveredBranch,
-  onBranchHover,
-  onBranchClick,
 }) => {
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const [indiaGeoJson, setIndiaGeoJson] = useState<any>(null);
   const [indiaStatesGeoJson, setIndiaStatesGeoJson] = useState<any>(null);
   const [renderKey, setRenderKey] = useState(0);
-  const deckRef = useRef<DeckGL>(null);
+  const deckRef = useRef<any>(null);
 
   const getScreenCoordinates = (lng: number, lat: number): { x: number; y: number } | null => {
     if (!deckRef.current?.deck) return null;
@@ -147,12 +144,12 @@ const Map3DContainer: React.FC<Map3DContainerProps> = ({
     lineWidthMinPixels: 0,
     getPosition: (d: any) => [d.longitude, d.latitude],
     getRadius: () => 12,
-    getLineColor: COLORS.white,
-    getFillColor: (d: any) => {
+    getLineColor: COLORS.white as any,
+    getFillColor: ((d: any) => {
       if (hoveredBranch === d.originalBranchId) return COLORS.blue;
       if (d.active_alerts > 0) return COLORS.red;
       return COLORS.blue;
-    },
+    }) as any,
     getLineWidth: 0,
   });
 
@@ -190,7 +187,7 @@ const Map3DContainer: React.FC<Map3DContainerProps> = ({
   ];
 
   return (
-    <div className="w-full h-full relative bg-purple-50">
+    <div className="w-full h-full relative overflow-hidden">
       <style>{SPIN_ANIMATIONS}</style>
 
       {/* Branch Information Cards - Over Canvas */}
@@ -231,44 +228,34 @@ const Map3DContainer: React.FC<Map3DContainerProps> = ({
         <svg
           width="100%"
           height="100%"
-          viewBox="-500 -500 1000 1000"
+          viewBox="-400 -400 800 800"
           style={{ position: 'absolute', top: 0, left: 0 }}
         >
-          <defs>
-            <filter id="hud-glow">
-              <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-
-          {/* Outer ring - thick segmented arcs */}
+          {/* Outer ring - 2 thick subtle gray arcs */}
           <g className="animate-spin-slow-1">
-            {[0, 90, 180, 270].map((start) => (
+            {[0, 180].map((start) => (
               <path
                 key={`outer-arc-${start}`}
-                d={`M ${400 * Math.cos((start * Math.PI) / 180)} ${400 * Math.sin((start * Math.PI) / 180)} A 400 400 0 0 1 ${400 * Math.cos(((start + 60) * Math.PI) / 180)} ${400 * Math.sin(((start + 60) * Math.PI) / 180)}`}
-                stroke="rgba(200, 200, 255, 0.9)"
-                strokeWidth="12"
+                d={`M ${400 * Math.cos((start * Math.PI) / 180)} ${400 * Math.sin((start * Math.PI) / 180)} A 400 400 0 0 1 ${400 * Math.cos(((start + 100) * Math.PI) / 180)} ${400 * Math.sin(((start + 100) * Math.PI) / 180)}`}
+                stroke="rgba(200, 200, 210, 0.3)"
+                strokeWidth="20"
                 fill="none"
-                filter="url(#hud-glow)"
-                className="pulse-glow"
               />
             ))}
           </g>
 
-          {/* Second ring - dashed circle with tick marks */}
+          {/* White filled circle - creates bright center */}
+          <circle cx="0" cy="0" r="350" fill="rgba(255, 255, 255, 0.5)" />
+
+          {/* Tick mark ring - ~60 ticks */}
           <g className="animate-spin-slow-2">
-            <circle cx="0" cy="0" r="300" stroke="rgba(200, 200, 255, 0.5)" strokeWidth="2" fill="none" strokeDasharray="10,8" />
-            {Array.from({ length: 24 }).map((_, i) => {
-              const angle = (i * 360) / 24;
+            {Array.from({ length: 60 }).map((_, i) => {
+              const angle = (i * 360) / 60;
               const rad = (angle * Math.PI) / 180;
-              const x1 = 300 * Math.cos(rad);
-              const y1 = 300 * Math.sin(rad);
-              const x2 = 320 * Math.cos(rad);
-              const y2 = 320 * Math.sin(rad);
+              const x1 = 290 * Math.cos(rad);
+              const y1 = 290 * Math.sin(rad);
+              const x2 = 310 * Math.cos(rad);
+              const y2 = 310 * Math.sin(rad);
               return (
                 <line
                   key={`tick-${i}`}
@@ -276,60 +263,18 @@ const Map3DContainer: React.FC<Map3DContainerProps> = ({
                   y1={y1}
                   x2={x2}
                   y2={y2}
-                  stroke="rgba(200, 200, 255, 0.6)"
+                  stroke="rgba(180, 180, 195, 0.4)"
                   strokeWidth="1"
                 />
               );
             })}
           </g>
 
-          {/* Third ring - medium segmented arcs */}
-          <g className="animate-spin-slow-3">
-            {[0, 120, 240].map((start) => (
-              <path
-                key={`mid-arc-${start}`}
-                d={`M ${200 * Math.cos((start * Math.PI) / 180)} ${200 * Math.sin((start * Math.PI) / 180)} A 200 200 0 0 1 ${200 * Math.cos(((start + 50) * Math.PI) / 180)} ${200 * Math.sin(((start + 50) * Math.PI) / 180)}`}
-                stroke="rgba(200, 200, 255, 0.7)"
-                strokeWidth="6"
-                fill="none"
-              />
-            ))}
-          </g>
+          {/* Inner circle - thin solid line */}
+          <circle cx="0" cy="0" r="280" stroke="rgba(180, 180, 195, 0.3)" strokeWidth="1" fill="none" />
 
-          {/* Inner ring - solid circle */}
-          <circle cx="0" cy="0" r="100" stroke="rgba(200, 200, 255, 0.5)" strokeWidth="1.5" fill="none" />
-
-          {/* Cardinal direction markers */}
-          {['N', 'E', 'S', 'W'].map((dir, i) => {
-            const angles = [0, 90, 180, 270];
-            const rad = (angles[i] * Math.PI) / 180;
-            const x = 130 * Math.cos(rad);
-            const y = 130 * Math.sin(rad);
-            return (
-              <text
-                key={`cardinal-${dir}`}
-                x={x}
-                y={y + 4}
-                textAnchor="middle"
-                fontSize="10"
-                fill="rgba(200, 200, 255, 0.7)"
-                fontFamily="monospace"
-                fontWeight="bold"
-              >
-                {dir}
-              </text>
-            );
-          })}
-
-          {/* Center crosshair */}
-          <g filter="url(#hud-glow)">
-            <circle cx="0" cy="0" r="8" stroke="rgba(200, 200, 255, 0.9)" strokeWidth="1.5" fill="none" />
-            <line x1="-15" y1="0" x2="-8" y2="0" stroke="rgba(200, 200, 255, 0.9)" strokeWidth="1.5" />
-            <line x1="8" y1="0" x2="15" y2="0" stroke="rgba(200, 200, 255, 0.9)" strokeWidth="1.5" />
-            <line x1="0" y1="-15" x2="0" y2="-8" stroke="rgba(200, 200, 255, 0.9)" strokeWidth="1.5" />
-            <line x1="0" y1="8" x2="0" y2="15" stroke="rgba(200, 200, 255, 0.9)" strokeWidth="1.5" />
-            <circle cx="0" cy="0" r="2" fill="rgba(200, 200, 255, 0.9)" />
-          </g>
+          {/* Innermost circle - very subtle */}
+          <circle cx="0" cy="0" r="200" stroke="rgba(180, 180, 195, 0.2)" strokeWidth="0.5" fill="none" />
         </svg>
       </div>
 
@@ -337,20 +282,20 @@ const Map3DContainer: React.FC<Map3DContainerProps> = ({
       <DeckGL
         ref={deckRef}
         initialViewState={viewState}
-        controller
+        controller={false}
         layers={layers}
         onViewStateChange={(e: any) => {
           setViewState(e.viewState);
           setRenderKey(k => k + 1);
         }}
         style={{
-          width: '100%',
+          width: '120%',
           height: '100%',
           position: 'absolute',
-          top: 0,
-          left: 0,
+          top: '0',
+          left: '-10%',
           zIndex: 10,
-        }}
+        } as any}
       />
 
 

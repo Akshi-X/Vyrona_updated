@@ -2123,8 +2123,8 @@ _CHAMBER_HEALTH_KPIS = {
 }
 
 _REFRIGERATOR_HEALTH_KPIS = {
-    "temp_external": ("Temperature", "°C"),
-    "probe_temp": ("Probe Temperature", "°C"),
+    "refrigerator_humidity": ("Humidity", "%"),
+    "refrigerator_temp": ("Temperature", "°C"),
 }
 
 

@@ -214,7 +214,10 @@ const IncubatorDetailWithAuth = () => (
 
 const RefrigeratorTrackingWithAuth = () => (
     <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
-        <RefrigeratorTrackingPage />
+        <VariantRoute
+            routePath="/refrigerator-tracking/:refrigeratorId"
+            defaultComponent={<RefrigeratorTrackingPage />}
+        />
     </RoleBasedRoute>
 );
 
