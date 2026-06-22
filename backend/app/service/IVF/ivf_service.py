@@ -364,17 +364,52 @@ class IVFService:
 
             results = self.db.execute(stmt).fetchall()
 
+            refrigerator_ids = [r.refrigerator_id for r, _, _ in results]
+
+            # Fetch user-assigned zone names from kpi_config in one batch query.
+            # zone_ids that have no kpi_config row will fall back to "Zone N" labels.
+            kpi_zone_names: Dict[int, Dict[str, str]] = defaultdict(dict)  # ref_id → {zone_id → zone_name}
+            if refrigerator_ids:
+                zone_rows = (
+                    self.db.query(
+                        KpiConfig.refrigerator_id,
+                        KpiConfig.zone_id,
+                        KpiConfig.zone_name,
+                    )
+                    .filter(
+                        KpiConfig.refrigerator_id.in_(refrigerator_ids),
+                        KpiConfig.zone_id.isnot(None),
+                        KpiConfig.alert_name.is_(None),
+                    )
+                    .distinct()
+                    .all()
+                )
+                for ref_id, z_id, z_name in zone_rows:
+                    if z_id and z_id not in kpi_zone_names[ref_id]:
+                        kpi_zone_names[ref_id][z_id] = z_name or z_id
+
             branches_dict: Dict[int, Any] = {}
             total = 0
             for refrigerator, b_id, b_name in results:
                 if b_id not in branches_dict:
                     branches_dict[b_id] = {"branch_id": b_id, "branch_name": b_name or "Unknown", "refrigerators": []}
+                zone_count = refrigerator.zone_count or 0
+                ref_names = kpi_zone_names.get(refrigerator.refrigerator_id, {})
+                zones = [
+                    {
+                        "zone_id": f"zone_{i}",
+                        "zone_name": ref_names.get(f"zone_{i}") or f"Zone {i}",
+                    }
+                    for i in range(1, zone_count + 1)
+                ]
                 branches_dict[b_id]["refrigerators"].append({
                     "refrigerator_id": refrigerator.refrigerator_id,
                     "refrigerator_code": refrigerator.refrigerator_code,
                     "external_id": refrigerator.external_id,
                     "type": refrigerator.type,
+                    "zone_count": zone_count,
                     "updated_at": refrigerator.updated_at,
+                    "zones": zones,
                 })
                 total += 1
 
