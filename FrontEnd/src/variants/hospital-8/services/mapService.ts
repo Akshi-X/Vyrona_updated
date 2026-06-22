@@ -1,27 +1,42 @@
+import { BaseApiService, type ApiResponse } from '../../../services/baseApiService';
 import { shipmentService } from '../../../services/shipmentService';
 import { ivfAlertsService } from '../../../services/ivfAlertsService';
 import type { BranchMetrics, Route } from '../types/map';
 
-const BRANCH_COORDINATES: Record<number, { lat: number; lng: number; district?: string; state?: string }> = {
-  1: { lat: 13.0827, lng: 80.2707, district: 'Chennai', state: 'Tamil Nadu' },
-  3: { lat: 17.3850, lng: 78.4867, district: 'Hyderabad', state: 'Telangana' },
-  4: { lat: 19.0760, lng: 72.8777, district: 'Mumbai', state: 'Maharashtra' },
-  5: { lat: 28.7041, lng: 77.1025, district: 'Delhi', state: 'Delhi' },
-};
+interface BranchCoordinatesItem {
+  branch_id: number;
+  branch_name: string;
+  latitude: number | null;
+  longitude: number | null;
+  district_name?: string;
+  state_name?: string;
+}
 
-export const mapService = {
+interface BranchCoordinatesResponse extends ApiResponse {
+  branches: BranchCoordinatesItem[];
+  total: number;
+}
+
+const CENTER_OF_INDIA = { lat: 20.5937, lng: 78.9629 };
+
+class MapService extends BaseApiService {
   async getBranchesWithMetrics(): Promise<BranchMetrics[]> {
     try {
-      const [refResponse, alertsResponse] = await Promise.all([
+      const [refResponse, alertsResponse, coordsResponse] = await Promise.all([
         shipmentService.getActiveRefrigerators(),
         ivfAlertsService.getHospitalAlerts(),
+        this.getBranchCoordinates(),
       ]);
 
       console.log('Map Service - Ref Response:', refResponse);
       console.log('Map Service - Alerts Response:', alertsResponse);
+      console.log('Map Service - Coords Response:', coordsResponse);
 
       const branches = refResponse?.branches || [];
       const alerts = alertsResponse?.alerts || [];
+      const coordsMap = new Map(
+        (coordsResponse?.branches || []).map(c => [c.branch_id, c])
+      );
 
       console.log('Map Service - Branches:', branches.length, branches);
 
@@ -36,7 +51,7 @@ export const mapService = {
       });
 
       const mapped = branches.map((branch) => {
-        const coords = BRANCH_COORDINATES[branch.branch_id];
+        const coords = coordsMap.get(branch.branch_id);
         const lastRefrigUpdate = (branch.refrigerators || [])
           .map((r) => r.updated_at)
           .filter(Boolean)
@@ -46,10 +61,10 @@ export const mapService = {
         return {
           branch_id: branch.branch_id,
           branch_name: branch.branch_name || `Branch #${branch.branch_id}`,
-          latitude: coords?.lat || 20.5937,
-          longitude: coords?.lng || 78.9629,
-          district_name: coords?.district,
-          state_name: coords?.state,
+          latitude: coords?.latitude || CENTER_OF_INDIA.lat,
+          longitude: coords?.longitude || CENTER_OF_INDIA.lng,
+          district_name: coords?.district_name,
+          state_name: coords?.state_name,
           country_name: 'India',
           refrigerator_count: branch.refrigerators?.length ?? 0,
           active_alerts: alertCountByBranch.get(branch.branch_id) ?? 0,
@@ -108,7 +123,17 @@ export const mapService = {
         },
       ];
     }
-  },
+  }
+
+  async getBranchCoordinates(): Promise<BranchCoordinatesResponse | null> {
+    try {
+      const response = await this.get<BranchCoordinatesResponse>('/api/ivf/branch_coordinates');
+      return response;
+    } catch (error) {
+      console.warn('Failed to fetch branch coordinates from API, will use fallback', error);
+      return null;
+    }
+  }
 
   generateRoutesFromBranches(branches: BranchMetrics[]): Route[] {
     if (branches.length < 2) return [];
@@ -132,5 +157,7 @@ export const mapService = {
     });
 
     return routes;
-  },
-};
+  }
+}
+
+export const mapService = new MapService();

@@ -13,6 +13,7 @@ from app.schemas.IVF.ivf_schema import (
     ActiveIncubatorsResponse,
     ActiveRefrigeratorsResponse,
     BranchListResponse,
+    BranchCoordinatesResponse,
     CanisterCheckResponse,
     EmbryoTransferResponse,
     EmbryoTrackingResponse,
@@ -663,6 +664,67 @@ def get_branches(
     except Exception as e:
         logger.error(f"Error getting branches: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting branches: {str(e)}")
+
+
+@router.get("/branch_coordinates", response_model=BranchCoordinatesResponse)
+def get_branch_coordinates(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of branches with their geographic coordinates for map display.
+
+    Returns branch_id, branch_name, latitude, longitude, district_name, state_name
+    for all branches belonging to the user's hospital.
+
+    This endpoint is used by the hospital-8 dashboard to display map markers
+    without needing hardcoded coordinate lookups in the frontend.
+
+    Role-based access:
+    - All IVF users (User, Manager, Admin): Can see all branches in their hospital
+    - Non-IVF users: Cannot access this endpoint
+
+    Response format:
+    {
+        "branches": [
+            {
+                "branch_id": 1,
+                "branch_name": "Egmore",
+                "latitude": 13.0827,
+                "longitude": 80.2707,
+                "district_name": "Chennai",
+                "state_name": "Tamil Nadu"
+            }
+        ],
+        "total": 1
+    }
+    """
+    try:
+        user = _ensure_ivf_user(request)
+        hospital_id = _resolve_hospital_id(request, db, user)
+
+        branches = db.query(HospitalBranch).filter(
+            HospitalBranch.hospital_id == hospital_id
+        ).all()
+
+        branch_items = [
+            {
+                "branch_id": b.branch_id,
+                "branch_name": b.branch_name,
+                "latitude": float(b.latitude) if b.latitude else None,
+                "longitude": float(b.longitude) if b.longitude else None,
+                "district_name": b.district_name,
+                "state_name": b.state_name,
+            }
+            for b in branches
+        ]
+
+        return BranchCoordinatesResponse(branches=branch_items, total=len(branch_items))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting branch coordinates: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting branch coordinates: {str(e)}")
 
 
 @router.get("/embryo-transfer", response_model=EmbryoTransferResponse)

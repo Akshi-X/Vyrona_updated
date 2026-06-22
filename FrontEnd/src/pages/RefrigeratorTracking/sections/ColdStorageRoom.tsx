@@ -17,7 +17,7 @@ export default function ColdStorageRoom({ sensorTiles = [], selectedSensorId, on
       />
 
       {/* Left SVG waves (flipped) */}
-      <div className="absolute left-8 top-[18%] w-[280px] h-[320px]" style={{ pointerEvents: 'none' }}>
+      <div className="absolute left-8 top-[18%] w-[180px] h-[200px]" style={{ pointerEvents: 'none' }}>
         <object
           data="/flipped.svg"
           type="image/svg+xml"
@@ -26,7 +26,7 @@ export default function ColdStorageRoom({ sensorTiles = [], selectedSensorId, on
       </div>
 
       {/* Right SVG waves (normal) */}
-      <div className="absolute right-8 top-[18%] w-[280px] h-[320px]" style={{ pointerEvents: 'none' }}>
+      <div className="absolute right-8 top-[18%] w-[180px] h-[200px]" style={{ pointerEvents: 'none' }}>
         <object
           data="/wave-rays.svg"
           type="image/svg+xml"

@@ -4,18 +4,18 @@ import { authUtils } from '../../../utils/auth';
 import { ivfService } from '../../../services/ivfService';
 
 const REFRIGERATOR_KPI_ORDER = [
-  'temp_external',
-  'probe_temp',
+  'refrigerator_humidity',
+  'refrigerator_temp',
 ] as const;
 
 const KPI_LABELS: Record<string, string> = {
-  temp_external: 'Temperature',
-  probe_temp: 'Probe Temperature',
+  refrigerator_humidity: 'Humidity',
+  refrigerator_temp: 'Temperature',
 };
 
 const KPI_UNITS: Record<string, string> = {
-  temp_external: '°C',
-  probe_temp: '°C',
+  refrigerator_humidity: '%',
+  refrigerator_temp: '°C',
 };
 
 const parseTimestampToMs = (timestamp?: string): number | null => {
