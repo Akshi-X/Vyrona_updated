@@ -667,6 +667,30 @@ class InTransitResponse(BaseModel):
         from_attributes = True
 
 
+class BranchMapMetricsItem(BaseModel):
+    """Schema for a single branch entry on the map"""
+    branch_id: int = Field(..., description="Branch ID")
+    branch_name: Optional[str] = Field(None, description="Branch name")
+    latitude: Optional[float] = Field(None, description="Latitude coordinate")
+    longitude: Optional[float] = Field(None, description="Longitude coordinate")
+    district_name: Optional[str] = Field(None, description="District name")
+    state_name: Optional[str] = Field(None, description="State name")
+    refrigerator_count: int = Field(0, description="Number of active refrigerators at this branch")
+    active_alerts: int = Field(0, description="Number of active alerts at this branch")
+
+    class Config:
+        from_attributes = True
+
+
+class BranchMapMetricsResponse(BaseModel):
+    """Response for branch map metrics endpoint"""
+    branches: List[BranchMapMetricsItem] = Field(..., description="All branches with map metrics")
+    total: int = Field(..., description="Total number of branches")
+
+    class Config:
+        from_attributes = True
+
+
 class EmbryoTrackingResponse(BaseModel):
     """Schema for embryo tracking API response"""
     data: List[EmbryoTrackingItem] = Field(..., description="List of embryo tracking records")
