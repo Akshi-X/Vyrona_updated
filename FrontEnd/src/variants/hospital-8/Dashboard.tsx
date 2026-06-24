@@ -24,9 +24,8 @@ import {
   LineElement,
   Tooltip,
   Filler,
-  ArcElement,
 } from "chart.js";
-import { Line, Pie } from "react-chartjs-2";
+import { Line } from "react-chartjs-2";
 import {
   Bell,
   TrendingUp,
@@ -40,7 +39,9 @@ import {
   Activity,
   Refrigerator,
   Lightbulb,
-  PieChart,
+  Calendar,
+  ChevronDown,
+  LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
@@ -83,7 +84,6 @@ ChartJS.register(
   LineElement,
   Tooltip,
   Filler,
-  ArcElement,
 );
 
 const BRAND_FULL = 'mgSCALE | ColdSense';
@@ -132,6 +132,12 @@ const INTRO_STYLES = `
     0%, 80%, 100% { opacity: 0.25; }
     40%           { opacity: 1; }
   }
+  @keyframes loading-word {
+    0%   { opacity: 0; transform: translateY(5px); }
+    16%  { opacity: 1; transform: translateY(0); }
+    84%  { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-5px); }
+  }
 
   .intro-zoom  { animation: intro-zoom 1s cubic-bezier(0.22,1,0.36,1) both; }
   .intro-drop  { animation: intro-drop 0.7s cubic-bezier(0.22,1,0.36,1) both; }
@@ -156,8 +162,6 @@ const INTRO_STYLES = `
     to   { opacity: 1; transform: translateY(0); }
   }
 `;
-
-const PIE_COLORS = ['#6b1176', '#9333ea', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!<>-_\\/[]{}=+*^?#·@%&";
 
@@ -224,6 +228,32 @@ const ScrambleText: React.FC<{
   );
 };
 
+const LOADING_WORDS = [
+  "Collecting Insights for you",
+  "Preparing your Dashboard",
+  "Establishing Secure Connection",
+  "Initialising Live Data Stream",
+  "Loading your Maps",
+];
+
+// Cycles through the loading phrases, fading each in and out.
+const LoadingWords: React.FC = () => {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setIdx((i) => (i + 1) % LOADING_WORDS.length), 1900);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span
+      key={idx}
+      className="text-xs font-semibold text-gray-500"
+      style={{ animation: "loading-word 1.9s ease-in-out" }}
+    >
+      {LOADING_WORDS[idx]}
+    </span>
+  );
+};
+
 type RangePreset = '7d' | '30d' | 'custom';
 type CardRange = 'global' | '7d' | '30d';
 
@@ -250,6 +280,22 @@ function cardRangeToTs(cardRange: CardRange, globalFromTs: number, globalToTs: n
   const now = Date.now();
   return { fromTs: now - (cardRange === '7d' ? 7 : 30) * 864e5, toTs: now };
 }
+
+const fmtShortDate = (s: string) =>
+  new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+function rangeLabelOf(preset: RangePreset, from: string, to: string): string {
+  if (preset === '7d') return 'Last 7 days';
+  if (preset === '30d') return 'Last 30 days';
+  if (from && to) return `${fmtShortDate(from)} – ${fmtShortDate(to)}`;
+  return 'Custom range';
+}
+
+const RANGE_OPTIONS: { value: RangePreset; label: string }[] = [
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+  { value: 'custom', label: 'Custom range' },
+];
 
 const TrendDelta: React.FC<{ delta: number | null; className?: string }> = ({ delta, className = '' }) => {
   if (delta === null) return <span className={`text-[11px] text-gray-400 ${className}`}>—</span>;
@@ -316,17 +362,18 @@ const DashboardHospital8: React.FC = () => {
   const [rangePreset, setRangePreset] = useState<RangePreset>('7d');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-  const [showCustomInputs, setShowCustomInputs] = useState(false);
+  const [showRangeMenu, setShowRangeMenu] = useState(false);
 
   // Per-card range overrides
   const [topKpiRange, setTopKpiRange] = useState<CardRange>('global');
   const [trendRange, setTrendRange] = useState<CardRange>('global');
   const [categoryRange, setCategoryRange] = useState<CardRange>('global');
-  const [pieRange, setPieRange] = useState<CardRange>('global');
+  const [kpiGridRange, setKpiGridRange] = useState<CardRange>('global');
 
   // Dashboard data states
   const [trendData, setTrendData] = useState<DeviationTrendResponse | null>(null);
   const [categoryData, setCategoryData] = useState<DeviationsByCategoryResponse | null>(null);
+  const [kpiGridData, setKpiGridData] = useState<DeviationsByCategoryResponse | null>(null);
   const [topKpiData, setTopKpiData] = useState<TopKpiResponse | null>(null);
   const [pieData, setPieData] = useState<BranchCriticalDistributionResponse | null>(null);
   const [opsData, setOpsData] = useState<OperationsResponse | null>(null);
@@ -352,7 +399,7 @@ const DashboardHospital8: React.FC = () => {
   const topKpiTs = useMemo(() => cardRangeToTs(topKpiRange, globalFromTs, globalToTs), [topKpiRange, globalFromTs, globalToTs]);
   const trendTs = useMemo(() => cardRangeToTs(trendRange, globalFromTs, globalToTs), [trendRange, globalFromTs, globalToTs]);
   const categoryTs = useMemo(() => cardRangeToTs(categoryRange, globalFromTs, globalToTs), [categoryRange, globalFromTs, globalToTs]);
-  const pieTs = useMemo(() => cardRangeToTs(pieRange, globalFromTs, globalToTs), [pieRange, globalFromTs, globalToTs]);
+  const kpiGridTs = useMemo(() => cardRangeToTs(kpiGridRange, globalFromTs, globalToTs), [kpiGridRange, globalFromTs, globalToTs]);
 
   const branchId = selectedBranch?.branch_id ?? null;
 
@@ -584,11 +631,21 @@ const DashboardHospital8: React.FC = () => {
     if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
-      const data = await refrigeratorDashboardService.getBranchCriticalDistribution({ fromTs: pieTs.fromTs, toTs: pieTs.toTs });
+      const data = await refrigeratorDashboardService.getDeviationsByCategory({ ...kpiGridTs, branchId });
+      if (!cancelled) setKpiGridData(data);
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, kpiGridTs.fromTs, kpiGridTs.toTs, branchId]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    (async () => {
+      const data = await refrigeratorDashboardService.getBranchCriticalDistribution({ fromTs: globalFromTs, toTs: globalToTs });
       if (!cancelled) setPieData(data);
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, pieTs.fromTs, pieTs.toTs]);
+  }, [isAuthenticated, globalFromTs, globalToTs]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -634,29 +691,12 @@ const DashboardHospital8: React.FC = () => {
     ],
   });
 
-  // Pie chart data
+  // Branch concentration (feeds the insight slides)
   const pieBranches = pieData?.branches ?? [];
-  const pieChartData = {
-    labels: pieBranches.map((b) => b.branch_name),
-    datasets: [{
-      data: pieBranches.map((b) => b.count),
-      backgroundColor: pieBranches.map((b, i) =>
-        b.branch_id === selectedBranch?.branch_id
-          ? PIE_COLORS[i % PIE_COLORS.length]
-          : `${PIE_COLORS[i % PIE_COLORS.length]}88`
-      ),
-      borderColor: pieBranches.map((b, i) =>
-        b.branch_id === selectedBranch?.branch_id ? '#ffffff' : PIE_COLORS[i % PIE_COLORS.length]
-      ),
-      borderWidth: pieBranches.map((b) => b.branch_id === selectedBranch?.branch_id ? 2 : 1),
-      offset: pieBranches.map((b) => b.branch_id === selectedBranch?.branch_id ? 10 : 0),
-    }],
-  };
-  const pieOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { enabled: false } },
-  };
+
+  // Per-KPI alert counts (bottom-left grid)
+  const kpiAlerts = kpiGridData?.categories ?? [];
+  const maxKpiAlert = kpiAlerts.length ? Math.max(...kpiAlerts.map((c) => c.count)) : 1;
 
   // Category bars
   const cats = categoryData?.categories ?? [];
@@ -933,11 +973,15 @@ const DashboardHospital8: React.FC = () => {
                   animation: "throb-spin-rev 1.6s linear infinite",
                 }}
               />
-              <img
-                src={brandLogo}
-                alt="mgSCALE"
-                className="relative w-16 h-16 object-contain"
-                style={{ animation: "throb-pulse 1.5s ease-in-out infinite",color:'purple' }}
+              <div
+                aria-label="mgSCALE"
+                className="relative w-16 h-16"
+                style={{
+                  backgroundColor: "#6b1176",
+                  WebkitMask: `url(${brandLogo}) center / contain no-repeat`,
+                  mask: `url(${brandLogo}) center / contain no-repeat`,
+                  animation: "throb-pulse 1.5s ease-in-out infinite",
+                }}
               />
             </div>
             <div className="mt-7 flex flex-col items-center gap-2">
@@ -945,6 +989,9 @@ const DashboardHospital8: React.FC = () => {
                 mgSCALE <span className="text-gray-300 font-thin">|</span>{" "}
                 <span style={{ color: "#6b1176" }}>ColdSense</span>
               </p>
+              <div className="h-4 flex items-center justify-center">
+                <LoadingWords />
+              </div>
               <div className="flex items-center gap-1.5">
                 {[0, 1, 2].map((i) => (
                   <span
@@ -963,7 +1010,7 @@ const DashboardHospital8: React.FC = () => {
         )}
 
         {/* Header */}
-        <header className="absolute top-0 inset-x-0 z-30 flex items-start justify-between gap-4 px-6 pt-5 pointer-events-none">
+        <header className="absolute top-0 inset-x-0 z-40 flex items-start justify-between gap-4 px-6 pt-5 pointer-events-none">
           {/* Branding card */}
           <div
             className={`pointer-events-auto ${revealed && !introDone ? "intro-drop" : ""}`}
@@ -1058,38 +1105,63 @@ const DashboardHospital8: React.FC = () => {
               <span className="text-xs font-bold text-gray-800">{networkHealth}%</span>
               <span className="text-[10px] text-gray-400">Health</span>
             </div>
-            {/* Date-range selector (replaces 3D/2D toggle) */}
-            <div className="flex items-center gap-1">
-              <div className="flex items-center rounded-full bg-white/80 backdrop-blur-md border border-white/70 shadow-sm p-0.5">
-                {(["7d", "30d", "custom"] as const).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => {
-                      setRangePreset(p);
-                      setShowCustomInputs(p === 'custom');
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs font-bold transition ${rangePreset === p ? "bg-primary text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
-                  >
-                    {p === '7d' ? '7D' : p === '30d' ? '30D' : 'Custom'}
-                  </button>
-                ))}
-              </div>
-              {showCustomInputs && (
-                <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-white/70 shadow-sm">
-                  <input
-                    type="date"
-                    value={customFrom}
-                    onChange={(e) => setCustomFrom(e.target.value)}
-                    className="text-[10px] font-medium bg-transparent outline-none text-gray-700 w-24"
-                  />
-                  <span className="text-[10px] text-gray-400">–</span>
-                  <input
-                    type="date"
-                    value={customTo}
-                    onChange={(e) => setCustomTo(e.target.value)}
-                    className="text-[10px] font-medium bg-transparent outline-none text-gray-700 w-24"
-                  />
-                </div>
+            {/* Date-range selector — single button + dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowRangeMenu((v) => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-white/70 shadow-sm hover:bg-white transition"
+              >
+                <Calendar size={14} className="text-primary" />
+                <span className="text-xs font-bold text-gray-800">
+                  {rangeLabelOf(rangePreset, customFrom, customTo)}
+                </span>
+                <ChevronDown
+                  size={13}
+                  className={`text-gray-400 transition-transform ${showRangeMenu ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {showRangeMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowRangeMenu(false)} />
+                  <div className="absolute right-0 mt-1.5 z-50 w-48 rounded-xl bg-white/95 backdrop-blur-md border border-white/70 shadow-lg overflow-hidden p-1">
+                    {RANGE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setRangePreset(opt.value);
+                          if (opt.value !== "custom") setShowRangeMenu(false);
+                        }}
+                        className={`w-full flex items-center gap-2 text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition ${rangePreset === opt.value ? "bg-primary text-white" : "text-gray-600 hover:bg-primary/5"}`}
+                      >
+                        {opt.value === "custom" && <Calendar size={12} />}
+                        {opt.label}
+                      </button>
+                    ))}
+                    {rangePreset === "custom" && (
+                      <div className="mt-1 pt-2 px-2 pb-1 border-t border-gray-100 flex flex-col gap-1.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">From</span>
+                          <input
+                            type="date"
+                            value={customFrom}
+                            onChange={(e) => setCustomFrom(e.target.value)}
+                            className="text-[11px] font-medium bg-gray-50 rounded-md px-2 py-1 outline-none text-gray-700 border border-gray-200"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">To</span>
+                          <input
+                            type="date"
+                            value={customTo}
+                            onChange={(e) => setCustomTo(e.target.value)}
+                            className="text-[11px] font-medium bg-gray-50 rounded-md px-2 py-1 outline-none text-gray-700 border border-gray-200"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1105,7 +1177,6 @@ const DashboardHospital8: React.FC = () => {
             <DashboardCard
               accent="violet"
               watermark={TrendingUp}
-              watermarkPosition="top-right"
               className="pointer-events-auto"
             >
               <div className="flex items-center justify-between mb-0.5">
@@ -1117,15 +1188,9 @@ const DashboardHospital8: React.FC = () => {
                 </div>
                 <CardRangeSelect value={topKpiRange} onChange={setTopKpiRange} />
               </div>
-              <p className="text-xl font-extrabold text-gray-900 mt-1 leading-tight line-clamp-2">
+              <p className="text-2xl font-extrabold text-gray-900 mt-1 leading-tight line-clamp-2 pr-16">
                 {topKpiData?.label ?? '—'}
               </p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-2xl font-black text-gray-900 leading-none">
-                  {(topKpiData?.count ?? 0).toLocaleString()}
-                </span>
-                <span className="text-[10px] text-gray-400">alerts</span>
-              </div>
               <div className="flex items-center gap-1 mt-1.5">
                 <TrendDelta delta={topKpiData?.delta_pct ?? null} />
                 <span className="text-[10px] text-gray-400">vs previous period</span>
@@ -1138,6 +1203,13 @@ const DashboardHospital8: React.FC = () => {
                   />
                 </div>
               )}
+              {/* Count — anchored to the card's bottom-right */}
+              <div className="absolute bottom-3 right-4 flex flex-col items-end leading-none">
+                <span className="text-5xl font-black text-gray-900 leading-none">
+                  {(topKpiData?.count ?? 0).toLocaleString()}
+                </span>
+                <span className="text-[10px] text-gray-400 mt-0.5">alerts</span>
+              </div>
             </DashboardCard>
 
             {/* Operations card */}
@@ -1179,52 +1251,46 @@ const DashboardHospital8: React.FC = () => {
               </DashboardCard>
             </div>
 
-            {/* Branch-wise critical distribution — pie chart */}
+            {/* Alerts by KPI — per-KPI alert counts grid */}
             <DashboardCard
               accent="indigo"
-              watermark={PieChart}
+              watermark={LayoutGrid}
               className="pointer-events-auto"
             >
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
-                  <PieChart size={12} style={{ color: "#6d4ae0" }} />
+                  <LayoutGrid size={12} style={{ color: "#6d4ae0" }} />
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                    Critical Alerts
+                    Alerts by KPI
                   </p>
                 </div>
-                <CardRangeSelect value={pieRange} onChange={setPieRange} />
+                <CardRangeSelect value={kpiGridRange} onChange={setKpiGridRange} />
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-extrabold text-gray-900 leading-none">
-                  {(pieData?.total ?? 0).toLocaleString()}
-                </span>
-                <TrendDelta delta={pieData?.delta_pct ?? null} />
-              </div>
-              <p className="text-[9px] text-gray-400 mb-1.5">Branch-wise distribution</p>
-              {pieBranches.length > 0 ? (
-                <>
-                  <div className="h-20 relative">
-                    <Pie data={pieChartData} options={pieOptions} />
-                  </div>
-                  <div className="flex flex-col gap-1 mt-2">
-                    {pieBranches.slice(0, 3).map((b, i) => (
-                      <div key={b.branch_id} className="flex items-center gap-1.5">
-                        <span
-                          className={`w-2 h-2 rounded-full shrink-0 ${b.branch_id === selectedBranch?.branch_id ? 'ring-1 ring-white' : ''}`}
-                          style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
-                        />
-                        <span className="text-[9px] text-gray-600 flex-1 truncate">{b.branch_name}</span>
-                        <span className="text-[9px] font-bold text-gray-900">{b.pct}%</span>
+              {kpiAlerts.length > 0 ? (
+                <div className="grid grid-cols-2 gap-1.5">
+                  {kpiAlerts.map((c) => (
+                    <div
+                      key={c.kpi_name}
+                      className="relative overflow-hidden rounded-lg px-2 py-1.5 bg-primary/[0.04] border border-primary/10"
+                    >
+                      <div
+                        className="absolute inset-y-0 left-0 bg-primary/[0.08]"
+                        style={{ width: `${maxKpiAlert > 0 ? (c.count / maxKpiAlert) * 100 : 0}%` }}
+                      />
+                      <div className="relative">
+                        <p className="text-[11px] font-semibold text-gray-600 leading-tight truncate" title={c.label}>
+                          {c.label}
+                        </p>
+                        <p className="text-2xl font-black text-gray-900 leading-none mt-0.5">
+                          {c.count.toLocaleString()}
+                        </p>
                       </div>
-                    ))}
-                    {pieBranches.length > 3 && (
-                      <p className="text-[9px] text-gray-400">+{pieBranches.length - 3} more branches</p>
-                    )}
-                  </div>
-                </>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <div className="h-20 flex items-center justify-center">
-                  <p className="text-[10px] text-gray-400">No critical alerts</p>
+                  <p className="text-[10px] text-gray-400">No KPI alerts in range</p>
                 </div>
               )}
             </DashboardCard>
@@ -1260,7 +1326,7 @@ const DashboardHospital8: React.FC = () => {
                 <TrendDelta delta={trendData?.delta_pct ?? null} />
               </div>
               <p className="text-[9px] text-gray-400 mt-0.5">vs previous period</p>
-              <div className="mt-2 h-20 -mx-4 -mb-4">
+              <div className="mt-2 h-20 -mx-4 -mb-4 opacity-50">
                 {trendSeries.length > 0 ? (
                   <Line
                     data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.45)")}
