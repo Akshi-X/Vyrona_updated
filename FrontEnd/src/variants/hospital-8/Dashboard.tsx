@@ -64,7 +64,7 @@ import Map3DContainer, {
 } from "./components/Map3DContainer";
 import DashboardCard from "./components/DashboardCard";
 import NoiseOverlay from "./components/NoiseOverlay";
-import abstractBg from "../../assets/aaabstract.png";
+// import abstractBg from "../../assets/aaabstract.png";
 import brandLogo from "../../assets/mGScale.svg";
 import { mapService } from "./services/mapService";
 import {
