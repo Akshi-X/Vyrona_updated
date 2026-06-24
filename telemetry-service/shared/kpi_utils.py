@@ -480,7 +480,11 @@ def save_refrigerator_kpi_readings(
     branch_id: int,
     kpi_readings: list[dict],
 ):
-    VALID_REFRIGERATOR_KPI_NAMES = {KPI_NAMES.REFRIGERATOR_TEMP, KPI_NAMES.REFRIGERATOR_HUMIDITY}
+    VALID_REFRIGERATOR_KPI_NAMES = {
+        KPI_NAMES.REFRIGERATOR_TEMP,
+        KPI_NAMES.REFRIGERATOR_HUMIDITY,
+        KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE,
+    }
 
     for reading in kpi_readings:
         kpi_name = reading["name"]
