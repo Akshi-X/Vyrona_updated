@@ -26,7 +26,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-mygrape}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}   # ← added fallback
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Steezy@123}   # ← added fallback
     ports:
       - "5432:5432"
     volumes:
@@ -117,10 +117,10 @@ services:
       - DB_PORT=5432
       - DB_NAME=${POSTGRES_DB:-mygrape}
       - DB_USER=${POSTGRES_USER:-postgres}
-      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-Steezy@123}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_PASSWORD=${REDIS_dbt:-}
       - ALERT_API_BASE_URL=http://backend:8000
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - EVENT_HUB_CONNECTION_STRING=Endpoint=sb://eventhub-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
