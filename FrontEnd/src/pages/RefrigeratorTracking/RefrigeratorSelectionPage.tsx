@@ -177,7 +177,7 @@ export default function RefrigeratorSelectionPage() {
 
     return (
         <div className="flex-1 min-h-screen flex items-center justify-center relative">
-            <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: 'url(/src/assets/ivf_pattern.png)', backgroundSize: '20%', backgroundRepeat: 'repeat', opacity: 0.6 }} />
+            <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: 'url(/ivf_pattern.png)', backgroundSize: '20%', backgroundRepeat: 'repeat', opacity: 0.6 }} />
             <div className="fixed top-3 left-4 z-30 md:hidden">
                 <HamburgerButton />
             </div>

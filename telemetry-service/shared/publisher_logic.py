@@ -178,34 +178,63 @@ def extract_tive_temperature_kpis(
     payload_data: Dict[str, Any], timestamp: str
 ) -> List[Dict[str, Any]]:
     """
-    Extract temperature KPIs relevant to refrigerator monitoring from a Tive payload.
+    Extract KPIs relevant to refrigerator monitoring from a Tive payload.
 
-    Returns [{timestamp, name, value, unit}] for temp_external and probe_temp.
-    Values that are None are omitted.
+    Returns [{timestamp, name, value, unit}] for refrigerator_temp,
+    refrigerator_humidity and tive_battery_percentage. Values that are None are omitted.
     """
     kpis = []
 
-    temp_ext = payload_data.get("DeviceTemperature")
-    if temp_ext is None:
-        temp_ext = (payload_data.get("Temperature") or {}).get("External")
-    if temp_ext is not None:
+    temp = payload_data.get("DeviceTemperature")
+    if temp is None:
+        temp = (payload_data.get("Temperature") or {}).get("External")
+    if temp is not None:
         kpis.append(
             {
                 "timestamp": timestamp,
-                "name": "temp_external",
-                "value": temp_ext,
+                "name": "refrigerator_temp",
+                "value": temp,
                 "unit": "°C",
             }
         )
 
-    probe_temp = payload_data.get("ProbeTemperature")
-    if probe_temp is not None:
+    humidity = None
+    hum_obj = payload_data.get("Humidity")
+    if isinstance(hum_obj, dict):
+        humidity = hum_obj.get("Percentage")
+    elif "humidity" in payload_data:
+        humidity = payload_data.get("humidity")
+    if humidity is not None:
         kpis.append(
             {
                 "timestamp": timestamp,
-                "name": "probe_temp",
-                "value": probe_temp,
-                "unit": "°C",
+                "name": "refrigerator_humidity",
+                "value": humidity,
+                "unit": "%",
+            }
+        )
+
+    battery_percentage = None
+    battery_obj = payload_data.get("Battery")
+    if isinstance(battery_obj, dict):
+        battery_percentage = (
+            battery_obj.get("Percentage")
+            or battery_obj.get("Percent")
+            or battery_obj.get("Level")
+        )
+    elif isinstance(battery_obj, (int, float)):
+        battery_percentage = battery_obj
+    elif "BatteryPercent" in payload_data:
+        battery_percentage = payload_data.get("BatteryPercent")
+    elif "BatteryLevel" in payload_data:
+        battery_percentage = payload_data.get("BatteryLevel")
+    if battery_percentage is not None:
+        kpis.append(
+            {
+                "timestamp": timestamp,
+                "name": "tive_battery_percentage",
+                "value": battery_percentage,
+                "unit": "%",
             }
         )
 
@@ -221,7 +250,7 @@ def process_tive_refrigerator(
     """
     Process a Tive webhook payload for a refrigerator zone.
 
-    Extracts temp_external and probe_temp, resolves kpi_config for the zone,
+    Extracts refrigerator_temp and refrigerator_humidity, resolves kpi_config for the zone,
     inserts into readings, and publishes to refrigerator_kpi_readings_channel.
     """
     timestamp = (
@@ -234,7 +263,7 @@ def process_tive_refrigerator(
 
     if not kpis:
         logger.warning(
-            f"No temperature KPIs extracted for refrigerator device {device_id}. Skipping."
+            f"No KPIs extracted for refrigerator device {device_id}. Skipping."
         )
         return
 
