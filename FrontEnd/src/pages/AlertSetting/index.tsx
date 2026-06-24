@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { Switch } from "../../components/ui/switch";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
+import { useHasVariant } from "../../components/VariantRoute";
 
 interface ContainerRow {
     tank_id: number;
@@ -628,7 +629,12 @@ export default function AlertSetting() {
     const isOnboarding = useOnboardingMode();
     const [searchParams, setSearchParams] = useSearchParams();
 
+    // Refrigerator-only hospitals (gated by the "/alert-setting#refrigerator-only"
+    // variant flag) are locked to refrigerators and never see the Direction tabs.
+    const refrigeratorOnly = useHasVariant("/alert-setting#refrigerator-only");
+
     const directionFilter: "cryotanks" | "incubators" | "refrigerators" = (() => {
+        if (refrigeratorOnly) return "refrigerators";
         const v = searchParams.get("direction");
         if (v === "incubators") return "incubators";
         if (v === "refrigerators") return "refrigerators";
@@ -706,6 +712,14 @@ export default function AlertSetting() {
     const [refrigeratorZoneName, setRefrigeratorZoneName] = useState<string>('');
     // Zone name to persist when saving — comes from the editable text input.
     const effectiveZoneName: string | null = refrigeratorZoneName.trim() || null;
+    // A refrigerator zone has been renamed when the input differs from the
+    // stored name of the currently selected zone.
+    const originalZoneName =
+        refrigeratorZones.find((z) => z.zone_id === selectedZoneId)?.zone_name ?? '';
+    const zoneNameDirty =
+        !!primaryContainer?.is_refrigerator &&
+        selectedZoneId != null &&
+        refrigeratorZoneName.trim() !== originalZoneName.trim();
     // Common = incubator-level (no chamber); only external temp applies at this scope
     const effectiveKpiNames = directionFilter === "refrigerators"
         ? REFRIGERATOR_KPI_NAMES
@@ -1575,6 +1589,28 @@ export default function AlertSetting() {
                 }
             }
 
+            // Renaming a zone that has no KPI config rows yet: zone names are stored
+            // on those rows, so scaffold the refrigerator's KPIs (disabled, no
+            // thresholds) to give the new zone name somewhere to persist.
+            if (
+                zoneNameDirty &&
+                primaryContainer?.is_refrigerator &&
+                configsToApply.length === 0
+            ) {
+                for (const kpiName of effectiveKpiNames) {
+                    const metadata = getKpiMetadata(kpiName);
+                    configsToApply.push({
+                        kpi_name: kpiName,
+                        alert_name: metadata.label,
+                        min: null,
+                        max: null,
+                        unit: metadata.unit ?? null,
+                        alert_type: null,
+                        status: false,
+                    });
+                }
+            }
+
             if (configsToApply.length === 0) return;
 
             setSaveAllLoading(true);
@@ -1628,9 +1664,30 @@ export default function AlertSetting() {
         }
         const ids = Object.keys(draftConfig).map(Number);
         const hasTemplateDrafts = Object.keys(multiDraftConfig).length > 0;
-        if (ids.length === 0 && !hasTemplateDrafts) return;
+        if (ids.length === 0 && !hasTemplateDrafts && !zoneNameDirty) return;
         setSaveAllLoading(true);
         try {
+            // Persist a zone rename: re-upsert the zone's existing configs (unchanged
+            // values) carrying the new zone_name. Runs before the per-id updates below,
+            // which don't touch zone_name, so threshold edits aren't clobbered.
+            if (zoneNameDirty && primaryContainer?.is_refrigerator) {
+                await ivfService.bulkUpsertKpiConfigForRefrigerator(
+                    primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
+                    selectedZoneId,
+                    configList.map((c) => ({
+                        kpi_name: c.kpi_name,
+                        alert_name: c.alert_name,
+                        min: c.min,
+                        max: c.max,
+                        unit: c.unit,
+                        alert_type: c.alert_type,
+                        cooldown_minutes: c.cooldown_minutes,
+                        unack_escalation_threshold: c.unack_escalation_threshold,
+                        status: c.status,
+                    })),
+                    effectiveZoneName,
+                );
+            }
             for (const id of ids) {
                 const d = draftConfig[id];
                 if (!d) continue;
@@ -1847,10 +1904,11 @@ export default function AlertSetting() {
 
     const isMultiMode =
         selectedContainers.length > 1 || configList.length === 0;
-    const hasPendingChanges = isMultiMode
-        ? Object.keys(multiDraftConfig).length > 0
-        : Object.keys(draftConfig).length > 0 ||
-          Object.keys(multiDraftConfig).length > 0;
+    const hasPendingChanges =
+        (isMultiMode
+            ? Object.keys(multiDraftConfig).length > 0
+            : Object.keys(draftConfig).length > 0 ||
+              Object.keys(multiDraftConfig).length > 0) || zoneNameDirty;
 
     // ─── Shared input renderer driven by KPI_FORM_CONFIG ─────────────────────
     const renderKpiInputs = (
@@ -1992,32 +2050,34 @@ export default function AlertSetting() {
                         <div className="w-full xl1:w-[380px] xl1:shrink-0 flex flex-col gap-6">
                             {/* Filters card - hidden on mobile (shown via header filter icon) */}
                             <div id="onboarding-alert-filters" className="hidden md:flex bg-white border border-line rounded-lg px-3 py-3 flex-col gap-3">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Direction</label>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setDirectionFilter("cryotanks")}
-                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "cryotanks" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
-                                        >
-                                            Cryotanks
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setDirectionFilter("incubators")}
-                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "incubators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
-                                        >
-                                            Incubators
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setDirectionFilter("refrigerators")}
-                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "refrigerators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
-                                        >
-                                            Refrigerators
-                                        </button>
+                                {!refrigeratorOnly && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Direction</label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setDirectionFilter("cryotanks")}
+                                                className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "cryotanks" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
+                                            >
+                                                Cryotanks
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setDirectionFilter("incubators")}
+                                                className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "incubators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
+                                            >
+                                                Incubators
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setDirectionFilter("refrigerators")}
+                                                className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "refrigerators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
+                                            >
+                                                Refrigerators
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Branch
@@ -2104,7 +2164,7 @@ export default function AlertSetting() {
                                     </h2>
                                 </div>
                                 <div className="pl-2 pr-2 py-2 rounded-t-lg bg-primary-bg text-xs font-semibold text-primary">
-                                    {directionFilter === "incubators" ? "Incubators #" : "Containers #"}
+                                    {directionFilter === "incubators" ? "Incubators #" : directionFilter === "refrigerators" ? "Refrigerators #" : "Containers #"}
                                 </div>
                                 <div
                                     className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
@@ -2185,7 +2245,7 @@ export default function AlertSetting() {
                                                     } ${lockContainerSelection ? "opacity-70 cursor-not-allowed" : ""}`}
                                                 >
                                                     <span className="text-primary text-xs font-bold block truncate">
-                                                        {directionFilter === "incubators" ? "Incubator" : "Container"} {c.canisterId}
+                                                        {directionFilter === "incubators" ? "Incubator" : directionFilter === "refrigerators" ? "Refrigerator" : "Container"} {c.canisterId}
                                                     </span>
                                                     {c.branchName && c.branchName !== "N/A" && (
                                                         <div className="text-xs text-gray-900 leading-snug truncate">
@@ -2219,7 +2279,7 @@ export default function AlertSetting() {
                                 <h2 className="font-bold text-black text-base">
                                     Alert Configuration{" "}
                                     {selectedContainers.length > 1
-                                        ? `- ${selectedContainers.length} ${directionFilter === "incubators" ? "Incubators" : "Containers"} Selected`
+                                        ? `- ${selectedContainers.length} ${directionFilter === "incubators" ? "Incubators" : directionFilter === "refrigerators" ? "Refrigerators" : "Containers"} Selected`
                                         : primaryContainer
                                           ? `- ${directionFilter === "incubators" ? "Incubator" : "Cryocan"} ${primaryContainer.canisterId}`
                                           : ""}
@@ -3538,7 +3598,7 @@ export default function AlertSetting() {
                                                                                             className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
                                                                                         />
                                                                                         <div className="min-w-0">
-                                                                                            <div className="text-xs font-semibold text-primary truncate">{directionFilter === "incubators" ? "Incubator" : "Container"} {c.canisterId}</div>
+                                                                                            <div className="text-xs font-semibold text-primary truncate">{directionFilter === "incubators" ? "Incubator" : directionFilter === "refrigerators" ? "Refrigerator" : "Container"} {c.canisterId}</div>
                                                                                             <div className="text-xs text-gray-500 truncate">{c.branchName}</div>
                                                                                         </div>
                                                                                     </label>
