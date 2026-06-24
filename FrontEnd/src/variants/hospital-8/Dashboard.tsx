@@ -914,7 +914,7 @@ const DashboardHospital8: React.FC = () => {
           style={{ zIndex: 0 }}
         /> */}
 
-        <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: 'url(/src/assets/ivf_pattern.png)', backgroundSize: '20%', backgroundRepeat: 'repeat', opacity: 0.4 }} />
+        <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: 'url(/ivf_pattern.png)', backgroundSize: '20%', backgroundRepeat: 'repeat', opacity: 0.4 }} />
             
 
         <style>{INTRO_STYLES}</style>
