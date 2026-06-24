@@ -14,6 +14,7 @@ from app.schemas.IVF.ivf_schema import (
     ActiveRefrigeratorsResponse,
     BranchListResponse,
     BranchCoordinatesResponse,
+    BranchMapMetricsResponse,
     CanisterCheckResponse,
     EmbryoTransferResponse,
     EmbryoTrackingResponse,
@@ -725,6 +726,47 @@ def get_branch_coordinates(
     except Exception as e:
         logger.error(f"Error getting branch coordinates: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting branch coordinates: {str(e)}")
+
+
+@router.get("/branch_map_metrics", response_model=BranchMapMetricsResponse)
+def get_branch_map_metrics(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Get all branches for this hospital with refrigerator count and active alert count.
+
+    Returns every branch from hospital_branches (not just those with refrigerators),
+    making it the authoritative source for the hospital-8 dashboard map.
+
+    Response format:
+    {
+        "branches": [
+            {
+                "branch_id": 1,
+                "branch_name": "Egmore",
+                "latitude": 13.0827,
+                "longitude": 80.2707,
+                "district_name": "Chennai",
+                "state_name": "Tamil Nadu",
+                "refrigerator_count": 5,
+                "active_alerts": 1
+            }
+        ],
+        "total": 1
+    }
+    """
+    try:
+        user = _ensure_ivf_user(request)
+        hospital_id = _resolve_hospital_id(request, db, user)
+        service = IVFService(db)
+        branch_data = service.get_branch_map_metrics(hospital_id=hospital_id)
+        return BranchMapMetricsResponse(branches=branch_data, total=len(branch_data))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting branch map metrics: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting branch map metrics: {str(e)}")
 
 
 @router.get("/embryo-transfer", response_model=EmbryoTransferResponse)
