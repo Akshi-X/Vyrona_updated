@@ -45,6 +45,7 @@ from app.controller.IVF import (
     ivf_quality_controller,
     ivf_reports_controller,
     quality_tracking_controller,
+    refrigerator_dashboard_controller,
 )
 from app.controller.external import (
     hms_controller,
@@ -252,6 +253,7 @@ app.include_router(ivf_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_cycle_controller.router, prefix=API_PREFIX)
 app.include_router(kpi_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_dashboard_controller.router, prefix=API_PREFIX)
+app.include_router(refrigerator_dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)
 app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_reports_controller.router, prefix=API_PREFIX)

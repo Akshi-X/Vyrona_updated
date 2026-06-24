@@ -1278,3 +1278,62 @@ class IVFService:
                 "total": 0,
                 "site_name_counts": {}, "status_counts": {}, "goblet_color_counts": {}, "crylock_color_counts": {},
             }
+
+    def get_branch_map_metrics(self, hospital_id: int) -> List[Dict[str, Any]]:
+        """
+        Return all branches for the hospital with refrigerator count and active alert count.
+        Used by the hospital-8 dashboard map to display every branch location,
+        marking branches that have refrigerators as clickable.
+        """
+        from ...models.IVF.critical_alert_model import CriticalAlert
+
+        branches = (
+            self.db.query(HospitalBranch)
+            .filter(HospitalBranch.hospital_id == hospital_id)
+            .all()
+        )
+
+        branch_ids = [b.branch_id for b in branches]
+
+        refrig_counts: Dict[int, int] = {}
+        if branch_ids:
+            rows = (
+                self.db.query(Refrigerator.branch_id, func.count(Refrigerator.refrigerator_id))
+                .filter(
+                    Refrigerator.hospital_id == hospital_id,
+                    Refrigerator.branch_id.in_(branch_ids),
+                    Refrigerator.is_active == True,
+                )
+                .group_by(Refrigerator.branch_id)
+                .all()
+            )
+            refrig_counts = {branch_id: count for branch_id, count in rows}
+
+        alert_counts: Dict[int, int] = {}
+        if branch_ids:
+            rows = (
+                self.db.query(CriticalAlert.branch_id, func.count(CriticalAlert.alert_id))
+                .filter(
+                    CriticalAlert.hospital_id == hospital_id,
+                    CriticalAlert.branch_id.in_(branch_ids),
+                    CriticalAlert.status == "Active",
+                    CriticalAlert.refrigerator_id.isnot(None),
+                )
+                .group_by(CriticalAlert.branch_id)
+                .all()
+            )
+            alert_counts = {branch_id: count for branch_id, count in rows}
+
+        return [
+            {
+                "branch_id": b.branch_id,
+                "branch_name": b.branch_name,
+                "latitude": float(b.latitude) if b.latitude is not None else None,
+                "longitude": float(b.longitude) if b.longitude is not None else None,
+                "district_name": b.district_name,
+                "state_name": b.state_name,
+                "refrigerator_count": refrig_counts.get(b.branch_id, 0),
+                "active_alerts": alert_counts.get(b.branch_id, 0),
+            }
+            for b in branches
+        ]
