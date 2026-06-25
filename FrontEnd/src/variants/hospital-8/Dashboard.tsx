@@ -914,7 +914,7 @@ const DashboardHospital8: React.FC = () => {
           style={{ zIndex: 0 }}
         /> */}
 
-        <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: 'url(/ivf_pattern.png)', backgroundSize: '20%', backgroundRepeat: 'repeat', opacity: 0.4 }} />
+        <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: 'url(/ivf_pattern.png)', backgroundSize: '20%', backgroundRepeat: 'repeat', opacity: 0.30 }} />
             
 
         <style>{INTRO_STYLES}</style>
@@ -923,8 +923,8 @@ const DashboardHospital8: React.FC = () => {
         <div className="absolute inset-0">
           {!loadingMap && (
             <div
-              className={`absolute inset-0 ${revealed && !introDone ? "intro-zoom" : ""}`}
-              style={{ opacity: revealed ? undefined : 0 }}
+              className={`absolute top-0 bottom-0 left-0 ${revealed && !introDone ? "intro-zoom" : ""}`}
+              style={{ width: "142%", opacity: revealed ? undefined : 0 }}
             >
               <Map3DContainer
                 ref={mapRef}
@@ -1167,28 +1167,28 @@ const DashboardHospital8: React.FC = () => {
           </div>
         </header>
 
-        {/* Left column */}
+        {/* Floating cards — row-wise grid (rows stretch to equal height) */}
         {!loadingMap && (
           <div
-            className={`absolute left-6 top-[136px] bottom-6 z-30 w-64 flex flex-col gap-3 justify-between pointer-events-none ${revealed && !introDone ? "intro-col-left" : ""}`}
+            className={`absolute left-6 top-[136px] z-30 w-[560px] grid grid-cols-12 items-stretch content-start gap-3 pointer-events-none ${revealed && !introDone ? "intro-col-left" : ""}`}
             style={{ opacity: revealed ? undefined : 0 }}
           >
             {/* Top KPI card (was: Total Refrigerators) */}
             <DashboardCard
               accent="violet"
               watermark={TrendingUp}
-              className="pointer-events-auto"
+              className="pointer-events-auto h-full order-1 col-span-6"
             >
               <div className="flex items-center justify-between mb-0.5">
                 <div className="flex items-center gap-1.5">
                   <TrendingUp size={12} style={{ color: "#8b3ad6" }} />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
                     Top Deviated KPI
                   </p>
                 </div>
                 <CardRangeSelect value={topKpiRange} onChange={setTopKpiRange} />
               </div>
-              <p className="text-2xl font-extrabold text-gray-900 mt-1 leading-tight line-clamp-2 pr-16">
+              <p className="text-xl font-extrabold text-primary mt-1 leading-tight line-clamp-2 pr-16">
                 {topKpiData?.label ?? '—'}
               </p>
               <div className="flex items-center gap-1 mt-1.5">
@@ -1196,7 +1196,7 @@ const DashboardHospital8: React.FC = () => {
                 <span className="text-[10px] text-gray-400">vs previous period</span>
               </div>
               {trendSeries.length > 0 && (
-                <div className="mt-2 h-8 -mx-4 -mb-4">
+                <div className="mt-2 h-6 -mx-4 -mb-4">
                   <Line
                     data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.35)")}
                     options={areaOptions}
@@ -1205,7 +1205,7 @@ const DashboardHospital8: React.FC = () => {
               )}
               {/* Count — anchored to the card's bottom-right */}
               <div className="absolute bottom-3 right-4 flex flex-col items-end leading-none">
-                <span className="text-5xl font-black text-gray-900 leading-none">
+                <span className="text-4xl font-black text-primary leading-none">
                   {(topKpiData?.count ?? 0).toLocaleString()}
                 </span>
                 <span className="text-[10px] text-gray-400 mt-0.5">alerts</span>
@@ -1213,11 +1213,11 @@ const DashboardHospital8: React.FC = () => {
             </DashboardCard>
 
             {/* Operations card */}
-            <div id="onboarding-dashboard-alerts" className="pointer-events-auto">
-              <DashboardCard accent="violet" watermark={Activity}>
+            <div id="onboarding-dashboard-alerts" className="pointer-events-auto h-full order-3 col-span-5">
+              <DashboardCard accent="violet" watermark={Activity} className="h-full">
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <Activity size={12} style={{ color: "#8b3ad6" }} />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
                     Operations
                   </p>
                   {selectedBranch && (
@@ -1240,7 +1240,7 @@ const DashboardHospital8: React.FC = () => {
                         <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
                           {row.label}
                         </p>
-                        <p className="text-lg font-extrabold text-gray-900 leading-tight">
+                        <p className="text-lg font-extrabold text-primary leading-tight">
                           {row.value}
                         </p>
                       </div>
@@ -1255,12 +1255,12 @@ const DashboardHospital8: React.FC = () => {
             <DashboardCard
               accent="indigo"
               watermark={LayoutGrid}
-              className="pointer-events-auto"
+              className="pointer-events-auto h-full order-5 col-span-6"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
                   <LayoutGrid size={12} style={{ color: "#6d4ae0" }} />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
                     Alerts by KPI
                   </p>
                 </div>
@@ -1281,7 +1281,7 @@ const DashboardHospital8: React.FC = () => {
                         <p className="text-[11px] font-semibold text-gray-600 leading-tight truncate" title={c.label}>
                           {c.label}
                         </p>
-                        <p className="text-2xl font-black text-gray-900 leading-none mt-0.5">
+                        <p className="text-2xl font-black text-primary leading-none mt-0.5">
                           {c.count.toLocaleString()}
                         </p>
                       </div>
@@ -1294,39 +1294,31 @@ const DashboardHospital8: React.FC = () => {
                 </div>
               )}
             </DashboardCard>
-          </div>
-        )}
 
-        {/* Right column */}
-        {!loadingMap && (
-          <div
-            className={`absolute right-6 top-[136px] bottom-6 z-30 w-72 hidden lg:flex flex-col gap-3 justify-between pointer-events-none ${revealed && !introDone ? "intro-col-right" : ""}`}
-            style={{ opacity: revealed ? undefined : 0 }}
-          >
             {/* Deviation Trend — cumulative line */}
             <DashboardCard
               accent="violet"
               watermark={Activity}
               watermarkPosition="top-right"
-              className="pointer-events-auto"
+              className="pointer-events-auto h-full order-2 col-span-6"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Activity size={12} style={{ color: "#8b3ad6" }} />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
                     Deviation Trend
                   </p>
                 </div>
                 <CardRangeSelect value={trendRange} onChange={setTrendRange} />
               </div>
               <div className="flex items-baseline gap-2 mt-1">
-                <p className="text-2xl font-extrabold text-gray-900 leading-none">
+                <p className="text-2xl font-extrabold text-primary leading-none">
                   {(trendData?.total ?? 0).toLocaleString()}
                 </p>
                 <TrendDelta delta={trendData?.delta_pct ?? null} />
               </div>
               <p className="text-[9px] text-gray-400 mt-0.5">vs previous period</p>
-              <div className="mt-2 h-20 -mx-4 -mb-4 opacity-50">
+              <div className="mt-2 h-12 -mx-4 -mb-4 opacity-50">
                 {trendSeries.length > 0 ? (
                   <Line
                     data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.45)")}
@@ -1344,12 +1336,12 @@ const DashboardHospital8: React.FC = () => {
             <DashboardCard
               accent="plum"
               watermark={BarChart3}
-              className="pointer-events-auto"
+              className="pointer-events-auto h-full order-6 col-span-6"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
                   <BarChart3 size={12} style={{ color: "#ab44b8" }} />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
                     Deviations by Category
                   </p>
                 </div>
@@ -1393,7 +1385,7 @@ const DashboardHospital8: React.FC = () => {
 
             {/* Insights card — auto-swipe with timer arc */}
             <div
-              className="relative overflow-hidden rounded-2xl pointer-events-auto"
+              className="relative overflow-hidden rounded-2xl pointer-events-auto h-full order-4 col-span-7"
               style={{ background: "linear-gradient(155deg, #162114 0%, #0c180d 55%, #09140f 100%)" }}
               onMouseEnter={() => setInsightPaused(true)}
               onMouseLeave={() => { setInsightPaused(false); setArcResetKey((k) => k + 1); }}
@@ -1406,7 +1398,7 @@ const DashboardHospital8: React.FC = () => {
                 className="absolute top-[-18%] right-[5%] w-36 h-36 rounded-full pointer-events-none"
                 style={{ background: "radial-gradient(circle, rgba(48,155,70,0.55) 0%, transparent 65%)", filter: "blur(24px)" }}
               />
-              <div className="relative z-10 p-3">
+              <div className="relative z-10 p-3 h-full flex flex-col">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
@@ -1438,9 +1430,9 @@ const DashboardHospital8: React.FC = () => {
                   </svg>
                 </div>
                 {insights.length > 0 && (
-                  <div key={safeInsightIdx} style={{ animation: 'insight-fadein 0.4s ease both' }}>
-                    <div className="flex items-start gap-1 mt-3">
-                      <span className={`text-4xl font-black tracking-tight leading-none ${insights[safeInsightIdx].colorClass}`}>
+                  <div key={safeInsightIdx} className="mt-auto" style={{ animation: 'insight-fadein 0.4s ease both' }}>
+                    <div className="flex items-start gap-1">
+                      <span className={`text-5xl font-black tracking-tight leading-none ${insights[safeInsightIdx].colorClass}`}>
                         {insights[safeInsightIdx].bigValue}
                       </span>
                       {insights[safeInsightIdx].arrow === 'up' && (
@@ -1450,10 +1442,10 @@ const DashboardHospital8: React.FC = () => {
                         <ArrowDownRight size={16} className={`${insights[safeInsightIdx].arrowClass} mt-1.5`} />
                       )}
                     </div>
-                    <p className="text-xs font-bold text-white mt-2.5 leading-snug">
+                    <p className="text-sm font-bold text-white mt-2.5 leading-snug">
                       {insights[safeInsightIdx].headline}
                     </p>
-                    <p className="text-[10px] text-white/40 mt-1 leading-relaxed">
+                    <p className="text-xs text-white/40 mt-1 leading-relaxed">
                       {insights[safeInsightIdx].sub}
                     </p>
                   </div>

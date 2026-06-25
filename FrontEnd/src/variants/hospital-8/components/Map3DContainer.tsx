@@ -154,6 +154,7 @@ const Map3DContainer = forwardRef<Map3DContainerHandle, Map3DContainerProps>(({
   }, [pitch]);
 
   const [indiaGeoJson, setIndiaGeoJson] = useState<any>(null);
+  const [worldGeoJson, setWorldGeoJson] = useState<any>(null);
   const [indiaStatesGeoJson, setIndiaStatesGeoJson] = useState<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -208,6 +209,11 @@ const Map3DContainer = forwardRef<Map3DContainerHandle, Map3DContainerProps>(({
         if (isCountry) {
           const india = data.features.find((f: any) => f.properties.name === 'India');
           if (india) setter(india);
+          // Keep every other country for the greyed-out backdrop
+          setWorldGeoJson({
+            type: 'FeatureCollection',
+            features: data.features.filter((f: any) => f.properties.name !== 'India'),
+          });
         } else {
           setter(data);
         }
@@ -302,6 +308,23 @@ const Map3DContainer = forwardRef<Map3DContainerHandle, Map3DContainerProps>(({
     stroked: true,
   });
 
+  // Greyed-out backdrop of every other country (overview only)
+  const worldLayer = worldGeoJson && !selectedStateKey
+    ? new GeoJsonLayer({
+        id: 'world-countries-layer',
+        data: worldGeoJson,
+        filled: true,
+        stroked: true,
+        pointType: 'circle',
+        getFillColor: [180, 180, 180, 100],
+        getLineColor: [80, 80, 80, 190],
+        getLineWidth: 2000,
+        lineWidthMinPixels: 0.5,
+        lineWidthMaxPixels: 1,
+        pickable: false,
+      })
+    : null;
+
   // Hide the full-India fill when a state is selected — only the selected state polygon should be visible
   const geoJsonLayer = indiaGeoJson && !selectedStateKey
     ? new GeoJsonLayer({
@@ -351,6 +374,7 @@ const Map3DContainer = forwardRef<Map3DContainerHandle, Map3DContainerProps>(({
     : null;
 
   const layers = [
+    ...(worldLayer ? [worldLayer] : []),
     ...(geoJsonLayer ? [geoJsonLayer] : []),
     ...(statesLayer ? [statesLayer] : []),
     ...(mapLoaded ? [scatterLayer] : []),
@@ -459,6 +483,16 @@ const Map3DContainer = forwardRef<Map3DContainerHandle, Map3DContainerProps>(({
           zIndex: 11,
           background:
             'linear-gradient(135deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.05) 26%, transparent 48%)',
+        }}
+      />
+
+      {/* Left-side vignette — darkens the canvas behind the floating cards */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          zIndex: 12,
+          background:
+            'linear-gradient(to right, rgba(250,250,250,0.62) 0%, rgba(250,250,250,0.38) 16%, rgba(250,250,250,0.14) 30%, transparent 46%)',
         }}
       />
 
