@@ -54,6 +54,19 @@ export interface OperationsResponse {
   active_tasks: number;
 }
 
+export interface TempHumidityPoint {
+  t: number;
+  temperature: number | null;
+  humidity: number | null;
+}
+
+export interface TemperatureHumidityTrendResponse {
+  avg_temperature: number | null;
+  avg_humidity: number | null;
+  bucket_hours: number;
+  points: TempHumidityPoint[];
+}
+
 interface DateRangeArgs {
   fromTs: number;
   toTs: number;
@@ -108,6 +121,16 @@ class RefrigeratorDashboardService extends BaseApiService {
       );
     } catch {
       return { total: 0, previous_total: 0, delta_pct: null, branches: [] };
+    }
+  }
+
+  async getTemperatureHumidityTrend({ fromTs, toTs, branchId }: DateRangeArgs): Promise<TemperatureHumidityTrendResponse> {
+    try {
+      return await this.get<TemperatureHumidityTrendResponse>(
+        `/api/ivf/refrigerator-dashboard/temperature-humidity-trend${this.qs(fromTs, toTs, branchId)}`
+      );
+    } catch {
+      return { avg_temperature: null, avg_humidity: null, bucket_hours: 0, points: [] };
     }
   }
 
