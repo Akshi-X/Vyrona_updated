@@ -21,6 +21,7 @@ from app.service.chat_service import (
     mark_canister_as_read, get_canister_unread_count,
     mark_incubator_as_read, get_incubator_unread_count,
     mark_refrigerator_as_read, get_refrigerator_unread_count,
+    get_refrigerator_unread_messages,
     mark_patient_as_read, get_patient_unread_count
 )
 from app.dependencies.auth_dependencies import (
@@ -208,6 +209,29 @@ def get_user_unread_messages(
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
     except ChatMessageNotFoundException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={
+            "error_code": "CHAT_INTERNAL_ERROR",
+            "message": "Internal server error",
+            "details": str(e)
+        })
+
+
+@router.get("/refrigerators/unread",
+    response_model=UnreadMessagesResponse,
+    summary="Get unread refrigerator messages",
+    description="Unread chat messages across all refrigerators of the current user's hospital.")
+def get_refrigerator_unread(
+    db: Session = Depends(database.get_db),
+    current_user: user_model.User = Depends(get_current_user),
+    http_request: Request = None,
+):
+    """Get unread refrigerator chat messages scoped to the user's hospital."""
+    try:
+        hospital_id = getattr(http_request.state, "hospital_id", None) if http_request else None
+        if hospital_id is None:
+            hospital_id = current_user.hospital_id
+        return get_refrigerator_unread_messages(current_user.user_id, hospital_id, db)
     except Exception as e:
         raise HTTPException(status_code=500, detail={
             "error_code": "CHAT_INTERNAL_ERROR",
