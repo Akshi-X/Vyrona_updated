@@ -114,6 +114,13 @@ export class TasksService extends BaseApiService {
     });
   }
 
+  /** All refrigerator tasks for the current user's hospital */
+  async getHospitalRefrigeratorTasks(): Promise<ScopedTaskListResponse> {
+    return await this.request<ScopedTaskListResponse>('/api/refrigerators/tasks', {
+      method: 'GET',
+    });
+  }
+
   /**
    * Get task by ID
    */

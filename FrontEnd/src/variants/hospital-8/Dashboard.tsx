@@ -462,35 +462,18 @@ const DashboardHospital8: React.FC = () => {
   }, [revealed, typedIndex]);
 
   // ── WebSocket for chat ──────────────────────────────────────────────
+  // Generic chat WS isn't refrigerator-scoped; only the count refresh is reused.
+  // The messages modal is populated from the refrigerator-specific fetch below.
   const {
     unreadCount: wsUnreadCount,
-    unreadMessages: wsUnreadMessages,
     refresh: refreshUnread,
   } = useDashboardChatWebSocket({ enabled: !isOnboarding });
-
-  useEffect(() => {
-    if (wsUnreadMessages && wsUnreadMessages.length > 0) {
-      const transformedChats: StakeholderChat[] = wsUnreadMessages.map((msg) => ({
-        id: msg.message_id.toString(),
-        sender: msg.sender_name,
-        patientId: msg.canister_number
-          ? `Canister ID: ${msg.canister_number}`
-          : msg.patient_id
-            ? `Patient ID: ${msg.patient_id}`
-            : "Unknown",
-        message: msg.message_content,
-        timestamp: new Date(msg.created_at).toLocaleString(),
-        isRead: false,
-      }));
-      setStakeholderChats(transformedChats);
-    }
-  }, [wsUnreadMessages]);
 
   // ── Modal data fetchers ─────────────────────────────────────────────
   const fetchStakeholderChats = async () => {
     setLoadingChats(true);
     try {
-      const response = await chatService.getUnreadMessages();
+      const response = await chatService.getRefrigeratorUnreadMessages();
       if (response && typeof response.total_unread === "number") {
         setApiUnreadCount(response.total_unread);
       }
@@ -499,13 +482,11 @@ const DashboardHospital8: React.FC = () => {
           (msg: UnreadMessageResponse) => ({
             id: msg.message_id.toString(),
             sender: msg.sender_name,
-            patientId: msg.tank_code
-              ? `Tank: ${msg.tank_code}`
-              : msg.canister_number
-                ? `Canister ID: ${msg.canister_number}`
-                : msg.patient_id
-                  ? `Patient ID: ${msg.patient_id}`
-                  : "N/A",
+            patientId: msg.refrigerator_code
+              ? `Refrigerator: ${msg.refrigerator_code}`
+              : msg.refrigerator_id
+                ? `Refrigerator #${msg.refrigerator_id}`
+                : "N/A",
             message: msg.message_content,
             timestamp: new Date(msg.created_at).toLocaleString(),
             isRead: false,
@@ -526,11 +507,8 @@ const DashboardHospital8: React.FC = () => {
   const fetchMyTasks = async () => {
     setLoadingTasks(true);
     try {
-      const response = await tasksService.getMyTasks();
-      setMyTasks([
-        ...(response.created_tasks || []),
-        ...(response.assigned_tasks || []),
-      ]);
+      const response = await tasksService.getHospitalRefrigeratorTasks();
+      setMyTasks(response.tasks || []);
     } catch {
       setMyTasks([]);
     } finally {
@@ -541,10 +519,8 @@ const DashboardHospital8: React.FC = () => {
   const fetchRefrigeratorAlerts = async () => {
     setLoadingRefrigeratorAlerts(true);
     try {
-      const response = await ivfAlertsService.getHospitalAlerts();
-      setRefrigeratorAlerts(
-        (response?.alerts || []).filter((a) => a.refrigerator_id != null),
-      );
+      const response = await ivfAlertsService.getHospitalRefrigeratorAlerts();
+      setRefrigeratorAlerts(response?.alerts || []);
     } catch {
       setRefrigeratorAlerts([]);
     } finally {
