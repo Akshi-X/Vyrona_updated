@@ -4,9 +4,12 @@ interface ColdStorageRoomProps {
   refrigeratorCode?: string;
   branchName?: string;
   zoneCount?: number;
+  zones?: { zone_id: string; zone_name: string }[];
 }
 
-export default function ColdStorageRoom({ refrigeratorCode, branchName, zoneCount }: ColdStorageRoomProps) {
+export default function ColdStorageRoom({ refrigeratorCode, branchName, zoneCount, zones }: ColdStorageRoomProps) {
+  const zone1 = zones?.find(z => z.zone_id === 'zone_1');
+  const zone2 = zones?.find(z => z.zone_id === 'zone_2');
   return (
     <div className="relative w-full h-full overflow-hidden bg-gray-900">
       <img
@@ -22,6 +25,11 @@ export default function ColdStorageRoom({ refrigeratorCode, branchName, zoneCoun
           style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
         />
       </div>
+      {zone1 && (
+        <div className="absolute left-8 top-[12%]" style={{ pointerEvents: 'none' }}>
+          <span className="inline-block px-2.5 py-1 bg-white/25 backdrop-blur-sm rounded-lg text-[10px] font-semibold text-white">{zone1.zone_name}</span>
+        </div>
+      )}
 
       <div className="absolute right-8 top-[18%] w-[180px] h-[200px]" style={{ pointerEvents: 'none' }}>
         <object
@@ -30,6 +38,11 @@ export default function ColdStorageRoom({ refrigeratorCode, branchName, zoneCoun
           style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
         />
       </div>
+      {zone2 && (
+        <div className="absolute right-8 top-[12%]" style={{ pointerEvents: 'none' }}>
+          <span className="inline-block px-2.5 py-1 bg-white/25 backdrop-blur-sm rounded-lg text-[10px] font-semibold text-white">{zone2.zone_name}</span>
+        </div>
+      )}
 
       <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none" style={{ zIndex: 2 }}>
         <div className="flex items-center gap-2 bg-white/85 backdrop-blur-sm rounded-xl border border-white/70 shadow-sm px-3 py-2">
