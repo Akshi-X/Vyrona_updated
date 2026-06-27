@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 def _get_internal_headers() -> Dict[str, str]:
     """Build headers with internal API key for service-to-service auth."""
     headers = {"Content-Type": "application/json"}
-    # if config.INTERNAL_API_KEY:
-    headers["X-Internal-Api-Key"] = "CHANGE_ME_TO_A_SECURE_RANDOM_STRING"
-    # else:
-    #     logger.warning(
-    #         "INTERNAL_API_KEY not configured — alert API calls will be rejected by dashboard-service"
-    #     )
+    if config.INTERNAL_API_KEY:
+        headers["X-Internal-Api-Key"] = "CHANGE_ME_TO_A_SECURE_RANDOM_STRING"
+    else:
+        logger.warning(
+            "INTERNAL_API_KEY not configured — alert API calls will be rejected by dashboard-service"
+        )
     return headers
 
 
@@ -337,7 +337,7 @@ def _check_and_create_refrigerator_kpi_alerts_sync(
     """
     try:
         api_url = (
-            f"http://host.docker.internal:8000/api/ivf/alerts/check_kpi_refrigerator"
+            f"{config.ALERT_API_BASE_URL}/api/ivf/alerts/check_kpi_refrigerator"
         )
 
         payload: Dict[str, Any] = {"refrigerator_id": refrigerator_id}
