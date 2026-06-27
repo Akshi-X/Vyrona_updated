@@ -24,6 +24,8 @@ export interface UnreadMessageResponse {
   patient_id?: string | null; // For CGT flow
   canister_number?: string | null; // For IVF flow (legacy)
   tank_code?: string | null; // For IVF flow
+  refrigerator_id?: number | null; // For refrigerator flow
+  refrigerator_code?: string | null; // For refrigerator flow
   patient_name?: string | null; // Patient name for CGT
   sender_id: string;
   sender_name: string;
@@ -95,6 +97,13 @@ export class ChatService extends BaseApiService {
    */
   async getUnreadMessages(): Promise<UnreadMessagesResponse> {
     return await this.request<UnreadMessagesResponse>('/api/chat/unread', {
+      method: 'GET',
+    });
+  }
+
+  /** Unread chat messages across all refrigerators of the user's hospital */
+  async getRefrigeratorUnreadMessages(): Promise<UnreadMessagesResponse> {
+    return await this.request<UnreadMessagesResponse>('/api/chat/refrigerators/unread', {
       method: 'GET',
     });
   }

@@ -228,6 +228,20 @@ def get_refrigerator_tasks(
     )
 
 
+@router.get("/refrigerators/tasks", response_model=PatientTaskListResponse)
+def get_hospital_refrigerator_tasks(
+    status: Optional[TaskStatus] = Query(None),
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """All refrigerator tasks for the current user's hospital."""
+    return task_service.get_hospital_refrigerator_tasks(
+        current_user=current_user,
+        db=db,
+        status=status,
+    )
+
+
 # ---------------------------
 # 4. Update Task (Full Update - Creator or Assignee)
 # ---------------------------

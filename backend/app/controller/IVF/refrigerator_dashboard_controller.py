@@ -136,6 +136,32 @@ def get_branch_critical_distribution(
         raise HTTPException(status_code=500, detail=f"Error getting branch distribution: {str(e)}")
 
 
+@router.get("/temperature-humidity-trend")
+def get_temperature_humidity_trend(
+    request: Request,
+    db: Session = Depends(get_db),
+    from_ts: Optional[float] = Query(None),
+    to_ts: Optional[float] = Query(None),
+    branch_id: Optional[int] = Query(None),
+):
+    try:
+        role_branch_id, role = get_dashboard_branch_filter(request)
+        hospital_id = request.state.current_user.hospital_id
+        eff_branch = _effective_branch(branch_id, role_branch_id, role)
+        service = RefrigeratorDashboardService(db)
+        return service.get_temperature_humidity_trend(
+            hospital_id=hospital_id,
+            branch_id=eff_branch,
+            role=None,
+            from_dt=_to_dt(from_ts),
+            to_dt=_to_dt(to_ts),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting temperature/humidity trend: {str(e)}")
+
+
 @router.get("/operations")
 def get_operations_counts(
     request: Request,

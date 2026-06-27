@@ -2888,6 +2888,52 @@ class CriticalAlertService:
             acknowledged_count=acknowledged_count,
         )
 
+    def get_hospital_refrigerator_alerts(
+        self,
+        branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
+        role: Optional[str] = None,
+        status: Optional[AlertStatus] = None,
+    ) -> HospitalAlertsResponse:
+        """
+        Get refrigerator alerts for the hospital. Unlike get_hospital_alerts
+        (which inner-joins Tank and so excludes refrigerator alerts), this joins
+        Refrigerator and returns alerts where refrigerator_id IS NOT NULL.
+        """
+        query = (
+            self.db.query(CriticalAlert, Refrigerator.refrigerator_code)
+            .join(Refrigerator, CriticalAlert.refrigerator_id == Refrigerator.refrigerator_id)
+        )
+
+        if role and role == "User" and branch_id:
+            query = query.filter(Refrigerator.branch_id == branch_id)
+        elif hospital_id is not None:
+            query = query.filter(Refrigerator.hospital_id == hospital_id)
+
+        if status:
+            query = query.filter(CriticalAlert.status == status.value)
+
+        rows = query.order_by(desc(CriticalAlert.occurred_at)).all()
+
+        alert_responses = []
+        active_count = 0
+        for alert, refrigerator_code in rows:
+            alert_dict = {
+                **alert.__dict__,
+                "refrigerator_code": refrigerator_code or f"Refrigerator-{alert.refrigerator_id}",
+            }
+            alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
+            if alert.status == AlertStatus.ACTIVE.value:
+                active_count += 1
+        acknowledged_count = len(alert_responses) - active_count
+
+        return HospitalAlertsResponse(
+            alerts=alert_responses,
+            total_count=len(alert_responses),
+            active_count=active_count,
+            acknowledged_count=acknowledged_count,
+        )
+
     def acknowledge_alert(
         self, alert_id: str, user_id: str, acknowledgment_reason: Optional[str] = None
     ) -> AcknowledgeAlertResponse:
