@@ -1,7 +1,5 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
-import WavePurple from '../../../assets/bottom-right1.svg';
-import WaveBlue from '../../../assets/bottom-right3.svg';
 
 export type CardAccent = 'purple' | 'blue' | 'indigo' | 'magenta' | 'aqua' | 'violet' | 'plum';
 
@@ -9,64 +7,48 @@ const ACCENT: Record<CardAccent, {
   blobA: string;
   blobB: string;
   border: string;
-  wave: string;
-  waveFilter: string;
   accentColor: string;
 }> = {
   purple: {
     blobA: 'rgba(192, 132, 252, 0.38)',
     blobB: 'rgba(154, 58, 208, 0.20)',
     border: 'rgba(192, 132, 252, 0.35)',
-    wave: WavePurple,
-    waveFilter: 'saturate(3) brightness(0.52)',
     accentColor: '#9a3ad0',
   },
   blue: {
     blobA: 'rgba(111, 147, 245, 0.38)',
     blobB: 'rgba(74, 100, 223, 0.20)',
     border: 'rgba(111, 147, 245, 0.35)',
-    wave: WaveBlue,
-    waveFilter: 'saturate(3) brightness(0.55)',
     accentColor: '#4a64df',
   },
   indigo: {
     blobA: 'rgba(154, 122, 242, 0.38)',
     blobB: 'rgba(109, 74, 224, 0.20)',
     border: 'rgba(154, 122, 242, 0.35)',
-    wave: WavePurple,
-    waveFilter: 'saturate(3) brightness(0.50) hue-rotate(20deg)',
     accentColor: '#6d4ae0',
   },
   magenta: {
     blobA: 'rgba(217, 111, 224, 0.38)',
     blobB: 'rgba(181, 60, 192, 0.20)',
     border: 'rgba(217, 111, 224, 0.35)',
-    wave: WavePurple,
-    waveFilter: 'saturate(3) brightness(0.50) hue-rotate(-20deg)',
     accentColor: '#b53cc0',
   },
   aqua: {
     blobA: 'rgba(79, 214, 232, 0.38)',
     blobB: 'rgba(59, 158, 240, 0.20)',
     border: 'rgba(79, 214, 232, 0.35)',
-    wave: WaveBlue,
-    waveFilter: 'saturate(3) brightness(0.52)',
     accentColor: '#3b9ef0',
   },
   violet: {
     blobA: 'rgba(176, 107, 240, 0.38)',
     blobB: 'rgba(139, 58, 214, 0.20)',
     border: 'rgba(176, 107, 240, 0.35)',
-    wave: WavePurple,
-    waveFilter: 'saturate(3) brightness(0.50) hue-rotate(10deg)',
     accentColor: '#8b3ad6',
   },
   plum: {
     blobA: 'rgba(205, 122, 214, 0.38)',
     blobB: 'rgba(171, 68, 184, 0.20)',
     border: 'rgba(205, 122, 214, 0.35)',
-    wave: WavePurple,
-    waveFilter: 'saturate(3) brightness(0.52) hue-rotate(-10deg)',
     accentColor: '#ab44b8',
   },
 };
@@ -113,8 +95,7 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
           : undefined
       }
       className={[
-        'relative overflow-hidden rounded-2xl shadow-lg card-hover-pulse',
-        'backdrop-blur-xl bg-white/70',
+        'relative overflow-hidden rounded-2xl shadow-lg card-hover-pulse bg-white',
         clickable ? 'cursor-pointer hover:shadow-xl' : '',
         className,
       ].join(' ')}
@@ -131,6 +112,7 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
           borderRadius: '50%',
           background: `radial-gradient(circle, ${a.blobA} 0%, transparent 68%)`,
           filter: 'blur(34px)',
+          opacity: 0.5,
         }}
       />
       {/* Ambient radial glow — top-right */}
@@ -144,16 +126,8 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
           borderRadius: '50%',
           background: `radial-gradient(circle, ${a.blobB} 0%, transparent 65%)`,
           filter: 'blur(28px)',
+          opacity: 0.5,
         }}
-      />
-
-      {/* Wave pattern — darkened via filter so it's visible on light bg */}
-      <img
-        src={a.wave}
-        aria-hidden="true"
-        alt=""
-        className="absolute bottom-0 left-[-25%] w-[150%] max-w-none pointer-events-none select-none animate-wave"
-        style={{ opacity: 0.62, filter: a.waveFilter }}
       />
 
       {/* Watermark icon — tinted with accent color */}

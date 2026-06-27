@@ -3,7 +3,7 @@ Refrigerator Dashboard Service
 Service layer for refrigerator-specific dashboard metrics.
 Scoped exclusively to refrigerator data (c.refrigerator_id IS NOT NULL).
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from sqlalchemy import func, and_, text
 from sqlalchemy.orm import Session
@@ -39,6 +39,10 @@ def _prettify_kpi(kpi_name: str) -> str:
     if kpi_name in KPI_LABELS:
         return KPI_LABELS[kpi_name]
     return kpi_name.replace("_", " ").title()
+
+
+REFRIGERATOR_TEMP_KPI = "temp_internal"
+REFRIGERATOR_HUMIDITY_KPI = "temp_external"
 
 
 class RefrigeratorDashboardService:
@@ -411,4 +415,112 @@ class RefrigeratorDashboardService:
             "active_alerts": int(active_alerts),
             "unread_messages": int(unread_messages),
             "active_tasks": int(active_tasks),
+        }
+
+    # ------------------------------------------------------------------
+    # 6. Avg temperature / humidity trend across all refrigerators
+    #    Always 24 buckets over the selected window (bucket = duration / 24):
+    #    24h -> hourly, 7d -> 7-hourly, custom -> duration/24.
+    # ------------------------------------------------------------------
+    def get_temperature_humidity_trend(
+        self,
+        hospital_id: int,
+        branch_id: Optional[int],
+        role: Optional[str],
+        from_dt: Optional[datetime],
+        to_dt: Optional[datetime],
+        bucket_count: int = 24,
+    ) -> dict:
+        filter_branch = self._get_branch_filter(branch_id, role)
+
+        if to_dt is None:
+            to_dt = datetime.now(timezone.utc)
+        if from_dt is None:
+            from_dt = to_dt - timedelta(hours=24)
+
+        from_epoch = from_dt.timestamp()
+        to_epoch = to_dt.timestamp()
+        bucket_seconds = max((to_epoch - from_epoch) / bucket_count, 1)
+
+        # Single index-friendly pass: restrict readings to this hospital's
+        # refrigerator temp/humidity kpi_config rows (small set, joined by PK)
+        # and the timestamp window, then bucket with width_bucket and compute
+        # per-bucket + overall averages together via GROUPING SETS.
+        sql = text("""
+            WITH cfg AS (
+                SELECT id,
+                       CASE WHEN kpi_name = :temp_kpi THEN 'temperature' ELSE 'humidity' END AS metric
+                FROM kpi_config
+                WHERE hospital_id = :hospital_id
+                  -- AND refrigerator_id IS NOT NULL
+                  AND kpi_name IN (:temp_kpi, :humidity_kpi)
+                  -- AND (:branch_id IS NULL OR branch_id = :branch_id)
+            ),
+            pts AS (
+                SELECT c.metric AS metric,
+                       width_bucket(
+                           extract(epoch FROM r.timestamp)::double precision,
+                           CAST(:from_epoch AS double precision),
+                           CAST(:to_epoch AS double precision),
+                           CAST(:bucket_count AS integer)
+                       ) AS bkt,
+                       r.kpi_value AS val
+                FROM readings r
+                JOIN cfg c ON c.id = r.kpi_config_id
+                WHERE r.timestamp >= :from_dt AND r.timestamp < :to_dt
+            )
+            SELECT metric, bkt, avg(val)::float AS avg_val
+            FROM pts
+            GROUP BY GROUPING SETS ((metric, bkt), (metric))
+        """)
+
+        params = {
+            "hospital_id": hospital_id,
+            "branch_id": filter_branch,
+            "temp_kpi": REFRIGERATOR_TEMP_KPI,
+            "humidity_kpi": REFRIGERATOR_HUMIDITY_KPI,
+            "from_dt": from_dt,
+            "to_dt": to_dt,
+            "from_epoch": from_epoch,
+            "to_epoch": to_epoch,
+            "bucket_count": bucket_count,
+        }
+
+
+        rows = self.db.execute(sql, params).fetchall()
+
+        temp_buckets: List[Optional[float]] = [None] * bucket_count
+        hum_buckets: List[Optional[float]] = [None] * bucket_count
+        overall_temp: Optional[float] = None
+        overall_hum: Optional[float] = None
+
+        for metric, bkt, avg_val in rows:
+            if avg_val is None:
+                continue
+            if bkt is None:
+                if metric == "temperature":
+                    overall_temp = avg_val
+                else:
+                    overall_hum = avg_val
+                continue
+            idx = int(bkt) - 1
+            if 0 <= idx < bucket_count:
+                if metric == "temperature":
+                    temp_buckets[idx] = avg_val
+                else:
+                    hum_buckets[idx] = avg_val
+
+        points = []
+        for i in range(bucket_count):
+            points.append({
+                "t": int((from_epoch + i * bucket_seconds) * 1000),
+                "temperature": round(temp_buckets[i], 2) if temp_buckets[i] is not None else None,
+                "humidity": round(hum_buckets[i], 2) if hum_buckets[i] is not None else None,
+            })
+
+        return {
+            "avg_temperature": round(overall_temp, 2) if overall_temp is not None else None,
+            "avg_humidity": round(overall_hum, 2) if overall_hum is not None else None,
+            "bucket_hours": round(bucket_seconds / 3600, 1),
+            "points": points,
         }

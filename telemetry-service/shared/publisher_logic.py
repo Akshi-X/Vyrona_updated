@@ -187,7 +187,7 @@ def extract_tive_temperature_kpis(
 
     temp = payload_data.get("DeviceTemperature")
     if temp is None:
-        temp = (payload_data.get("Temperature") or {}).get("External")
+        temp = payload_data.get("Temperature")
     if temp is not None:
         kpis.append(
             {

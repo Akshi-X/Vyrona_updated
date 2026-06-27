@@ -42,6 +42,8 @@ import {
   Calendar,
   ChevronDown,
   LayoutGrid,
+  Thermometer,
+  Droplets,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
@@ -74,6 +76,7 @@ import {
   type TopKpiResponse,
   type BranchCriticalDistributionResponse,
   type OperationsResponse,
+  type TemperatureHumidityTrendResponse,
 } from "./services/refrigeratorDashboardService";
 import type { BranchMetrics } from "./types/map";
 
@@ -284,6 +287,13 @@ function cardRangeToTs(cardRange: CardRange, globalFromTs: number, globalToTs: n
 const fmtShortDate = (s: string) =>
   new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
+// Shift a yyyy-mm-dd date string by N days, returning yyyy-mm-dd
+const shiftDay = (dateStr: string, days: number): string => {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 function rangeLabelOf(preset: RangePreset, from: string, to: string): string {
   if (preset === '7d') return 'Last 7 days';
   if (preset === '30d') return 'Last 30 days';
@@ -362,6 +372,9 @@ const DashboardHospital8: React.FC = () => {
   const [rangePreset, setRangePreset] = useState<RangePreset>('7d');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  // Draft values for the custom-range inputs; committed to customFrom/customTo on Apply
+  const [draftFrom, setDraftFrom] = useState('');
+  const [draftTo, setDraftTo] = useState('');
   const [showRangeMenu, setShowRangeMenu] = useState(false);
 
   // Per-card range overrides
@@ -377,6 +390,7 @@ const DashboardHospital8: React.FC = () => {
   const [topKpiData, setTopKpiData] = useState<TopKpiResponse | null>(null);
   const [pieData, setPieData] = useState<BranchCriticalDistributionResponse | null>(null);
   const [opsData, setOpsData] = useState<OperationsResponse | null>(null);
+  const [tempHumidity, setTempHumidity] = useState<TemperatureHumidityTrendResponse | null>(null);
 
   const [insightIdx, setInsightIdx] = useState(0);
   const [insightPaused, setInsightPaused] = useState(false);
@@ -448,35 +462,18 @@ const DashboardHospital8: React.FC = () => {
   }, [revealed, typedIndex]);
 
   // ── WebSocket for chat ──────────────────────────────────────────────
+  // Generic chat WS isn't refrigerator-scoped; only the count refresh is reused.
+  // The messages modal is populated from the refrigerator-specific fetch below.
   const {
     unreadCount: wsUnreadCount,
-    unreadMessages: wsUnreadMessages,
     refresh: refreshUnread,
   } = useDashboardChatWebSocket({ enabled: !isOnboarding });
-
-  useEffect(() => {
-    if (wsUnreadMessages && wsUnreadMessages.length > 0) {
-      const transformedChats: StakeholderChat[] = wsUnreadMessages.map((msg) => ({
-        id: msg.message_id.toString(),
-        sender: msg.sender_name,
-        patientId: msg.canister_number
-          ? `Canister ID: ${msg.canister_number}`
-          : msg.patient_id
-            ? `Patient ID: ${msg.patient_id}`
-            : "Unknown",
-        message: msg.message_content,
-        timestamp: new Date(msg.created_at).toLocaleString(),
-        isRead: false,
-      }));
-      setStakeholderChats(transformedChats);
-    }
-  }, [wsUnreadMessages]);
 
   // ── Modal data fetchers ─────────────────────────────────────────────
   const fetchStakeholderChats = async () => {
     setLoadingChats(true);
     try {
-      const response = await chatService.getUnreadMessages();
+      const response = await chatService.getRefrigeratorUnreadMessages();
       if (response && typeof response.total_unread === "number") {
         setApiUnreadCount(response.total_unread);
       }
@@ -485,13 +482,11 @@ const DashboardHospital8: React.FC = () => {
           (msg: UnreadMessageResponse) => ({
             id: msg.message_id.toString(),
             sender: msg.sender_name,
-            patientId: msg.tank_code
-              ? `Tank: ${msg.tank_code}`
-              : msg.canister_number
-                ? `Canister ID: ${msg.canister_number}`
-                : msg.patient_id
-                  ? `Patient ID: ${msg.patient_id}`
-                  : "N/A",
+            patientId: msg.refrigerator_code
+              ? `Refrigerator: ${msg.refrigerator_code}`
+              : msg.refrigerator_id
+                ? `Refrigerator #${msg.refrigerator_id}`
+                : "N/A",
             message: msg.message_content,
             timestamp: new Date(msg.created_at).toLocaleString(),
             isRead: false,
@@ -512,11 +507,8 @@ const DashboardHospital8: React.FC = () => {
   const fetchMyTasks = async () => {
     setLoadingTasks(true);
     try {
-      const response = await tasksService.getMyTasks();
-      setMyTasks([
-        ...(response.created_tasks || []),
-        ...(response.assigned_tasks || []),
-      ]);
+      const response = await tasksService.getHospitalRefrigeratorTasks();
+      setMyTasks(response.tasks || []);
     } catch {
       setMyTasks([]);
     } finally {
@@ -527,10 +519,8 @@ const DashboardHospital8: React.FC = () => {
   const fetchRefrigeratorAlerts = async () => {
     setLoadingRefrigeratorAlerts(true);
     try {
-      const response = await ivfAlertsService.getHospitalAlerts();
-      setRefrigeratorAlerts(
-        (response?.alerts || []).filter((a) => a.refrigerator_id != null),
-      );
+      const response = await ivfAlertsService.getHospitalRefrigeratorAlerts();
+      setRefrigeratorAlerts(response?.alerts || []);
     } catch {
       setRefrigeratorAlerts([]);
     } finally {
@@ -657,6 +647,21 @@ const DashboardHospital8: React.FC = () => {
     return () => { cancelled = true; };
   }, [isAuthenticated, branchId]);
 
+  // Avg temp/humidity trend — follows the global range, always 24 buckets
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    (async () => {
+      const data = await refrigeratorDashboardService.getTemperatureHumidityTrend({
+        fromTs: globalFromTs,
+        toTs: globalToTs,
+        branchId,
+      });
+      if (!cancelled) setTempHumidity(data);
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, globalFromTs, globalToTs, branchId]);
+
   // ── Derived values ──────────────────────────────────────────────────
   const routes = useMemo(() => mapService.generateRoutesFromBranches(branches), [branches]);
 
@@ -672,6 +677,85 @@ const DashboardHospital8: React.FC = () => {
     maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { enabled: false } },
     scales: { x: { display: false }, y: { display: false } },
+    elements: { point: { radius: 0 } },
+    layout: { padding: 0 },
+  };
+
+  // Avg temperature / humidity trend (wide card)
+  const thPoints = tempHumidity?.points ?? [];
+  const thFmtHour = (d: Date) => {
+    let h = d.getHours();
+    const ampm = h < 12 ? "am" : "pm";
+    h = h % 12 || 12;
+    return `${h}${ampm}`;
+  };
+  // Short hour label; prefix the date when the day changes (e.g. "1 May 1am")
+  const thLabels = thPoints.map((p, i) => {
+    const d = new Date(p.t);
+    const prev = i > 0 ? new Date(thPoints[i - 1].t) : null;
+    const dayChanged =
+      !prev || prev.getDate() !== d.getDate() || prev.getMonth() !== d.getMonth();
+    const hour = thFmtHour(d);
+    return dayChanged
+      ? `${d.getDate()} ${d.toLocaleDateString([], { month: "short" })} ${hour}`
+      : hour;
+  });
+  const thLine = (data: (number | null)[], color: string, fill: string) => ({
+    labels: thLabels,
+    datasets: [{
+      data,
+      borderColor: color,
+      borderWidth: 2,
+      fill: true,
+      backgroundColor: fill,
+      tension: 0.4,
+      pointRadius: 0,
+      spanGaps: true,
+      // Point markers reveal only on hover (overlay)
+      pointHoverRadius: 4,
+      pointHoverBackgroundColor: color,
+      pointHoverBorderColor: "#ffffff",
+      pointHoverBorderWidth: 2,
+      pointHitRadius: 12,
+    }],
+  });
+  const tempChartData = thLine(thPoints.map((p) => p.temperature), "#8b3ad6", "rgba(139,58,214,0.12)");
+  const humChartData = thLine(thPoints.map((p) => p.humidity), "#3b9ef0", "rgba(59,158,240,0.12)");
+  const thOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index" as const, intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        enabled: true,
+        mode: "index" as const,
+        intersect: false,
+        callbacks: {
+          title: (items: any) => {
+            const i = items?.[0]?.dataIndex;
+            return i != null && thPoints[i]
+              ? new Date(thPoints[i].t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+              : "";
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        display: true,
+        grid: { display: false },
+        ticks: {
+          font: { size: 8 },
+          color: "#9ca3af",
+          autoSkip: true,
+          maxRotation: 0,
+          minRotation: 0,
+          maxTicksLimit: 6,
+        },
+      },
+      y: { display: false },
+    },
     elements: { point: { radius: 0 } },
     layout: { padding: 0 },
   };
@@ -1129,8 +1213,16 @@ const DashboardHospital8: React.FC = () => {
                       <button
                         key={opt.value}
                         onClick={() => {
-                          setRangePreset(opt.value);
-                          if (opt.value !== "custom") setShowRangeMenu(false);
+                          if (opt.value === "custom") {
+                            // Seed the draft inputs from the last applied range; don't
+                            // commit until Apply is clicked.
+                            setRangePreset("custom");
+                            setDraftFrom(customFrom);
+                            setDraftTo(customTo);
+                          } else {
+                            setRangePreset(opt.value);
+                            setShowRangeMenu(false);
+                          }
                         }}
                         className={`w-full flex items-center gap-2 text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition ${rangePreset === opt.value ? "bg-primary text-white" : "text-gray-600 hover:bg-primary/5"}`}
                       >
@@ -1139,13 +1231,19 @@ const DashboardHospital8: React.FC = () => {
                       </button>
                     ))}
                     {rangePreset === "custom" && (
-                      <div className="mt-1 pt-2 px-2 pb-1 border-t border-gray-100 flex flex-col gap-1.5">
+                      <div className="mt-1 pt-2 px-2 pb-2 border-t border-gray-100 flex flex-col gap-1.5">
                         <div className="flex flex-col gap-0.5">
                           <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">From</span>
                           <input
                             type="date"
-                            value={customFrom}
-                            onChange={(e) => setCustomFrom(e.target.value)}
+                            value={draftFrom}
+                            max={draftTo ? shiftDay(draftTo, -1) : undefined}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setDraftFrom(v);
+                              // Keep from < to: bump To to +1 day if missing or not after From
+                              if (v && (!draftTo || draftTo <= v)) setDraftTo(shiftDay(v, 1));
+                            }}
                             className="text-[11px] font-medium bg-gray-50 rounded-md px-2 py-1 outline-none text-gray-700 border border-gray-200"
                           />
                         </div>
@@ -1153,11 +1251,28 @@ const DashboardHospital8: React.FC = () => {
                           <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">To</span>
                           <input
                             type="date"
-                            value={customTo}
-                            onChange={(e) => setCustomTo(e.target.value)}
+                            value={draftTo}
+                            min={draftFrom ? shiftDay(draftFrom, 1) : undefined}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setDraftTo(v);
+                              // Keep from < to: pull From back 1 day if missing or not before To
+                              if (v && (!draftFrom || draftFrom >= v)) setDraftFrom(shiftDay(v, -1));
+                            }}
                             className="text-[11px] font-medium bg-gray-50 rounded-md px-2 py-1 outline-none text-gray-700 border border-gray-200"
                           />
                         </div>
+                        <button
+                          disabled={!draftFrom || !draftTo || draftFrom >= draftTo}
+                          onClick={() => {
+                            setCustomFrom(draftFrom);
+                            setCustomTo(draftTo);
+                            setShowRangeMenu(false);
+                          }}
+                          className="mt-1 w-full px-3 py-1.5 rounded-lg text-xs font-bold transition bg-primary text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90"
+                        >
+                          Apply
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1170,8 +1285,11 @@ const DashboardHospital8: React.FC = () => {
         {/* Floating cards — row-wise grid (rows stretch to equal height) */}
         {!loadingMap && (
           <div
-            className={`absolute left-6 top-[136px] z-30 w-[560px] grid grid-cols-12 items-stretch content-start gap-3 pointer-events-none ${revealed && !introDone ? "intro-col-left" : ""}`}
+            className="absolute left-6 top-[136px] bottom-6 z-30 w-[572px] overflow-y-auto overflow-x-hidden pr-3 pointer-events-auto"
             style={{ opacity: revealed ? undefined : 0 }}
+          >
+          <div
+            className={`grid grid-cols-12 items-stretch content-start gap-3 ${revealed && !introDone ? "intro-col-left" : ""}`}
           >
             {/* Top KPI card (was: Total Refrigerators) */}
             <DashboardCard
@@ -1465,6 +1583,65 @@ const DashboardHospital8: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Avg Temperature & Humidity — wide trend card (24 points) */}
+            <DashboardCard
+              accent="violet"
+              watermark={Activity}
+              className="pointer-events-auto h-full col-span-12 order-7"
+            >
+              <div className="flex items-stretch gap-4">
+                {/* 30% — overall averages: temp centered in upper half, humidity in lower half */}
+                <div className="w-[30%] shrink-0 flex flex-col border-r border-gray-100 pr-4">
+                  {/* Upper half — temperature */}
+                  <div className="flex-1 flex flex-col items-center justify-center text-center gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <Thermometer size={12} style={{ color: "#8b3ad6" }} />
+                      <p className="text-[9px] text-gray-400 uppercase tracking-wider">Avg Temperature</p>
+                    </div>
+                    <p className="text-3xl font-black text-primary leading-none">
+                      {tempHumidity?.avg_temperature ?? '—'}
+                      <span className="text-base font-bold">°C</span>
+                    </p>
+                  </div>
+
+                  <div className="h-px bg-gray-100" />
+
+                  {/* Lower half — humidity */}
+                  <div className="flex-1 flex flex-col items-center justify-center text-center gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <Droplets size={12} style={{ color: "#3b9ef0" }} />
+                      <p className="text-[9px] text-gray-400 uppercase tracking-wider">Avg Humidity</p>
+                    </div>
+                    <p className="text-3xl font-black text-primary leading-none">
+                      {tempHumidity?.avg_humidity ?? '—'}
+                      <span className="text-base font-bold">%</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* 70% — two stacked graphs */}
+                <div className="flex-1 min-w-0 flex flex-col gap-2">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      Temperature (°C)
+                    </p>
+                    <div className="h-20">
+                      <Line data={tempChartData} options={thOptions} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      Humidity (%)
+                    </p>
+                    <div className="h-20">
+                      <Line data={humChartData} options={thOptions} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </DashboardCard>
+          </div>
           </div>
         )}
 
