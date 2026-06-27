@@ -1378,6 +1378,7 @@ export default function RefrigeratorVisualisation({
             refrigeratorCode={refrigeratorCode}
             branchName={branchName}
             zoneCount={zones.length}
+            zones={zones}
           />
         ) : (
           <>
