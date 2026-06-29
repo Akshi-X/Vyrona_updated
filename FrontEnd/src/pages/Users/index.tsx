@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { Users, UserPlus } from "lucide-react";
 import PageLayout from "../../components/PageLayout";
+import { useHasVariant } from "../../components/VariantRoute";
 import { useAuth } from "../../contexts/AuthContext";
 import { userService } from "../../services/userService";
 import type { HospitalUserItem } from "../../services/userService";
@@ -14,6 +15,9 @@ type FilterState = {
 
 export default function UsersPage() {
     const { isAuthenticated } = useAuth();
+    // There is no Users variant for the refrigerator-only hospital, so detect it
+    // via its dedicated refrigerator-tracking variant (hospital-8 exclusive).
+    const refrigeratorOnly = useHasVariant("/refrigerator-tracking/:refrigeratorId");
 
     const [users, setUsers] = useState<HospitalUserItem[]>([]);
     const [allBranches, setAllBranches] = useState<string[]>([]);
@@ -221,7 +225,9 @@ export default function UsersPage() {
         )}
         <PageLayout
             title="Users"
+            description={refrigeratorOnly ? "Manage your team's roles and branch access." : undefined}
             lucideIcon={Users}
+            patternBackground={refrigeratorOnly}
             actions={
                 <button
                     id="onboarding-users-add-btn"
