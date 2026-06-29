@@ -44,6 +44,8 @@ import {
   LayoutGrid,
   Thermometer,
   Droplets,
+  Gauge,
+  Inbox,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
@@ -337,15 +339,17 @@ const TrendDelta: React.FC<{ delta: number | null; className?: string }> = ({ de
   );
 };
 
-const CardRangeSelect: React.FC<{ value: CardRange; onChange: (v: CardRange) => void }> = ({ value, onChange }) => (
+const CardRangeSelect: React.FC<{ value: CardRange; onChange: (v: CardRange) => void; globalLabel: string; globalPreset: RangePreset }> = ({ value, onChange, globalLabel, globalPreset }) => (
   <select
     value={value}
     onChange={(e) => onChange(e.target.value as CardRange)}
     className="text-[10px] font-semibold text-gray-500 bg-transparent border-none outline-none cursor-pointer hover:text-gray-700"
   >
-    <option value="global">Global range</option>
-    <option value="7d">Last 7 days</option>
-    <option value="30d">Last 30 days</option>
+    {/* The global option already shows the active range, so hide the preset that
+        would duplicate it — unless this card is explicitly set to that override. */}
+    <option value="global">{globalLabel}</option>
+    {(globalPreset !== '7d' || value === '7d') && <option value="7d">Last 7 days</option>}
+    {(globalPreset !== '30d' || value === '30d') && <option value="30d">Last 30 days</option>}
   </select>
 );
 
@@ -395,6 +399,7 @@ const DashboardHospital8: React.FC = () => {
   const [topKpiRange, setTopKpiRange] = useState<CardRange>('global');
   const [trendRange, setTrendRange] = useState<CardRange>('global');
   const [combinedRange, setCombinedRange] = useState<CardRange>('global');
+  const [avgRange, setAvgRange] = useState<CardRange>('global');
 
   // Dashboard data states
   const [trendData, setTrendData] = useState<DeviationTrendResponse | null>(null);
@@ -426,6 +431,10 @@ const DashboardHospital8: React.FC = () => {
   const topKpiTs = useMemo(() => cardRangeToTs(topKpiRange, globalFromTs, globalToTs), [topKpiRange, globalFromTs, globalToTs]);
   const trendTs = useMemo(() => cardRangeToTs(trendRange, globalFromTs, globalToTs), [trendRange, globalFromTs, globalToTs]);
   const combinedTs = useMemo(() => cardRangeToTs(combinedRange, globalFromTs, globalToTs), [combinedRange, globalFromTs, globalToTs]);
+  const avgTs = useMemo(() => cardRangeToTs(avgRange, globalFromTs, globalToTs), [avgRange, globalFromTs, globalToTs]);
+
+  // Label for the global range, shown as the "global" option in each card's range select.
+  const globalRangeLabel = rangeLabelOf(rangePreset, customFrom, customTo);
 
   const branchId = selectedBranch?.branch_id ?? null;
 
@@ -659,20 +668,20 @@ const DashboardHospital8: React.FC = () => {
     return () => { cancelled = true; };
   }, [isAuthenticated, branchId]);
 
-  // Avg temp/humidity trend — follows the global range, always 24 buckets
+  // Avg temp/humidity trend — follows its card range, always 24 buckets
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
       const data = await refrigeratorDashboardService.getTemperatureHumidityTrend({
-        fromTs: globalFromTs,
-        toTs: globalToTs,
+        fromTs: avgTs.fromTs,
+        toTs: avgTs.toTs,
         branchId,
       });
       if (!cancelled) setTempHumidity(data);
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, globalFromTs, globalToTs, branchId]);
+  }, [isAuthenticated, avgTs.fromTs, avgTs.toTs, branchId]);
 
   // ── Derived values ──────────────────────────────────────────────────
   const routes = useMemo(() => mapService.generateRoutesFromBranches(branches), [branches]);
@@ -1310,30 +1319,35 @@ const DashboardHospital8: React.FC = () => {
               watermark={TrendingUp}
               className="group pointer-events-auto h-full order-1 col-span-6"
             >
-              <div className="flex items-center justify-between mb-0.5">
-                <div className="flex items-center gap-1.5">
-                  <TrendingUp size={12} style={{ color: "#8b3ad6" }} className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
-                    Top Deviated KPI
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp size={12} style={{ color: "#8b3ad6" }} className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
+                      Top Deviated KPI
+                    </p>
+                  </div>
+                  <CardRangeSelect value={topKpiRange} onChange={setTopKpiRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
+                </div>
+                {/* KPI name + comparison — vertically centered in the card */}
+                <div className="flex-1 flex flex-col justify-center">
+                  <p className="text-2xl font-extrabold text-primary leading-tight line-clamp-2 pr-16">
+                    {topKpiData?.label ?? '—'}
                   </p>
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <TrendDelta delta={topKpiData?.delta_pct ?? null} />
+                    <span className="text-[10px] text-gray-400">vs previous period</span>
+                  </div>
                 </div>
-                <CardRangeSelect value={topKpiRange} onChange={setTopKpiRange} />
+                {trendSeries.length > 0 && (
+                  <div className="h-6 -mx-4 -mb-4">
+                    <Line
+                      data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.35)")}
+                      options={areaOptions}
+                    />
+                  </div>
+                )}
               </div>
-              <p className="text-xl font-extrabold text-primary mt-1 leading-tight line-clamp-2 pr-16">
-                {topKpiData?.label ?? '—'}
-              </p>
-              <div className="flex items-center gap-1 mt-1.5">
-                <TrendDelta delta={topKpiData?.delta_pct ?? null} />
-                <span className="text-[10px] text-gray-400">vs previous period</span>
-              </div>
-              {trendSeries.length > 0 && (
-                <div className="mt-2 h-6 -mx-4 -mb-4">
-                  <Line
-                    data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.35)")}
-                    options={areaOptions}
-                  />
-                </div>
-              )}
               {/* Count — anchored to the card's bottom-right */}
               <div className="absolute bottom-3 right-4 flex flex-col items-end leading-none">
                 <span className="text-5xl font-black text-primary leading-none inline-block origin-bottom-right transition-transform duration-300 group-hover:scale-105">
@@ -1345,9 +1359,9 @@ const DashboardHospital8: React.FC = () => {
 
             {/* Operations card */}
             <div id="onboarding-dashboard-alerts" className="pointer-events-auto h-full order-3 col-span-5">
-              <DashboardCard accent="violet" watermark={Activity} className="group h-full">
+              <DashboardCard accent="violet" watermark={Inbox} className="group h-full">
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <Activity size={12} style={{ color: "#8b3ad6" }} />
+                  <Inbox size={12} style={{ color: "#8b3ad6" }} />
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
                     Operations
                   </p>
@@ -1399,7 +1413,7 @@ const DashboardHospital8: React.FC = () => {
                     Deviation Overview
                   </p>
                 </div>
-                <CardRangeSelect value={combinedRange} onChange={setCombinedRange} />
+                <CardRangeSelect value={combinedRange} onChange={setCombinedRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
               </div>
               <div className="flex items-stretch gap-4">
                 {/* Left — Alerts by KPI */}
@@ -1479,7 +1493,6 @@ const DashboardHospital8: React.FC = () => {
             <DashboardCard
               accent="violet"
               watermark={Activity}
-              watermarkPosition="top-right"
               className="group pointer-events-auto h-full order-2 col-span-6"
             >
               <div className="flex items-center justify-between">
@@ -1489,7 +1502,7 @@ const DashboardHospital8: React.FC = () => {
                     Deviation Trend
                   </p>
                 </div>
-                <CardRangeSelect value={trendRange} onChange={setTrendRange} />
+                <CardRangeSelect value={trendRange} onChange={setTrendRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
               </div>
               <div className="flex items-baseline gap-2 mt-1">
                 <p className="text-2xl font-extrabold text-primary leading-none transition-transform duration-300 group-hover:-translate-y-0.5">
@@ -1598,14 +1611,17 @@ const DashboardHospital8: React.FC = () => {
             {/* Avg Temperature & Humidity — wide trend card (24 points) */}
             <DashboardCard
               accent="violet"
-              watermark={Activity}
+              watermark={Gauge}
               className="group pointer-events-auto h-full col-span-12 order-5"
             >
-              <div className="flex items-center gap-1.5 mb-2">
-                <Thermometer size={12} style={{ color: "#8b3ad6" }} />
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
-                  Avg Conditions
-                </p>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Gauge size={12} style={{ color: "#8b3ad6" }} />
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
+                    Avg Conditions
+                  </p>
+                </div>
+                <CardRangeSelect value={avgRange} onChange={setAvgRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
               </div>
               <div className="flex items-stretch gap-4">
                 {/* 30% — overall averages: temp centered in upper half, humidity in lower half */}
@@ -1655,18 +1671,18 @@ const DashboardHospital8: React.FC = () => {
                       <Line data={humChartData} options={thOptions} />
                     </div>
                   </div>
+                  {/* Interval info — centered on the graphs, always 24 points */}
+                  <p className="text-[9px] text-gray-400 text-center">
+                    {tempHumidity?.bucket_hours
+                      ? `24 points · each ≈ ${
+                          tempHumidity.bucket_hours >= 24
+                            ? `${(tempHumidity.bucket_hours / 24).toFixed(tempHumidity.bucket_hours % 24 === 0 ? 0 : 1)} day${tempHumidity.bucket_hours >= 48 ? "s" : ""}`
+                            : `${tempHumidity.bucket_hours} hr${tempHumidity.bucket_hours === 1 ? "" : "s"}`
+                        } across the selected period`
+                      : "24 points across the selected period"}
+                  </p>
                 </div>
               </div>
-              {/* Interval info — graph always plots 24 points across the period */}
-              <p className="text-[9px] text-gray-400 mt-2 text-center">
-                {tempHumidity?.bucket_hours
-                  ? `24 points · each ≈ ${
-                      tempHumidity.bucket_hours >= 24
-                        ? `${(tempHumidity.bucket_hours / 24).toFixed(tempHumidity.bucket_hours % 24 === 0 ? 0 : 1)} day${tempHumidity.bucket_hours >= 48 ? "s" : ""}`
-                        : `${tempHumidity.bucket_hours} hr${tempHumidity.bucket_hours === 1 ? "" : "s"}`
-                    } across the selected period`
-                  : "24 points across the selected period"}
-              </p>
             </DashboardCard>
           </div>
           </div>
