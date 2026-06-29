@@ -110,7 +110,7 @@ class RefrigeratorDashboardService extends BaseApiService {
         `/api/ivf/refrigerator-dashboard/top-kpi${this.qs(fromTs, toTs, branchId)}`
       );
     } catch {
-      return { kpi_name: null, label: 'N/A', count: 0, previous_count: 0, delta_pct: null };
+      return { kpi_name: null, label: 'No Deviations', count: 0, previous_count: 0, delta_pct: null };
     }
   }
 

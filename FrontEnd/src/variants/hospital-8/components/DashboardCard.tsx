@@ -141,7 +141,7 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
         />
       )}
 
-      <div className={`relative z-10 ${contentClassName}`}>{children}</div>
+      <div className={`relative h-full z-10 ${contentClassName}`}>{children}</div>
     </div>
   );
 };

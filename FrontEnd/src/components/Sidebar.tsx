@@ -17,7 +17,6 @@ import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg"
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
 import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
-import UserIcon from "../assets/DashBoardIcons/User.svg";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -375,7 +374,14 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     onClick={() => { navigate(resolvePath("/user-profile")); closeMobile(); }}
                     className="group w-full flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 flex-shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
                 >
-                    <img src={UserIcon} alt="" className="w-5 h-5 flex-shrink-0" />
+                    <span className="w-6 h-6 flex-shrink-0 rounded-full bg-white/20 text-white text-[10px] font-bold flex items-center justify-center uppercase">
+                        {(profileName || "User")
+                            .split(/\s+/)
+                            .filter(Boolean)
+                            .slice(0, 2)
+                            .map((s) => s[0])
+                            .join("") || "U"}
+                    </span>
                     <div className="flex-1 min-w-0 flex flex-col items-start">
                         <span className="font-semibold text-xs md:text-sm text-white truncate w-full">
                             {profileName || "\u00A0"}
