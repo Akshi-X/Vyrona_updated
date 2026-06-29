@@ -41,8 +41,8 @@ def _prettify_kpi(kpi_name: str) -> str:
     return kpi_name.replace("_", " ").title()
 
 
-REFRIGERATOR_TEMP_KPI = "temp_internal"
-REFRIGERATOR_HUMIDITY_KPI = "temp_external"
+REFRIGERATOR_TEMP_KPI = "refrigerator_temperature"
+REFRIGERATOR_HUMIDITY_KPI = "refrigerator_humidity"
 
 
 class RefrigeratorDashboardService:
@@ -452,9 +452,9 @@ class RefrigeratorDashboardService:
                        CASE WHEN kpi_name = :temp_kpi THEN 'temperature' ELSE 'humidity' END AS metric
                 FROM kpi_config
                 WHERE hospital_id = :hospital_id
-                  -- AND refrigerator_id IS NOT NULL
+                  AND refrigerator_id IS NOT NULL
                   AND kpi_name IN (:temp_kpi, :humidity_kpi)
-                  -- AND (:branch_id IS NULL OR branch_id = :branch_id)
+                AND (:branch_id IS NULL OR branch_id = :branch_id)
             ),
             pts AS (
                 SELECT c.metric AS metric,
