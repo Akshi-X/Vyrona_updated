@@ -34,7 +34,6 @@ import {
   ArrowDownRight,
   MessageSquare,
   CheckSquare,
-  BarChart3,
   ShieldCheck,
   Activity,
   Refrigerator,
