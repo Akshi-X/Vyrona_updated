@@ -28,6 +28,17 @@ const parseTimestampToMs = (timestamp?: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const parseDbTimestamp = (ts: string): { tsMs: number; isoIST: string } | null => {
+  if (!ts) return null;
+  const norm = ts.trim().replace(' ', 'T');
+  const withZ = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(norm) ? norm : `${norm}Z`;
+  const d = new Date(withZ);
+  if (isNaN(d.getTime())) return null;
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istMs = d.getTime() + istOffset;
+  return { tsMs: d.getTime(), isoIST: new Date(istMs).toISOString() };
+};
+
 const normalizeKpiValue = (rawValue: unknown): number | null => {
   if (typeof rawValue === 'number') return Number.isFinite(rawValue) ? rawValue : null;
   if (typeof rawValue === 'string') {
@@ -62,6 +73,7 @@ export type RefrigeratorSensorTile = {
   timestamp: string | null;
   isMissing: boolean;
   history: number[];
+  unit: string;
 };
 
 type LatestKpi = {
@@ -152,13 +164,16 @@ export function useRefrigeratorKpiSnapshot({
         const now = Date.now();
         const entries: LatestKpi[] = rows
           .filter((r) => r.value != null)
-          .map((r) => ({
-            name: r.kpi_name,
-            value: Number(r.value),
-            unit: r.unit || '',
-            timestamp: new Date(now).toISOString(),
-            tsMs: now,
-          }));
+          .map((r) => {
+            const parsed = r.timestamp ? parseDbTimestamp(r.timestamp) : null;
+            return {
+              name: r.kpi_name,
+              value: Number(r.value),
+              unit: r.unit || '',
+              timestamp: parsed?.isoIST ?? new Date(now).toISOString(),
+              tsMs: parsed?.tsMs ?? now,
+            };
+          });
         updateLatest(entries);
       })
       .catch(() => {})
@@ -240,13 +255,15 @@ export function useRefrigeratorKpiSnapshot({
       const latest = latestByName[id];
       const value = latest ? latest.value : null;
       const tsMs = latest ? latest.tsMs : null;
+      const unit = latest?.unit || KPI_UNITS[id] || '°C';
       return {
         id: id as 'temp_external' | 'probe_temp',
         label: KPI_LABELS[id] ?? id,
-        value: formatKpiValue(value, latest?.unit || KPI_UNITS[id] || '°C'),
+        value: formatKpiValue(value, unit),
         timestamp: formatTimeAgo(nowTs, tsMs),
         isMissing: value == null,
         history: kpiHistoryRef.current[id]?.slice() ?? [],
+        unit,
       };
     });
   }, [latestByName, nowTs]);

@@ -43,6 +43,7 @@ import { AlertTriangle, Droplets, Thermometer, TrendingUp } from 'lucide-react';
 import type { Task } from '../../../services/tasksService';
 import { ivfService } from '../../../services/ivfService';
 import { useRefrigeratorKpiSnapshot } from '../../../pages/RefrigeratorTracking/sections/useRefrigeratorKpiSnapshot';
+import { useAuth } from '../../../contexts/AuthContext';
 
 import { ivfAlertsService, type IVFAlert } from '../../../services/ivfAlertsService';
 import ColdStorageRoom from './ColdStorageRoom';
@@ -424,11 +425,65 @@ function buildCompartment(
 
 
 const INLINE_TIME_RANGES = [
+  { id: 'LIVE' as const, label: 'LATEST', minutes: undefined },
   { id: '1H'  as const, label: '1H',  minutes: 60    },
   { id: '24H' as const, label: '24H', minutes: 1440  },
   { id: '7D'  as const, label: '7D',  minutes: 10080 },
 ] as const;
 type InlineRangeId = (typeof INLINE_TIME_RANGES)[number]['id'];
+
+type InlineDataPoint = { timestamp: string; value: number };
+type InlineBucketedChart = { labels: string[]; values: (number | null)[] };
+
+function parseInlineTimestamp(ts: string): Date | null {
+  try {
+    const norm = ts.trim().replace(' ', 'T');
+    const withZ = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(norm) ? norm : `${norm}Z`;
+    const d = new Date(withZ);
+    return isNaN(d.getTime()) ? null : d;
+  } catch { return null; }
+}
+
+function buildInlineBucketedChart(
+  series: InlineDataPoint[],
+  range: InlineRangeId,
+  rangeStartMs: number,
+  nowMs: number,
+): InlineBucketedChart {
+  const slotMs =
+    range === '1H'  ? 2  * 60_000 :
+    range === '24H' ? 30 * 60_000 :
+                      6  * 60 * 60_000;
+
+  const labels: string[] = [];
+  const values: (number | null)[] = [];
+
+  const slotMap = new Map<number, number>();
+  for (const p of series) {
+    const d = parseInlineTimestamp(p.timestamp);
+    if (!d) continue;
+    const offsetMs = d.getTime() - rangeStartMs;
+    if (offsetMs < 0 || offsetMs > nowMs - rangeStartMs) continue;
+    const slotIdx = Math.floor(offsetMs / slotMs);
+    if (!slotMap.has(slotIdx)) slotMap.set(slotIdx, p.value);
+  }
+
+  const totalMs = nowMs - rangeStartMs;
+  const totalSlots = Math.ceil(totalMs / slotMs);
+
+  for (let i = 0; i <= totalSlots; i++) {
+    const slotTimeMs = rangeStartMs + i * slotMs;
+    const d = new Date(slotTimeMs);
+    const label =
+      range === '7D'
+        ? d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+        : `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    labels.push(label);
+    values.push(slotMap.get(i) ?? null);
+  }
+
+  return { labels, values };
+}
 
 function InlineKpiChart({
   refrigeratorId,
@@ -443,13 +498,17 @@ function InlineKpiChart({
   accent: string;
   unit: string;
 }) {
-  const [range, setRange] = useState<InlineRangeId>('24H');
+  const { token } = useAuth();
+  const [range, setRange] = useState<InlineRangeId>('LIVE');
   const [series, setSeries] = useState<{ timestamp: string; value: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const wsRef = useRef<WebSocket | null>(null);
+  const latestKpiTimestampRef = useRef<Record<string, string>>({});
+  const chartRef = useRef<any>(null);
 
   useEffect(() => {
     setLoading(true);
-    const minutes = INLINE_TIME_RANGES.find((r) => r.id === range)?.minutes ?? 1440;
+    const minutes = INLINE_TIME_RANGES.find((r) => r.id === range)?.minutes;
     ivfService
       .getRefrigeratorKpiHistory(refrigeratorId, minutes, zoneId)
       .then((res) => {
@@ -460,25 +519,100 @@ function InlineKpiChart({
       .finally(() => setLoading(false));
   }, [refrigeratorId, kpiKey, zoneId, range]);
 
-  const labels = useMemo(() => series.map((p) => {
-    try {
-      const norm = p.timestamp.trim().replace(' ', 'T');
-      const withZ = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(norm) ? norm : `${norm}Z`;
-      const d = new Date(withZ);
-      if (isNaN(d.getTime())) return '';
-      if (range === '7D') return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-      return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-    } catch { return ''; }
-  }), [series, range]);
+  useEffect(() => {
+    if (range !== 'LIVE') {
+      wsRef.current?.close();
+      wsRef.current = null;
+      return;
+    }
 
-  const values = useMemo(() => series.map((p) => p.value), [series]);
+    if (wsRef.current) return;
+
+    try {
+      const wsBase = import.meta.env.VITE_API_BASE_URL?.replace(/^http/, 'ws') || 'ws://localhost:8001';
+      const wsUrl = `${wsBase}/api/ivf/quality/refrigerator-kpi-ws?token=${token}`;
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ refrigerator_id: refrigeratorId, zone_id: zoneId }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          if (!parsed.kpis || !Array.isArray(parsed.kpis)) return;
+
+          const relevantKpis = parsed.kpis.filter((k: any) => k.name === kpiKey);
+
+          setSeries((prev) => {
+            let updated = [...prev];
+            for (const kpi of relevantKpis) {
+              const ts = kpi.timestamp || '';
+              const lastTs = latestKpiTimestampRef.current[kpiKey];
+              if (lastTs && ts <= lastTs) continue;
+
+              latestKpiTimestampRef.current[kpiKey] = ts;
+              updated.push({
+                timestamp: ts,
+                value: kpi.value,
+              });
+            }
+            return updated;
+          });
+        } catch (err) {
+          console.error('WS parse error:', err);
+        }
+      };
+
+      ws.onclose = () => {
+        wsRef.current = null;
+      };
+
+      wsRef.current = ws;
+    } catch (err) {
+      console.error('WS error:', err);
+    }
+
+    return () => {
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
+  }, [range, refrigeratorId, zoneId, token, kpiKey]);
+
+  useEffect(() => {
+    chartRef.current?.update();
+  }, [series]);
+
+  const rangeMinutes = INLINE_TIME_RANGES.find((r) => r.id === range)?.minutes;
+  const nowMs = Date.now();
+  const rangeStartMs = rangeMinutes != null ? nowMs - rangeMinutes * 60_000 : null;
+
+  const { labels, values } = useMemo(() => {
+    if (range === 'LIVE' || rangeStartMs == null) {
+      return {
+        labels: series.map((p) => {
+          try {
+            const norm = p.timestamp.trim().replace(' ', 'T');
+            const withZ = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(norm) ? norm : `${norm}Z`;
+            const d = new Date(withZ);
+            if (isNaN(d.getTime())) return '';
+            if (range === '7D') return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+          } catch { return ''; }
+        }),
+        values: series.map((p) => p.value),
+      };
+    }
+    return buildInlineBucketedChart(series, range, rangeStartMs, nowMs);
+  }, [series, range, rangeStartMs, nowMs]);
 
   const stats = useMemo(() => {
-    if (values.length === 0) return null;
+    const nonNullValues = values.filter((v): v is number => v !== null);
+    if (nonNullValues.length === 0) return { min: null, max: null, avg: null };
     return {
-      min: Math.min(...values),
-      max: Math.max(...values),
-      avg: values.reduce((a, b) => a + b, 0) / values.length,
+      min: Math.min(...nonNullValues),
+      max: Math.max(...nonNullValues),
+      avg: nonNullValues.reduce((a, b) => a + b, 0) / nonNullValues.length,
     };
   }, [values]);
 
@@ -490,11 +624,12 @@ function InlineKpiChart({
       borderColor: accent,
       backgroundColor: `${accent}18`,
       borderWidth: 2,
-      pointRadius: values.length > 80 ? 0 : 2,
+      pointRadius: range === 'LIVE' ? 0 : (values.length > 82 ? 0 : 2),
       fill: true,
       tension: 0.3,
+      spanGaps: false,
     }],
-  }), [labels, values, accent, kpiKey]);
+  }), [labels, values, accent, kpiKey, range]);
 
   const chartOptions = useMemo(() => ({
     responsive: true,
@@ -505,10 +640,10 @@ function InlineKpiChart({
       callbacks: { label: (ctx: { parsed: { y: number } }) => `${ctx.parsed.y?.toFixed(2)} ${unit}` },
     }},
     scales: {
-      x: { ticks: { maxTicksLimit: 6, font: { size: 9 }, color: '#9ca3af' }, grid: { color: '#f0ecf6' } },
+      x: { ticks: { maxTicksLimit: range === '7D' ? 8 : 6, font: { size: 9 }, color: '#9ca3af' }, grid: { color: '#f0ecf6' } },
       y: { ticks: { font: { size: 9 }, color: '#9ca3af', callback: (v: number | string) => `${v}` }, grid: { color: '#f0ecf6' } },
     },
-  }), [unit]);
+  }), [unit, range]);
 
   return (
     <div>
@@ -526,23 +661,21 @@ function InlineKpiChart({
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#9ca3af' }}>No data</div>
           )}
           {!loading && series.length > 0 && (
-            <Line data={chartData} options={chartOptions as any} />
+            <Line ref={chartRef} data={chartData} options={chartOptions as any} />
           )}
         </div>
       </div>
       <div style={{ padding: '8px 12px 10px', borderTop: '1px solid #f0e8f4', marginTop: 6 }}>
-        {stats && (
-          <div style={{ display: 'flex', gap: 0, marginBottom: 8 }}>
-            {(['min', 'max', 'avg'] as const).map((key, i) => (
-              <div key={key} style={{ flex: 1, textAlign: 'center', borderRight: i < 2 ? '1px solid #f0e8f4' : undefined, paddingRight: i < 2 ? 8 : 0, paddingLeft: i > 0 ? 8 : 0 }}>
-                <div style={{ fontSize: 8, fontWeight: 600, color: '#a07ab8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{key}</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: accent, marginTop: 1 }}>
-                  {stats[key].toFixed(1)}<span style={{ fontSize: 9, color: '#9ca3af', marginLeft: 1 }}>{unit}</span>
-                </div>
+        <div style={{ display: 'flex', gap: 0, marginBottom: 8 }}>
+          {(['min', 'max', 'avg'] as const).map((key, i) => (
+            <div key={key} style={{ flex: 1, textAlign: 'center', borderRight: i < 2 ? '1px solid #f0e8f4' : undefined, paddingRight: i < 2 ? 8 : 0, paddingLeft: i > 0 ? 8 : 0 }}>
+              <div style={{ fontSize: 8, fontWeight: 600, color: '#a07ab8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{key}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: accent, marginTop: 1 }}>
+                {stats[key] !== null ? `${stats[key]!.toFixed(1)}` : '—'}<span style={{ fontSize: 9, color: '#9ca3af', marginLeft: 1 }}>{unit}</span>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 500 }}>Range:</span>
           <div style={{ display: 'flex', borderRadius: 6, border: '1px solid #e6d6ee', overflow: 'hidden', background: '#fdfbfe' }}>
@@ -785,7 +918,11 @@ function ZoneKpiSection({
       {sensorTiles.length === 0 ? (
         <div className="text-xs text-gray-400 italic">No data</div>
       ) : (
-        sensorTiles.map((tile) => {
+        [...sensorTiles].sort((a, b) => {
+          const aIsTemp = (a.id as any) === 'refrigerator_temp' ? 0 : 1;
+          const bIsTemp = (b.id as any) === 'refrigerator_temp' ? 0 : 1;
+          return aIsTemp - bIsTemp;
+        }).map((tile) => {
           const isTemp = (tile.id as any) === 'refrigerator_temp';
           const accent = isTemp ? '#1a7abb' : '#7a22c8';
           const ring = isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)';
@@ -828,7 +965,7 @@ function ZoneKpiSection({
                   kpiKey={tile.id}
                   zoneId={zone.zone_id}
                   accent={accent}
-                  unit="°C"
+                  unit={tile.unit ?? '°C'}
                 />
               )}
             </div>
@@ -1327,7 +1464,14 @@ export default function RefrigeratorVisualisation({
             <TrendingUp size={16} style={{ color: '#6b4a78' }} />
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto p-3 grid grid-cols-1 @[650px]:grid-cols-2 gap-4 content-start">
-            {zones.length === 0 ? (
+            {isLoadingType ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, width: '100%' }}>
+                <svg className="animate-spin" style={{ width: 20, height: 20, color: '#8b6c97' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+            ) : zones.length === 0 ? (
               <div className="text-xs text-gray-400 italic">No zones configured.</div>
             ) : (
               zones.map((zone) => (
