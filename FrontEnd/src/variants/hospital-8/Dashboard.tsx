@@ -1494,33 +1494,35 @@ const DashboardHospital8: React.FC = () => {
               watermark={Activity}
               className="group pointer-events-auto h-full order-2 col-span-6"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Activity size={12} style={{ color: "#8b3ad6" }} />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
-                    Deviation Trend
-                  </p>
-                </div>
-                <CardRangeSelect value={trendRange} onChange={setTrendRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
-              </div>
-              <div className="flex items-baseline gap-2 mt-1">
-                <p className="text-2xl font-extrabold text-primary leading-none transition-transform duration-300 group-hover:-translate-y-0.5">
-                  {(trendData?.total ?? 0).toLocaleString()}
-                </p>
-                <TrendDelta delta={trendData?.delta_pct ?? null} />
-              </div>
-              <p className="text-[9px] text-gray-400 mt-0.5">vs previous period</p>
-              <div className="mt-2 h-12 -mx-4 -mb-4 opacity-50 transition-opacity duration-500 group-hover:opacity-100">
-                {trendSeries.length > 0 ? (
-                  <Line
-                    data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.45)")}
-                    options={areaOptions}
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center">
-                    <p className="text-[10px] text-gray-400">No data for range</p>
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Activity size={12} style={{ color: "#8b3ad6" }} />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
+                      Deviation Trend
+                    </p>
                   </div>
-                )}
+                  <CardRangeSelect value={trendRange} onChange={setTrendRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <p className="text-2xl font-extrabold text-primary leading-none transition-transform duration-300 group-hover:-translate-y-0.5">
+                    {(trendData?.total ?? 0).toLocaleString()}
+                  </p>
+                  <TrendDelta delta={trendData?.delta_pct ?? null} />
+                </div>
+                <p className="text-[9px] text-gray-400 mt-0.5">vs previous period</p>
+                <div className="mt-auto h-12 -mx-4 -mb-4 opacity-50 transition-opacity duration-500 group-hover:opacity-100">
+                  {trendSeries.length > 0 ? (
+                    <Line
+                      data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.45)")}
+                      options={areaOptions}
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-[10px] text-gray-400">No data for range</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </DashboardCard>
 
