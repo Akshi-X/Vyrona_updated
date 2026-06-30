@@ -51,10 +51,15 @@ class KPI_NAMES:
     IVF_TIVE_BATTERY_PERCENTAGE = "tive_battery_percentage"
     IVF_LN2_LID_STATE = "ln2_lid_state"
 
+    REFRIGERATOR_TEMP = "refrigerator_temp"
+    REFRIGERATOR_HUMIDITY = "refrigerator_humidity"
+
     def get_unit_for_kpi(kpi_name):
         """Return the unit for a given KPI name."""
-        if kpi_name in [KPI_NAMES.IVF_TEMPERATURE_INTERNAL, KPI_NAMES.IVF_TEMPERATURE_EXTERNAL]:
+        if kpi_name in [KPI_NAMES.IVF_TEMPERATURE_INTERNAL, KPI_NAMES.IVF_TEMPERATURE_EXTERNAL, KPI_NAMES.REFRIGERATOR_TEMP]:
             return "°C"
+        elif kpi_name in [KPI_NAMES.REFRIGERATOR_HUMIDITY]:
+            return "%"
         elif kpi_name in [KPI_NAMES.IVF_LN2_LEVEL]:
             return "Kg"
         elif kpi_name in [KPI_NAMES.IVF_LN2_EVAPORATION_RATE]:
@@ -475,7 +480,11 @@ def save_refrigerator_kpi_readings(
     branch_id: int,
     kpi_readings: list[dict],
 ):
-    VALID_REFRIGERATOR_KPI_NAMES = {"temp_external", "probe_temp"}
+    VALID_REFRIGERATOR_KPI_NAMES = {
+        KPI_NAMES.REFRIGERATOR_TEMP,
+        KPI_NAMES.REFRIGERATOR_HUMIDITY,
+        KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE,
+    }
 
     for reading in kpi_readings:
         kpi_name = reading["name"]

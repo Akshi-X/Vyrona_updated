@@ -29,14 +29,25 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { Droplets, MessageSquare, Thermometer, TrendingUp } from 'lucide-react';
-import type { ActivityLogRecord } from '../../../services/activityLogService';
-import { tasksService, type Task } from '../../../services/tasksService';
-import type { RefrigeratorSensorTile } from './useRefrigeratorKpiSnapshot';
-import StakeholderChatBox from '../../../components/StakeholderChatBox';
-import MyTasksModal, { type MyTask } from '../../../components/MyTasksModal';
-import RefrigeratorKpiChartModal from './RefrigeratorKpiChartModal';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import { AlertTriangle, Droplets, Thermometer, TrendingUp } from 'lucide-react';
+import type { Task } from '../../../services/tasksService';
+import { ivfService } from '../../../services/ivfService';
+import { useRefrigeratorKpiSnapshot } from '../../../pages/RefrigeratorTracking/sections/useRefrigeratorKpiSnapshot';
+
+import { ivfAlertsService, type IVFAlert } from '../../../services/ivfAlertsService';
 import ColdStorageRoom from './ColdStorageRoom';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
 /**
  * Procedural 3D refrigerator. Two stacked glass-door compartments: top =
@@ -47,150 +58,29 @@ import ColdStorageRoom from './ColdStorageRoom';
  * approach already in the codebase.
  */
 
+type RefrigeratorZone = { zone_id: string; zone_name: string };
+
 export type RefrigeratorVisualisationProps = {
-  sensorTiles?: RefrigeratorSensorTile[];
+  zones?: RefrigeratorZone[];
   selectedSensorId?: string | null;
   onSensorSelect?: (sensorId: string) => void;
 
-  tempExternal?: number | null;
-  probeTemp?: number | null;
   hasAlert?: boolean;
   doorStatus?: 'open' | 'closed';
 
-  systemActivity?: ActivityLogRecord[];
   tasks?: Task[];
   onTaskCreated?: () => void;
-  onEditTask?: (task: MyTask) => Promise<void>;
   currentUserName?: string;
   currentUserId?: string;
 
   refrigeratorCode?: string;
   refrigeratorId?: number;
   branchName?: string;
-  zoneId?: string | null;
 
   type?: 'default' | 'cold_storage';
   isLoadingType?: boolean;
 };
 
-// ── Activity log helpers (mirrored from CryocanVisualisation) ─────────────────
-
-const ACTIVITY_ACTION_LABELS: Record<string, string> = {
-  'alert.acknowledged': 'Alert Acknowledged',
-  'alert.acknowledged_all': 'All Alerts Acknowledged',
-  'alert.created': 'Critical Alert Created',
-  'alert_configuration.kpi_config_bulk_upserted': 'Alert Configuration Bulk Updated',
-  'alert_configuration.kpi_config_created': 'Alert Configuration Created',
-  'alert_configuration.kpi_config_deleted': 'Alert Configuration Deleted',
-  'alert_configuration.kpi_config_updated': 'Alert Configuration Updated',
-  'alert_configuration.notification_settings_updated': 'Alert Notification Settings Updated',
-  'email.critical_alert_sent': 'Critical Alert Email Sent',
-  'email.escalation_sent': 'Escalation Email Sent',
-  'email.otp_sent': 'OTP Email Sent',
-  'email.password_reset_sent': 'Password Reset Email Sent',
-  'email.support_ticket_comment_sent': 'Support Ticket Comment Sent',
-  'email.support_ticket_created': 'Support Ticket Email Sent',
-  'email.user_approval_requested': 'Approval Email Sent',
-  'email.user_approved_sent': 'Approval Confirmation Sent',
-  'integration.auth.login': 'Integration Login',
-  'integration.auth.token_revoked': 'Integration Token Revoked',
-  'refill_detection.created': 'Refill Detection Created',
-  'refill_detection.reviewed': 'Refill Detection Reviewed',
-  'report.activity_logs.downloaded': 'Activity Logs Downloaded',
-  'report.ivf.critical_alerts.downloaded': 'Critical Alerts Downloaded',
-  'report.ivf.monthly_summary.downloaded': 'Monthly Summary Downloaded',
-  'support_ticket.comment_added': 'Support Ticket Commented',
-  'support_ticket.created': 'Support Ticket Created',
-  'support_ticket.status_updated': 'Support Ticket Status Updated',
-  'task.created': 'Task Created',
-  'task.deleted': 'Task Deleted',
-  'task.status_updated': 'Task Status Updated',
-  'task.updated': 'Task Updated',
-  'user.approved': 'User Approved',
-  'user.invite_registered': 'User Registered via Invite',
-  'user.invited': 'User Invited',
-  'user.login': 'Login Successful',
-  'user.login_requested': 'Login Requested',
-  'user.logout': 'Logged Out',
-  'user.password_reset_completed': 'Password Reset Completed',
-  'user.profile_updated': 'Profile Updated',
-  'user.registered': 'User Registered',
-  'user.rejected': 'User Rejected',
-};
-
-function formatActivityActionLabel(action: string) {
-  if (ACTIVITY_ACTION_LABELS[action]) return ACTIVITY_ACTION_LABELS[action];
-  return action.replace(/_/g, ' ').replace(/\./g, ' · ').split(' ').filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-
-function getActivityMetadataLines(action: string, metadata?: Record<string, any> | null): string[] {
-  if (!metadata) return [];
-  const lines: string[] = [];
-  const val = (v: any) => (v === null || v === undefined || v === '' ? null : String(v));
-  if (action.startsWith('task.')) {
-    if (val(metadata.status)) lines.push(`Status: ${metadata.status}`);
-    if (val(metadata.priority)) lines.push(`Priority: ${metadata.priority}`);
-    return lines;
-  }
-  if (action.startsWith('alert.')) {
-    if (val(metadata.message)) lines.push(String(metadata.message).slice(0, 70));
-    else if (val(metadata.alert_type)) lines.push(`KPI: ${metadata.alert_type}`);
-    if (val(metadata.severity)) lines.push(`Severity: ${metadata.severity}`);
-    return lines;
-  }
-  if (action.startsWith('user.')) {
-    if (val(metadata.role)) lines.push(`Role: ${metadata.role}`);
-    if (val(metadata.branch_name)) lines.push(`Branch: ${metadata.branch_name}`);
-    return lines;
-  }
-  return [];
-}
-
-type ActivityIconType = 'alert' | 'config' | 'task' | 'email' | 'user' | 'report' | 'default';
-
-function getActivityIconType(action: string): ActivityIconType {
-  if (action.startsWith('alert.') || action.startsWith('email.critical_alert')) return 'alert';
-  if (action.startsWith('alert_configuration.')) return 'config';
-  if (action.startsWith('task.')) return 'task';
-  if (action.startsWith('email.')) return 'email';
-  if (action.startsWith('user.')) return 'user';
-  if (action.startsWith('report.')) return 'report';
-  return 'default';
-}
-
-const ACTIVITY_BADGE_STYLE: Record<ActivityIconType, { bg: string; color: string; label: string }> = {
-  alert:   { bg: '#f3e8fd', color: '#7a22c8', label: 'Alert'  },
-  config:  { bg: '#ede5f7', color: '#6b4a78', label: 'Config' },
-  task:    { bg: '#f3e8fd', color: '#7a22c8', label: 'Task'   },
-  email:   { bg: '#ede5f7', color: '#6b4a78', label: 'Email'  },
-  user:    { bg: '#f3e8fd', color: '#7a22c8', label: 'User'   },
-  report:  { bg: '#ede5f7', color: '#6b4a78', label: 'Export' },
-  default: { bg: '#f3e8fd', color: '#7a22c8', label: 'System' },
-};
-
-const ACTIVITY_ICON_INNER: Record<ActivityIconType, React.ReactNode> = {
-  alert: (
-    <><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>
-  ),
-  config: (
-    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
-  ),
-  task: (
-    <><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></>
-  ),
-  email: (
-    <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></>
-  ),
-  user: (
-    <><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></>
-  ),
-  report: (
-    <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></>
-  ),
-  default: <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
-};
-
-// ── End activity log helpers ───────────────────────────────────────────────────
 
 const FRIDGE_TIPS = [
   'Refrigerator compartment should be maintained between 2 °C and 8 °C for culture media and reagent storage.',
@@ -533,19 +423,433 @@ function buildCompartment(
 }
 
 
+const INLINE_TIME_RANGES = [
+  { id: '1H'  as const, label: '1H',  minutes: 60    },
+  { id: '24H' as const, label: '24H', minutes: 1440  },
+  { id: '7D'  as const, label: '7D',  minutes: 10080 },
+] as const;
+type InlineRangeId = (typeof INLINE_TIME_RANGES)[number]['id'];
+
+function InlineKpiChart({
+  refrigeratorId,
+  kpiKey,
+  zoneId,
+  accent,
+  unit,
+}: {
+  refrigeratorId: number;
+  kpiKey: string;
+  zoneId: string;
+  accent: string;
+  unit: string;
+}) {
+  const [range, setRange] = useState<InlineRangeId>('24H');
+  const [series, setSeries] = useState<{ timestamp: string; value: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const minutes = INLINE_TIME_RANGES.find((r) => r.id === range)?.minutes ?? 1440;
+    ivfService
+      .getRefrigeratorKpiHistory(refrigeratorId, minutes, zoneId)
+      .then((res) => {
+        const raw = res.kpi_series?.[kpiKey] ?? [];
+        setSeries(raw.map((p: any) => ({ timestamp: p.timestamp, value: p.value })));
+      })
+      .catch(() => setSeries([]))
+      .finally(() => setLoading(false));
+  }, [refrigeratorId, kpiKey, zoneId, range]);
+
+  const labels = useMemo(() => series.map((p) => {
+    try {
+      const norm = p.timestamp.trim().replace(' ', 'T');
+      const withZ = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(norm) ? norm : `${norm}Z`;
+      const d = new Date(withZ);
+      if (isNaN(d.getTime())) return '';
+      if (range === '7D') return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    } catch { return ''; }
+  }), [series, range]);
+
+  const values = useMemo(() => series.map((p) => p.value), [series]);
+
+  const stats = useMemo(() => {
+    if (values.length === 0) return null;
+    return {
+      min: Math.min(...values),
+      max: Math.max(...values),
+      avg: values.reduce((a, b) => a + b, 0) / values.length,
+    };
+  }, [values]);
+
+  const chartData = useMemo(() => ({
+    labels,
+    datasets: [{
+      label: kpiKey,
+      data: values,
+      borderColor: accent,
+      backgroundColor: `${accent}18`,
+      borderWidth: 2,
+      pointRadius: values.length > 80 ? 0 : 2,
+      fill: true,
+      tension: 0.3,
+    }],
+  }), [labels, values, accent, kpiKey]);
+
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false as const,
+    plugins: { legend: { display: false }, tooltip: {
+      backgroundColor: '#1a0a1f', titleColor: '#d4b8e0', bodyColor: '#ffffff', padding: 10,
+      callbacks: { label: (ctx: { parsed: { y: number } }) => `${ctx.parsed.y?.toFixed(2)} ${unit}` },
+    }},
+    scales: {
+      x: { ticks: { maxTicksLimit: 6, font: { size: 9 }, color: '#9ca3af' }, grid: { color: '#f0ecf6' } },
+      y: { ticks: { font: { size: 9 }, color: '#9ca3af', callback: (v: number | string) => `${v}` }, grid: { color: '#f0ecf6' } },
+    },
+  }), [unit]);
+
+  return (
+    <div>
+      <div style={{ padding: '10px 12px 0', minHeight: 120 }}>
+        <div style={{ height: 120, position: 'relative' }}>
+          {loading && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg className="animate-spin" style={{ width: 20, height: 20, color: accent }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            </div>
+          )}
+          {!loading && series.length === 0 && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#9ca3af' }}>No data</div>
+          )}
+          {!loading && series.length > 0 && (
+            <Line data={chartData} options={chartOptions as any} />
+          )}
+        </div>
+      </div>
+      <div style={{ padding: '8px 12px 10px', borderTop: '1px solid #f0e8f4', marginTop: 6 }}>
+        {stats && (
+          <div style={{ display: 'flex', gap: 0, marginBottom: 8 }}>
+            {(['min', 'max', 'avg'] as const).map((key, i) => (
+              <div key={key} style={{ flex: 1, textAlign: 'center', borderRight: i < 2 ? '1px solid #f0e8f4' : undefined, paddingRight: i < 2 ? 8 : 0, paddingLeft: i > 0 ? 8 : 0 }}>
+                <div style={{ fontSize: 8, fontWeight: 600, color: '#a07ab8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{key}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: accent, marginTop: 1 }}>
+                  {stats[key].toFixed(1)}<span style={{ fontSize: 9, color: '#9ca3af', marginLeft: 1 }}>{unit}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 500 }}>Range:</span>
+          <div style={{ display: 'flex', borderRadius: 6, border: '1px solid #e6d6ee', overflow: 'hidden', background: '#fdfbfe' }}>
+            {INLINE_TIME_RANGES.map((r) => (
+              <button key={r.id} type="button" onClick={() => setRange(r.id)} style={{
+                padding: '3px 10px', fontSize: 9, fontWeight: 600,
+                background: range === r.id ? accent : 'transparent',
+                color: range === r.id ? '#fff' : '#6b5a70',
+                border: 'none', cursor: 'pointer',
+              }}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getDateLabel(ts: string): string {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return 'Unknown';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const item = new Date(d); item.setHours(0,0,0,0);
+  if (item.getTime() === today.getTime()) return 'Today';
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  if (item.getTime() === yesterday.getTime()) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatAlertTime(ts: string): string {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts;
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function getSeverityCardClass(sev: string): string {
+  if (sev === 'High' || sev === 'Critical')
+    return 'border-red-200 bg-white [background-image:linear-gradient(135deg,rgba(248,113,113,0.14)_0%,rgba(255,255,255,0.92)_52%,rgba(255,255,255,1)_100%)]';
+  return 'border-orange-200 bg-white [background-image:linear-gradient(135deg,rgba(251,146,60,0.14)_0%,rgba(255,255,255,0.92)_52%,rgba(255,255,255,1)_100%)]';
+}
+
+function SeverityIcon({ severity }: { severity: string }) {
+  const isHigh = severity === 'High' || severity === 'Critical';
+  return (
+    <div className={`flex h-8 w-8 items-center justify-center rounded-xl border ${isHigh ? 'border-red-200 bg-red-50 text-red-600' : 'border-orange-200 bg-orange-50 text-orange-600'}`}>
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        {isHigh ? (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+        ) : (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        )}
+      </svg>
+    </div>
+  );
+}
+
+type AlertGroup = { key: string; alerts: IVFAlert[] };
+
+function EmbeddedAlerts({ refrigeratorId }: { refrigeratorId?: number }) {
+  const [alerts, setAlerts] = useState<IVFAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [ackingIds, setAckingIds] = useState<Set<string>>(new Set());
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+  const fetchAlerts = () => {
+    if (!refrigeratorId) return;
+    setLoading(true);
+    ivfAlertsService
+      .getRefrigeratorAlerts(refrigeratorId)
+      .then((res) => setAlerts(res.alerts || []))
+      .catch(() => setAlerts([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchAlerts(); }, [refrigeratorId]);
+
+  const handleAcknowledge = async (alertId: string) => {
+    setAckingIds((p) => new Set(p).add(alertId));
+    try {
+      await ivfAlertsService.acknowledgeAlert(alertId);
+      fetchAlerts();
+    } catch {} finally {
+      setAckingIds((p) => { const n = new Set(p); n.delete(alertId); return n; });
+    }
+  };
+
+  const toggleExpand = (key: string) => {
+    setExpandedKeys((p) => { const n = new Set(p); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  };
+
+  const grouped = useMemo(() => {
+    const byDate: Record<string, AlertGroup[]> = {};
+    const sorted = [...alerts].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    for (const a of sorted) {
+      const dateKey = getDateLabel(a.created_at);
+      if (!byDate[dateKey]) byDate[dateKey] = [];
+      const groupKey = `${dateKey}__${a.alert_type}__${a.message}__${a.acknowledged_at ? 'acked' : 'active'}`;
+      let group = byDate[dateKey].find((g) => g.key === groupKey);
+      if (!group) { group = { key: groupKey, alerts: [] }; byDate[dateKey].push(group); }
+      group.alerts.push(a);
+    }
+    return byDate;
+  }, [alerts]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (alerts.length === 0) {
+    return <div className="flex-1 flex items-center justify-center text-xs text-gray-400">No alerts</div>;
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto p-3">
+      <div className="space-y-3">
+        {Object.entries(grouped).map(([dateLabel, groups]) => (
+          <div key={dateLabel} className="space-y-2">
+            <div className="inline-flex items-center rounded-full bg-[#f0f0f0] px-2.5 py-0.5 text-[11px] font-medium text-[#3a3a3a]">
+              {dateLabel}
+            </div>
+            <div className="space-y-2">
+              {groups.map((group) => {
+                const latest = group.alerts[0];
+                const older = group.alerts.slice(1);
+                const hiddenCount = older.length;
+                const isExpanded = expandedKeys.has(group.key);
+                const isAcked = !!latest.acknowledged_at;
+                const sevBadge = latest.severity === 'High' || (latest.severity as any) === 'Critical'
+                  ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700';
+
+                return (
+                  <div
+                    key={group.key}
+                    className={`rounded-xl border p-3 ${getSeverityCardClass(latest.severity)} ${hiddenCount > 0 ? 'cursor-pointer' : ''}`}
+                    onClick={hiddenCount > 0 ? () => toggleExpand(group.key) : undefined}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="flex flex-col items-center shrink-0">
+                        <SeverityIcon severity={latest.severity} />
+                        {hiddenCount > 0 && !isExpanded && (
+                          <span className="mt-0.5 text-[10px] font-semibold text-primary">+{hiddenCount}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs font-semibold text-gray-800">{latest.alert_type}</span>
+                          <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${sevBadge}`}>{latest.severity}</span>
+                          <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${isAcked ? 'bg-gray-100 text-gray-600' : 'bg-green-50 text-green-700'}`}>
+                            {isAcked ? 'Acknowledged' : 'Active'}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-[#333]">{latest.message}</div>
+                        <div className="mt-1 text-[10px] text-gray-500">{formatAlertTime(latest.created_at)}</div>
+                        {isAcked && latest.acknowledgment_reason && (
+                          <div className="mt-1 flex flex-wrap items-start gap-x-1 text-[10px] text-gray-500">
+                            <span className="font-semibold text-gray-600">Reason:</span>
+                            <span>{latest.acknowledgment_reason}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {hiddenCount > 0 && (
+                          <svg className={`w-3.5 h-3.5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        )}
+                        {!isAcked && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleAcknowledge(latest.alert_id); }}
+                            disabled={ackingIds.has(latest.alert_id)}
+                            className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-primary text-white hover:bg-[#5a0f66] transition-colors disabled:opacity-50 whitespace-nowrap"
+                          >
+                            {ackingIds.has(latest.alert_id) ? '...' : 'Acknowledge'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {isExpanded && hiddenCount > 0 && (
+                      <div className="mt-2 border-t border-gray-200/70 pt-2 space-y-2">
+                        {older.map((a) => (
+                          <div key={a.alert_id} className="flex items-center justify-between gap-2 pl-10">
+                            <div className="min-w-0">
+                              <div className="text-[11px] text-[#333]">{a.message}</div>
+                              <div className="mt-0.5 text-[10px] text-gray-500">{formatAlertTime(a.created_at)}</div>
+                              {a.acknowledged_at && a.acknowledgment_reason && (
+                                <div className="mt-0.5 flex flex-wrap items-start gap-x-1 text-[10px] text-gray-500">
+                                  <span className="font-semibold text-gray-600">Reason:</span>
+                                  <span>{a.acknowledgment_reason}</span>
+                                </div>
+                              )}
+                            </div>
+                            {!a.acknowledged_at && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleAcknowledge(a.alert_id); }}
+                                disabled={ackingIds.has(a.alert_id)}
+                                className="shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-primary text-white hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
+                              >
+                                {ackingIds.has(a.alert_id) ? '...' : 'Acknowledge'}
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ZoneKpiSection({
+  zone,
+  refrigeratorId,
+}: {
+  zone: RefrigeratorZone;
+  refrigeratorId?: number;
+}) {
+  const { sensorTiles } = useRefrigeratorKpiSnapshot({
+    refrigeratorId: refrigeratorId ? String(refrigeratorId) : undefined,
+    zoneId: zone.zone_id,
+    enabled: !!refrigeratorId,
+  });
+
+  return (
+    <div className="flex flex-col gap-2">
+      {sensorTiles.length === 0 ? (
+        <div className="text-xs text-gray-400 italic">No data</div>
+      ) : (
+        sensorTiles.map((tile) => {
+          const isTemp = (tile.id as any) === 'refrigerator_temp';
+          const accent = isTemp ? '#1a7abb' : '#7a22c8';
+          const ring = isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)';
+          return (
+            <div
+              key={tile.id}
+              style={{
+                borderRadius: 16,
+                border: `1px solid #e6d6ee`,
+                background: '#fdfbfe',
+                boxShadow: '0 4px 12px rgba(64,17,83,0.06)',
+                overflow: 'hidden',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#8b6c97', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                      {tile.label}
+                    </span>
+                    <span className="inline-flex px-1.5 py-0.5 text-[9px] font-semibold rounded-full bg-primary/10 text-primary border border-primary/20">
+                      {zone.zone_name}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: accent, marginTop: 4 }}>
+                    {tile.value}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
+                    {tile.timestamp ?? '—'}
+                  </div>
+                </div>
+                <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', border: '1px solid #e6d6ee', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `inset 0 0 0 6px ${ring}`, color: accent, flexShrink: 0 }}>
+                  {isTemp ? <Thermometer size={18} /> : <Droplets size={18} />}
+                </div>
+              </div>
+              {refrigeratorId != null && (
+                <InlineKpiChart
+                  refrigeratorId={refrigeratorId}
+                  kpiKey={tile.id}
+                  zoneId={zone.zone_id}
+                  accent={accent}
+                  unit="°C"
+                />
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
 export default function RefrigeratorVisualisation({
-  sensorTiles = [],
+  zones = [],
   selectedSensorId,
   onSensorSelect,
   hasAlert,
-  systemActivity = [],
-  tasks = [],
-  onTaskCreated,
-  onEditTask,
-  currentUserName = '',
-  currentUserId = '',
+  onTaskCreated: _onTaskCreated,
+  currentUserName: _currentUserName = '',
+  currentUserId: _currentUserId = '',
   refrigeratorId,
-  zoneId,
+  refrigeratorCode,
+  branchName,
   type = 'default',
   isLoadingType = false,
 }: RefrigeratorVisualisationProps) {
@@ -1004,57 +1308,14 @@ export default function RefrigeratorVisualisation({
     }
   }, [hasAlert]);
 
-  // ── Activity dedup (stable list for the right panel) ───────────────────────
-  const activity = useMemo(() => systemActivity.slice(0, 20), [systemActivity]);
-
-  const myTasks: MyTask[] = tasks.map((t) => ({
-    id: String(t.id),
-    patientId: t.patient_id ?? '',
-    canisterNumber: t.tank_code ?? '',
-    tankCode: t.tank_code ?? undefined,
-    tankId: t.tank_id ?? undefined,
-    assigneeId: t.assignee?.user_id ?? undefined,
-    taskName: t.task_name,
-    description: t.description ?? '',
-    assigneeBy: t.created_by ? `${t.created_by.first_name ?? ''} ${t.created_by.last_name ?? ''}`.trim() : '',
-    assignedTo: t.assignee
-      ? `${t.assignee.first_name ?? ''} ${t.assignee.last_name ?? ''}`.trim()
-      : '',
-    dueDate: t.due_date ?? '',
-    priority: (t.priority as 'Low' | 'Medium' | 'High') ?? 'Medium',
-    status: (t.status as 'Not started' | 'In progress' | 'Done' | 'Cancelled') ?? 'Not started',
-  }));
-
-  const handleEditTask = async (task: MyTask) => {
-    const taskId = parseInt(task.id, 10);
-    if (!onEditTask) {
-      if (task.assigneeBy?.trim().toLowerCase() === currentUserName?.trim().toLowerCase()) {
-        await tasksService.updateTask(taskId, {
-          task_name: task.taskName,
-          description: task.description,
-          status: task.status as import('../../../services/tasksService').TaskStatus,
-        });
-      } else {
-        await tasksService.updateTaskStatus(taskId, task.status as import('../../../services/tasksService').TaskStatus);
-      }
-      onTaskCreated?.();
-      return;
-    }
-    await onEditTask(task);
-  };
-
-  const [kpiModalKey, setKpiModalKey] = useState<string | null>(null);
-  const [activityScrollPaused, setActivityScrollPaused] = useState(false);
-
   return (
-    <>
-    <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_320px] gap-4 h-full min-h-0">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 h-full min-h-0">
 
       {/* Left: Live Conditions (top) + Messages (bottom) */}
       <aside className="flex flex-col gap-3 min-h-0">
 
-        {/* Live Conditions card */}
-        <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
+        {/* Live Conditions card — 60% */}
+        <div className="@container min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ flex: '3 1 0%' }}>
           <div
             className="flex items-center justify-between px-4 py-3 shrink-0"
             style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}
@@ -1065,79 +1326,34 @@ export default function RefrigeratorVisualisation({
             </div>
             <TrendingUp size={16} style={{ color: '#6b4a78' }} />
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2">
-            {sensorTiles.length === 0 ? (
-              <div className="text-xs text-gray-400 italic">No sensor data.</div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 grid grid-cols-1 @[650px]:grid-cols-2 gap-4 content-start">
+            {zones.length === 0 ? (
+              <div className="text-xs text-gray-400 italic">No zones configured.</div>
             ) : (
-              sensorTiles.map((tile) => {
-                const isSelected = selectedSensorId === tile.id;
-                const isAlert = hasAlert && !tile.isMissing;
-                const isTemp = (tile.id as any) === 'refrigerator_temp';
-                const accent = isAlert ? '#dc2626' : (isTemp ? '#1a7abb' : '#7a22c8');
-                const ring = isAlert ? 'rgba(220,38,38,0.12)' : (isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)');
-                return (
-                  <button
-                    key={tile.id}
-                    type="button"
-                    onClick={() => { onSensorSelect?.(tile.id); setKpiModalKey(tile.id); }}
-                    className={['text-left w-full rfg-kpi-card', isAlert ? 'ring-1 ring-red-300' : ''].join(' ')}
-                    style={{
-                      borderRadius: 16,
-                      padding: '12px 14px',
-                      border: `1px solid ${isSelected ? accent : '#e6d6ee'}`,
-                      background: '#fdfbfe',
-                      boxShadow: isSelected ? `0 6px 16px ${ring}` : '0 4px 12px rgba(64,17,83,0.06)',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, position: 'relative', zIndex: 1 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 10, fontWeight: 600, color: '#8b6c97', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                          {tile.label}
-                        </div>
-                        <div style={{ fontSize: 24, fontWeight: 700, color: isAlert ? '#dc2626' : accent, marginTop: 4 }}>
-                          {tile.value}
-                        </div>
-                        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
-                          {tile.timestamp ?? '—'}
-                        </div>
-                      </div>
-                      <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', border: '1px solid #e6d6ee', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `inset 0 0 0 6px ${ring}`, color: accent, flexShrink: 0 }}>
-                        {isTemp ? <Thermometer size={18} /> : <Droplets size={18} />}
-                      </div>
-                    </div>
-                    <div className="rfg-kpi-orb" style={{ position: 'absolute', right: -20, bottom: -18, width: 140, height: 70, borderRadius: '50%', border: '1px solid rgba(170,140,190,0.35)', opacity: 0.7 }} />
-                    <div className="rfg-kpi-glow" style={{ position: 'absolute', left: -30, top: -24, width: 110, height: 110, borderRadius: '50%', background: 'radial-gradient(circle, rgba(123,92,139,0.12) 0%, rgba(123,92,139,0) 70%)', opacity: 0.6 }} />
-                    <div className="rfg-kpi-sheen" style={{ position: 'absolute', inset: '12px 12px auto auto', width: 46, height: 46, borderRadius: 10, border: '1px solid rgba(230,214,238,0.9)', opacity: 0.45, transform: 'rotate(12deg)' }} />
-                    <div className="rfg-kpi-curve" style={{ position: 'absolute', left: -18, bottom: -22, width: 160, height: 90, borderRadius: '100%', border: '1px solid rgba(214,198,228,0.5)', transform: 'rotate(-8deg)', opacity: 0.55 }} />
-                    <div className="rfg-kpi-wave" style={{ position: 'absolute', right: -40, top: 28, width: 180, height: 80, borderRadius: '100%', border: '1px dashed rgba(214,198,228,0.45)', transform: 'rotate(10deg)', opacity: 0.5 }} />
-                  </button>
-                );
-              })
+              zones.map((zone) => (
+                <ZoneKpiSection
+                  key={zone.zone_id}
+                  zone={zone}
+                  refrigeratorId={refrigeratorId}
+                />
+              ))
             )}
           </div>
         </div>
 
-        {/* Messages card */}
-        <div className="shrink-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ height: 220 }}>
+        {/* Alerts card — 40% */}
+        <div className="min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ flex: '2 1 0%' }}>
           <div
             className="flex items-center justify-between px-4 py-3 shrink-0"
             style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}
           >
             <div>
-              <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>Messages</span>
-              <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Stakeholder communications</span>
+              <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>Critical Alerts</span>
+              <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Alerts requiring attention</span>
             </div>
-            <MessageSquare size={16} style={{ color: '#6b4a78' }} />
+            <AlertTriangle size={16} style={{ color: '#6b4a78' }} />
           </div>
-          <StakeholderChatBox
-            embedded
-            isOpen={false}
-            onClose={() => {}}
-            refrigeratorId={refrigeratorId}
-          />
+          <EmbeddedAlerts refrigeratorId={refrigeratorId} />
         </div>
       </aside>
 
@@ -1157,9 +1373,12 @@ export default function RefrigeratorVisualisation({
           </div>
         ) : type === 'cold_storage' ? (
           <ColdStorageRoom
-            sensorTiles={sensorTiles}
             selectedSensorId={selectedSensorId}
             onSensorSelect={onSensorSelect}
+            refrigeratorCode={refrigeratorCode}
+            branchName={branchName}
+            zoneCount={zones.length}
+            zones={zones}
           />
         ) : (
           <>
@@ -1177,10 +1396,8 @@ export default function RefrigeratorVisualisation({
             <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none" style={{ zIndex: 2 }}>
               {/* Connected status */}
               <div className="flex items-center gap-2 bg-white/85 backdrop-blur-sm rounded-xl border border-white/70 shadow-sm px-3 py-2">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${sensorTiles.some((t) => !t.isMissing) ? 'bg-emerald-400 animate-pulse' : 'bg-gray-300'}`} />
-                <span className="text-[11px] font-bold text-gray-700">
-                  {sensorTiles.some((t) => !t.isMissing) ? 'Connected Live' : 'No Signal'}
-                </span>
+                <span className="w-2 h-2 rounded-full shrink-0 bg-emerald-400 animate-pulse" />
+                <span className="text-[11px] font-bold text-gray-700">Connected Live</span>
               </div>
             </div>
 
@@ -1195,7 +1412,7 @@ export default function RefrigeratorVisualisation({
               </svg>
               <span className="text-[11px] font-semibold text-red-600">Alert active</span>
             </div>
-          ) : sensorTiles.some((t) => !t.isMissing) ? (
+          ) : (
             <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-emerald-200 rounded-xl px-2.5 py-1.5 shadow-sm">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path d="M12 2L3 7v6c0 5.25 3.75 10.15 9 11.35C17.25 23.15 21 18.25 21 13V7L12 2z" fill="#22c55e" />
@@ -1203,13 +1420,6 @@ export default function RefrigeratorVisualisation({
               </svg>
               <span className="text-[11px] font-semibold text-gray-700">Normal</span>
             </div>
-            ) : (
-              <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl px-2.5 py-1.5 shadow-sm">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2L3 7v6c0 5.25 3.75 10.15 9 11.35C17.25 23.15 21 18.25 21 13V7L12 2z" fill="#9ca3af" />
-                </svg>
-                <span className="text-[11px] font-semibold text-gray-500">No signal</span>
-              </div>
             )}
             </div>
 
@@ -1263,7 +1473,6 @@ export default function RefrigeratorVisualisation({
 @keyframes rfg-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @keyframes rfgKpiFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 @keyframes rfgKpiSheen { 0% { transform: translateX(0) rotate(12deg); opacity: 0.3; } 50% { transform: translateX(8px) rotate(12deg); opacity: 0.6; } 100% { transform: translateX(0) rotate(12deg); opacity: 0.3; } }
-@keyframes rfgScrollActivity { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
 .rfg-kpi-card .rfg-kpi-glow  { animation: rfgKpiFloat 4.8s ease-in-out infinite; }
 .rfg-kpi-card .rfg-kpi-orb   { animation: rfgKpiFloat 5.6s ease-in-out infinite reverse; }
 .rfg-kpi-card .rfg-kpi-sheen { animation: rfgKpiSheen 6.2s ease-in-out infinite; }
@@ -1286,95 +1495,6 @@ export default function RefrigeratorVisualisation({
         )}
       </section>
 
-      {/* Right: System Activity (top) + Tasks (bottom) */}
-      <aside className="flex flex-col gap-3 min-h-0">
-
-        {/* System Activity card */}
-        <div
-          className="flex-1 min-h-0 flex flex-col"
-          style={{ border: '1px solid #e6d6ee', borderRadius: 18, overflow: 'hidden', boxShadow: '0 6px 16px #40115308', background: '#fff' }}
-        >
-          <div style={{ fontWeight: 600, fontSize: 14, color: '#5f3b73', padding: '12px 16px 10px', background: '#f7f2fa', flexShrink: 0, borderBottom: '1px solid #efe5f4' }}>
-            System Activity
-            <div style={{ fontSize: 10, fontWeight: 400, color: '#a07ab8', marginTop: 2 }}>Recent system events</div>
-          </div>
-          <div
-            style={{ flex: 1, overflow: 'hidden', position: 'relative', padding: '8px 10px 0' }}
-            onMouseEnter={() => setActivityScrollPaused(true)}
-            onMouseLeave={() => setActivityScrollPaused(false)}
-          >
-            {activity.length === 0 ? (
-              <div style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', padding: '16px 0' }}>No recent activity</div>
-            ) : (
-              <div style={{
-                display: 'flex', flexDirection: 'column', gap: 8,
-                animation: `rfgScrollActivity ${Math.max(activity.length * 3, 8)}s linear infinite`,
-                animationPlayState: activityScrollPaused ? 'paused' : 'running',
-              }}>
-                {[...activity, ...activity].flatMap((log, idx) => {
-                  const key = `${log.id}-${idx}`;
-                  const action = log.action ?? '';
-                  const iconType = getActivityIconType(action);
-                  const badge = ACTIVITY_BADGE_STYLE[iconType];
-                  const timeStr = log.created_at ? new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-                  const title = formatActivityActionLabel(action);
-                  const metaLines = getActivityMetadataLines(action, log.metadata).slice(0, 2);
-                  const actorName = log.actor_label || (log.actor_details ? `${String(log.actor_details['first_name'] ?? '')} ${String(log.actor_details['last_name'] ?? '')}`.trim() : '');
-                  const card = (
-                    <div key={key} style={{ display: 'flex', gap: 10, padding: '8px 10px', borderRadius: 10, border: '1px solid #f0e8f4', background: '#fdfbfe', flexShrink: 0 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: badge.bg, color: badge.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          {ACTIVITY_ICON_INNER[iconType]}
-                        </svg>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                          <span style={{ fontSize: 9, color: '#6b7280', fontWeight: 500 }}>{timeStr}</span>
-                          <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 999, background: badge.bg, color: badge.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{badge.label}</span>
-                        </div>
-                        <div style={{ fontSize: 12, fontWeight: 500, color: '#1a0a1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
-                        {actorName && <div style={{ fontSize: 10, color: '#6b5a70', marginTop: 1 }}>{actorName}</div>}
-                        {metaLines.map((line, i) => (
-                          <div key={i} style={{ fontSize: 10, color: '#6b5a70', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{line}</div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                  const isCopyEnd = idx === activity.length - 1 || idx === activity.length * 2 - 1;
-                  return isCopyEnd ? [card, <div key={`gap-${idx}`} style={{ height: 52, flexShrink: 0 }} />] : [card];
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Tasks card */}
-        <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
-          <MyTasksModal
-            embedded
-            isOpen={false}
-            onClose={() => {}}
-            variant="refrigerator"
-            tasks={myTasks}
-            defaultRefrigeratorId={refrigeratorId}
-            currentUserName={currentUserName}
-            currentUserId={currentUserId}
-            onAdd={() => {}}
-            onEdit={handleEditTask}
-            onTaskCreated={onTaskCreated}
-          />
-        </div>
-      </aside>
     </div>
-
-    {kpiModalKey && refrigeratorId != null && (
-      <RefrigeratorKpiChartModal
-        refrigeratorId={refrigeratorId}
-        kpiKey={kpiModalKey}
-        zoneId={zoneId}
-        onClose={() => setKpiModalKey(null)}
-      />
-    )}
-    </>
   );
 }
