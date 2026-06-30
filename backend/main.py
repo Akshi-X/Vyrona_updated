@@ -162,7 +162,7 @@ async def startup_event():
     #create_admin()
 
     # Step 3: Start quality monitoring background tasks
-    logger.info("Starting quality monitoring background tasks...")
+    # logger.info("Starting quality monitoring background tasks...")
     db = SessionLocal()
     quality_service = QualityService(db)
     asyncio.create_task(quality_service.redis_listener(quality_controller.manager))
@@ -175,9 +175,11 @@ async def startup_event():
 
     asyncio.create_task(ivf_quality_controller.ln2_redis_listener())
     asyncio.create_task(ivf_quality_controller.tank_kpi_redis_listener())
+    asyncio.create_task(ivf_quality_controller.incubator_kpi_redis_listener())
+    asyncio.create_task(ivf_quality_controller.refrigerator_kpi_redis_listener())
 
     # Step 4: Start scheduled task to fetch World Bank LPI data daily at midnight
-    logger.info("Starting World Bank LPI daily fetch scheduler...")
+    # logger.info("Starting World Bank LPI daily fetch scheduler...")
     asyncio.create_task(schedule_daily_lpi_fetch())
 
     print("!" * 60 + "\n")
