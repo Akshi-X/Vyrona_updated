@@ -21,7 +21,7 @@ const PageLayout = ({ title, description, icon, iconAlt, lucideIcon, actions, ch
                 <div
                     aria-hidden
                     className="absolute inset-0 -z-10 pointer-events-none"
-                    style={{ backgroundImage: "url(/ivf_pattern.png)", backgroundSize: "20%", backgroundRepeat: "repeat", opacity: 0.5 }}
+                    style={{ backgroundImage: "url(/ivf_pattern.png)", backgroundSize: "20%", backgroundRepeat: "repeat", opacity: 0.35 }}
                 />
             )}
             <div className={`${hideHeaderOnDesktop ? "md:hidden" : "md:px-6 md:pt-10 md:pb-6"} flex-shrink-0 px-4`}>
