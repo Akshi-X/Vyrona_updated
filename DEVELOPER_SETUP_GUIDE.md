@@ -797,6 +797,9 @@ SUBSCRIBE quality_channel
 
 ## 🧪 Running Tests
 
+> [!TIP]
+> For running GitHub Actions CI workflows locally using Nektos `act` or to see details on pytest and custom interactive HTML reports, see **[LOCAL_CICD_AND_TESTING_GUIDE.md](./LOCAL_CICD_AND_TESTING_GUIDE.md)**.
+
 ### Backend Tests
 
 ```bash

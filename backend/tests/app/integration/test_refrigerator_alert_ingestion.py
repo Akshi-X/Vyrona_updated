@@ -16,8 +16,8 @@ How the flow works (entry → alert → email)
    `EntityName`, fails to match a tank, then calls
    `find_refrigerator_by_device_code` to resolve (refrigerator_id, zone_id,
    hospital_id, branch_id) by joining `refrigerator_devices` → `refrigerators`.
-3. `process_tive_refrigerator` extracts `temp_external` (from `DeviceTemperature`)
-   and `probe_temp` (from `ProbeTemperature`) and calls
+3. `process_tive_refrigerator` extracts `refrigerator_temp` (from `DeviceTemperature`)
+   and `refrigerator_humidity` (from `Humidity/Percentage`) and calls
    `save_refrigerator_kpi_readings`, which looks up the zone's kpi_config
    (matching on refrigerator_id AND zone_id AND kpi_name), scores the value
    against the thresholds, and INSERTs a `readings` row with `deviation = true`.
@@ -64,9 +64,10 @@ from app.config.database import SessionLocal
 # reached by their compose service names (the published localhost ports are only
 # bound on the host). Backend/frontend run on localhost. Override via env if your
 # layout differs.
-INGESTION_URL = os.environ.get("INGESTION_URL", "http://iot-ingestion-service/api/tive/webhook")
-SMTP_API_URL = os.environ.get("SMTP4DEV_API", "http://smtp4dev/api/Messages")
-
+# INGESTION_URL = os.environ.get("INGESTION_URL", "http://iot-ingestion-service/api/tive/webhook")
+# SMTP_API_URL = os.environ.get("SMTP4DEV_API", "http://smtp4dev/api/Messages")
+INGESTION_URL = "http://localhost:7072/api/tive/webhook"
+SMTP_API_URL = "http://localhost:5000/api/Messages"
 # ── Fixed test ids (deterministic cleanup) ─────────────────────────────────────
 HOSPITAL_ID = 9927
 BRANCH_ID = 9927
@@ -134,7 +135,7 @@ def setup_refrigerator_ingestion(db):
     # zone_id is concrete here so the telemetry lookup (refrigerator_id + zone_id + kpi_name) resolves it.
     db.execute(text("""
         INSERT INTO kpi_config (hospital_id, branch_id, refrigerator_id, zone_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        VALUES (:hid, :bid, :rid, :zone, 'temp_external', 'Zone Temp Critical', 2.0, 8.0, '°C', 'critical', 1, true)
+        VALUES (:hid, :bid, :rid, :zone, 'refrigerator_temp', 'Zone Temp Critical', 2.0, 8.0, '°C', 'critical', 1, true)
     """), {"hid": HOSPITAL_ID, "bid": BRANCH_ID, "rid": REFRIGERATOR_ID, "zone": ZONE_ID})
 
     db.execute(text("""
@@ -167,32 +168,33 @@ def _clean(db):
 
 def _build_payload(
     device_temp_celsius: float,
-    probe_temp_celsius: float | None = None,
+    humidity_percentage: float | None = None,
     device_code: str = DEVICE_CODE,
     at: datetime | None = None,
 ) -> dict:
     """Build a refrigerator Tive payload.
 
-    Refrigerators carry FLAT temperature fields (the refrigerator extractor reads
-    DeviceTemperature / ProbeTemperature as plain numbers), unlike the nested
+    Refrigerators carry FLAT temperature/humidity fields, unlike the nested
     {"Celsius": ...} objects in a cryotank Tive payload. The remaining envelope
     fields mirror a realistic Tive post. ``device_code`` selects which zone's device
     the payload targets (defaults to the fixture's zone_1 device). ``at`` overrides the
     payload timestamp (the reading's occurred_at), used to simulate specific clock times.
     """
     now = at or datetime.now(timezone.utc)
-    return {
+    payload = {
         "EntityName": device_code,
         "DeviceName": device_code,
         "EntryTimeEpoch": int(now.timestamp() * 1000),
         "EntryTimeUtc": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
         "CaptureTime": now.isoformat(),
         "DeviceTemperature": device_temp_celsius,
-        "ProbeTemperature": probe_temp_celsius,
         "Battery": {"Percentage": 100.0, "Estimation": "N/A", "IsCharging": False},
         "Location": {"Latitude": 12.9716, "Longitude": 77.5946, "IsGpsLocationAvailable": True},
         "_nonce": str(uuid.uuid4()),
     }
+    if humidity_percentage is not None:
+        payload["Humidity"] = {"Percentage": humidity_percentage}
+    return payload
 
 
 def _post_payload(payload: dict):
@@ -226,7 +228,7 @@ def _email_html(msg_id: str) -> str:
 def test_refrigerator_telemetry_creates_alert_and_sends_email(setup_refrigerator_ingestion, db):
     """A breaching refrigerator telemetry payload creates a critical alert and emails the branch user.
 
-    Arrange: Seed a refrigerator zone with a critical temp_external config (2–8°C)
+    Arrange: Seed a refrigerator zone with a critical refrigerator_temp config (2–8°C)
     and a device mapping; clear smtp4dev.
     Act: POST a Tive refrigerator payload with DeviceTemperature = 15°C (above max)
     to the live ingestion webhook.
@@ -412,7 +414,7 @@ def test_refrigerator_alert_escalation(setup_refrigerator_ingestion, db):
     db.execute(text("""
         UPDATE kpi_config
         SET unack_escalation_threshold = 1, last_escalation_sent_at = NULL
-        WHERE refrigerator_id = :rid AND zone_id = :zone AND kpi_name = 'temp_external'
+        WHERE refrigerator_id = :rid AND zone_id = :zone AND kpi_name = 'refrigerator_temp'
     """), {"rid": REFRIGERATOR_ID, "zone": ZONE_ID})
     db.commit()
 
@@ -505,12 +507,12 @@ def test_refrigerator_alert_escalation(setup_refrigerator_ingestion, db):
 
 
 def test_refrigerator_both_kpis_alert(setup_refrigerator_ingestion, db):
-    """A payload breaching both temp_external and probe_temp thresholds must produce two
+    """A payload breaching both refrigerator_temp and refrigerator_humidity thresholds must produce two
     deviation readings and two critical alerts (one per KPI config).
 
-    Arrange: The fixture seeds temp_external (2–8°C); this test additionally seeds
-    probe_temp (-5–5°C). DeviceTemperature=15 breaches temp_external; ProbeTemperature=10
-    breaches probe_temp.
+    Arrange: The fixture seeds refrigerator_temp (2–8°C); this test additionally seeds
+    refrigerator_humidity (10–80%). DeviceTemperature=15 breaches refrigerator_temp; Humidity=95
+    breaches refrigerator_humidity.
     Assert: Both readings are inserted with deviation=True; at least 2 critical alerts exist;
     two alert emails (one per breaching KPI) reach the branch user.
     """
@@ -518,14 +520,14 @@ def test_refrigerator_both_kpis_alert(setup_refrigerator_ingestion, db):
         INSERT INTO kpi_config
             (hospital_id, branch_id, refrigerator_id, zone_id, kpi_name,
              alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        VALUES (:hid, :bid, :rid, :zone, 'probe_temp',
-                'Probe Temp Critical', -5.0, 5.0, '°C', 'critical', 1, true)
+        VALUES (:hid, :bid, :rid, :zone, 'refrigerator_humidity',
+                'Probe Temp Critical', 10.0, 80.0, '%', 'critical', 1, true)
     """), {"hid": HOSPITAL_ID, "bid": BRANCH_ID, "rid": REFRIGERATOR_ID, "zone": ZONE_ID})
     db.commit()
 
     clear_smtp4dev()
 
-    payload = _build_payload(device_temp_celsius=15.0, probe_temp_celsius=10.0)
+    payload = _build_payload(device_temp_celsius=15.0, humidity_percentage=95.0)
     resp = requests.post(INGESTION_URL, json=payload, headers={"Content-Type": "application/json"}, timeout=10)
     assert resp.status_code == 200, f"Webhook ingestion failed: {resp.status_code} - {resp.text}"
 
@@ -545,10 +547,10 @@ def test_refrigerator_both_kpis_alert(setup_refrigerator_ingestion, db):
         if len(kpi_deviations) >= 2:
             break
 
-    assert "temp_external" in kpi_deviations, "temp_external reading was not inserted"
-    assert kpi_deviations["temp_external"] is True, "temp_external reading did not register a deviation"
-    assert "probe_temp" in kpi_deviations, "probe_temp reading was not inserted"
-    assert kpi_deviations["probe_temp"] is True, "probe_temp reading did not register a deviation"
+    assert "refrigerator_temp" in kpi_deviations, "refrigerator_temp reading was not inserted"
+    assert kpi_deviations["refrigerator_temp"] is True, "refrigerator_temp reading did not register a deviation"
+    assert "refrigerator_humidity" in kpi_deviations, "refrigerator_humidity reading was not inserted"
+    assert kpi_deviations["refrigerator_humidity"] is True, "refrigerator_humidity reading did not register a deviation"
 
     # Alerts are created after the readings are committed (separate backend call),
     # so poll rather than reading once.
@@ -637,15 +639,15 @@ def test_refrigerator_soft_alert_no_email(setup_refrigerator_ingestion, db):
     """A breaching 'soft' KPI records a low-severity alert but dispatches NO email.
 
     Only 'critical' alert_type triggers notification; 'soft' deviations are stored for
-    visibility. Reuses the fixture's temp_external config, downgraded to alert_type='soft'.
+    visibility. Reuses the fixture's refrigerator_temp config, downgraded to alert_type='soft'.
 
-    Arrange: Set the zone's temp_external config to alert_type='soft'.
+    Arrange: Set the zone's refrigerator_temp config to alert_type='soft'.
     Act: POST DeviceTemperature = 15°C (above the 8°C max).
     Assert: A critical_alerts row exists with severity 'Low'; no email reaches the user.
     """
     db.execute(text("""
         UPDATE kpi_config SET alert_type = 'soft'
-        WHERE refrigerator_id = :rid AND zone_id = :zone AND kpi_name = 'temp_external'
+        WHERE refrigerator_id = :rid AND zone_id = :zone AND kpi_name = 'refrigerator_temp'
     """), {"rid": REFRIGERATOR_ID, "zone": ZONE_ID})
     db.commit()
 
@@ -679,14 +681,14 @@ def test_refrigerator_no_alert(setup_refrigerator_ingestion, db):
     With alert_type='no_alert' the deviation scoring keeps deviation=False even though the
     value is OUTSIDE the configured range, so the alert step never picks it up.
 
-    Arrange: Set the zone's temp_external config alert_type='no_alert' (range stays 2–8°C).
+    Arrange: Set the zone's refrigerator_temp config alert_type='no_alert' (range stays 2–8°C).
     Act: POST DeviceTemperature = 15°C (above the 8°C max — out of range).
     Assert: A readings row is inserted with the sent value but deviation=False; no
     critical_alerts row; no email.
     """
     db.execute(text("""
         UPDATE kpi_config SET alert_type = 'no_alert'
-        WHERE refrigerator_id = :rid AND zone_id = :zone AND kpi_name = 'temp_external'
+        WHERE refrigerator_id = :rid AND zone_id = :zone AND kpi_name = 'refrigerator_temp'
     """), {"rid": REFRIGERATOR_ID, "zone": ZONE_ID})
     db.commit()
 
@@ -702,7 +704,7 @@ def test_refrigerator_no_alert(setup_refrigerator_ingestion, db):
         row = db.execute(text("""
             SELECT r.kpi_value, r.deviation FROM readings r
             JOIN kpi_config kc ON r.kpi_config_id = kc.id
-            WHERE r.refrigerator_id = :rid AND kc.kpi_name = 'temp_external'
+            WHERE r.refrigerator_id = :rid AND kc.kpi_name = 'refrigerator_temp'
             ORDER BY r.timestamp DESC LIMIT 1
         """), {"rid": REFRIGERATOR_ID}).fetchone()
         if row is not None:
@@ -731,14 +733,14 @@ def test_refrigerator_disabled_kpi_no_alert(setup_refrigerator_ingestion, db):
     The backend alert step filters kpi_config.status == True, so a disabled config never
     produces an alert even though the value breaches the threshold.
 
-    Arrange: Set the zone's temp_external config status=false (alert_type stays 'critical').
+    Arrange: Set the zone's refrigerator_temp config status=false (alert_type stays 'critical').
     Act: POST DeviceTemperature = 15°C (breaches the 8°C max).
     Assert: The reading deviates (deviation=True) but deviation_alert_sent=False; no
     critical_alerts row; no email.
     """
     db.execute(text("""
         UPDATE kpi_config SET status = false
-        WHERE refrigerator_id = :rid AND zone_id = :zone AND kpi_name = 'temp_external'
+        WHERE refrigerator_id = :rid AND zone_id = :zone AND kpi_name = 'refrigerator_temp'
     """), {"rid": REFRIGERATOR_ID, "zone": ZONE_ID})
     db.commit()
 
@@ -755,7 +757,7 @@ def test_refrigerator_disabled_kpi_no_alert(setup_refrigerator_ingestion, db):
         row = db.execute(text("""
             SELECT r.deviation, r.deviation_alert_sent FROM readings r
             JOIN kpi_config kc ON r.kpi_config_id = kc.id
-            WHERE r.refrigerator_id = :rid AND kc.kpi_name = 'temp_external'
+            WHERE r.refrigerator_id = :rid AND kc.kpi_name = 'refrigerator_temp'
             ORDER BY r.timestamp DESC LIMIT 1
         """), {"rid": REFRIGERATOR_ID}).fetchone()
         if row is not None:
@@ -781,23 +783,23 @@ def test_refrigerator_disabled_kpi_no_alert(setup_refrigerator_ingestion, db):
 
 
 def test_refrigerator_correct_payload_within_threshold(setup_refrigerator_ingestion, db):
-    """A correct payload with BOTH temperatures inside their ranges ingests two non-deviating
+    """A correct payload with BOTH parameters inside their ranges ingests two non-deviating
     readings and raises no alert/email.
 
-    Arrange: Fixture seeds temp_external (2–8°C); this test adds probe_temp (-5–5°C).
-    Act: POST DeviceTemperature=5°C (in range) and ProbeTemperature=0°C (in range).
+    Arrange: Fixture seeds refrigerator_temp (2–8°C); this test adds refrigerator_humidity (10–80%).
+    Act: POST DeviceTemperature=5°C (in range) and Humidity=50% (in range).
     Assert: Both readings store deviation=False; no critical_alerts row; no email.
     """
     db.execute(text("""
         INSERT INTO kpi_config (hospital_id, branch_id, refrigerator_id, zone_id, kpi_name,
             alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        VALUES (:hid, :bid, :rid, :zone, 'probe_temp', 'Probe Temp Critical', -5.0, 5.0, '°C', 'critical', 1, true)
+        VALUES (:hid, :bid, :rid, :zone, 'refrigerator_humidity', 'Probe Temp Critical', 10.0, 80.0, '%', 'critical', 1, true)
     """), {"hid": HOSPITAL_ID, "bid": BRANCH_ID, "rid": REFRIGERATOR_ID, "zone": ZONE_ID})
     db.commit()
 
     clear_smtp4dev()
 
-    _post_payload(_build_payload(device_temp_celsius=5.0, probe_temp_celsius=0.0))
+    _post_payload(_build_payload(device_temp_celsius=5.0, humidity_percentage=50.0))
 
     kpi_dev: dict = {}
     for _ in range(20):
@@ -813,10 +815,10 @@ def test_refrigerator_correct_payload_within_threshold(setup_refrigerator_ingest
         if len(kpi_dev) >= 2:
             break
 
-    assert "temp_external" in kpi_dev, "temp_external reading was not inserted"
-    assert kpi_dev["temp_external"] is False, "temp_external within range should not deviate"
-    assert "probe_temp" in kpi_dev, "probe_temp reading was not inserted"
-    assert kpi_dev["probe_temp"] is False, "probe_temp within range should not deviate"
+    assert "refrigerator_temp" in kpi_dev, "refrigerator_temp reading was not inserted"
+    assert kpi_dev["refrigerator_temp"] is False, "refrigerator_temp within range should not deviate"
+    assert "refrigerator_humidity" in kpi_dev, "refrigerator_humidity reading was not inserted"
+    assert kpi_dev["refrigerator_humidity"] is False, "refrigerator_humidity within range should not deviate"
 
     db.rollback()
     alert_count = db.execute(text(
@@ -851,7 +853,7 @@ def test_refrigerator_both_zones_alert(setup_refrigerator_ingestion, db):
     db.execute(text("""
         INSERT INTO kpi_config (hospital_id, branch_id, refrigerator_id, zone_id, kpi_name,
             alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        VALUES (:hid, :bid, :rid, :zone, 'temp_external', 'Zone2 Temp Critical', 2.0, 8.0, '°C', 'critical', 1, true)
+        VALUES (:hid, :bid, :rid, :zone, 'refrigerator_temp', 'Zone2 Temp Critical', 2.0, 8.0, '°C', 'critical', 1, true)
     """), {"hid": HOSPITAL_ID, "bid": BRANCH_ID, "rid": REFRIGERATOR_ID, "zone": zone2_id})
     db.commit()
 
@@ -912,7 +914,7 @@ def test_refrigerator_midnight_cooldown(setup_refrigerator_ingestion, db):
 
     db.execute(text("""
         UPDATE kpi_config SET cooldown_minutes = 3
-        WHERE refrigerator_id = :rid AND zone_id = :zone AND kpi_name = 'temp_external'
+        WHERE refrigerator_id = :rid AND zone_id = :zone AND kpi_name = 'refrigerator_temp'
     """), {"rid": REFRIGERATOR_ID, "zone": ZONE_ID})
     db.commit()
 

@@ -17,6 +17,7 @@ The developer setup guide contains complete, step-by-step instructions for setti
 ## 📚 Documentation
 
 - **[Developer Setup Guide](./DEVELOPER_SETUP_GUIDE.md)** - Complete setup instructions for new developers
+- **[Local CI/CD & Testing Guide](./LOCAL_CICD_AND_TESTING_GUIDE.md)** - Setup and run GitHub Actions locally and execute pytest suites
 - **[Backend README](./backend/README.md)** - Backend API documentation
 - **[Frontend README](./FrontEnd/README.md)** - Frontend documentation
 - **[Publisher README](./publisher/README.md)** - Publisher service documentation

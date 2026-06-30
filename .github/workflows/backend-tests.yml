@@ -1,0 +1,188 @@
+name: Backend Tests - Develop
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "backend/**"
+      - "telemetry-service/**"
+      - "tive-ingestion-function/**"
+      - "docker-compose.yml"
+  push:
+    branches:
+      - develop
+    paths:
+      - "backend/**"
+      - "telemetry-service/**"
+      - "tive-ingestion-function/**"
+      - "docker-compose.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DB_USER: postgres
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgresDB-pass' }}
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: mygrape
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'postgresDB-pass' }}
+      POSTGRES_DB: mygrape
+      SECRET_KEY: dummy_secret_key_for_testing
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_DEFAULT_PASSWORD: password123
+      MYGRAPE_ADMIN_EMAIL: mygrapeadmin@example.com
+      MYGRAPE_ADMIN_PASSWORD: password123
+      FRONTEND_URL: http://localhost:5173
+      BACKEND_URL: http://localhost:8000
+      ALLOWED_ORIGINS: "*"
+      IOT_CLIENT_ID: test_client_id
+      IOT_CLIENT_SECRET: test_client_secret
+      IOT_ACCOUNT_ID: test_account_id
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      REDIS_SSL: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.4.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache dependencies
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: ${{ runner.os }}-poetry-${{ hashFiles('backend/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project root
+        run: poetry install --no-interaction
+
+      - name: Set up Docker environment configs
+        run: |
+          cat > .env << EOF
+          DB_USER=postgres
+          DB_PASSWORD=${DB_PASSWORD}
+          DB_HOST=localhost
+          DB_PORT=5432
+          DB_NAME=mygrape
+          SECRET_KEY=dummy_secret_key_for_testing
+          ADMIN_EMAIL=admin@example.com
+          ADMIN_DEFAULT_PASSWORD=password123
+          MYGRAPE_ADMIN_EMAIL=mygrapeadmin@example.com
+          MYGRAPE_ADMIN_PASSWORD=password123
+          FRONTEND_URL=http://localhost:5173
+          BACKEND_URL=http://localhost:8000
+          ALLOWED_ORIGINS=*
+          IOT_CLIENT_ID=test_client_id
+          IOT_CLIENT_SECRET=test_client_secret
+          IOT_ACCOUNT_ID=test_account_id
+          REDIS_HOST=localhost
+          REDIS_PORT=6379
+          REDIS_SSL=False
+          ENVIRONMENT=testing
+          DEBUG=True
+          HOST=0.0.0.0
+          PORT=8000
+          RELOAD=True
+          FIXED_OTP_MODE=True
+          FIXED_OTP_CODE=123456
+          EOF
+        working-directory: backend
+
+      - name: Set up Docker environment configs (CI only)
+        if: ${{ !env.ACT }}
+        run: |
+          cat > ../.env << EOF
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          POSTGRES_DB=mygrape
+          SECRET_KEY=dummy_secret_key_for_testing
+          ADMIN_EMAIL=admin@example.com
+          ADMIN_DEFAULT_PASSWORD=password123
+          MYGRAPE_ADMIN_EMAIL=mygrapeadmin@example.com
+          MYGRAPE_ADMIN_PASSWORD=password123
+          IOT_CLIENT_ID=test_client_id
+          IOT_CLIENT_SECRET=test_client_secret
+          IOT_ACCOUNT_ID=test_account_id
+          FRONTEND_URL=http://localhost:5173
+          BACKEND_URL=http://localhost:8000
+          VITE_API_BASE_URL=http://localhost:8000
+          EOF
+          cat << 'EOF' > ../docker-compose.override.yml
+          version: '3.8'
+          services:
+            postgres:
+              volumes:
+                - postgres_test_data:/var/lib/postgresql/data
+
+          volumes:
+            postgres_test_data:
+          EOF
+        working-directory: backend
+
+      - name: Start Docker services (CI only)
+        if: ${{ !env.ACT }}
+        run: |
+          docker compose up -d postgres redis azurite eventhub-emulator smtp4dev backend telemetry-service iot-ingestion-service
+        working-directory: .
+
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for services to become healthy..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8000/docs > /dev/null && curl -s http://localhost:7072/api/tive/webhook > /dev/null; then
+              echo "Backend and webhook services are fully up and healthy!"
+              break
+            fi
+            echo "Still waiting..."
+            sleep 4
+          done
+        working-directory: .
+
+      - name: Initialize database schema
+        run: poetry run python -c "from app.init_db import init_db; init_db()"
+
+      - name: Run pytest suites (including integration)
+        run: |
+          poetry run pytest \
+            tests/app/auth/test_auth.py \
+            tests/app/alert-config/test_alert.py \
+            tests/app/dashboard/test_dashboard_consistency.py \
+            tests/app/dashboard/report_dash.py \
+            tests/app/integration/test_alert_ingestion.py \
+            tests/app/integration/test_refrigerator_alert_ingestion.py \
+            tests/app/profile/test_profile.py \
+            tests/app/integration/test_feedback_integration.py \
+            tests/app/activity_log/test_activity_log.py
+
+      - name: Clean up temporary Docker files
+        if: always()
+        run: |
+          rm -f docker-compose.override.yml
+        working-directory: .

@@ -11,7 +11,7 @@ from app.models.readings_model import Readings
 
 # Endpoints
 INGESTION_URL = "http://localhost:7072/api/tive/webhook"
-SMTP_API_URL = "http://localhost:5005/api/Messages"
+SMTP_API_URL = "http://localhost:5000/api/Messages"
 
 
 def clear_smtp4dev():
@@ -42,8 +42,32 @@ def setup_teardown_environment(db):
     Ensures Branch 9926, Tank 94, and test-user94@mygrape.com are cleanly set up
     """
 
-
-    # print("\n[Setup] Cleaning any leftover test data...")
+    print("[Setup] Adding missing columns to ln2_iot_devices for testing...")
+    try:
+        db.execute(text("""
+            ALTER TABLE ln2_iot_devices 
+            ADD COLUMN IF NOT EXISTS closed_noise_margin_kg_per_h NUMERIC,
+            ADD COLUMN IF NOT EXISTS open_rate_min_kg_per_h NUMERIC,
+            ADD COLUMN IF NOT EXISTS refill_threshold_kg NUMERIC,
+            ADD COLUMN IF NOT EXISTS window_minutes INTEGER,
+            ADD COLUMN IF NOT EXISTS window_min_points INTEGER,
+            ADD COLUMN IF NOT EXISTS consecutive_windows_for_state INTEGER,
+            ADD COLUMN IF NOT EXISTS spike_tolerance_kg NUMERIC,
+            ADD COLUMN IF NOT EXISTS spike_max_duration_s INTEGER,
+            ADD COLUMN IF NOT EXISTS lid_weight_min_kg NUMERIC,
+            ADD COLUMN IF NOT EXISTS lid_weight_max_kg NUMERIC,
+            ADD COLUMN IF NOT EXISTS lid_confirm_stable_points INTEGER,
+            ADD COLUMN IF NOT EXISTS low_level_threshold_kg NUMERIC,
+            ADD COLUMN IF NOT EXISTS low_level_consecutive_readings INTEGER,
+            ADD COLUMN IF NOT EXISTS canister_weight_kg NUMERIC,
+            ADD COLUMN IF NOT EXISTS canister_tolerance_kg NUMERIC,
+            ADD COLUMN IF NOT EXISTS product_change_max_kg NUMERIC,
+            ADD COLUMN IF NOT EXISTS precaution_level_pct NUMERIC;
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Failed to add test columns: {e}")    # print("\n[Setup] Cleaning any leftover test data...")
     # clean_test_records(db)
 
     print("[Setup] Provisioning Hospital 9926, Branch 9926, Device, Tank 94, ln2_iot_devices, test IVF User, and KPI configurations...")
