@@ -21,7 +21,7 @@ const PageHeader = ({ title, description, icon, iconAlt, lucideIcon: LucideIcon,
                 )}
                 <div>
                     <h1 className="font-semibold text-black text-lg md:text-2xl leading-tight">{title}</h1>
-                    {description && <p className="text-xs text-gray-400 mt-0.5 hidden md:block">{description}</p>}
+                    {description && <p className="text-xs font-semibold text-primary mt-0.5 hidden md:block">{description}</p>}
                 </div>
             </div>
             {actions && <div className="flex items-center gap-2">{actions}</div>}
