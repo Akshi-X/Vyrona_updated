@@ -11,7 +11,7 @@ from app.models.readings_model import Readings
 
 # Endpoints
 INGESTION_URL = "http://localhost:7072/api/tive/webhook"
-SMTP_API_URL = "http://localhost:5000/api/Messages"
+SMTP_API_URL = "http://localhost:5005/api/Messages"
 
 
 def clear_smtp4dev():

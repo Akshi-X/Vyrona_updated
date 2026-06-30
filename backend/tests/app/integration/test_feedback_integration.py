@@ -24,7 +24,7 @@ from app.constants.enums import (
 
 client = TestClient(app)
 
-SMTP_API_URL = "http://localhost:5000/api/Messages"
+SMTP_API_URL = "http://localhost:5005/api/Messages"
 
 
 def clear_smtp4dev():

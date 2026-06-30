@@ -67,7 +67,7 @@ from app.config.database import SessionLocal
 # INGESTION_URL = os.environ.get("INGESTION_URL", "http://iot-ingestion-service/api/tive/webhook")
 # SMTP_API_URL = os.environ.get("SMTP4DEV_API", "http://smtp4dev/api/Messages")
 INGESTION_URL = "http://localhost:7072/api/tive/webhook"
-SMTP_API_URL = "http://localhost:5000/api/Messages"
+SMTP_API_URL = "http://localhost:5005/api/Messages"
 # ── Fixed test ids (deterministic cleanup) ─────────────────────────────────────
 HOSPITAL_ID = 9927
 BRANCH_ID = 9927

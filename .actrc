@@ -1,2 +1,1 @@
 --container-options --network host
---secret-file .secrets

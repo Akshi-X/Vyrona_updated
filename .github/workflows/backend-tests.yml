@@ -23,33 +23,33 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # env:
+    #   DB_USER: postgres
+    #   DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgresDB-pass' }}
+    #   DB_HOST: localhost
+    #   DB_PORT: 5432
+    #   DB_NAME: mygrape_test
+    #   POSTGRES_USER: postgres
+    #   POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'postgresDB-pass' }}
+    #   POSTGRES_DB: mygrape_test
+    #   SECRET_KEY: dummy_secret_key_for_testing
+    #   ADMIN_EMAIL: admin@example.com
+    #   ADMIN_DEFAULT_PASSWORD: password123
+    #   MYGRAPE_ADMIN_EMAIL: mygrapeadmin@example.com
+    #   MYGRAPE_ADMIN_PASSWORD: password123
+    #   FRONTEND_URL: http://localhost:5173
+    #   BACKEND_URL: http://localhost:8000
+    #   ALLOWED_ORIGINS: "*"
+    #   IOT_CLIENT_ID: test_client_id
+    #   IOT_CLIENT_SECRET: test_client_secret
+    #   IOT_ACCOUNT_ID: test_account_id
+    #   REDIS_HOST: localhost
+    #   REDIS_PORT: 6379
+    #   REDIS_SSL: "false"
+
     defaults:
       run:
         working-directory: backend
-
-    env:
-      DB_USER: postgres
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgresDB-pass' }}
-      DB_HOST: localhost
-      DB_PORT: 5432
-      DB_NAME: mygrape
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'postgresDB-pass' }}
-      POSTGRES_DB: mygrape
-      SECRET_KEY: dummy_secret_key_for_testing
-      ADMIN_EMAIL: admin@example.com
-      ADMIN_DEFAULT_PASSWORD: password123
-      MYGRAPE_ADMIN_EMAIL: mygrapeadmin@example.com
-      MYGRAPE_ADMIN_PASSWORD: password123
-      FRONTEND_URL: http://localhost:5173
-      BACKEND_URL: http://localhost:8000
-      ALLOWED_ORIGINS: "*"
-      IOT_CLIENT_ID: test_client_id
-      IOT_CLIENT_SECRET: test_client_secret
-      IOT_ACCOUNT_ID: test_account_id
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
-      REDIS_SSL: "false"
 
     steps:
       - name: Checkout repository
@@ -84,56 +84,13 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Set up Docker environment configs
-        run: |
-          cat > .env << EOF
-          DB_USER=postgres
-          DB_PASSWORD=${DB_PASSWORD}
-          DB_HOST=localhost
-          DB_PORT=5432
-          DB_NAME=mygrape
-          SECRET_KEY=dummy_secret_key_for_testing
-          ADMIN_EMAIL=admin@example.com
-          ADMIN_DEFAULT_PASSWORD=password123
-          MYGRAPE_ADMIN_EMAIL=mygrapeadmin@example.com
-          MYGRAPE_ADMIN_PASSWORD=password123
-          FRONTEND_URL=http://localhost:5173
-          BACKEND_URL=http://localhost:8000
-          ALLOWED_ORIGINS=*
-          IOT_CLIENT_ID=test_client_id
-          IOT_CLIENT_SECRET=test_client_secret
-          IOT_ACCOUNT_ID=test_account_id
-          REDIS_HOST=localhost
-          REDIS_PORT=6379
-          REDIS_SSL=False
-          ENVIRONMENT=testing
-          DEBUG=True
-          HOST=0.0.0.0
-          PORT=8000
-          RELOAD=True
-          FIXED_OTP_MODE=True
-          FIXED_OTP_CODE=123456
-          EOF
+        run: cp .env.test .env
         working-directory: backend
 
       - name: Set up Docker environment configs (CI only)
         if: ${{ !env.ACT }}
         run: |
-          cat > ../.env << EOF
-          POSTGRES_USER=postgres
-          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-          POSTGRES_DB=mygrape
-          SECRET_KEY=dummy_secret_key_for_testing
-          ADMIN_EMAIL=admin@example.com
-          ADMIN_DEFAULT_PASSWORD=password123
-          MYGRAPE_ADMIN_EMAIL=mygrapeadmin@example.com
-          MYGRAPE_ADMIN_PASSWORD=password123
-          IOT_CLIENT_ID=test_client_id
-          IOT_CLIENT_SECRET=test_client_secret
-          IOT_ACCOUNT_ID=test_account_id
-          FRONTEND_URL=http://localhost:5173
-          BACKEND_URL=http://localhost:8000
-          VITE_API_BASE_URL=http://localhost:8000
-          EOF
+          cp ../.env.test ../.env
           cat << 'EOF' > ../docker-compose.override.yml
           version: '3.8'
           services:
@@ -166,7 +123,9 @@ jobs:
         working-directory: .
 
       - name: Initialize database schema
-        run: poetry run python -c "from app.init_db import init_db; init_db()"
+        run: |
+          poetry run python -c "from app.config.database import init_db; init_db()"
+          poetry run python -c "from app.init_db import init_db; init_db()"
 
       - name: Run pytest suites (including integration)
         run: |

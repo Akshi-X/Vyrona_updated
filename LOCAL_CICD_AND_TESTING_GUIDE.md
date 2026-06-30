@@ -1,234 +1,306 @@
-# mG-SCALE — Local CI/CD & Testing Guide
+# mG-SCALE — Local Testing Guide
 
-This guide covers everything you need to run the backend test suite locally — either directly with Pytest via Poetry, or by running the full GitHub Actions workflow on your machine using **Nektos `act`**. Written for new interns who want to test without pushing to GitHub first.
+This guide walks you through running the backend tests on your own computer — no need to push anything to GitHub first. It is written for someone who may be doing this for the first time, so everything is explained step by step.
 
 ---
 
 ## Table of Contents
 
-1. [Overview — What Are We Running?](#1-overview--what-are-we-running)
-2. [Prerequisites](#2-prerequisites)
-   - [Install Docker Desktop](#install-docker-desktop)
-   - [Install Python 3.12 & Poetry](#install-python-312--poetry)
-   - [Install Nektos `act` (for GitHub Actions locally)](#install-nektos-act-for-github-actions-locally)
-3. [Start the Docker Services](#3-start-the-docker-services)
-4. [Running Tests Directly with Pytest](#4-running-tests-directly-with-pytest)
-5. [Running GitHub Actions Locally with `act`](#5-running-github-actions-locally-with-act)
-   - [What `act` does](#what-act-does)
-   - [Why the Docker socket command looks unusual](#why-the-docker-socket-command-looks-unusual)
-   - [The `.actrc` file — what it pre-configures](#the-actrc-file--what-it-pre-configures)
-   - [What happens automatically when `act` runs](#what-happens-automatically-when-act-runs)
-   - [Running the workflow](#running-the-workflow)
-6. [Interactive HTML Test Reports](#6-interactive-html-test-reports)
-7. [CI/CD Pipelines Overview](#7-cicd-pipelines-overview)
-8. [Troubleshooting](#8-troubleshooting)
+1. [What Are We Actually Doing?](#1-what-are-we-actually-doing)
+2. [Step 1 — Install Docker Desktop](#2-step-1--install-docker-desktop)
+3. [Step 2 — Install Python 3.12 and Poetry](#3-step-2--install-python-312-and-poetry)
+4. [Step 3 — Install `act` (only if you need it)](#4-step-3--install-act-only-if-you-need-it)
+5. [Step 4 — Start the Services](#5-step-4--start-the-services)
+6. [Step 5 — Run Tests with Pytest](#6-step-5--run-tests-with-pytest)
+7. [Step 6 — Run GitHub Actions on Your Computer with `act`](#7-step-6--run-github-actions-on-your-computer-with-act)
+8. [Test Reports](#8-test-reports)
+9. [How Deployments Work](#9-how-deployments-work)
+10. [Something Went Wrong?](#10-something-went-wrong)
 
 ---
 
-## 1. Overview — What Are We Running?
+## 1. What Are We Actually Doing?
 
-The backend is a **FastAPI + SQLAlchemy** application that talks to PostgreSQL, Redis, Azurite (Azure Storage emulator), an Event Hub emulator, and an SMTP dev server. The test suite is in `backend/tests/` and uses **Pytest**.
+The backend is a Python app that needs a few other things running alongside it — a database, a cache, some cloud service replacements, and a fake email server. All of these run in Docker so you do not have to install them manually.
 
-There are two ways to run the tests:
+The tests live in `backend/tests/` and run using a tool called **Pytest**.
 
-| Method | When to use |
-|--------|-------------|
-| **Pytest directly** | Fastest. Run individual test files while developing. Services must already be up. |
-| **`act` (GitHub Actions locally)** | Simulates what GitHub CI does end-to-end: installs Poetry, sets env vars, runs the full suite exactly as the workflow defines. Good for catching CI-specific failures before pushing. |
+You have two ways to run the tests:
 
-Both methods need Docker running to provide the backing services (Postgres, Redis, etc.).
+| Method | When to use it |
+|--------|----------------|
+| **Pytest directly** | The quickest option. Great for testing while you are writing code. |
+| **`act`** | Makes your computer pretend to be GitHub's CI server. Use this when you want to be 100% sure your changes will pass before pushing. |
+
+Both ways need Docker to be running first.
 
 ---
 
-## 2. Prerequisites
+## 2. Step 1 — Install Docker Desktop
 
-### Install Docker Desktop
+Docker lets you run apps in isolated boxes called containers. Instead of installing Postgres, Redis, and other tools directly on your computer, Docker runs them in the background without touching your system.
 
-Docker Desktop bundles the Docker engine, the CLI, and the Docker Compose plugin. It is the simplest way to get Docker running on both Windows and Linux without manually managing system daemons.
+Docker Desktop is the easiest way to get Docker — it comes with everything you need in one installer.
 
-- **Download page:** https://www.docker.com/products/docker-desktop/
-- Choose the installer for your OS (Linux `.deb`/`.rpm`, or Windows `.exe`).
+### macOS
 
-**Linux (Debian/Ubuntu) — quick install:**
+1. Go to [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/) and download the right version:
+   - **Apple chip (M1/M2/M3):** pick "Mac with Apple Silicon"
+   - **Older Intel Mac:** pick "Mac with Intel chip"
+2. Open the downloaded file and drag Docker into your Applications folder.
+3. Open Docker from Applications. You will see a whale icon appear in your top menu bar.
+4. Wait until it says **"Docker Desktop is running"**.
+5. Open Terminal and type `docker ps` — if you see an empty table instead of an error, you are good.
+
+### Windows
+
+1. Go to [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/) and download `Docker Desktop Installer.exe`.
+2. Run the installer. When it asks about **WSL 2**, say yes — this is the recommended setup on Windows.
+3. Restart your computer if it asks you to.
+4. Open Docker Desktop from the Start Menu and wait for it to say **"Engine running"**.
+5. Open PowerShell and type `docker ps` to confirm it works.
+
+### Linux (Ubuntu/Debian)
+
+**Option A — Docker Desktop (has a GUI):**
 ```bash
-# Download the .deb from the Docker Desktop download page, then:
+# Download the .deb file from https://www.docker.com/products/docker-desktop/ then run:
 sudo apt install ./docker-desktop-<version>-amd64.deb
-
-# Start Docker Desktop
 systemctl --user start docker-desktop
-
-# Confirm it's running
 docker ps
 ```
 
-**Windows:**
-1. Run the downloaded `Docker Desktop Installer.exe`.
-2. Follow the wizard (enable WSL 2 integration when prompted).
-3. Launch Docker Desktop from the Start Menu and wait for it to show "Engine running".
-4. Open PowerShell and run `docker ps` to verify.
-
-> After Docker Desktop is running, the Docker socket is at:
-> - **Linux:** `/home/<your-user>/.docker/desktop/docker.sock`
-> - **Windows (WSL 2):** `//./pipe/dockerDesktopLinuxEngine` or use the WSL2 socket path
+**Option B — Just the Docker engine (lighter, no GUI):**
+```bash
+sudo apt update
+sudo apt install docker.io docker-compose-plugin
+sudo systemctl start docker
+sudo usermod -aG docker $USER   # so you can run docker without sudo
+newgrp docker                   # apply that change right now
+docker ps
+```
 
 ---
 
-### Install Python 3.12 & Poetry
+## 3. Step 2 — Install Python 3.12 and Poetry
 
-The backend requires **Python 3.12**. Poetry manages the virtual environment and dependencies.
+The backend runs on **Python 3.12**. **Poetry** is the tool that installs all the Python packages the project needs and keeps them separate from anything else on your computer.
 
-**Linux:**
+### macOS
+
 ```bash
-# Install Python 3.12 (if not already installed)
-sudo apt update && sudo apt install python3.12 python3.12-venv python3.12-dev
+# Install Homebrew first if you do not have it: https://brew.sh
+# Then install Python 3.12:
+brew install python@3.12
 
-# Install Poetry
+# Install Poetry:
 curl -sSL https://install.python-poetry.org | python3 -
 
-# Add Poetry to PATH (add this line to ~/.bashrc or ~/.zshrc, then restart terminal)
+# Tell your terminal where to find Poetry.
+# Add this line to ~/.zshrc, then restart Terminal:
 export PATH="$HOME/.local/bin:$PATH"
 
-# Verify
+# Check it worked:
+python3.12 --version
 poetry --version
 ```
 
-**Windows (PowerShell):**
-```powershell
-# Download Python 3.12 from https://www.python.org/downloads/ and install.
-# Then install Poetry:
-(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+### Windows (PowerShell)
 
-# Add Poetry to PATH if prompted by the installer output, then restart the terminal.
+1. Download Python 3.12 from [https://www.python.org/downloads/](https://www.python.org/downloads/) and run the installer. Make sure to check **"Add Python to PATH"**.
+2. Then install Poetry:
+   ```powershell
+   (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+   ```
+3. Restart PowerShell and check:
+   ```powershell
+   python --version
+   poetry --version
+   ```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update && sudo apt install python3.12 python3.12-venv python3.12-dev
+
+# Install Poetry:
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Add this to ~/.bashrc, then restart your terminal:
+export PATH="$HOME/.local/bin:$PATH"
+
+# Check it worked:
+python3.12 --version
 poetry --version
 ```
 
 ---
 
-### Install Nektos `act` (for GitHub Actions locally)
+## 4. Step 3 — Install `act` (only if you need it)
 
-`act` is a CLI tool that reads your `.github/workflows/*.yml` files and executes each job inside a Docker container, replicating GitHub's runner environment on your own machine.
+Skip this step if you just want to run Pytest directly (Step 5). You only need `act` if you want to simulate the full GitHub CI process on your computer.
 
-**Linux:**
+`act` reads the GitHub Actions workflow files in `.github/workflows/` and runs them on your machine, in the same way GitHub would run them on its servers.
+
+### macOS
+
 ```bash
-curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
-
-# Or via Homebrew if you have it:
 brew install act
-
-# Verify
 act --version
 ```
 
-**Windows (PowerShell as Administrator):**
+### Windows (PowerShell — run as Administrator)
+
 ```powershell
-# Winget
+# Pick any one of these:
 winget install nektos.act
-
-# Or Chocolatey
+# or
 choco install act-cli
-
-# Or Scoop
+# or
 scoop install act
 
 act --version
 ```
 
-> On the **first run**, `act` asks which runner image size to pull:
-> - **Micro** (~1 GB) — too minimal, missing most tools.
-> - **Medium** (~5 GB) — **choose this**. Has the tools the workflow needs.
-> - **Large** (~20 GB) — full Ubuntu VM image, overkill.
+### Linux
+
+```bash
+curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+# or, if you have Homebrew on Linux:
+brew install act
+
+act --version
+```
+
+> **First time running `act`?** It will ask you to pick an image size to download. These are like mini operating systems `act` uses to run your workflow:
+> - **Micro** — too small, will be missing tools.
+> - **Medium** — pick this one. It has everything needed.
+> - **Large** — 17 GB download, way more than we need.
 
 ---
 
-## 3. Start the Docker Services
+## 5. Step 4 — Start the Services
 
-Before running any tests (either Pytest directly or via `act`), the backing services must be running on your host machine. From the **project root** directory:
+Before running any tests, you need to start the supporting services — the database, cache, and a few others. These all run in Docker containers.
+
+Run this from the **root of the project** (the folder that has `docker-compose.yml` in it):
 
 ```bash
 docker compose up -d postgres redis azurite eventhub-emulator smtp4dev backend telemetry-service iot-ingestion-service
+docker compose up -d (alternative for above command)
 ```
 
-**What each service does:**
+The `-d` at the end means "run in the background" so your terminal stays free.
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| `postgres` | 5432 | Main database (PostgreSQL 15, db: `mygrape`) |
-| `redis` | 6379 | Session caching and pub/sub |
-| `azurite` | 10000–10002 | Azure Blob/Queue/Table storage emulator (local replacement for Azure Storage) |
-| `eventhub-emulator` | 5672, 9092, 5300 | Azure Event Hub emulator (local replacement for cloud message bus) |
-| `smtp4dev` | 25, 80 | Catches outgoing emails so tests don't send real mail |
-| `backend` | 8000 | The FastAPI app itself |
-| `telemetry-service` | — | Processes device telemetry from IoT sensors |
-| `iot-ingestion-service` | 7072 | Receives IoT webhook payloads (used in integration tests) |
+**What each service is for:**
 
-Confirm everything is healthy:
+| Service | Port | What it does |
+|---------|------|--------------|
+| `postgres` | 5432 | The main database |
+| `redis` | 6379 | Stores temporary data like sessions |
+| `azurite` | 10000–10002 | Pretends to be Azure file storage, locally |
+| `eventhub-emulator` | 5672, 9092, 5300 | Pretends to be Azure's message system, locally |
+| `smtp4dev` | 25, 80 | Catches emails sent by the app so nothing real is sent |
+| `backend` | 8000 | The actual Python app |
+| `telemetry-service` | — | Handles sensor data coming from devices |
+| `iot-ingestion-service` | 7072 | Receives data from IoT devices |
+
+**Check that everything started properly:**
 ```bash
 docker compose ps
+```
+All services should show as `Up` or `healthy`.
+
+**Also check the backend is responding:**
+```bash
+# macOS / Linux
 curl http://localhost:8000/health
+
+# Windows PowerShell
+Invoke-WebRequest http://localhost:8000/health
+```
+You should get a success response, not an error.
+
+---
+
+## 6. Step 5 — Run Tests with Pytest
+
+This is the quickest way to run tests. Use this while you are working on code day to day.
+
+### 5a — Go to the backend folder and install packages
+
+```bash
+cd backend
+poetry install
+```
+
+This reads the project's package list and installs everything into its own isolated environment. You only need to do this once, or when packages change.
+
+### 5b — Set Up Database Isolation (Development vs Testing)
+
+To avoid corrupting or polluting your local development data in `mygrape`, it is highly recommended to run tests against a separate database called **`mygrape_test`**.
+
+#### 1. Create the test database
+Run this command once in your terminal to create the test database inside your running PostgreSQL container:
+```bash
+docker exec -it mgscale-postgres psql -U postgres -c "CREATE DATABASE mygrape_test;"
+```
+
+#### 2. Copy the test environment settings
+The tests read settings from `.env` inside the `backend/` folder. Copy the template `backend/.env.test` (which points to `mygrape_test`) to your active `backend/.env`:
+
+**macOS / Linux:**
+```bash
+cp .env.test .env
+```
+
+**Windows (PowerShell):**
+```powershell
+Copy-Item .env.test .env
 ```
 
 ---
 
-## 4. Running Tests Directly with Pytest
+### Critical Integration Test Note: Database Alignment
 
-This is the fastest way to run tests during development. No `act` or CI overhead.
+> [!IMPORTANT]
+> **Database alignment is only needed for running live integration tests or testing GitHub Actions locally.**
+> Changing your root `.env` to `mygrape_test` is a **temporary configuration**. You must revert it back to your original database (`mygrape`) when you return to normal development and local UI testing.
 
-### Step 1 — Navigate to the backend directory and install dependencies
+Some tests (like `test_alert_ingestion.py` and `test_refrigerator_alert_ingestion.py`) are **live integration tests**. They post data to the IoT ingestion webhook on your host machine, which is processed by your running Docker containers (`telemetry-service`, `iot-ingestion-service`, etc.).
 
-```bash
-cd backend
+Because these host containers read your **root** `.env` file, they will search for devices and write telemetry data based on whatever database name is set there. 
 
-# Install all dependencies into the Poetry virtual environment
-poetry install
-```
+If you want these live integration tests to pass locally under `act` or `pytest`, your host containers and your test configuration **must point to the same database**. 
 
-### Step 2 — Set up the backend `.env` file
+To align them and run cleanly against the test database:
+1. Edit your **root** `.env` file (in the project root directory) and set:
+   ```env
+   POSTGRES_DB=mygrape_test
+   ```
+2. Restart your host containers to apply the change:
+   ```bash
+   docker compose down
+   docker compose up -d
+   ```
+3. Run `act` or `pytest`. They will now pass perfectly.
+4. When going back to development, revert the root `.env` to `POSTGRES_DB=mygrape` and run `docker compose up -d` again.
 
-The tests expect a `.env` file at `backend/.env`. Create it once:
+---
 
-```bash
-cat > .env << 'EOF'
-DB_USER=postgres
-DB_PASSWORD=postgresDB-pass
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=mygrape
-SECRET_KEY=dummy_secret_key_for_testing
-ADMIN_EMAIL=admin@example.com
-ADMIN_DEFAULT_PASSWORD=password123
-MYGRAPE_ADMIN_EMAIL=mygrapeadmin@example.com
-MYGRAPE_ADMIN_PASSWORD=password123
-FRONTEND_URL=http://localhost:5173
-BACKEND_URL=http://localhost:8000
-ALLOWED_ORIGINS=*
-IOT_CLIENT_ID=test_client_id
-IOT_CLIENT_SECRET=test_client_secret
-IOT_ACCOUNT_ID=test_account_id
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_SSL=False
-ENVIRONMENT=testing
-DEBUG=True
-HOST=0.0.0.0
-PORT=8000
-RELOAD=True
-FIXED_OTP_MODE=True
-FIXED_OTP_CODE=123456
-EOF
-```
+### 5c — Set up the database tables
 
-### Step 3 — Initialize the database schema
-
-This runs the app's `init_db()` which creates all tables and seeds the admin user:
+This initializes the tables and default schemas inside your active test database. Run it once before running the tests:
 
 ```bash
+poetry run python -c "from app.config.database import init_db; init_db()"
 poetry run python -c "from app.init_db import init_db; init_db()"
 ```
 
-### Step 4 — Run tests
+### 5d — Run the tests
 
 ```bash
-# Run the full CI suite (same files the workflow runs)
+# Run the full set of tests (same ones GitHub runs)
 poetry run pytest \
   tests/app/auth/test_auth.py \
   tests/app/alert-config/test_alert.py \
@@ -240,195 +312,193 @@ poetry run pytest \
   tests/app/integration/test_feedback_integration.py \
   tests/app/activity_log/test_activity_log.py
 
-# Run with verbose output (shows each test name as it runs)
+# Run one file and see each test name as it runs
 poetry run pytest -v tests/app/auth/test_auth.py
 
-# Run a single test file
+# Run just one file
 poetry run pytest tests/app/profile/test_profile.py
 
-# Run with coverage report
+# Run with a coverage report
 poetry run pytest --cov=app --cov-report=html
 ```
 
 ---
 
-## 5. Running GitHub Actions Locally with `act`
+## 7. Step 6 — Run GitHub Actions on Your Computer with `act`
 
-### What `act` does
+Use this when you want to check that your code will pass GitHub's checks before you push it.
 
-`act` reads `.github/workflows/backend-tests.yml` and runs each step of the `test` job inside a Docker container (the "runner"). It:
+### What `act` actually does
 
-1. Pulls a base Ubuntu image (the Medium runner you selected on first run).
-2. Clones the repo into the container's workspace.
-3. Runs every `steps:` entry in the workflow sequentially — setting up Python, installing Poetry, creating the `.env` files, waiting for services to become healthy, initializing the DB, and finally running Pytest.
+`act` opens `.github/workflows/backend-tests.yml` and runs every step in it on your computer, inside a container. It sets up Python, installs packages, creates the settings file, waits for the services to be ready, and then runs the tests — exactly the same as GitHub would do.
 
-This is exactly what happens when you push to `develop` on GitHub, minus GitHub's own compute.
+> The services (Postgres, Redis, etc.) still need to be started manually before you run `act`. More on why below.
 
 ---
 
-### Why the Docker socket command looks unusual
+### The `.actrc` file
 
-On **Linux with Docker Desktop**, the Docker socket is not at the standard `/var/run/docker.sock` — it is at:
-
-```
-/home/<your-user>/.docker/desktop/docker.sock
-```
-
-You must tell both `act` and the Docker CLI where this socket is, otherwise `act` cannot spin up the runner container. The full command is:
-
-```bash
-DOCKER_HOST=unix:///home/akshi/.docker/desktop/docker.sock \
-  act -W .github/workflows/backend-tests.yml \
-  --container-daemon-socket /home/akshi/.docker/desktop/docker.sock \
-  --network host
-```
-
-**Breaking down each flag:**
-
-| Part | What it does |
-|------|--------------|
-| `DOCKER_HOST=unix:///home/akshi/.docker/desktop/docker.sock` | Tells the Docker CLI in your shell session where the daemon socket is (overrides the default `/var/run/docker.sock`). |
-| `act -W .github/workflows/backend-tests.yml` | Tells `act` to only run the backend tests workflow file. |
-| `--container-daemon-socket /home/akshi/.docker/desktop/docker.sock` | Tells `act` itself where the Docker socket is so it can create and manage the runner container. |
-| `--network host` | Runs the runner container in the **host network namespace**, meaning `localhost` inside the container resolves to your actual machine's `localhost`. This lets the tests reach Postgres on port 5432, Redis on 6379, and so on — without any extra network bridging. |
-
-> **If you are on standard Linux (not Docker Desktop):** the socket is at `/var/run/docker.sock`, so the simpler command works:
-> ```bash
-> act -W .github/workflows/backend-tests.yml --network host
-> ```
-
----
-
-### The `.actrc` file — what it pre-configures
-
-The repository already has a `.actrc` file at the project root. `act` automatically reads it before every run:
+There is already a `.actrc` file in the project root. `act` reads it automatically every time you run it. It contains:
 
 ```
 --container-options --network host
---secret-file .secrets
 ```
 
-- `--container-options --network host` — pre-applies the host-network flag so you do not have to type it every time (for standard Linux sockets). When using Docker Desktop's socket, you still need to pass the `DOCKER_HOST` and `--container-daemon-socket` manually since those are machine-specific paths.
-- `--secret-file .secrets` — loads a local file called `.secrets` from the project root as GitHub Actions secrets. This file already exists in the repo. It contains:
-
-```
-POSTGRES_PASSWORD=postgresDB-pass
-DB_PASSWORD=postgresDB-pass
-```
-
-These are the dummy local passwords injected into the workflow wherever `${{ secrets.POSTGRES_PASSWORD }}` appears.
+- `--network host` — makes it so the container can reach `localhost` on your computer (so it can talk to Postgres, Redis, etc.).
 
 ---
 
-### What happens automatically when `act` runs
+### Running `act` — pick your operating system
 
-When you fire the command, here is the sequence of events (matching the workflow steps):
+#### macOS
 
-1. **Checkout** — `act` mounts the local repo into the runner container (it does not re-clone from GitHub).
-2. **Set up Python 3.12** — installs Python inside the runner container.
-3. **Install Poetry 2.4.1** — installs Poetry inside the runner.
-4. **Cache dependencies** — checks for a cached `.venv` keyed on `poetry.lock`. On first run this misses; subsequent runs are faster.
-5. **Install dependencies** — runs `poetry install` inside `backend/`.
-6. **Create `backend/.env`** — the workflow writes the full env file using the secrets you configured.
-7. **Create root `.env` and `docker-compose.override.yml` (CI only, skipped by `act`)** — the step has `if: ${{ !env.ACT }}`. Because `act` automatically sets `ACT=true` in its environment, this step is **skipped**. `act` relies on the services already running on your host instead.
-8. **Start Docker services (CI only, skipped by `act`)** — same `if: ${{ !env.ACT }}` guard. On real GitHub CI, this step runs `docker compose up -d ...`. Locally, you started those services manually in Step 3 of this guide.
-9. **Wait for services** — polls `http://localhost:8000/docs` and `http://localhost:7072/api/tive/webhook` every 4 seconds (up to 30 tries) until both respond. Because the runner container is in the **host network**, these `localhost` calls reach your actual running containers.
-10. **Initialize database schema** — runs `init_db()` to create tables and seed the admin.
-11. **Run Pytest** — runs the full list of test files and streams output to your terminal.
-12. **Cleanup** — removes the temporary `docker-compose.override.yml` if it was created.
+On macOS, Docker's connection file lives at `~/.docker/run/docker.sock`. You need to tell `act` where to find it:
 
----
-
-### Running the workflow
-
-Make sure the Docker services are up first (see [Section 3](#3-start-the-docker-services)), then from the **project root**:
-
-**Linux with Docker Desktop (most common setup here):**
 ```bash
-DOCKER_HOST=unix:///home/<user>/.docker/desktop/docker.sock \
+DOCKER_HOST=unix://$HOME/.docker/run/docker.sock \
   act -W .github/workflows/backend-tests.yml \
-  --container-daemon-socket /home/<user>/.docker/desktop/docker.sock \
+  --container-daemon-socket $HOME/.docker/run/docker.sock \
   --network host
 ```
 
-**Standard Linux (Docker installed system-wide, not Docker Desktop):**
+#### Windows (PowerShell)
+
+```powershell
+act -W .github/workflows/backend-tests.yml --network host
+```
+
+If you get a connection error, make sure Docker Desktop is open and running.
+
+#### Linux with Docker Desktop
+
+Docker Desktop on Linux puts its connection file in a non-standard place:
+
+```bash
+DOCKER_HOST=unix://$HOME/.docker/desktop/docker.sock \
+  act -W .github/workflows/backend-tests.yml \
+  --container-daemon-socket $HOME/.docker/desktop/docker.sock \
+  --network host
+```
+
+#### Linux with the Docker engine (no Docker Desktop)
+
 ```bash
 act -W .github/workflows/backend-tests.yml
 ```
 
-**Other useful `act` commands:**
-```bash
-# List all jobs in all workflow files
-act -l
+---
 
-# Dry-run: show what would execute without actually running
-act -n
+### Why does `act` skip some steps?
 
-# Run just the 'test' job by name
-act -j test
+Two steps in the workflow file have this condition:
 
-# Simulate a pull_request event trigger
-act pull_request -W .github/workflows/backend-tests.yml
+```yaml
+if: ${{ !env.ACT }}
 ```
+
+`act` automatically sets a variable called `ACT=true` when it runs. So any step with `!env.ACT` gets skipped when running locally. The skipped steps are:
+
+- **"Start Docker services"** — on GitHub, this starts Postgres and Redis. On your computer, you already did that manually in Step 4.
+- **"Create docker-compose.override.yml"** — only needed on GitHub's servers, not locally.
+
+Everything else runs normally — Python setup, package install, settings file creation, database setup, and the actual tests.
 
 ---
 
-## 6. Interactive HTML Test Reports
+### Other useful `act` commands
 
-Every Pytest run generates a timestamped HTML report under `backend/reports/`. These are self-contained HTML files — open them in any browser.
+```bash
+# See a list of all jobs across all workflow files
+act -l
+
+# Do a dry run — see what would happen without actually running anything
+act -n
+
+# Run just the 'test' job
+act -j test
+
+# Pretend a pull request was opened
+act pull_request -W .github/workflows/backend-tests.yml
+```
+
+> [!NOTE]
+> If you are on **macOS** or **Linux with Docker Desktop**, you must include your Docker socket environment variables and arguments (from Step 6) for **any** of these commands to avoid connection errors. For example:
+> ```bash
+> DOCKER_HOST=unix://$HOME/.docker/desktop/docker.sock \
+>   act pull_request -W .github/workflows/backend-tests.yml \
+>   --container-daemon-socket $HOME/.docker/desktop/docker.sock \
+>   --network host
+> ```
+
+---
+
+## 8. Test Reports
+
+Every time you run Pytest, it automatically creates an HTML report in `backend/reports/`. These are regular files you can open in any browser.
 
 ```
 backend/reports/test_auth_20260630_120000.html
 backend/reports/test_alert_20260630_120010.html
-...
 ```
 
-Each report contains:
-- A summary card: total / passed / failed / skipped counts.
-- Per-test status rows with execution duration.
-- An expandable "show logs" drawer for each test showing stdout, stderr, captured log output, and full tracebacks for failures.
+Each report shows:
+- How many tests passed, failed, or were skipped.
+- How long each test took.
+- For any failed test, you can expand it to see exactly what went wrong and why.
+
+**Open a report:**
 
 ```bash
-# Open a report on Linux
+# macOS
+open backend/reports/test_auth_20260630_120000.html
+
+# Linux
 xdg-open backend/reports/test_auth_20260630_120000.html
 ```
 
+On Windows, just find the file in File Explorer and double-click it.
+
 ---
 
-## 7. CI/CD Pipelines Overview
+## 9. How Deployments Work
 
-The workflows live in `.github/workflows/`:
+The GitHub Actions files live in `.github/workflows/`:
 
 ```
 .github/workflows/
-├── backend-tests.yml                         # CI: runs Pytest on push/PR to develop
-├── main_mgscale-backend-dev.yml              # CD: builds & deploys backend Docker image to dev Azure
-├── main_mgscale-backend-prod.yml             # CD: builds & deploys backend Docker image to production Azure
-├── main_mgscale-frontnd-dev.yml              # CD: builds Vite bundle, deploys frontend to dev Azure
-├── master_mgscale-dashboard-service-prod.yml # CD: deploys dashboard service to production
-├── reusable-azure-webapp-docker.yml          # Reusable: Docker build + Azure Web App deploy
-└── reusable-azure-webapp-node.yml            # Reusable: Node/Vite build + Azure Web App deploy
+├── backend-tests.yml                         # Runs the tests on every push or pull request
+├── main_mgscale-backend-dev.yml              # Deploys the backend to the dev environment
+├── main_mgscale-backend-prod.yml             # Deploys the backend to production
+├── main_mgscale-frontnd-dev.yml              # Builds and deploys the frontend to dev
+├── master_mgscale-dashboard-service-prod.yml # Deploys the dashboard service to production
+├── reusable-azure-webapp-docker.yml          # Shared file used by backend deploys
+└── reusable-azure-webapp-node.yml            # Shared file used by frontend deploys
 ```
 
-**Deployment flow:**
+**What happens when you push code:**
 
-1. Developer pushes to `develop` or opens a PR targeting `develop`:
-   - `backend-tests.yml` runs. If it passes, the CD backend workflow builds a Docker image from `backend/Dockerfile`, pushes it to Azure Container Registry (ACR), and deploys to the Dev Web App.
-   - The frontend CD workflow runs `vite build` and deploys the static bundle to the Frontend Dev Web App.
-2. PR merged into `main`/`master`:
-   - The production CD workflows publish Docker images to the production ACR and update the Production Web Apps.
+1. You push to `develop` or open a pull request:
+   - The tests run automatically.
+   - If they pass, the backend gets packaged and deployed to the dev server on Azure.
+   - The frontend gets built and deployed to the dev server too.
+
+2. A pull request gets merged into `main`:
+   - The same thing happens, but this time it goes to the production servers.
 
 ---
 
-## 8. Troubleshooting
+## 10. Something Went Wrong?
 
-| Symptom | Likely cause | Fix |
-|---------|-------------|-----|
-| `dial unix /var/run/docker.sock: no such file` | `act` is looking at the wrong socket path | Pass `DOCKER_HOST` and `--container-daemon-socket` pointing to Docker Desktop's socket at `/home/<user>/.docker/desktop/docker.sock` |
-| `permission denied` on `/var/run/docker.sock` | Your user is not in the `docker` group | Run `sudo usermod -aG docker $USER`, then `newgrp docker`, then retry |
-| `Port 8000 already in use` or `Port 5432 already in use` | A native process or stale container is holding the port | Run `docker compose ps` and `lsof -i :8000` to identify the conflict. Stop the conflicting process or change the port mapping in `docker-compose.yml`. |
-| `poetry: command not found` inside `act` | The Medium runner image is not selected | On the first `act` run when prompted, select **Medium**. Or delete `~/.cache/act` and rerun to get the prompt again. |
-| Pytest fails immediately with DB connection error | Services are not up or DB is not initialized | Run `docker compose ps` to check container health. Make sure you ran `init_db()` before the test run. |
-| `Poetry lock file is not consistent with pyproject.toml` | A dependency was added without updating the lock file | Inside `backend/`: run `poetry lock --no-update` then `poetry install`. |
-| `act` skips the "Start Docker services" step | Expected — this is intentional | The step has `if: ${{ !env.ACT }}`. `act` sets `ACT=true`, so the step is skipped. You start services manually instead. |
-| Tests time out waiting for `localhost:8000` | Backend container is not healthy yet | Wait a moment for the backend to finish starting, then retry. Or check `docker compose logs backend`. |
+| What you see | Why it happens | How to fix it |
+|--------------|----------------|---------------|
+| `dial unix /var/run/docker.sock: no such file` | `act` cannot find Docker's connection file | Add `DOCKER_HOST` and `--container-daemon-socket` with the correct path for your OS (see Step 6). |
+| `permission denied` on `/var/run/docker.sock` | Your user account does not have Docker access | Run `sudo usermod -aG docker $USER`, then `newgrp docker`, then try again. |
+| `docker ps` says "Cannot connect to the Docker daemon" | Docker Desktop is not open | Open Docker Desktop and wait for it to say "Engine running". |
+| `Port 5432 already in use` or `Port 8000 already in use` | Something else is using that port | Run `docker compose ps` to check. On macOS/Linux: `lsof -i :5432`. On Windows: `netstat -ano \| findstr 5432`. Stop whatever is using the port. |
+| `poetry: command not found` | Poetry is not on your PATH | Add `export PATH="$HOME/.local/bin:$PATH"` to your shell settings file (`~/.zshrc` or `~/.bashrc`) and restart your terminal. |
+| `poetry: command not found` inside `act` | The wrong image size was chosen for `act` | Delete `~/.cache/act` and run `act` again. When asked, pick **Medium**. |
+| Tests fail with a database connection error | The database is not running, or the tables were never created | Run `docker compose ps` to check. Then run `poetry run python -c "from app.init_db import init_db; init_db()"`. |
+| `Poetry lock file is not consistent with pyproject.toml` | A package was added but the lock file was not updated | Inside `backend/`, run `poetry lock --no-update` and then `poetry install`. |
+| `act` skips the "Start Docker services" step | This is on purpose | That step only runs on GitHub. Locally, you start the services yourself in Step 4. |
+| Tests are stuck waiting for `localhost:8000` | The backend container is still starting up | Wait 10–15 seconds and try again. Or run `docker compose logs backend` to see what is happening. |
+| On macOS, `act` cannot connect to Docker | Wrong connection file path | Use `$HOME/.docker/run/docker.sock` — not the Linux path. Run `ls ~/.docker/run/` to confirm the file is there. |
