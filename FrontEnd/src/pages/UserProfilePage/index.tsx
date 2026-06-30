@@ -5,6 +5,7 @@ import { feedbackApi, type UserTicketSummary } from '../../api/feedbackApi';
 import { userService, type UserProfileDto } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
+import { useHasVariant } from '../../components/VariantRoute';
 import Header from '../../components/Header';
 import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
  
@@ -40,6 +41,9 @@ const UserProfilePage: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const navigate = useNavigate();
   const isOnboarding = useOnboardingMode();
+  // Refrigerator-only hospitals (gated via "/user-profile#hide-onboarding" variant flag)
+  // don't use the guided tour, so hide the onboarding card.
+  const hideOnboardingCard = useHasVariant('/user-profile#hide-onboarding');
   const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token, onboardingCompleted } = useAuth();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
  
@@ -663,7 +667,7 @@ const UserProfilePage: React.FC = () => {
           )}
         </div>
 
-        {onboardingCompleted && !isOnboarding && (
+        {onboardingCompleted && !isOnboarding && !hideOnboardingCard && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 flex items-center justify-between gap-6">
             <div className="flex items-center gap-5 min-w-0">
               <img src="/genie/explaining_casual.webp" alt="" className="w-40 h-40 object-contain shrink-0" />

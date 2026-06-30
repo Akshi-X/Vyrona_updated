@@ -1,6 +1,8 @@
-import React from 'react';
-import { Grid3x3, Settings, LogOut, FileText, Users, User, Refrigerator } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Grid3x3, Settings, LogOut, FileText, Users, Refrigerator } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { userService } from '../../services/userService';
 
 interface SidebarProps {
   onLogout?: () => void;
@@ -27,6 +29,24 @@ function NavButton({ onClick, className, children, tooltip }: {
 const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
+  const [profileName, setProfileName] = useState('');
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    userService.getProfile().then((profile) => {
+      const first = profile.first_name?.trim() ?? '';
+      const last = profile.last_name?.trim() ?? '';
+      setProfileName([first, last].filter(Boolean).join(' ') || 'User');
+    }).catch(() => {});
+  }, [isAuthenticated]);
+
+  const initials = (profileName || 'User')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join('') || 'U';
 
   const navItems = [
     { id: 'dashboard', icon: Grid3x3, label: 'Dashboard', path: '/dashboard' },
@@ -61,7 +81,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
       {/* Bottom */}
       <div className="flex flex-col gap-4 items-center">
         <NavButton onClick={() => navigate('/user-profile')} className={navCls('/user-profile')} tooltip="Profile">
-          <User size={20} />
+          <span className="w-6 h-6 rounded-full bg-white/20 text-white text-[10px] font-bold flex items-center justify-center uppercase">
+            {initials}
+          </span>
         </NavButton>
         <NavButton
           onClick={() => onLogout?.()}

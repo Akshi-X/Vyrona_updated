@@ -2018,7 +2018,9 @@ export default function AlertSetting() {
         <>
                 <PageLayout
                     title="Alert Configuration"
+                    description={refrigeratorOnly ? "Set temperature and humidity alert thresholds for each refrigerator." : undefined}
                     icon={CriticalAlertsIcon}
+                    patternBackground={refrigeratorOnly}
                     actions={
                         <>
                             <div className="md:hidden">

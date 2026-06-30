@@ -433,7 +433,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const apiSyncNeededRef = useRef(false);
     const apiHydratedRef = useRef(false);
     const [isHydrating, setIsHydrating] = React.useState(false);
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, markOnboardingComplete } = useAuth();
 
     // On login, fetch saved state from the API and merge it.
     // If the API returns null (first-ever login), keep fresh state → welcome shows.
@@ -496,6 +496,9 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             apiSyncNeededRef.current = true;
             if (levelId === "level-8") {
                 onboardingService.completeOnboarding();
+                // Keep auth state in sync so the user isn't redirected back into
+                // onboarding when they leave the flow without a reload.
+                markOnboardingComplete();
             }
             dispatch({ type: "COMPLETE_LEVEL", levelId, score });
         },

@@ -985,7 +985,11 @@ export default function RefrigeratorVisualisation({
         else if (mat) mat.dispose();
       });
     };
-  }, []);
+    // Re-run once the mount element actually exists: while isLoadingType is true
+    // (or type is cold_storage) the mountRef div isn't rendered, so the effect
+    // above bails early. Depend on these so the scene initialises when the 3D
+    // panel appears.
+  }, [isLoadingType, type]);
 
   // ── Alert glow override ────────────────────────────────────────────────────
   useEffect(() => {

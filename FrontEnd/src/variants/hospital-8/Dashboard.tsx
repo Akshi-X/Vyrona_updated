@@ -34,7 +34,6 @@ import {
   ArrowDownRight,
   MessageSquare,
   CheckSquare,
-  BarChart3,
   ShieldCheck,
   Activity,
   Refrigerator,
@@ -44,6 +43,8 @@ import {
   LayoutGrid,
   Thermometer,
   Droplets,
+  Gauge,
+  Inbox,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
@@ -163,6 +164,20 @@ const INTRO_STYLES = `
   @keyframes insight-fadein {
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
+  }
+`;
+
+// Per-card hover micro-interactions, each peculiar to the card's content.
+const HOVER_STYLES = `
+  /* Operations chevrons beckon rightward */
+  @keyframes hover-beckon {
+    0%, 100% { transform: translateX(0); }
+    50%      { transform: translateX(3px); }
+  }
+  /* Avg Conditions — humidity droplet drips down */
+  @keyframes hover-drip {
+    0%, 60%, 100% { transform: translateY(0); }
+    30%           { transform: translateY(2.5px); }
   }
 `;
 
@@ -311,27 +326,29 @@ const TrendDelta: React.FC<{ delta: number | null; className?: string }> = ({ de
   if (delta === null) return <span className={`text-[11px] text-gray-400 ${className}`}>—</span>;
   if (delta >= 0) {
     return (
-      <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-600 ${className}`}>
+      <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold text-rose-500 ${className}`}>
         <ArrowUpRight size={11} /> +{delta}%
       </span>
     );
   }
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold text-rose-500 ${className}`}>
+    <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-600 ${className}`}>
       <ArrowDownRight size={11} /> {delta}%
     </span>
   );
 };
 
-const CardRangeSelect: React.FC<{ value: CardRange; onChange: (v: CardRange) => void }> = ({ value, onChange }) => (
+const CardRangeSelect: React.FC<{ value: CardRange; onChange: (v: CardRange) => void; globalLabel: string; globalPreset: RangePreset }> = ({ value, onChange, globalLabel, globalPreset }) => (
   <select
     value={value}
     onChange={(e) => onChange(e.target.value as CardRange)}
     className="text-[10px] font-semibold text-gray-500 bg-transparent border-none outline-none cursor-pointer hover:text-gray-700"
   >
-    <option value="global">Global range</option>
-    <option value="7d">Last 7 days</option>
-    <option value="30d">Last 30 days</option>
+    {/* The global option already shows the active range, so hide the preset that
+        would duplicate it — unless this card is explicitly set to that override. */}
+    <option value="global">{globalLabel}</option>
+    {(globalPreset !== '7d' || value === '7d') && <option value="7d">Last 7 days</option>}
+    {(globalPreset !== '30d' || value === '30d') && <option value="30d">Last 30 days</option>}
   </select>
 );
 
@@ -380,8 +397,8 @@ const DashboardHospital8: React.FC = () => {
   // Per-card range overrides
   const [topKpiRange, setTopKpiRange] = useState<CardRange>('global');
   const [trendRange, setTrendRange] = useState<CardRange>('global');
-  const [categoryRange, setCategoryRange] = useState<CardRange>('global');
-  const [kpiGridRange, setKpiGridRange] = useState<CardRange>('global');
+  const [combinedRange, setCombinedRange] = useState<CardRange>('global');
+  const [avgRange, setAvgRange] = useState<CardRange>('global');
 
   // Dashboard data states
   const [trendData, setTrendData] = useState<DeviationTrendResponse | null>(null);
@@ -412,8 +429,11 @@ const DashboardHospital8: React.FC = () => {
 
   const topKpiTs = useMemo(() => cardRangeToTs(topKpiRange, globalFromTs, globalToTs), [topKpiRange, globalFromTs, globalToTs]);
   const trendTs = useMemo(() => cardRangeToTs(trendRange, globalFromTs, globalToTs), [trendRange, globalFromTs, globalToTs]);
-  const categoryTs = useMemo(() => cardRangeToTs(categoryRange, globalFromTs, globalToTs), [categoryRange, globalFromTs, globalToTs]);
-  const kpiGridTs = useMemo(() => cardRangeToTs(kpiGridRange, globalFromTs, globalToTs), [kpiGridRange, globalFromTs, globalToTs]);
+  const combinedTs = useMemo(() => cardRangeToTs(combinedRange, globalFromTs, globalToTs), [combinedRange, globalFromTs, globalToTs]);
+  const avgTs = useMemo(() => cardRangeToTs(avgRange, globalFromTs, globalToTs), [avgRange, globalFromTs, globalToTs]);
+
+  // Label for the global range, shown as the "global" option in each card's range select.
+  const globalRangeLabel = rangeLabelOf(rangePreset, customFrom, customTo);
 
   const branchId = selectedBranch?.branch_id ?? null;
 
@@ -601,11 +621,11 @@ const DashboardHospital8: React.FC = () => {
     if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
-      const data = await refrigeratorDashboardService.getDeviationsByCategory({ ...categoryTs, branchId });
+      const data = await refrigeratorDashboardService.getDeviationsByCategory({ ...combinedTs, branchId });
       if (!cancelled) setCategoryData(data);
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, categoryTs.fromTs, categoryTs.toTs, branchId]);
+  }, [isAuthenticated, combinedTs.fromTs, combinedTs.toTs, branchId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -621,11 +641,11 @@ const DashboardHospital8: React.FC = () => {
     if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
-      const data = await refrigeratorDashboardService.getDeviationsByCategory({ ...kpiGridTs, branchId });
+      const data = await refrigeratorDashboardService.getDeviationsByCategory({ ...combinedTs, branchId });
       if (!cancelled) setKpiGridData(data);
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, kpiGridTs.fromTs, kpiGridTs.toTs, branchId]);
+  }, [isAuthenticated, combinedTs.fromTs, combinedTs.toTs, branchId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -647,20 +667,20 @@ const DashboardHospital8: React.FC = () => {
     return () => { cancelled = true; };
   }, [isAuthenticated, branchId]);
 
-  // Avg temp/humidity trend — follows the global range, always 24 buckets
+  // Avg temp/humidity trend — follows its card range, always 24 buckets
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
       const data = await refrigeratorDashboardService.getTemperatureHumidityTrend({
-        fromTs: globalFromTs,
-        toTs: globalToTs,
+        fromTs: avgTs.fromTs,
+        toTs: avgTs.toTs,
         branchId,
       });
       if (!cancelled) setTempHumidity(data);
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, globalFromTs, globalToTs, branchId]);
+  }, [isAuthenticated, avgTs.fromTs, avgTs.toTs, branchId]);
 
   // ── Derived values ──────────────────────────────────────────────────
   const routes = useMemo(() => mapService.generateRoutesFromBranches(branches), [branches]);
@@ -1002,6 +1022,7 @@ const DashboardHospital8: React.FC = () => {
             
 
         <style>{INTRO_STYLES}</style>
+        <style>{HOVER_STYLES}</style>
 
         {/* Full-bleed map */}
         <div className="absolute inset-0">
@@ -1285,7 +1306,7 @@ const DashboardHospital8: React.FC = () => {
         {/* Floating cards — row-wise grid (rows stretch to equal height) */}
         {!loadingMap && (
           <div
-            className="absolute left-6 top-[136px] bottom-6 z-30 w-[572px] overflow-y-auto overflow-x-hidden pr-3 pointer-events-auto"
+            className="absolute left-10 top-[136px] bottom-6 z-30 w-[572px] overflow-y-auto overflow-x-hidden pr-3 pointer-events-auto"
             style={{ opacity: revealed ? undefined : 0 }}
           >
           <div
@@ -1295,35 +1316,40 @@ const DashboardHospital8: React.FC = () => {
             <DashboardCard
               accent="violet"
               watermark={TrendingUp}
-              className="pointer-events-auto h-full order-1 col-span-6"
+              className="group pointer-events-auto h-full order-1 col-span-6"
             >
-              <div className="flex items-center justify-between mb-0.5">
-                <div className="flex items-center gap-1.5">
-                  <TrendingUp size={12} style={{ color: "#8b3ad6" }} />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
-                    Top Deviated KPI
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp size={12} style={{ color: "#8b3ad6" }} className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
+                      Top Deviated KPI
+                    </p>
+                  </div>
+                  <CardRangeSelect value={topKpiRange} onChange={setTopKpiRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
+                </div>
+                {/* KPI name + comparison — vertically centered in the card */}
+                <div className="flex-1 flex flex-col justify-center">
+                  <p className="text-2xl font-extrabold text-primary leading-tight line-clamp-2 pr-16">
+                    {topKpiData?.label ?? '—'}
                   </p>
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <TrendDelta delta={topKpiData?.delta_pct ?? null} />
+                    <span className="text-[10px] text-gray-400">vs previous period</span>
+                  </div>
                 </div>
-                <CardRangeSelect value={topKpiRange} onChange={setTopKpiRange} />
+                {trendSeries.length > 0 && (
+                  <div className="h-6 -mx-4 -mb-4">
+                    <Line
+                      data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.35)")}
+                      options={areaOptions}
+                    />
+                  </div>
+                )}
               </div>
-              <p className="text-xl font-extrabold text-primary mt-1 leading-tight line-clamp-2 pr-16">
-                {topKpiData?.label ?? '—'}
-              </p>
-              <div className="flex items-center gap-1 mt-1.5">
-                <TrendDelta delta={topKpiData?.delta_pct ?? null} />
-                <span className="text-[10px] text-gray-400">vs previous period</span>
-              </div>
-              {trendSeries.length > 0 && (
-                <div className="mt-2 h-6 -mx-4 -mb-4">
-                  <Line
-                    data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.35)")}
-                    options={areaOptions}
-                  />
-                </div>
-              )}
               {/* Count — anchored to the card's bottom-right */}
               <div className="absolute bottom-3 right-4 flex flex-col items-end leading-none">
-                <span className="text-4xl font-black text-primary leading-none">
+                <span className="text-5xl font-black text-primary leading-none inline-block origin-bottom-right transition-transform duration-300 group-hover:scale-105">
                   {(topKpiData?.count ?? 0).toLocaleString()}
                 </span>
                 <span className="text-[10px] text-gray-400 mt-0.5">alerts</span>
@@ -1332,9 +1358,9 @@ const DashboardHospital8: React.FC = () => {
 
             {/* Operations card */}
             <div id="onboarding-dashboard-alerts" className="pointer-events-auto h-full order-3 col-span-5">
-              <DashboardCard accent="violet" watermark={Activity} className="h-full">
+              <DashboardCard accent="violet" watermark={Inbox} className="group h-full">
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <Activity size={12} style={{ color: "#8b3ad6" }} />
+                  <Inbox size={12} style={{ color: "#8b3ad6" }} />
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
                     Operations
                   </p>
@@ -1345,7 +1371,7 @@ const DashboardHospital8: React.FC = () => {
                   )}
                 </div>
                 <div className="flex flex-col">
-                  {statRows.map((row) => (
+                  {statRows.map((row, i) => (
                     <button
                       key={row.key}
                       onClick={row.onClick}
@@ -1362,63 +1388,111 @@ const DashboardHospital8: React.FC = () => {
                           {row.value}
                         </p>
                       </div>
-                      <ChevronRight size={16} className="text-gray-300" />
+                      <ChevronRight
+                        size={16}
+                        className="text-primary group-hover:[animation:hover-beckon_1.1s_ease-in-out_infinite]"
+                        style={{ animationDelay: `${i * 130}ms` }}
+                      />
                     </button>
                   ))}
                 </div>
               </DashboardCard>
             </div>
 
-            {/* Alerts by KPI — per-KPI alert counts grid */}
+            {/* Alerts by KPI + Deviations by Category — combined wide card (bottom) */}
             <DashboardCard
               accent="indigo"
               watermark={LayoutGrid}
-              className="pointer-events-auto h-full order-5 col-span-6"
+              className="group pointer-events-auto h-full order-6 col-span-12"
             >
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-1.5">
                   <LayoutGrid size={12} style={{ color: "#6d4ae0" }} />
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
-                    Alerts by KPI
+                    Deviation Overview
                   </p>
                 </div>
-                <CardRangeSelect value={kpiGridRange} onChange={setKpiGridRange} />
+                <CardRangeSelect value={combinedRange} onChange={setCombinedRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
               </div>
-              {kpiAlerts.length > 0 ? (
-                <div className="grid grid-cols-2 gap-1.5">
-                  {kpiAlerts.map((c) => (
-                    <div
-                      key={c.kpi_name}
-                      className="relative overflow-hidden rounded-lg px-2 py-1.5 bg-primary/[0.04] border border-primary/10"
-                    >
-                      <div
-                        className="absolute inset-y-0 left-0 bg-primary/[0.08]"
-                        style={{ width: `${maxKpiAlert > 0 ? (c.count / maxKpiAlert) * 100 : 0}%` }}
-                      />
-                      <div className="relative">
-                        <p className="text-[11px] font-semibold text-gray-600 leading-tight truncate" title={c.label}>
-                          {c.label}
-                        </p>
-                        <p className="text-2xl font-black text-primary leading-none mt-0.5">
-                          {c.count.toLocaleString()}
-                        </p>
-                      </div>
+              <div className="flex items-stretch gap-4">
+                {/* Left — Alerts by KPI */}
+                <div className="flex-1 min-w-0 border-r border-gray-100 pr-4">
+                  <p className="text-[10px] font-semibold text-gray-500 mb-2">Alerts by KPI</p>
+                  {kpiAlerts.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {kpiAlerts.map((c) => (
+                        <div
+                          key={c.kpi_name}
+                          className="relative overflow-hidden rounded-lg px-2 py-1.5 bg-primary/[0.04] border border-primary/10"
+                        >
+                          <div
+                            className="absolute inset-y-0 left-0 bg-primary/[0.08]"
+                            style={{ width: `${maxKpiAlert > 0 ? (c.count / maxKpiAlert) * 100 : 0}%` }}
+                          />
+                          <div className="relative">
+                            <p className="text-[11px] font-semibold text-gray-600 leading-tight truncate" title={c.label}>
+                              {c.label}
+                            </p>
+                            <p className="text-2xl font-black text-primary leading-none mt-0.5">
+                              {c.count.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="h-20 flex items-center justify-center">
+                      <p className="text-[10px] text-gray-400">No KPI alerts in range</p>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="h-20 flex items-center justify-center">
-                  <p className="text-[10px] text-gray-400">No KPI alerts in range</p>
+
+                {/* Right — Deviations by Category */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-semibold text-gray-500 mb-2">By Category</p>
+                  {cats.length > 0 ? (
+                    <>
+                      <div className="flex items-end justify-between gap-2 h-24">
+                        {cats.map((c, i) => (
+                          <div key={c.kpi_name} className="flex-1 flex flex-col items-center justify-end h-full">
+                            <span className="text-[9px] font-bold text-gray-600 mb-1 transition-transform duration-300 group-hover:-translate-y-0.5">{c.pct}%</span>
+                            <div
+                              className="w-full rounded-t-lg origin-bottom transition-transform duration-300 group-hover:scale-y-105"
+                              style={{
+                                height: `${maxCatPct > 0 ? (c.pct / maxCatPct) * 100 : 0}%`,
+                                backgroundColor: CAT_COLORS[i % CAT_COLORS.length],
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-3">
+                        {cats.map((c, i) => (
+                          <div key={c.kpi_name} className="flex items-center gap-1.5">
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: CAT_COLORS[i % CAT_COLORS.length] }}
+                            />
+                            <span className="text-[10px] text-gray-600 flex-1 truncate">{c.label}</span>
+                            <span className="text-[10px] font-bold text-gray-900">{c.pct}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="h-24 flex items-center justify-center">
+                      <p className="text-[10px] text-gray-400">No KPI alerts in range</p>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </DashboardCard>
 
             {/* Deviation Trend — cumulative line */}
             <DashboardCard
               accent="violet"
               watermark={Activity}
-              watermarkPosition="top-right"
-              className="pointer-events-auto h-full order-2 col-span-6"
+              className="group pointer-events-auto h-full order-2 col-span-6"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
@@ -1427,16 +1501,16 @@ const DashboardHospital8: React.FC = () => {
                     Deviation Trend
                   </p>
                 </div>
-                <CardRangeSelect value={trendRange} onChange={setTrendRange} />
+                <CardRangeSelect value={trendRange} onChange={setTrendRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
               </div>
               <div className="flex items-baseline gap-2 mt-1">
-                <p className="text-2xl font-extrabold text-primary leading-none">
+                <p className="text-2xl font-extrabold text-primary leading-none transition-transform duration-300 group-hover:-translate-y-0.5">
                   {(trendData?.total ?? 0).toLocaleString()}
                 </p>
                 <TrendDelta delta={trendData?.delta_pct ?? null} />
               </div>
               <p className="text-[9px] text-gray-400 mt-0.5">vs previous period</p>
-              <div className="mt-2 h-12 -mx-4 -mb-4 opacity-50">
+              <div className="mt-2 h-12 -mx-4 -mb-4 opacity-50 transition-opacity duration-500 group-hover:opacity-100">
                 {trendSeries.length > 0 ? (
                   <Line
                     data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.45)")}
@@ -1450,60 +1524,9 @@ const DashboardHospital8: React.FC = () => {
               </div>
             </DashboardCard>
 
-            {/* Deviations by Category — top 5 bar chart */}
-            <DashboardCard
-              accent="plum"
-              watermark={BarChart3}
-              className="pointer-events-auto h-full order-6 col-span-6"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5">
-                  <BarChart3 size={12} style={{ color: "#ab44b8" }} />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
-                    Deviations by Category
-                  </p>
-                </div>
-                <CardRangeSelect value={categoryRange} onChange={setCategoryRange} />
-              </div>
-              {cats.length > 0 ? (
-                <>
-                  <div className="flex items-end justify-between gap-2 h-24">
-                    {cats.map((c, i) => (
-                      <div key={c.kpi_name} className="flex-1 flex flex-col items-center justify-end h-full">
-                        <span className="text-[9px] font-bold text-gray-600 mb-1">{c.pct}%</span>
-                        <div
-                          className="w-full rounded-t-lg transition-all"
-                          style={{
-                            height: `${maxCatPct > 0 ? (c.pct / maxCatPct) * 100 : 0}%`,
-                            backgroundColor: CAT_COLORS[i % CAT_COLORS.length],
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-3">
-                    {cats.map((c, i) => (
-                      <div key={c.kpi_name} className="flex items-center gap-1.5">
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: CAT_COLORS[i % CAT_COLORS.length] }}
-                        />
-                        <span className="text-[10px] text-gray-600 flex-1 truncate">{c.label}</span>
-                        <span className="text-[10px] font-bold text-gray-900">{c.pct}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="h-24 flex items-center justify-center">
-                  <p className="text-[10px] text-gray-400">No KPI alerts in range</p>
-                </div>
-              )}
-            </DashboardCard>
-
             {/* Insights card — auto-swipe with timer arc */}
             <div
-              className="relative overflow-hidden rounded-2xl pointer-events-auto h-full order-4 col-span-7"
+              className="group relative overflow-hidden rounded-2xl pointer-events-auto h-full order-4 col-span-7"
               style={{ background: "linear-gradient(155deg, #162114 0%, #0c180d 55%, #09140f 100%)" }}
               onMouseEnter={() => setInsightPaused(true)}
               onMouseLeave={() => { setInsightPaused(false); setArcResetKey((k) => k + 1); }}
@@ -1519,8 +1542,8 @@ const DashboardHospital8: React.FC = () => {
               <div className="relative z-10 p-3 h-full flex flex-col">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
-                      <Lightbulb size={13} className="text-yellow-300" />
+                    <div className="w-7 h-7 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center transition-colors duration-300 group-hover:bg-yellow-300/15">
+                      <Lightbulb size={13} className="text-yellow-300 transition-all duration-300 group-hover:scale-125 group-hover:drop-shadow-[0_0_6px_rgba(253,224,71,0.9)]" />
                     </div>
                     <span className="text-xs font-semibold text-white">ColdSense Insights</span>
                   </div>
@@ -1587,16 +1610,25 @@ const DashboardHospital8: React.FC = () => {
             {/* Avg Temperature & Humidity — wide trend card (24 points) */}
             <DashboardCard
               accent="violet"
-              watermark={Activity}
-              className="pointer-events-auto h-full col-span-12 order-7"
+              watermark={Gauge}
+              className="group pointer-events-auto h-full col-span-12 order-5"
             >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Gauge size={12} style={{ color: "#8b3ad6" }} />
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
+                    Avg Conditions
+                  </p>
+                </div>
+                <CardRangeSelect value={avgRange} onChange={setAvgRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
+              </div>
               <div className="flex items-stretch gap-4">
                 {/* 30% — overall averages: temp centered in upper half, humidity in lower half */}
                 <div className="w-[30%] shrink-0 flex flex-col border-r border-gray-100 pr-4">
                   {/* Upper half — temperature */}
                   <div className="flex-1 flex flex-col items-center justify-center text-center gap-1">
                     <div className="flex items-center gap-1.5">
-                      <Thermometer size={12} style={{ color: "#8b3ad6" }} />
+                      <Thermometer size={12} style={{ color: "#8b3ad6" }} className="transition-transform duration-300 group-hover:-translate-y-0.5" />
                       <p className="text-[9px] text-gray-400 uppercase tracking-wider">Avg Temperature</p>
                     </div>
                     <p className="text-3xl font-black text-primary leading-none">
@@ -1610,7 +1642,7 @@ const DashboardHospital8: React.FC = () => {
                   {/* Lower half — humidity */}
                   <div className="flex-1 flex flex-col items-center justify-center text-center gap-1">
                     <div className="flex items-center gap-1.5">
-                      <Droplets size={12} style={{ color: "#3b9ef0" }} />
+                      <Droplets size={12} style={{ color: "#3b9ef0" }} className="group-hover:[animation:hover-drip_1.3s_ease-in-out_infinite]" />
                       <p className="text-[9px] text-gray-400 uppercase tracking-wider">Avg Humidity</p>
                     </div>
                     <p className="text-3xl font-black text-primary leading-none">
@@ -1638,6 +1670,16 @@ const DashboardHospital8: React.FC = () => {
                       <Line data={humChartData} options={thOptions} />
                     </div>
                   </div>
+                  {/* Interval info — centered on the graphs, always 24 points */}
+                  <p className="text-[9px] text-gray-400 text-center">
+                    {tempHumidity?.bucket_hours
+                      ? `24 points · each ≈ ${
+                          tempHumidity.bucket_hours >= 24
+                            ? `${(tempHumidity.bucket_hours / 24).toFixed(tempHumidity.bucket_hours % 24 === 0 ? 0 : 1)} day${tempHumidity.bucket_hours >= 48 ? "s" : ""}`
+                            : `${tempHumidity.bucket_hours} hr${tempHumidity.bucket_hours === 1 ? "" : "s"}`
+                        } across the selected period`
+                      : "24 points across the selected period"}
+                  </p>
                 </div>
               </div>
             </DashboardCard>
