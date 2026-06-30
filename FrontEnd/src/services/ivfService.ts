@@ -851,6 +851,16 @@ export class IvfService extends BaseApiService {
         refrigerator_id: number;
         refrigerator_code: string;
         zone_id?: string | null;
+        kpi_configs: Array<{
+            id: number;
+            kpi_name: string;
+            alert_name: string | null;
+            min: number | null;
+            max: number | null;
+            unit: string;
+            zone_id: string | null;
+            zone_name: string | null;
+        }>;
         kpi_series: Record<string, Array<{
             timestamp: string;
             value: number;
@@ -878,6 +888,7 @@ export class IvfService extends BaseApiService {
         value: number | null;
         unit: string;
         zone_id?: string | null;
+        timestamp?: string | null;
     }>> {
         const params = new URLSearchParams();
         if (zoneId != null) params.set("zone_id", zoneId);
