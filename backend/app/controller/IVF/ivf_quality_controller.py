@@ -2248,37 +2248,28 @@ def get_refrigerator_zone_latest(
     if not refrigerator:
         raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
 
-    from sqlalchemy import func as sa_func
-
-    base_q = (
-        db.query(
-            KpiConfig.kpi_name,
-            Readings.kpi_value,
-            KpiConfig.unit,
-            sa_func.row_number()
-            .over(
-                partition_by=KpiConfig.kpi_name,
-                order_by=Readings.timestamp.desc(),
-            )
-            .label("rn"),
-        )
-        .join(Readings, Readings.kpi_config_id == KpiConfig.id)
-        .filter(Readings.refrigerator_id == refrigerator_id)
-    )
+    # Step 1: Get kpi_config IDs for this refrigerator (and zone if provided)
+    config_q = db.query(KpiConfig).filter(KpiConfig.refrigerator_id == refrigerator_id)
     if zone_id is not None:
-        base_q = base_q.filter(Readings.zone_id == zone_id)
+        config_q = config_q.filter(KpiConfig.zone_id == zone_id)
+    configs = config_q.all()
 
-    subq = base_q.subquery()
-    rows = db.query(subq.c.kpi_name, subq.c.kpi_value, subq.c.unit).filter(subq.c.rn == 1).all()
-
+    # Step 2: For each config, get the latest reading by kpi_config_id
     result = []
-    for row in rows:
+    for config in configs:
+        reading = (
+            db.query(Readings)
+            .filter(Readings.kpi_config_id == config.id)
+            .order_by(Readings.timestamp.desc())
+            .first()
+        )
         result.append({
-            "kpi_name": row.kpi_name,
-            "label": row.kpi_name,
-            "value": float(row.kpi_value) if row.kpi_value is not None else None,
-            "unit": row.unit or "°C",
+            "kpi_name": config.kpi_name,
+            "label": config.kpi_name,
+            "value": float(reading.kpi_value) if reading and reading.kpi_value is not None else None,
+            "unit": config.unit or "°C",
             "zone_id": zone_id,
+            "timestamp": reading.timestamp.isoformat() if reading and reading.timestamp else None,
         })
 
     if not result:
@@ -2322,34 +2313,13 @@ def get_refrigerator_kpi_history(
         if duration_minutes
         else None
     )
-    latest_timestamp = None
-    if duration_minutes in {DURATION_1H, DURATION_24H, DURATION_7D}:
-        latest_timestamp = quality_service.get_latest_refrigerator_kpi_timestamp(refrigerator_id, zone_id)
-        if latest_timestamp is not None:
-            since = latest_timestamp - timedelta(minutes=duration_minutes)
-
-    aggregated_order_asc = False
-    if duration_minutes == DURATION_1H:
-        per_kpi = quality_service.get_refrigerator_kpi_history_aggregated(
-            refrigerator_id, zone_id, since, AGG_BUCKET_MINUTES_1H, until=latest_timestamp
-        ) or {}
-        aggregated_order_asc = True
-    elif duration_minutes == DURATION_24H:
-        per_kpi = quality_service.get_refrigerator_kpi_history_aggregated(
-            refrigerator_id, zone_id, since, AGG_BUCKET_MINUTES_24H, until=latest_timestamp
-        ) or {}
-        aggregated_order_asc = True
-    elif duration_minutes == DURATION_7D:
-        per_kpi = quality_service.get_refrigerator_kpi_history_aggregated(
-            refrigerator_id, zone_id, since, AGG_BUCKET_MINUTES_7D, until=latest_timestamp
-        ) or {}
-        aggregated_order_asc = True
-    elif duration_minutes is not None and duration_minutes > 0:
+    if duration_minutes is not None and duration_minutes > 0:
         per_kpi = quality_service.get_readings_per_kpi_since_refrigerator(refrigerator_id, since, zone_id) or {}
     else:
         per_kpi = quality_service.get_last_n_readings_per_kpi_refrigerator(
             refrigerator_id, DEFAULT_LIVE_READINGS_CAP, zone_id
         ) or {}
+    aggregated_order_asc = False
 
     kpi_series: dict = {}
     for item in per_kpi.get("kpis") or []:
@@ -2372,10 +2342,31 @@ def get_refrigerator_kpi_history(
         for name in list(kpi_series.keys()):
             kpi_series[name].reverse()
 
+    configs = db.query(KpiConfig).filter(
+        KpiConfig.refrigerator_id == refrigerator_id,
+    ).all()
+    if zone_id:
+        configs = [c for c in configs if c.zone_id == zone_id]
+
+    kpi_configs_out = [
+        {
+            "id": c.id,
+            "kpi_name": c.kpi_name,
+            "alert_name": c.alert_name,
+            "min": float(c.min) if c.min is not None else None,
+            "max": float(c.max) if c.max is not None else None,
+            "unit": c.unit or "",
+            "zone_id": c.zone_id,
+            "zone_name": c.zone_name,
+        }
+        for c in configs
+    ]
+
     return {
         "refrigerator_id": refrigerator_id,
         "refrigerator_code": refrigerator_code,
         "zone_id": zone_id,
+        "kpi_configs": kpi_configs_out,
         "kpi_series": kpi_series,
     }
 
