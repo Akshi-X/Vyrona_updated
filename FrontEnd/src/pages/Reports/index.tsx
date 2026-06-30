@@ -1061,7 +1061,7 @@ export default function ReportsPage() {
     }
 
     return (
-                <PageLayout title="Reports" lucideIcon={Download}>
+                <PageLayout title="Reports" description={refrigeratorOnly ? "Generate monthly summary, critical alert and activity reports." : undefined} lucideIcon={Download} patternBackground={refrigeratorOnly}>
 
                     <section id="onboarding-reports-filters" className="bg-white border border-line rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">

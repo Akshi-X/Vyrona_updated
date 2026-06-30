@@ -1662,8 +1662,7 @@ class QualityService:
                 .filter(
                     KpiConfig.refrigerator_id == refrigerator_id,
                     KpiConfig.zone_id.isnot(None),
-                    KpiConfig.alert_name.is_(None),
-                )
+                        )
                 .distinct()
                 .all()
             )
@@ -1682,14 +1681,20 @@ class QualityService:
     ) -> Optional[dict]:
         """Last N readings per KPI for a refrigerator (mirrors incubator variant). Optionally scoped to a zone."""
         db = self.db
+        config_q = db.query(KpiConfig.id).filter(
+            KpiConfig.refrigerator_id == refrigerator_id,
+        )
+        if zone_id is not None:
+            config_q = config_q.filter(KpiConfig.zone_id == zone_id)
+        config_ids = [r.id for r in config_q.all()]
+        if not config_ids:
+            return None
         row_number = (
             func.row_number()
             .over(partition_by=Readings.kpi_config_id, order_by=Readings.timestamp.desc())
             .label("rn")
         )
-        base_q = db.query(Readings.id, row_number).filter(Readings.refrigerator_id == refrigerator_id)
-        if zone_id is not None:
-            base_q = base_q.filter(Readings.zone_id == zone_id)
+        base_q = db.query(Readings.id, row_number).filter(Readings.kpi_config_id.in_(config_ids))
         subquery = base_q.subquery()
         valid_ids = db.query(subquery.c.id).filter(subquery.c.rn <= n).subquery()
         results = (
@@ -1712,13 +1717,19 @@ class QualityService:
     ) -> Optional[dict]:
         """All KPI readings for a refrigerator since a timestamp. Optionally scoped to a zone."""
         db = self.db
+        config_q = db.query(KpiConfig.id).filter(
+            KpiConfig.refrigerator_id == refrigerator_id,
+        )
+        if zone_id is not None:
+            config_q = config_q.filter(KpiConfig.zone_id == zone_id)
+        config_ids = [r.id for r in config_q.all()]
+        if not config_ids:
+            return None
         q = (
             db.query(Readings.kpi_value, Readings.timestamp, KpiConfig.kpi_name, KpiConfig.unit)
             .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
-            .filter(Readings.refrigerator_id == refrigerator_id, Readings.timestamp >= since)
+            .filter(Readings.kpi_config_id.in_(config_ids), Readings.timestamp >= since)
         )
-        if zone_id is not None:
-            q = q.filter(Readings.zone_id == zone_id)
         results = q.order_by(Readings.timestamp.desc()).all()
         if not results:
             return None
@@ -1738,6 +1749,14 @@ class QualityService:
     ) -> Optional[dict]:
         """Aggregated KPI history for a refrigerator zone (mirrors get_incubator_kpi_history_aggregated)."""
         bucket_seconds = bucket_minutes * 60
+        config_q = self.db.query(KpiConfig.id).filter(
+            KpiConfig.refrigerator_id == refrigerator_id,
+        )
+        if zone_id is not None:
+            config_q = config_q.filter(KpiConfig.zone_id == zone_id)
+        config_ids = [r.id for r in config_q.all()]
+        if not config_ids:
+            return None
         sql = text("""
             SELECT
                 to_timestamp(
@@ -1751,8 +1770,7 @@ class QualityService:
                 COUNT(*)::integer AS sample_count
             FROM readings r
             JOIN kpi_config k ON r.kpi_config_id = k.id
-            WHERE r.refrigerator_id = :refrigerator_id
-              AND (:zone_id IS NULL OR r.zone_id = :zone_id)
+            WHERE r.kpi_config_id = ANY(:config_ids)
               AND r.timestamp >= :since
               AND (:until IS NULL OR r.timestamp <= :until)
             GROUP BY bucket_start, k.id, k.kpi_name, k.unit
@@ -1762,8 +1780,7 @@ class QualityService:
             rows = self.db.execute(
                 sql,
                 {
-                    "refrigerator_id": refrigerator_id,
-                    "zone_id": zone_id,
+                    "config_ids": config_ids,
                     "since": since,
                     "until": until,
                     "bucket_sec": bucket_seconds,
@@ -2273,7 +2290,6 @@ def append_tank_kpi_snapshot_to_db(
         .filter(
             KpiConfig.tank_id == tank_id,
             KpiConfig.status == True,
-            KpiConfig.alert_name.is_(None),
         )
         .all()
     }
@@ -2351,7 +2367,6 @@ def append_incubator_kpi_snapshot_to_db(
             KpiConfig.incubator_id == incubator_id,
             KpiConfig.chamber_id == chamber_id,
             KpiConfig.status == True,
-            KpiConfig.alert_name.is_(None),
         )
         .all()
     }
