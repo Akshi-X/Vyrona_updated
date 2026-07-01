@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Snowflake } from 'lucide-react';
 import HamburgerButton from '../../components/HamburgerButton';
@@ -10,6 +10,8 @@ import { shipmentService } from '../../services/shipmentService';
 
 export default function RefrigeratorSelectionPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const preselectedBranchId = searchParams.get('branchId');
     const { userRole } = useAuth();
     const normalizedRole = (userRole || '').trim().toLowerCase();
     const isManagerAdmin = normalizedRole.includes('manager') || normalizedRole.includes('admin');
@@ -144,6 +146,17 @@ export default function RefrigeratorSelectionPage() {
 
         return () => { cancelled = true; };
     }, [isManagerAdmin]);
+
+    // Pre-select the branch passed via URL param (e.g. from the dashboard map popup)
+    useEffect(() => {
+        if (!isManagerAdmin || !preselectedBranchId || branches.length === 0 || selectedBranchId !== null) return;
+        const id = parseInt(preselectedBranchId, 10);
+        const found = branches.find((b) => b.branch_id === id);
+        if (found) {
+            setSelectedBranchId(found.branch_id);
+            setSelectedBranchName(found.branch_name);
+        }
+    }, [branches, isManagerAdmin, preselectedBranchId, selectedBranchId]);
 
     useEffect(() => {
         if (!isManagerAdmin || !selectedBranchId) {

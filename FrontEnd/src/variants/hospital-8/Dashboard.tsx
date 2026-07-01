@@ -15,7 +15,7 @@
  * Registry key: DashboardHospital8 (auto from hospital-8/Dashboard.tsx)
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ElementType } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -692,14 +692,49 @@ const DashboardHospital8: React.FC = () => {
 
   const trendSeries = trendData?.series.map((p) => p.cumulative) ?? [];
 
-  const areaOptions = {
+  // const areaOptions = {
+  //   responsive: true,
+  //   maintainAspectRatio: false,
+  //   plugins: { legend: { display: false }, tooltip: { enabled: false } },
+  //   scales: { x: { display: false }, y: { display: false } },
+  //   elements: { point: { radius: 0 } },
+  //   layout: { padding: 0 },
+  // };
+
+  const trendCardOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { enabled: false } },
-    scales: { x: { display: false }, y: { display: false } },
+    scales: {
+      x: {
+        display: true,
+        grid: { display: false },
+        border: { display: false },
+        ticks: { font: { size: 7 }, color: '#9ca3af', maxTicksLimit: 4, maxRotation: 0, minRotation: 0 },
+      },
+      y: {
+        display: true,
+        grid: { color: 'rgba(107,17,118,0.06)' },
+        border: { display: false },
+        ticks: { font: { size: 7 }, color: '#9ca3af', maxTicksLimit: 3 },
+      },
+    },
     elements: { point: { radius: 0 } },
-    layout: { padding: 0 },
+    layout: { padding: { top: 4, right: 4, bottom: 0, left: 0 } },
   };
+
+  const trendCardData = useMemo(() => ({
+    labels: (trendData?.series ?? []).map((p) => fmtShortDate(p.day)),
+    datasets: [{
+      data: (trendData?.series ?? []).map((p) => p.cumulative),
+      borderColor: '#8b3ad6',
+      borderWidth: 2,
+      fill: true,
+      backgroundColor: 'rgba(139,58,214,0.18)',
+      tension: 0.4,
+      pointRadius: 0,
+    }],
+  }), [trendData]);
 
   // Avg temperature / humidity trend (wide card)
   const thPoints = tempHumidity?.points ?? [];
@@ -780,20 +815,20 @@ const DashboardHospital8: React.FC = () => {
     layout: { padding: 0 },
   };
 
-  const makeArea = (points: number[], color: string, fillColor?: string) => ({
-    labels: points.map((_, i) => i),
-    datasets: [
-      {
-        data: points,
-        borderColor: color,
-        borderWidth: 2,
-        fill: true,
-        backgroundColor: fillColor ?? `${color}22`,
-        tension: 0.4,
-        pointRadius: 0,
-      },
-    ],
-  });
+  // const makeArea = (points: number[], color: string, fillColor?: string) => ({
+  //   labels: points.map((_, i) => i),
+  //   datasets: [
+  //     {
+  //       data: points,
+  //       borderColor: color,
+  //       borderWidth: 2,
+  //       fill: true,
+  //       backgroundColor: fillColor ?? `${color}22`,
+  //       tension: 0.4,
+  //       pointRadius: 0,
+  //     },
+  //   ],
+  // });
 
   // Branch concentration (feeds the insight slides)
   const pieBranches = pieData?.branches ?? [];
@@ -1338,18 +1373,10 @@ const DashboardHospital8: React.FC = () => {
                     <span className="text-[10px] text-gray-400">vs previous period</span>
                   </div>
                 </div>
-                {trendSeries.length > 0 && (
-                  <div className="h-6 -mx-4 -mb-4">
-                    <Line
-                      data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.35)")}
-                      options={areaOptions}
-                    />
-                  </div>
-                )}
               </div>
-              {/* Count — anchored to the card's bottom-right */}
-              <div className="absolute bottom-3 right-4 flex flex-col items-end leading-none">
-                <span className="text-5xl font-black text-primary leading-none inline-block origin-bottom-right transition-transform duration-300 group-hover:scale-105">
+              {/* Count — anchored to right center */}
+              <div className="absolute top-1/2 -translate-y-1/2 mt-1 right-4 flex flex-col items-end leading-none">
+                <span className="text-5xl font-black text-primary leading-none inline-block origin-right transition-transform duration-300 group-hover:scale-105">
                   {(topKpiData?.count ?? 0).toLocaleString()}
                 </span>
                 <span className="text-[10px] text-gray-400 mt-0.5">alerts</span>
@@ -1358,7 +1385,7 @@ const DashboardHospital8: React.FC = () => {
 
             {/* Operations card */}
             <div id="onboarding-dashboard-alerts" className="pointer-events-auto h-full order-3 col-span-5">
-              <DashboardCard accent="violet" watermark={Inbox} className="group h-full">
+              <DashboardCard accent="violet" className="group h-full">
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <Inbox size={12} style={{ color: "#8b3ad6" }} />
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
@@ -1418,33 +1445,52 @@ const DashboardHospital8: React.FC = () => {
                 {/* Left — Alerts by KPI */}
                 <div className="flex-1 min-w-0 border-r border-gray-100 pr-4">
                   <p className="text-[10px] font-semibold text-gray-500 mb-2">Alerts by KPI</p>
-                  {kpiAlerts.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {kpiAlerts.map((c) => (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {Array.from({ length: 4 }).map((_, idx) => {
+                      const c = kpiAlerts[idx] ?? null;
+                      if (!c) {
+                        return (
+                          <div
+                            key={`kpi-empty-${idx}`}
+                            className="rounded-lg px-3 py-2.5 bg-gray-50/60 border border-gray-100 flex items-center justify-center min-h-[56px]"
+                          >
+                            <span className="text-[10px] text-gray-500">—</span>
+                          </div>
+                        );
+                      }
+                      const key = (c.kpi_name + ' ' + c.label).toLowerCase();
+                      const KpiIcon: ElementType =
+                        key.includes('temp') ? Thermometer :
+                        key.includes('humid') || key.includes('moist') ? Droplets :
+                        Activity;
+                      const iconColor =
+                        key.includes('temp') ? '#8b3ad6' :
+                        key.includes('humid') || key.includes('moist') ? '#3b9ef0' :
+                        '#8b3ad6';
+                      return (
                         <div
                           key={c.kpi_name}
-                          className="relative overflow-hidden rounded-lg px-2 py-1.5 bg-primary/[0.04] border border-primary/10"
+                          className="relative overflow-hidden rounded-lg px-3 py-2.5 bg-primary/[0.04] border border-primary/10 min-h-[56px]"
                         >
                           <div
-                            className="absolute inset-y-0 left-0 bg-primary/[0.08]"
+                            className="absolute inset-y-0 left-0 bg-primary/[0.07]"
                             style={{ width: `${maxKpiAlert > 0 ? (c.count / maxKpiAlert) * 100 : 0}%` }}
                           />
-                          <div className="relative">
-                            <p className="text-[11px] font-semibold text-gray-600 leading-tight truncate" title={c.label}>
-                              {c.label}
-                            </p>
-                            <p className="text-2xl font-black text-primary leading-none mt-0.5">
-                              {c.count.toLocaleString()}
-                            </p>
+                          <div className="relative flex items-center justify-between gap-1">
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold text-gray-500 leading-tight truncate" title={c.label}>
+                                {c.label}
+                              </p>
+                              <p className="text-2xl font-black text-primary leading-none mt-0.5">
+                                {c.count.toLocaleString()}
+                              </p>
+                            </div>
+                            <KpiIcon size={32} className="shrink-0 opacity-20" style={{ color: iconColor }} />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-20 flex items-center justify-center">
-                      <p className="text-[10px] text-gray-400">No KPI alerts in range</p>
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Right — Deviations by Category */}
@@ -1474,7 +1520,6 @@ const DashboardHospital8: React.FC = () => {
                               style={{ backgroundColor: CAT_COLORS[i % CAT_COLORS.length] }}
                             />
                             <span className="text-[10px] text-gray-600 flex-1 truncate">{c.label}</span>
-                            <span className="text-[10px] font-bold text-gray-900">{c.pct}%</span>
                           </div>
                         ))}
                       </div>
@@ -1491,11 +1536,10 @@ const DashboardHospital8: React.FC = () => {
             {/* Deviation Trend — cumulative line */}
             <DashboardCard
               accent="violet"
-              watermark={Activity}
               className="group pointer-events-auto h-full order-2 col-span-6"
             >
               <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
                     <Activity size={12} style={{ color: "#8b3ad6" }} />
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700">
@@ -1504,24 +1548,30 @@ const DashboardHospital8: React.FC = () => {
                   </div>
                   <CardRangeSelect value={trendRange} onChange={setTrendRange} globalLabel={globalRangeLabel} globalPreset={rangePreset} />
                 </div>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-extrabold text-primary leading-none transition-transform duration-300 group-hover:-translate-y-0.5">
-                    {(trendData?.total ?? 0).toLocaleString()}
-                  </p>
-                  <TrendDelta delta={trendData?.delta_pct ?? null} />
-                </div>
-                <p className="text-[9px] text-gray-400 mt-0.5">vs previous period</p>
-                <div className="mt-auto h-12 -mx-4 -mb-4 opacity-50 transition-opacity duration-500 group-hover:opacity-100">
-                  {trendSeries.length > 0 ? (
-                    <Line
-                      data={makeArea(trendSeries, "#8b3ad6", "rgba(139,58,214,0.45)")}
-                      options={areaOptions}
-                    />
-                  ) : (
-                    <div className="h-full flex items-center justify-center">
-                      <p className="text-[10px] text-gray-400">No data for range</p>
+                {/* Left / Right split */}
+                <div className="flex flex-1 min-h-0 gap-2">
+                  {/* Left — count centred, delta + label pinned to bottom */}
+                  <div className="w-[44%] shrink-0 flex flex-col border-r border-gray-100 pr-3">
+                    <div className="flex-1 flex flex-col items-center justify-center gap-1.5">
+                      <p className="text-4xl font-black text-primary leading-none transition-transform duration-300 group-hover:-translate-y-0.5">
+                        {(trendData?.total ?? 0).toLocaleString()}
+                      </p>
+                      <TrendDelta delta={trendData?.delta_pct ?? null} />
                     </div>
-                  )}
+                    <p className="text-[9px] text-gray-400 text-center pb-0.5">vs previous period</p>
+                  </div>
+                  {/* Right — chart with axes + left-edge fade */}
+                  <div className="flex-1 min-w-0 relative">
+                    <div className="absolute inset-0">
+                      {trendSeries.length > 0 ? (
+                        <Line data={trendCardData} options={trendCardOptions} />
+                      ) : (
+                        <div className="h-full flex items-center justify-center">
+                          <p className="text-[10px] text-gray-400">No data for range</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </DashboardCard>
@@ -1612,7 +1662,6 @@ const DashboardHospital8: React.FC = () => {
             {/* Avg Temperature & Humidity — wide trend card (24 points) */}
             <DashboardCard
               accent="violet"
-              watermark={Gauge}
               className="group pointer-events-auto h-full col-span-12 order-5"
             >
               <div className="flex items-center justify-between mb-2">
