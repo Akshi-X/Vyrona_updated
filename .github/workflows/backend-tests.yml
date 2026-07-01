@@ -113,13 +113,17 @@ jobs:
         run: |
           echo "Waiting for services to become healthy..."
           for i in {1..30}; do
-            if curl -s http://localhost:8000/docs > /dev/null && curl -s http://localhost:7072/api/tive/webhook > /dev/null; then
-              echo "Backend and webhook services are fully up and healthy!"
+            if curl -s http://localhost:8000/docs > /dev/null && \
+               curl -s http://localhost:7072/api/tive/webhook > /dev/null && \
+               curl -s http://localhost:7071/ > /dev/null && \
+               python -c "import socket; s = socket.socket(); s.settimeout(1); s.connect(('localhost', 5672))" 2>/dev/null; then
+              echo "Backend, webhook, telemetry, and Event Hub services are fully up and healthy!"
               break
             fi
             echo "Still waiting..."
             sleep 4
           done
+          sleep 5
         working-directory: .
 
       - name: Initialize database schema

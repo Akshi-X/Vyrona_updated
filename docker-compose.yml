@@ -67,12 +67,6 @@ services:
         condition: service_healthy
     volumes:
       - ./eventhub-config/config.json:/Eventhubs_Emulator/ConfigFiles/Config.json
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:5672 || exit 0" ]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
     networks:
       - mgscale-network
 
@@ -113,6 +107,7 @@ services:
       - SMTP_PORT=25
       - SMTP_USERNAME=${SMTP_USERNAME}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SENDER_EMAIL=alerts@mygrape.com
       - FIXED_OTP_MODE=true
       - FIXED_OTP_CODE=123456
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}

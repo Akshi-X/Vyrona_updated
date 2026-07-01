@@ -336,9 +336,7 @@ def _check_and_create_refrigerator_kpi_alerts_sync(
     KPI deviation alerts (runs in background thread).
     """
     try:
-        api_url = (
-            f"http://host.docker.internal:8000/api/ivf/alerts/check_kpi_refrigerator"
-        )
+        api_url = f"{config.ALERT_API_BASE_URL}/api/ivf/alerts/check_kpi_refrigerator"
 
         payload: Dict[str, Any] = {"refrigerator_id": refrigerator_id}
         if zone_id is not None:
