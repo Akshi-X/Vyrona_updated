@@ -123,7 +123,7 @@ export default function RefrigeratorTrackingPageHospital8() {
 
   return (
     <>
-    <PageLayout title="Refrigerator Tracking" description="Monitor temperature, alerts and tasks for cold storage units" lucideIcon={Snowflake} actions={pageActions} patternBackground>
+    <PageLayout title="Refrigerator Tracking" description="Monitor temperature, alerts and tasks for cold storage units" lucideIcon={Snowflake} actions={pageActions}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
         <div className="flex items-center gap-1 text-sm">
           <button
