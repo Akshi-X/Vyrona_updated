@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader
 from psycopg2.errors import UniqueViolation
-from sqlalchemy import and_, desc, func, or_
+from sqlalchemy import and_, desc, func, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -50,6 +50,7 @@ from ...schemas.IVF.critical_alert_schema import (
     TankAlertsResponse,
 )
 from ...service.email_service import send_email
+from ...service.redis_service import get_redis
 from ...service.activity_log_service import (
     ActivityLogService,
     build_system_actor,
@@ -76,6 +77,13 @@ REMINDER_INTERVAL_HOURS = 1  # Send reminder every 1 hour
 # Occurrence tracking window for immediate alerts (24 hours)
 OCCURRENCE_TRACKING_HOURS = 24  # Track occurrences in last 24 hours
 OCCURRENCE_THRESHOLD = 3  # Send to managers after 3 occurrences
+
+# Namespace for pg_try_advisory_xact_lock so concurrent /check_kpi runs for the
+# same tank serialize instead of racing (arbitrary but stable across processes).
+_ADVISORY_LOCK_NS_KPI = 4711
+
+# Cross-process guard so a given alert is emailed to a given recipient only once.
+_EMAIL_DEDUP_TTL_SECONDS = 21600  # 6 hours
 
 # WhatsApp Content Template SIDs
 _WA_TEMPLATE_DEVIATION = "HX890c0696439223c8f7b952d35360ea25"   # "{{1}} is deviated to {{2}} in {{3}} branch for {{4}} tank"
@@ -367,8 +375,12 @@ class CriticalAlertService:
         occurred_at: datetime,
         triggered_by: AlertTriggeredBy = AlertTriggeredBy.SYSTEM,
         extra_info: Optional[str] = None,
-    ) -> CriticalAlert:
-        """Create a new alert if it doesn't already exist (using dedup_key)"""
+    ) -> tuple[CriticalAlert, bool]:
+        """Create a new alert if it doesn't already exist (using dedup_key).
+
+        Returns (alert, created) where created is True only when a new row was
+        inserted. Callers must gate notifications on created to avoid re-sending
+        for an alert that already exists (the concurrency de-dup path)."""
         # Get hospital and branch info
         hospital_id, branch_id = self._get_tank_hospital_branch(tank_id)
 
@@ -394,7 +406,7 @@ class CriticalAlertService:
             )
             existing_alert.occurred_at = occurred_at
             existing_alert.updated_at = datetime.now(timezone.utc)
-            return existing_alert
+            return existing_alert, False
 
         tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
         tank_code = tank.tank_code if tank else None
@@ -443,7 +455,7 @@ class CriticalAlertService:
                     "branch_name": branch_name,
                 },
             )
-            return alert
+            return alert, True
         except IntegrityError as e:
             # Handle race condition: if another process created the alert between our check and insert
             if isinstance(e.orig, UniqueViolation) and "dedup_key" in str(e.orig):
@@ -467,7 +479,7 @@ class CriticalAlertService:
                     existing_alert.occurred_at = occurred_at
                     existing_alert.updated_at = datetime.now(timezone.utc)
                     self.db.flush()
-                    return existing_alert
+                    return existing_alert, False
                 else:
                     # Alert exists but was acknowledged/resolved, create new one with different dedup_key
                     logger.warning(
@@ -512,7 +524,7 @@ class CriticalAlertService:
                             "branch_name": branch_name,
                         },
                     )
-                    return alert
+                    return alert, True
             else:
                 # Re-raise if it's a different integrity error
                 raise
@@ -524,6 +536,24 @@ class CriticalAlertService:
         """
         Check the readings table to see if there is any deviation and create alert not create.
         """
+
+        # Serialize concurrent /check_kpi runs for the same tank. Telemetry calls this
+        # every ~5s while a deviation persists and the endpoint runs in a threadpool across
+        # 2 workers, so without this the cooldown/dedup checks (which read committed state)
+        # race and the same alert is emailed many times. A transaction-scoped advisory lock
+        # auto-releases on commit/rollback; if another run holds it we skip — the next call
+        # picks up any deviation left unchecked.
+        if tank_id is not None:
+            locked = self.db.execute(
+                text("SELECT pg_try_advisory_xact_lock(:ns, :tank_id)"),
+                {"ns": _ADVISORY_LOCK_NS_KPI, "tank_id": tank_id},
+            ).scalar()
+            if not locked:
+                logger.info(
+                    "check_kpi for tank_id=%s skipped; another run holds the advisory lock",
+                    tank_id,
+                )
+                return []
 
         deviations = (
             self.db.query(Readings)
@@ -705,7 +735,7 @@ class CriticalAlertService:
             if kpi_config.kpi_name == "ln2_level":
                 message = f"{kpi_config.alert_name} crossed L2 in {branch_name} branch for {tank_code} tank"
 
-            alert = self._create_alert(
+            alert, created = self._create_alert(
                 tank_id=tank_id,
                 alert_type=AlertType.DEVIATION_ALERT,
                 source=AlertSource.KPI,
@@ -725,8 +755,11 @@ class CriticalAlertService:
             )  # Set branch_id on alert for better filtering and notification targeting
             alert.tank_id = tank_id  # Set tank_id on alert for better filtering and notification targeting
 
+            # Notify only when a new alert row was actually created. When a concurrent
+            # run already created this alert, _create_alert returns the existing row with
+            # created=False and we must not re-send (root cause of duplicate emails).
             # Fetch both notification flags in a single DB query.
-            if kpi_config.alert_type == "critical":
+            if created and kpi_config.alert_type == "critical":
                 (
                     is_hospital_email_configured,
                     is_hospital_whatsapp_configured,
@@ -756,8 +789,9 @@ class CriticalAlertService:
                     )
 
             # Escalation check: fires a background email to Admins/Managers when N
-            # consecutive unacknowledged alerts exist for this KPI.
-            if kpi_config.unack_escalation_threshold is not None:
+            # consecutive unacknowledged alerts exist for this KPI. Only evaluate when a
+            # new alert was added — a returned-existing alert did not change the count.
+            if created and kpi_config.unack_escalation_threshold is not None:
                 if self._check_escalation_needed(kpi_config, tank_id):
                     dedup_prefix = f"{tank_id}:{AlertSource.KPI.value}:{AlertType.DEVIATION_ALERT.value}:%:{kpi_config.id}"
                     unack_alerts = (
@@ -931,7 +965,7 @@ class CriticalAlertService:
                         quality_log.reading_timestamp,
                     )
 
-                    alert = self._create_alert(
+                    alert, _created = self._create_alert(
                         tank_id=tank.tank_id,
                         alert_type=AlertType.DEVIATION_ALERT,
                         source=AlertSource.KPI,
@@ -971,7 +1005,7 @@ class CriticalAlertService:
                         quality_log.reading_timestamp,
                     )
 
-                    alert = self._create_alert(
+                    alert, _created = self._create_alert(
                         tank_id=tank.tank_id,
                         alert_type=AlertType.QUALITY_ALERT,
                         source=AlertSource.QUALITY,
@@ -1010,7 +1044,7 @@ class CriticalAlertService:
                     AlertType.REFILL_LOG_ALERT,
                     current_time,
                 )
-                alert = self._create_alert(
+                alert, _created = self._create_alert(
                     tank_id=tank.tank_id,
                     alert_type=AlertType.REFILL_LOG_ALERT,
                     source=AlertSource.REFILL,
@@ -1175,6 +1209,22 @@ class CriticalAlertService:
         tank_code = tank.tank_code or f"Tank-{tank.tank_id}"
 
         for user in all_users:
+            # Cross-process guard: claim this (alert, recipient) atomically so concurrent
+            # runs / retries can never send the same alert to the same user twice. Fail-open
+            # if Redis is unreachable — never drop a critical alert because the cache is down.
+            dedup_key = f"alert:email:{alert.alert_id}:{user.user_id}"
+            try:
+                if not get_redis().set(dedup_key, 1, nx=True, ex=_EMAIL_DEDUP_TTL_SECONDS):
+                    logger.info(
+                        "Skipping duplicate email to %s for alert_id=%s (redis guard)",
+                        user.email, alert.alert_id,
+                    )
+                    continue
+            except Exception as exc:
+                logger.warning(
+                    "Redis email-dedup guard unavailable for alert_id=%s (%s); sending anyway",
+                    alert.alert_id, exc,
+                )
             try:
                 subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {tank_code}"
                 ist = timezone(timedelta(hours=5, minutes=30))
@@ -1242,6 +1292,30 @@ class CriticalAlertService:
                 )
             except Exception as e:
                 logger.error(f"Failed to send alert email to {user.email}: {str(e)}")
+                ActivityLogService(self.db).log_activity(
+                    action="email.critical_alert_sent",
+                    outcome=ActivityOutcome.FAILURE.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.email),
+                    metadata={
+                        "recipient_email": user.email,
+                        "recipient_user_id": user.user_id,
+                        "alert_id": alert.alert_id,
+                        "alert_type": alert.alert_type,
+                        "severity": alert.severity,
+                        "message": alert.message,
+                        "tank_id": alert.tank_id,
+                        "tank_code": tank_code,
+                        "branch_id": branch.branch_id if branch else None,
+                        "branch_name": branch.branch_name if branch else None,
+                        "error": str(e),
+                    },
+                )
+                # Release the guard so a genuinely failed send can be retried before TTL.
+                try:
+                    get_redis().delete(dedup_key)
+                except Exception:
+                    pass
 
     def _send_alert_email_to_users_only(self, alert: CriticalAlert):
         """Send critical alert email to branch Users only (role=User).
@@ -1304,6 +1378,22 @@ class CriticalAlertService:
         tank_code = tank.tank_code or f"Tank-{tank.tank_id}"
 
         for user in branch_users:
+            # Cross-process guard: claim this (alert, recipient) atomically so concurrent
+            # runs / retries can never send the same alert to the same user twice. Fail-open
+            # if Redis is unreachable — never drop a critical alert because the cache is down.
+            dedup_key = f"alert:email:{alert.alert_id}:{user.user_id}"
+            try:
+                if not get_redis().set(dedup_key, 1, nx=True, ex=_EMAIL_DEDUP_TTL_SECONDS):
+                    logger.info(
+                        "Skipping duplicate users-only email to %s for alert_id=%s (redis guard)",
+                        user.email, alert.alert_id,
+                    )
+                    continue
+            except Exception as exc:
+                logger.warning(
+                    "Redis email-dedup guard unavailable for alert_id=%s (%s); sending anyway",
+                    alert.alert_id, exc,
+                )
             try:
                 subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {tank_code}"
                 ist = timezone(timedelta(hours=5, minutes=30))
@@ -1364,6 +1454,31 @@ class CriticalAlertService:
                 )
             except Exception as e:
                 logger.error(f"Failed to send users-only alert email to {user.email}: {str(e)}")
+                ActivityLogService(self.db).log_activity(
+                    action="email.critical_alert_sent",
+                    outcome=ActivityOutcome.FAILURE.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.email),
+                    metadata={
+                        "recipient_email": user.email,
+                        "recipient_user_id": user.user_id,
+                        "alert_id": alert.alert_id,
+                        "alert_type": alert.alert_type,
+                        "severity": alert.severity,
+                        "message": alert.message,
+                        "tank_id": alert.tank_id,
+                        "tank_code": tank_code,
+                        "branch_id": branch.branch_id,
+                        "branch_name": branch.branch_name,
+                        "escalation_mode": True,
+                        "error": str(e),
+                    },
+                )
+                # Release the guard so a genuinely failed send can be retried before TTL.
+                try:
+                    get_redis().delete(dedup_key)
+                except Exception:
+                    pass
 
     def _send_alert_whatsapp(self, alert: CriticalAlert, *, kpi_config=None, kpi_value: Optional[float] = None):
         """Send WhatsApp notification via Twilio for critical (High severity) alerts only.
@@ -1494,6 +1609,25 @@ class CriticalAlertService:
                     "Sent WhatsApp alert to %s for alert_id=%s (template=%s twilio_sid=%s)",
                     to_number, alert.alert_id, template_sid, msg.sid,
                 )
+                ActivityLogService(self.db).log_activity(
+                    action="whatsapp.critical_alert_sent",
+                    outcome=ActivityOutcome.SUCCESS.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.phone_number),
+                    metadata={
+                        "recipient_phone": user.phone_number,
+                        "recipient_user_id": user.user_id,
+                        "alert_id": alert.alert_id,
+                        "alert_type": alert.alert_type,
+                        "severity": alert.severity,
+                        "message": alert.message,
+                        "tank_id": alert.tank_id,
+                        "tank_code": tank_code,
+                        "branch_name": branch_name,
+                        "template_sid": template_sid,
+                        "twilio_sid": msg.sid,
+                    },
+                )
             except Exception as e:
                 logger.error(
                     "Failed to send WhatsApp to %s for alert_id=%s: %s",
@@ -1501,6 +1635,25 @@ class CriticalAlertService:
                     alert.alert_id,
                     str(e),
                     exc_info=True,
+                )
+                ActivityLogService(self.db).log_activity(
+                    action="whatsapp.critical_alert_sent",
+                    outcome=ActivityOutcome.FAILURE.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, getattr(user, "phone_number", None)),
+                    metadata={
+                        "recipient_phone": getattr(user, "phone_number", None),
+                        "recipient_user_id": user.user_id,
+                        "alert_id": alert.alert_id,
+                        "alert_type": alert.alert_type,
+                        "severity": alert.severity,
+                        "message": alert.message,
+                        "tank_id": alert.tank_id,
+                        "tank_code": tank_code,
+                        "branch_name": branch_name,
+                        "template_sid": template_sid,
+                        "error": str(e),
+                    },
                 )
 
     def _check_escalation_needed(self, kpi_config, tank_id: int) -> bool:
