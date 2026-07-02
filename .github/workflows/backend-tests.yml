@@ -9,14 +9,6 @@ on:
       - "telemetry-service/**"
       - "tive-ingestion-function/**"
       - "docker-compose.yml"
-  push:
-    branches:
-      - develop
-    paths:
-      - "backend/**"
-      - "telemetry-service/**"
-      - "tive-ingestion-function/**"
-      - "docker-compose.yml"
   workflow_dispatch:
 
 jobs:
@@ -143,6 +135,19 @@ jobs:
             tests/app/profile/test_profile.py \
             tests/app/integration/test_feedback_integration.py \
             tests/app/activity_log/test_activity_log.py
+
+      - name: Print docker logs on failure
+        if: failure()
+        run: |
+          echo "=== Backend Logs ==="
+          docker compose logs backend --tail 200
+          echo "=== Telemetry Service Logs ==="
+          docker compose logs telemetry-service --tail 200
+          echo "=== IoT Ingestion Logs ==="
+          docker compose logs iot-ingestion-service --tail 200
+          echo "=== Postgres Logs ==="
+          docker compose logs postgres --tail 200
+        working-directory: .
 
       - name: Clean up temporary Docker files
         if: always()

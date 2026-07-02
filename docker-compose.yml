@@ -41,8 +41,7 @@ services:
       - "10000:10000"
       - "10001:10001"
       - "10002:10002"
-    volumes:
-      - azurite_data:/data
+
     healthcheck:
       test: [ "CMD-SHELL", "node -e 'const http = require(\"http\"); const req = http.get(\"http://127.0.0.1:10000/\", res => { process.exit([200,400,404].includes(res.statusCode) ? 0 : 1); }); req.on(\"error\", () => process.exit(1));'" ]
       interval: 10s
@@ -216,7 +215,6 @@ services:
 
 volumes:
   postgres_data:
-  azurite_data:
 
 networks:
   mgscale-network:
