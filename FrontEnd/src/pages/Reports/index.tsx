@@ -183,6 +183,7 @@ const ACTION_LABELS: Record<string, string> = {
     "alert.acknowledged_all": "All Alerts Acknowledged",
     "alert.created": "Critical Alert Created",
     "email.critical_alert_sent": "Critical Alert Email Sent",
+    "whatsapp.critical_alert_sent": "Critical Alert WhatsApp Sent",
     "email.escalation_sent": "Escalation Email Sent",
     "refill_detection.created": "Refill Detection Created",
     "refill_detection.reviewed": "Refill Detection Reviewed",
@@ -268,6 +269,14 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
             if (metadata.email_message) lines.push(`Email: ${truncateText(String(metadata.email_message), 80)}`);
             if (metadata.occurred_at) lines.push(`Occurred: ${metadata.occurred_at}`);
         }
+        if (metadata.error) lines.push(`Error: ${truncateText(String(metadata.error), 80)}`);
+        return lines;
+    }
+
+    if (action.startsWith("whatsapp.")) {
+        if (metadata.recipient_phone) lines.push(`To: ${metadata.recipient_phone}`);
+        if (metadata.message) lines.push(`Message: ${truncateText(String(metadata.message), 80)}`);
+        if (metadata.error) lines.push(`Error: ${truncateText(String(metadata.error), 80)}`);
         return lines;
     }
 
