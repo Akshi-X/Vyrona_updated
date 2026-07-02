@@ -1292,6 +1292,25 @@ class CriticalAlertService:
                 )
             except Exception as e:
                 logger.error(f"Failed to send alert email to {user.email}: {str(e)}")
+                ActivityLogService(self.db).log_activity(
+                    action="email.critical_alert_sent",
+                    outcome=ActivityOutcome.FAILURE.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.email),
+                    metadata={
+                        "recipient_email": user.email,
+                        "recipient_user_id": user.user_id,
+                        "alert_id": alert.alert_id,
+                        "alert_type": alert.alert_type,
+                        "severity": alert.severity,
+                        "message": alert.message,
+                        "tank_id": alert.tank_id,
+                        "tank_code": tank_code,
+                        "branch_id": branch.branch_id if branch else None,
+                        "branch_name": branch.branch_name if branch else None,
+                        "error": str(e),
+                    },
+                )
                 # Release the guard so a genuinely failed send can be retried before TTL.
                 try:
                     get_redis().delete(dedup_key)
@@ -1435,6 +1454,26 @@ class CriticalAlertService:
                 )
             except Exception as e:
                 logger.error(f"Failed to send users-only alert email to {user.email}: {str(e)}")
+                ActivityLogService(self.db).log_activity(
+                    action="email.critical_alert_sent",
+                    outcome=ActivityOutcome.FAILURE.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.email),
+                    metadata={
+                        "recipient_email": user.email,
+                        "recipient_user_id": user.user_id,
+                        "alert_id": alert.alert_id,
+                        "alert_type": alert.alert_type,
+                        "severity": alert.severity,
+                        "message": alert.message,
+                        "tank_id": alert.tank_id,
+                        "tank_code": tank_code,
+                        "branch_id": branch.branch_id,
+                        "branch_name": branch.branch_name,
+                        "escalation_mode": True,
+                        "error": str(e),
+                    },
+                )
                 # Release the guard so a genuinely failed send can be retried before TTL.
                 try:
                     get_redis().delete(dedup_key)
@@ -1570,6 +1609,25 @@ class CriticalAlertService:
                     "Sent WhatsApp alert to %s for alert_id=%s (template=%s twilio_sid=%s)",
                     to_number, alert.alert_id, template_sid, msg.sid,
                 )
+                ActivityLogService(self.db).log_activity(
+                    action="whatsapp.critical_alert_sent",
+                    outcome=ActivityOutcome.SUCCESS.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.phone_number),
+                    metadata={
+                        "recipient_phone": user.phone_number,
+                        "recipient_user_id": user.user_id,
+                        "alert_id": alert.alert_id,
+                        "alert_type": alert.alert_type,
+                        "severity": alert.severity,
+                        "message": alert.message,
+                        "tank_id": alert.tank_id,
+                        "tank_code": tank_code,
+                        "branch_name": branch_name,
+                        "template_sid": template_sid,
+                        "twilio_sid": msg.sid,
+                    },
+                )
             except Exception as e:
                 logger.error(
                     "Failed to send WhatsApp to %s for alert_id=%s: %s",
@@ -1577,6 +1635,25 @@ class CriticalAlertService:
                     alert.alert_id,
                     str(e),
                     exc_info=True,
+                )
+                ActivityLogService(self.db).log_activity(
+                    action="whatsapp.critical_alert_sent",
+                    outcome=ActivityOutcome.FAILURE.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, getattr(user, "phone_number", None)),
+                    metadata={
+                        "recipient_phone": getattr(user, "phone_number", None),
+                        "recipient_user_id": user.user_id,
+                        "alert_id": alert.alert_id,
+                        "alert_type": alert.alert_type,
+                        "severity": alert.severity,
+                        "message": alert.message,
+                        "tank_id": alert.tank_id,
+                        "tank_code": tank_code,
+                        "branch_name": branch_name,
+                        "template_sid": template_sid,
+                        "error": str(e),
+                    },
                 )
 
     def _check_escalation_needed(self, kpi_config, tank_id: int) -> bool:
