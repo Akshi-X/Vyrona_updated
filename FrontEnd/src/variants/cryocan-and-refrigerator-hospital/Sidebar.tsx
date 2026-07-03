@@ -1,22 +1,28 @@
+/**
+ * @variant CryocanRefrigeratorHospitalSidebar
+ * @hospital ID: 9
+ * @route /_sidebar
+ */
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ChevronRight, Download, Users } from "lucide-react";
 
-import { useSidebar } from "../contexts/SidebarContext";
-import { useOnboardingMode } from "../contexts/OnboardingModeContext";
-import { useAuth } from "../contexts/AuthContext";
-import { userService } from "../services/userService";
+import { useSidebar } from "../../contexts/SidebarContext";
+import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { userService } from "../../services/userService";
 
-import MyGrapeLogo from "../assets/mGScale.svg";
-import IsolationModeBanner from "../assets/Isolation_Mode.svg";
-import DashboardIconWhite from "../assets/DashBoardIcons/DashboardWhite.svg";
-import DatabaseIconWhite from "../assets/DashBoardIcons/DataBaseWhite.svg";
-import DatabaseIconDark from "../assets/DashBoardIcons/DatabaseDark.svg";
-import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
-import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg";
-import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
-import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
-import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
+import MyGrapeLogo from "../../assets/mGScale.svg";
+import IsolationModeBanner from "../../assets/Isolation_Mode.svg";
+import DashboardIconWhite from "../../assets/DashBoardIcons/DashboardWhite.svg";
+import DatabaseIconWhite from "../../assets/DashBoardIcons/DataBaseWhite.svg";
+import DatabaseIconDark from "../../assets/DashBoardIcons/DatabaseDark.svg";
+import ControlTowerIconWhite from "../../assets/DashBoardIcons/ControlTowerWhite.svg";
+import ControlTowerIconDark from "../../assets/DashBoardIcons/ControlTowerDark.svg";
+import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
+import ContainersIcon from "../../assets/DashBoardIcons/Containers.svg";
+import LogoutIcon from "../../assets/DashBoardIcons/Logout.svg";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -115,7 +121,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const [profileName, setProfileName] = useState("");
     const [profileEmail, setProfileEmail] = useState("");
 
-    // Prefix path with /onboarding when in onboarding mode
     const resolvePath = (path: string) =>
         isOnboarding ? `/onboarding${path}` : path;
 
@@ -160,7 +165,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             return !isIVF;
         return true;
     }).map((item) => {
-        // Filter dropdown children by department
         if (isDropdown(item)) {
             const filtered = item.children.filter((child) => {
                 if (child.path === "/ivf-track-shipment") return isIVF;
@@ -212,7 +216,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 </div>
 
                 {/* Logo */}
-                <header className="flex items-center gap-[7px] px-6 pt-0 pb-2 md:pb-6 flex-shrink-0 relative z-10">
+                <header className="flex items-center gap-[7px] px-6 pt-0 pb-2 md:pb-6 shrink-0 relative z-10">
                     <img
                         src={MyGrapeLogo}
                         alt="myGrape logo"
@@ -274,7 +278,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                             </span>
                                         </div>
                                         <svg
-                                            className={`w-4 h-4 flex-shrink-0 transition-transform text-white/90 ${isOpen ? "rotate-180" : ""}`}
+                                            className={`w-4 h-4 shrink-0 transition-transform text-white/90 ${isOpen ? "rotate-180" : ""}`}
                                             fill="none"
                                             viewBox="0 0 24 24"
                                             stroke="currentColor"
@@ -364,9 +368,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     id="onboarding-sidebar-profile"
                     type="button"
                     onClick={() => { navigate(resolvePath("/user-profile")); closeMobile(); }}
-                    className="group w-full flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 flex-shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
+                    className="group w-full flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
                 >
-                    <span className="w-6 h-6 flex-shrink-0 rounded-full bg-white/20 text-white text-[10px] font-bold flex items-center justify-center uppercase">
+                    <span className="w-6 h-6 shrink-0 rounded-full bg-white/20 text-white text-[10px] font-bold flex items-center justify-center uppercase">
                         {(profileName || "User")
                             .split(/\s+/)
                             .filter(Boolean)
@@ -376,10 +380,10 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     </span>
                     <div className="flex-1 min-w-0 flex flex-col items-start">
                         <span className="font-semibold text-xs md:text-sm text-white truncate w-full">
-                            {profileName || "\u00A0"}
+                            {profileName || " "}
                         </span>
                         <span className="text-[10px] md:text-xs text-white/80 truncate w-full">
-                            {profileEmail || "\u00A0"}
+                            {profileEmail || " "}
                         </span>
                     </div>
                     <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/90 opacity-0 transition-opacity duration-200 group-hover:opacity-100" strokeWidth={2} />
@@ -388,7 +392,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 {/* Logout */}
                 <button
                     onClick={() => setShowLogoutConfirm(true)}
-                    className="h-auto flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 hover:bg-white/10 flex-shrink-0 relative z-10"
+                    className="h-auto flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 hover:bg-white/10 shrink-0 relative z-10"
                 >
                     <img src={LogoutIcon} alt="" className="w-5 h-5" />
                     <span className="font-bold text-white text-xs md:text-sm">Log Out</span>
@@ -421,3 +425,5 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         </>
     );
 };
+
+export default Sidebar;

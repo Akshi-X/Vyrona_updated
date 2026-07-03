@@ -1570,6 +1570,21 @@ export class IvfService extends BaseApiService {
     async deleteLog(cycleId: number, logId: number): Promise<void> {
         return this.request<void>(`/api/ivf/cycles/${cycleId}/logs/${logId}`, { method: 'DELETE' });
     }
+
+    async getRefrigeratorDeviationsByCategory(fromTs: number, toTs: number): Promise<{
+        total: number;
+        categories: { kpi_name: string; label: string; count: number }[];
+    }> {
+        return this.request(`/api/ivf/refrigerator-dashboard/deviations-by-category?from_ts=${fromTs}&to_ts=${toTs}`);
+    }
+
+    async getRefrigeratorTopKpi(fromTs: number, toTs: number): Promise<{
+        kpi_name: string | null;
+        label: string;
+        count: number;
+    }> {
+        return this.request(`/api/ivf/refrigerator-dashboard/top-kpi?from_ts=${fromTs}&to_ts=${toTs}`);
+    }
 }
 
 // ── Chamber health ────────────────────────────────────────────────────────────

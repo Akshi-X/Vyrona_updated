@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import VariantRoute, { useHasVariant } from './VariantRoute';
+import VariantRoute from './VariantRoute';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmDialog from './ConfirmDialog';
 
 export default function SidebarLayout() {
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const hasVariantSidebar = useHasVariant('/_sidebar');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
@@ -23,7 +22,7 @@ export default function SidebarLayout() {
         defaultComponent={<Sidebar onLogout={() => setShowLogoutConfirm(true)} />}
         componentProps={{ onLogout: () => setShowLogoutConfirm(true) }}
       />
-      <div className={`flex-1 min-w-0 overflow-x-hidden ${!hasVariantSidebar ? 'md:ml-60' : ''}`}>
+      <div className="flex-1 min-w-0 overflow-x-hidden">
         <Outlet />
       </div>
 
