@@ -111,6 +111,19 @@ class InviteUserRequest(BaseModel):
     branch_name: Optional[str] = None
 
 
+class HospitalUserUpdateRequest(BaseModel):
+    """Admin/Manager editing another hospital user's name, role, and branch."""
+    first_name: str
+    last_name: str
+    role: str
+    branch_name: Optional[str] = None
+
+
+class HospitalUserStatusUpdateRequest(BaseModel):
+    """Activate/deactivate (soft delete) a hospital user."""
+    status: bool
+
+
 class InviteTokenResponse(BaseModel):
     email: str
     role: str

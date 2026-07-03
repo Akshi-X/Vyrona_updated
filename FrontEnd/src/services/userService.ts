@@ -220,6 +220,20 @@ export class UserService extends BaseApiService {
     });
   }
 
+  async updateHospitalUser(userId: string, data: { first_name: string; last_name: string; role: string; branch_name?: string | null }): Promise<{ message: string; user_id: string; first_name: string; last_name: string; role: string; branch_name?: string | null }> {
+    return await this.request(`/api/hospital/users/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async setHospitalUserStatus(userId: string, status: boolean): Promise<{ message: string; user_id: string; status: boolean }> {
+    return await this.request(`/api/hospital/users/${encodeURIComponent(userId)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
   async getInviteToken(token: string): Promise<{ email: string; role: string; hospital_name: string | null; expires_at: string; branch_name: string | null } | null> {
     return await this.request(`/api/invite/${token}`, { method: 'GET' });
   }

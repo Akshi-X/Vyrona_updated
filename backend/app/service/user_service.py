@@ -1030,6 +1030,101 @@ def resend_invite(db: Session, current_user: User, user_id: str, base_url: str) 
     return {"message": f"Invite resent to {target.email}"}
 
 
+def update_hospital_user(
+    db: Session, current_user: User, user_id: str,
+    first_name: str, last_name: str, role: str, branch_name: Optional[str] = None
+) -> dict:
+    """Admin/Manager: edit another hospital user's name, role, and branch (same hospital only)."""
+    if current_user.role.lower() not in ("admin", "manager"):
+        raise ValueError("Only Admin or Manager can edit users.")
+
+    target = db.query(User).filter(User.user_id == user_id).first()
+    if not target:
+        raise ValueError("User not found.")
+    if target.hospital_id != current_user.hospital_id:
+        raise ValueError("Access denied.")
+    if target.user_id == current_user.user_id:
+        raise ValueError("You cannot edit your own account from here.")
+
+    role_norm = normalize_role_to_title_case(role)
+    if role_norm not in ("User", "Manager", "Admin"):
+        raise ValueError("Role must be User, Manager, or Admin.")
+
+    branch_id = None
+    if role_norm == "User":
+        if not branch_name:
+            raise ValueError("branch_name is required for User role.")
+        branch = db.query(HospitalBranch).filter(
+            HospitalBranch.branch_name == branch_name,
+            HospitalBranch.hospital_id == current_user.hospital_id,
+        ).first()
+        if not branch:
+            raise ValueError(f"Branch '{branch_name}' not found.")
+        branch_id = branch.branch_id
+
+    target.first_name = first_name.strip()
+    target.last_name = last_name.strip()
+    target.role = role_norm
+    target.branch_id = branch_id
+    target.updated_by = current_user.user_id
+    target.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(target)
+
+    ActivityLogService(db).log_activity(
+        action="user.updated_by_admin",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("user", target.user_id, f"{target.first_name} {target.last_name}".strip()),
+        metadata={"role": role_norm, "branch_name": branch_name},
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
+
+    return {
+        "message": "User updated successfully",
+        "user_id": target.user_id,
+        "first_name": target.first_name,
+        "last_name": target.last_name,
+        "role": role_norm,
+        "branch_name": branch_name if role_norm == "User" else None,
+    }
+
+
+def set_hospital_user_status(db: Session, current_user: User, user_id: str, status: bool) -> dict:
+    """Admin/Manager: activate or deactivate (soft delete) a hospital user without removing the record."""
+    if current_user.role.lower() not in ("admin", "manager"):
+        raise ValueError("Only Admin or Manager can change user status.")
+
+    target = db.query(User).filter(User.user_id == user_id).first()
+    if not target:
+        raise ValueError("User not found.")
+    if target.hospital_id != current_user.hospital_id:
+        raise ValueError("Access denied.")
+    if target.user_id == current_user.user_id:
+        raise ValueError("You cannot change your own status.")
+
+    target.status = status
+    target.updated_by = current_user.user_id
+    target.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(target)
+
+    ActivityLogService(db).log_activity(
+        action="user.activated" if status else "user.deactivated",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("user", target.user_id, f"{target.first_name} {target.last_name}".strip()),
+        metadata={},
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
+
+    return {
+        "message": "User activated successfully" if status else "User deactivated successfully",
+        "user_id": target.user_id,
+        "status": target.status,
+    }
+
+
 def get_invite_token(db: Session, token: str) -> InviteTokenResponse:
     """Validate an invite token and return its metadata (stored in users table)."""
     user = db.query(User).filter(User.invite_token == token).first()

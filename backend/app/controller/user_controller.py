@@ -29,7 +29,7 @@ from app.schemas.response_schema import (
     UserDetailsResponse,
     UserProfileResponse
 )
-from app.schemas.user_schema import UserListResponse, UserNameUpdateRequest, UserUpdateResponse, HospitalUserListResponse, HospitalUserItem, InviteUserRequest, InviteTokenResponse, RegisterFromInviteRequest
+from app.schemas.user_schema import UserListResponse, UserNameUpdateRequest, UserUpdateResponse, HospitalUserListResponse, HospitalUserItem, InviteUserRequest, InviteTokenResponse, RegisterFromInviteRequest, HospitalUserUpdateRequest, HospitalUserStatusUpdateRequest
 from app.constants.messages import SuccessMessages
 from app.dependencies.auth_dependencies import get_current_user, validate_registration_request
 from app.service.activity_log_service import ActivityLogService, build_actor_from_user
@@ -399,6 +399,47 @@ def resend_invite(
     """Resend invite email to a pending user with a fresh token."""
     try:
         return user_service.resend_invite(db=db, current_user=current_user, user_id=user_id, base_url=settings.FRONTEND_URL)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/hospital/users/{user_id}")
+def update_hospital_user(
+    user_id: str,
+    body: HospitalUserUpdateRequest,
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Admin/Manager: edit another hospital user's name, role, and branch (same hospital only)."""
+    try:
+        return user_service.update_hospital_user(
+            db=db,
+            current_user=current_user,
+            user_id=user_id,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            role=body.role,
+            branch_name=body.branch_name,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/hospital/users/{user_id}/status")
+def update_hospital_user_status(
+    user_id: str,
+    body: HospitalUserStatusUpdateRequest,
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Admin/Manager: activate or deactivate (soft delete) a hospital user without deleting the record."""
+    try:
+        return user_service.set_hospital_user_status(
+            db=db,
+            current_user=current_user,
+            user_id=user_id,
+            status=body.status,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

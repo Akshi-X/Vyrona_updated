@@ -71,28 +71,28 @@ const ALL_NAV_ITEMS: NavItem[] = [
         label: "Dashboard",
         dropdown: true,
         children: [
-            { label: "Overview",                  path: "/dashboard"          },
-            { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
-            { label: "Incubator Tracking",         path: "/incubator-tracking" },
-            { label: "Refrigerator Tracking",      path: "/refrigerator-tracking" },
-            { label: "Embryo Console",              path: "/embryo-console"     },
+            { label: "Overview", path: "/dashboard" },
+            { label: "Cryocan Quality Tracking", path: "/ivf-track-shipment" },
+            { label: "Incubator Tracking", path: "/incubator-tracking" },
+            { label: "Refrigerator Tracking", path: "/refrigerator-tracking" },
+            { label: "Embryo Console", path: "/embryo-console" },
         ],
     },
-    { icon: DatabaseIconWhite,    label: "Database",            path: "/database"      },
-    { icon: ControlTowerIconWhite, label: "Control Tower",      path: "/control-tower" },
-    { icon: "", lucideIcon: Users,    label: "Users",            path: "/users"         },
+    { icon: DatabaseIconWhite, label: "Database", path: "/database" },
+    { icon: ControlTowerIconWhite, label: "Control Tower", path: "/control-tower" },
+    { icon: "", lucideIcon: Users, label: "Users", path: "/users" },
     {
         icon: CriticalAlertsIcon,
         label: "Alert Config",
         dropdown: true,
         children: [
-            { label: "Cryotanks",  path: "/alert-setting" },
+            { label: "Cryotanks", path: "/alert-setting" },
             { label: "Incubators", path: "/alert-setting?direction=incubators" },
             { label: "Refrigerators", path: "/alert-setting?direction=refrigerators" },
         ],
     },
-    { icon: "", lucideIcon: Download, label: "Reports",         path: "/reports"       },
-    { icon: ContainersIcon,       label: "Refill log",          path: "/refill-log"    },
+    { icon: "", lucideIcon: Download, label: "Reports", path: "/reports" },
+    { icon: ContainersIcon, label: "Refill log", path: "/refill-log" },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             setUserDepartment(dept);
 
             const first = profile.first_name?.trim() ?? "";
-            const last  = profile.last_name?.trim()  ?? "";
+            const last = profile.last_name?.trim() ?? "";
             setProfileName([first, last].filter(Boolean).join(" ") || "User");
             setProfileEmail(profile.email?.trim() ?? "");
         }).catch(() => {
@@ -196,18 +196,16 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         <>
             {/* Mobile backdrop */}
             <div
-                className={`fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300 ${
-                    isMobileOpen
-                        ? "opacity-100 pointer-events-auto"
-                        : "opacity-0 pointer-events-none"
-                }`}
+                className={`fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300 ${isMobileOpen
+                    ? "opacity-100 pointer-events-auto"
+                    : "opacity-0 pointer-events-none"
+                    }`}
                 onClick={closeMobile}
             />
 
             <aside
-                className={`fixed left-0 top-0 w-60 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out ${
-                    isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-                }`}
+                className={`fixed left-0 top-0 w-60 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+                    }`}
                 style={{ height: sidebarHeight }}
             >
                 {/* Decorative background */}
@@ -237,10 +235,10 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                             const active = isDashboard
                                 ? isDashboardRoute(resolvedPathname)
                                 : isAlertConfig
-                                  ? isAlertConfigRoute(resolvedPathname)
-                                  : false;
+                                    ? isAlertConfigRoute(resolvedPathname)
+                                    : false;
                             const isOpen = isDashboard ? dashboardOpen : isAlertConfig ? alertConfigOpen : false;
-                            const setOpen = isDashboard ? setDashboardOpen : isAlertConfig ? setAlertConfigOpen : () => {};
+                            const setOpen = isDashboard ? setDashboardOpen : isAlertConfig ? setAlertConfigOpen : () => { };
 
                             const getChildActive = (child: NavChild) => {
                                 if (child.path.includes("?")) {
@@ -262,13 +260,12 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                     <button
                                         id={isAlertConfig ? "onboarding-sidebar-alert-setting" : undefined}
                                         onClick={() => setOpen((o: boolean) => !o)}
-                                        className={`h-auto w-full justify-between gap-4 px-3 py-[7px] rounded-[10px] flex items-center transition-colors ${
-                                            active
-                                                ? "bg-white/20"
-                                                : isOpen
-                                                  ? "bg-white/10"
-                                                  : "bg-transparent hover:bg-white/10"
-                                        }`}
+                                        className={`h-auto w-full justify-between gap-4 px-3 py-[7px] rounded-[10px] flex items-center transition-colors ${active
+                                            ? "bg-white/20"
+                                            : isOpen
+                                                ? "bg-white/10"
+                                                : "bg-transparent hover:bg-white/10"
+                                            }`}
                                     >
                                         <div className="flex items-center gap-4">
                                             <img
@@ -302,11 +299,10 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                             setOpen(true);
                                                             handleNavigation(child.path);
                                                         }}
-                                                        className={`h-auto w-full justify-start pr-3 py-2 rounded-[10px] flex items-center text-left transition-colors pl-5 ${ci === 0 ? "mt-2" : ""} ${
-                                                            childActive
-                                                                ? "bg-white text-primary"
-                                                                : "text-white/85 hover:bg-white/10 hover:text-white"
-                                                        }`}
+                                                        className={`h-auto w-full justify-start pr-3 py-2 rounded-[10px] flex items-center text-left transition-colors pl-5 ${ci === 0 ? "mt-2" : ""} ${childActive
+                                                            ? "bg-white text-primary"
+                                                            : "text-white/85 hover:bg-white/10 hover:text-white"
+                                                            }`}
                                                     >
                                                         <span className="font-medium text-xs md:text-sm">
                                                             {child.label}
@@ -326,28 +322,27 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                         const isActive =
                             path === "/approval"
                                 ? location.pathname === resolvePath("/approval") ||
-                                  location.pathname === resolvePath("/approval-screen")
+                                location.pathname === resolvePath("/approval-screen")
                                 : location.pathname === resolvedPath ||
-                                  location.pathname.startsWith(resolvedPath + "/");
+                                location.pathname.startsWith(resolvedPath + "/");
 
                         const iconSrc =
-                            label === "Database"      ? (isActive ? DatabaseIconDark     : DatabaseIconWhite)
-                          : label === "Control Tower" ? (isActive ? ControlTowerIconDark : ControlTowerIconWhite)
-                          : icon;
+                            label === "Database" ? (isActive ? DatabaseIconDark : DatabaseIconWhite)
+                                : label === "Control Tower" ? (isActive ? ControlTowerIconDark : ControlTowerIconWhite)
+                                    : icon;
 
                         const needsInvert =
                             (label === "Pending approvals" ||
-                             label === "Alert Config" ||
-                             label === "Refill log") && !isActive;
+                                label === "Alert Config" ||
+                                label === "Refill log") && !isActive;
 
                         return (
                             <button
                                 key={index}
                                 id={label === "Control Tower" ? "onboarding-sidebar-control-tower" : label === "Refill log" ? "onboarding-sidebar-refill-log" : label === "Reports" ? "onboarding-sidebar-reports" : label === "Users" ? "onboarding-sidebar-users" : undefined}
                                 onClick={() => handleNavigation(path)}
-                                className={`h-auto w-full justify-start gap-4 px-3 py-[7px] rounded-[10px] flex items-center ${
-                                    isActive ? "bg-white" : "bg-transparent hover:bg-white/10"
-                                }`}
+                                className={`h-auto w-full justify-start gap-4 px-3 py-[7px] rounded-[10px] flex items-center ${isActive ? "bg-white" : "bg-transparent hover:bg-white/10"
+                                    }`}
                             >
                                 {LucideIcon ? (
                                     <LucideIcon className="w-5 h-5" color={isActive ? "var(--color-primary)" : "#ffffff"} />

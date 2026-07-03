@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { toast } from "react-toastify";
-import { Users, UserPlus } from "lucide-react";
+import { Users, UserPlus, MoreVertical } from "lucide-react";
 import PageLayout from "../../components/PageLayout";
 import { useHasVariant } from "../../components/VariantRoute";
 import { useAuth } from "../../contexts/AuthContext";
 import { userService } from "../../services/userService";
-import type { HospitalUserItem } from "../../services/userService";
+import type { HospitalUserItem, UserProfileDto } from "../../services/userService";
 import { ivfService } from "../../services/ivfService";
 
 type FilterState = {
@@ -27,6 +28,35 @@ export default function UsersPage() {
 
     const [resendingId, setResendingId] = useState<string | null>(null);
 
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const [menuDirection, setMenuDirection] = useState<"down" | "up">("down");
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const [resettingId, setResettingId] = useState<string | null>(null);
+    const [statusLoadingId, setStatusLoadingId] = useState<string | null>(null);
+    const [confirmStatusUser, setConfirmStatusUser] = useState<HospitalUserItem | null>(null);
+
+    const [currentUser, setCurrentUser] = useState<UserProfileDto | null>(null);
+
+    const [editingUser, setEditingUser] = useState<HospitalUserItem | null>(null);
+    const [editFirstName, setEditFirstName] = useState("");
+    const [editLastName, setEditLastName] = useState("");
+    const [editRole, setEditRole] = useState("User");
+    const [editBranch, setEditBranch] = useState("");
+    const [editLoading, setEditLoading] = useState(false);
+    const [editError, setEditError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!openMenuId) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest(".actions-menu")) {
+                setOpenMenuId(null);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [openMenuId]);
+
     // Onboarding: open invite modal via event so tour can walk through it
     useEffect(() => {
         const fn = () => setShowInviteModal(true);
@@ -40,6 +70,104 @@ export default function UsersPage() {
             await userService.resendInvite(userId);
         } finally {
             setResendingId(null);
+        }
+    };
+
+    const openEditUser = (user: HospitalUserItem) => {
+        setEditingUser(user);
+        setEditFirstName(user.first_name);
+        setEditLastName(user.last_name);
+        setEditRole(user.role);
+        setEditBranch(user.branch_name ?? "");
+        setEditError(null);
+        setOpenMenuId(null);
+    };
+
+    const closeEditUser = () => {
+        setEditingUser(null);
+        setEditLoading(false);
+        setEditError(null);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingUser) return;
+        if (!editFirstName.trim() || !editLastName.trim()) {
+            setEditError("First and last name are required.");
+            return;
+        }
+        if (editRole === "User" && !editBranch) {
+            setEditError("Branch is required for User role.");
+            return;
+        }
+        setEditLoading(true);
+        setEditError(null);
+        try {
+            const updated = await userService.updateHospitalUser(editingUser.user_id, {
+                first_name: editFirstName.trim(),
+                last_name: editLastName.trim(),
+                role: editRole,
+                branch_name: editRole === "User" ? editBranch : undefined,
+            });
+            setUsers((prev) => prev.map((u) => u.user_id === editingUser.user_id
+                ? { ...u, first_name: updated.first_name, last_name: updated.last_name, role: updated.role, branch_name: updated.branch_name ?? null }
+                : u
+            ));
+            toast.success("User updated successfully");
+            closeEditUser();
+        } catch (err) {
+            setEditError((err as Error)?.message || "Failed to update user");
+        } finally {
+            setEditLoading(false);
+        }
+    };
+
+    const handleResetPassword = async (user: HospitalUserItem) => {
+        setResettingId(user.user_id);
+        setOpenMenuId(null);
+        try {
+            await userService.forgotPassword({ email: user.email });
+            toast.success(`Password reset link sent to ${user.email}`);
+        } catch (err) {
+            toast.error((err as Error)?.message || "Failed to send reset link");
+        } finally {
+            setResettingId(null);
+        }
+    };
+
+    const toggleActionsMenu = (userId: string, e: ReactMouseEvent<HTMLButtonElement>) => {
+        if (openMenuId === userId) {
+            setOpenMenuId(null);
+            return;
+        }
+        const rect = e.currentTarget.getBoundingClientRect();
+        const menuHeight = 130; // approx height of the 3-item dropdown
+        // The table wrapper below has overflow-x-auto, which (per the CSS overflow spec)
+        // also clips the y-axis — so the real boundary is this container's edge, not the viewport.
+        const containerBottom = tableContainerRef.current?.getBoundingClientRect().bottom ?? window.innerHeight;
+        setMenuDirection(containerBottom - rect.bottom < menuHeight ? "up" : "down");
+        setOpenMenuId(userId);
+    };
+
+    const requestStatusChange = (user: HospitalUserItem) => {
+        setConfirmStatusUser(user);
+        setOpenMenuId(null);
+    };
+
+    const closeStatusConfirm = () => setConfirmStatusUser(null);
+
+    const handleConfirmStatusChange = async () => {
+        if (!confirmStatusUser) return;
+        const nextStatus = !confirmStatusUser.status;
+        setStatusLoadingId(confirmStatusUser.user_id);
+        try {
+            await userService.setHospitalUserStatus(confirmStatusUser.user_id, nextStatus);
+            setUsers((prev) => prev.map((u) => u.user_id === confirmStatusUser.user_id ? { ...u, status: nextStatus } : u));
+            toast.success(nextStatus ? "User activated successfully" : "User deactivated successfully");
+            setConfirmStatusUser(null);
+        } catch (err) {
+            toast.error((err as Error)?.message || "Failed to update user status");
+        } finally {
+            setStatusLoadingId(null);
         }
     };
 
@@ -79,6 +207,7 @@ export default function UsersPage() {
         };
 
         loadData();
+        userService.getProfile().then(setCurrentUser).catch(() => {});
     }, [isAuthenticated]);
 
     const roleOptions = useMemo(() => {
@@ -137,258 +266,429 @@ export default function UsersPage() {
 
     return (
         <>
-        {showInviteModal && (
-            <div id="onboarding-users-invite-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-                <div id="onboarding-users-invite-modal-card" className="bg-white rounded-lg border border-gray-200 shadow-lg w-full max-w-md mx-4 p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-1">Invite User</h3>
-                    <p className="text-sm text-gray-500 mb-1">Enter the email and role to send an invite link.</p>
-                    <p className="text-xs text-amber-600 mb-5">The invite link will expire in 1 week.</p>
+            {showInviteModal && (
+                <div id="onboarding-users-invite-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div id="onboarding-users-invite-modal-card" className="bg-white rounded-lg border border-gray-200 shadow-lg w-full max-w-md mx-4 p-6">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-1">Invite User</h3>
+                        <p className="text-sm text-gray-500 mb-1">Enter the email and role to send an invite link.</p>
+                        <p className="text-xs text-amber-600 mb-5">The invite link will expire in 1 week.</p>
 
-                    <div className="flex flex-col gap-4">
-                        <div id="onboarding-users-invite-email" className="flex flex-col gap-1.5">
-                            <label className="text-xs font-semibold text-gray-600">Email</label>
-                            <input
-                                type="email"
-                                placeholder="user@example.com"
-                                className={`border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${inviteEmailError ? "border-red-400" : "border-line"}`}
-                                value={inviteEmail}
-                                onChange={(e) => { setInviteEmail(e.target.value); setInviteEmailError(null); }}
-                                disabled={inviteLoading}
-                            />
-                            {inviteEmailError && <p className="text-xs text-red-500">{inviteEmailError}</p>}
+                        <div className="flex flex-col gap-4">
+                            <div id="onboarding-users-invite-email" className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-gray-600">Email</label>
+                                <input
+                                    type="email"
+                                    placeholder="user@example.com"
+                                    className={`border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${inviteEmailError ? "border-red-400" : "border-line"}`}
+                                    value={inviteEmail}
+                                    onChange={(e) => { setInviteEmail(e.target.value); setInviteEmailError(null); }}
+                                    disabled={inviteLoading}
+                                />
+                                {inviteEmailError && <p className="text-xs text-red-500">{inviteEmailError}</p>}
+                            </div>
+
+                            <div id="onboarding-users-invite-role" className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-gray-600">Role</label>
+                                <select
+                                    className="border border-line rounded-md px-3 py-2 text-sm"
+                                    value={inviteRole}
+                                    onChange={(e) => { setInviteRole(e.target.value); setInviteBranch(""); }}
+                                    disabled={inviteLoading}
+                                >
+                                    <option value="User">User</option>
+                                    <option value="Manager">Manager</option>
+                                    <option value="Admin">Admin</option>
+                                </select>
+                            </div>
+
+                            {inviteRole === "User" && (
+                                <div id="onboarding-users-invite-branch" className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-semibold text-gray-600">Branch</label>
+                                    <select
+                                        className="border border-line rounded-md px-3 py-2 text-sm"
+                                        value={inviteBranch}
+                                        onChange={(e) => setInviteBranch(e.target.value)}
+                                        disabled={inviteLoading}
+                                    >
+                                        <option value="">Select branch</option>
+                                        {allBranches.map((name) => (
+                                            <option key={name} value={name}>{name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {inviteStatus && (
+                                <p className={`text-sm font-medium ${inviteStatus.type === "success" ? "text-green-600" : "text-red-600"}`}>
+                                    {inviteStatus.message}
+                                </p>
+                            )}
                         </div>
 
-                        <div id="onboarding-users-invite-role" className="flex flex-col gap-1.5">
+                        <div id="onboarding-users-invite-actions" className="flex gap-3 justify-end mt-6">
+                            <button
+                                type="button"
+                                onClick={closeInviteModal}
+                                disabled={inviteLoading}
+                                className="px-4 py-2 bg-primary-bg text-primary rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                id="onboarding-users-invite-send"
+                                type="button"
+                                onClick={handleInvite}
+                                disabled={
+                                    inviteLoading ||
+                                    !inviteEmail.trim() ||
+                                    !validateEmail(inviteEmail) ||
+                                    (inviteRole === "User" && !inviteBranch)
+                                }
+                                className="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
+                            >
+                                {inviteLoading ? "Sending..." : "Send Invite"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {editingUser && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-lg w-full max-w-md mx-4 p-6">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-1">Edit User</h3>
+                        <p className="text-sm text-gray-500 mb-5">Update the user's details below.</p>
+
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-gray-600">Email</label>
+                                <input
+                                    type="email"
+                                    value={editingUser.email}
+                                    disabled
+                                    className="border border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed rounded-md px-3 py-2 text-sm"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-gray-600">First Name</label>
+                                <input
+                                    type="text"
+                                    className="border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    value={editFirstName}
+                                    onChange={(e) => setEditFirstName(e.target.value)}
+                                    disabled={editLoading}
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-gray-600">Last Name</label>
+                                <input
+                                    type="text"
+                                    className="border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    value={editLastName}
+                                    onChange={(e) => setEditLastName(e.target.value)}
+                                    disabled={editLoading}
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-gray-600">Role</label>
+                                <select
+                                    className="border border-line rounded-md px-3 py-2 text-sm"
+                                    value={editRole}
+                                    onChange={(e) => { setEditRole(e.target.value); setEditBranch(""); }}
+                                    disabled={editLoading}
+                                >
+                                    <option value="User">User</option>
+                                    <option value="Manager">Manager</option>
+                                    <option value="Admin">Admin</option>
+                                </select>
+                            </div>
+
+                            {editRole === "User" && (
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-semibold text-gray-600">Branch</label>
+                                    <select
+                                        className="border border-line rounded-md px-3 py-2 text-sm"
+                                        value={editBranch}
+                                        onChange={(e) => setEditBranch(e.target.value)}
+                                        disabled={editLoading}
+                                    >
+                                        <option value="">Select branch</option>
+                                        {allBranches.map((name) => (
+                                            <option key={name} value={name}>{name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {editError && <p className="text-sm font-medium text-red-600">{editError}</p>}
+                        </div>
+
+                        <div className="flex gap-3 justify-end mt-6">
+                            <button
+                                type="button"
+                                onClick={closeEditUser}
+                                disabled={editLoading}
+                                className="px-4 py-2 bg-primary-bg text-primary rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveEdit}
+                                disabled={editLoading || !editFirstName.trim() || !editLastName.trim() || (editRole === "User" && !editBranch)}
+                                className="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
+                            >
+                                {editLoading ? "Saving..." : "Save Changes"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {confirmStatusUser && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-lg w-full max-w-md mx-4 p-6">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                            {confirmStatusUser.status ? "Deactivate User" : "Activate User"}
+                        </h3>
+                        <p className="text-sm text-gray-500 mb-5">
+                            {confirmStatusUser.status
+                                ? `${confirmStatusUser.first_name} ${confirmStatusUser.last_name} will immediately lose login access. Their account and data are kept.`
+                                : `${confirmStatusUser.first_name} ${confirmStatusUser.last_name} will regain login access.`}
+                        </p>
+
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                type="button"
+                                onClick={closeStatusConfirm}
+                                disabled={statusLoadingId === confirmStatusUser.user_id}
+                                className="px-4 py-2 bg-primary-bg text-primary rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmStatusChange}
+                                disabled={statusLoadingId === confirmStatusUser.user_id}
+                                className={`px-4 py-2 rounded-md text-sm font-semibold text-white transition-colors disabled:opacity-50 ${confirmStatusUser.status ? "bg-red-600 hover:bg-red-700" : "bg-primary hover:bg-[#5a0f66]"}`}
+                            >
+                                {statusLoadingId === confirmStatusUser.user_id
+                                    ? "Saving..."
+                                    : confirmStatusUser.status ? "Deactivate" : "Activate"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <PageLayout
+                title="Users"
+                description={refrigeratorOnly ? "Manage your team's roles and branch access." : undefined}
+                lucideIcon={Users}
+                patternBackground={refrigeratorOnly}
+                actions={
+                    <button
+                        id="onboarding-users-add-btn"
+                        type="button"
+                        onClick={() => setShowInviteModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
+                    >
+                        <UserPlus className="w-4 h-4" />
+                        Add User
+                    </button>
+                }
+            >
+                {/* Filters */}
+                <section id="onboarding-users-filters" className="bg-white border border-line rounded-lg p-5">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                            <h2 className="text-base font-semibold text-black">Filters</h2>
+                            <p className="text-xs text-gray-500">Filter users by role or branch.</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleReset}
+                            className="px-3 py-2 border border-line rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            Reset Filters
+                        </button>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                        <div id="onboarding-users-filter-role" className="flex flex-col gap-2">
                             <label className="text-xs font-semibold text-gray-600">Role</label>
                             <select
                                 className="border border-line rounded-md px-3 py-2 text-sm"
-                                value={inviteRole}
-                                onChange={(e) => { setInviteRole(e.target.value); setInviteBranch(""); }}
-                                disabled={inviteLoading}
+                                value={filters.role}
+                                onChange={(e) => setFilters((prev) => ({ ...prev, role: e.target.value }))}
                             >
-                                <option value="User">User</option>
-                                <option value="Manager">Manager</option>
-                                <option value="Admin">Admin</option>
+                                {roleOptions.map((role) => (
+                                    <option key={role} value={role}>{role}</option>
+                                ))}
                             </select>
                         </div>
 
-                        {inviteRole === "User" && (
-                            <div id="onboarding-users-invite-branch" className="flex flex-col gap-1.5">
-                                <label className="text-xs font-semibold text-gray-600">Branch</label>
-                                <select
-                                    className="border border-line rounded-md px-3 py-2 text-sm"
-                                    value={inviteBranch}
-                                    onChange={(e) => setInviteBranch(e.target.value)}
-                                    disabled={inviteLoading}
-                                >
-                                    <option value="">Select branch</option>
-                                    {allBranches.map((name) => (
-                                        <option key={name} value={name}>{name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
+                        <div id="onboarding-users-filter-branch" className="flex flex-col gap-2">
+                            <label className="text-xs font-semibold text-gray-600">Branch</label>
+                            <select
+                                className="border border-line rounded-md px-3 py-2 text-sm"
+                                value={filters.branch}
+                                onChange={(e) => setFilters((prev) => ({ ...prev, branch: e.target.value }))}
+                            >
+                                {branchOptions.map((name) => (
+                                    <option key={name} value={name}>{name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </section>
 
-                        {inviteStatus && (
-                            <p className={`text-sm font-medium ${inviteStatus.type === "success" ? "text-green-600" : "text-red-600"}`}>
-                                {inviteStatus.message}
+                {/* Results */}
+                <section id="onboarding-users-results" className="bg-white border border-line rounded-lg p-5">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                            <h2 className="text-base font-semibold text-black">Users</h2>
+                            <p className="text-xs text-gray-500">
+                                {loading
+                                    ? "Loading users..."
+                                    : `Showing ${filteredUsers.length} of ${users.length} users`}
                             </p>
-                        )}
+                        </div>
                     </div>
 
-                    <div id="onboarding-users-invite-actions" className="flex gap-3 justify-end mt-6">
-                        <button
-                            type="button"
-                            onClick={closeInviteModal}
-                            disabled={inviteLoading}
-                            className="px-4 py-2 bg-primary-bg text-primary rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            id="onboarding-users-invite-send"
-                            type="button"
-                            onClick={handleInvite}
-                            disabled={
-                                inviteLoading ||
-                                !inviteEmail.trim() ||
-                                !validateEmail(inviteEmail) ||
-                                (inviteRole === "User" && !inviteBranch)
-                            }
-                            className="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
-                        >
-                            {inviteLoading ? "Sending..." : "Send Invite"}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-        <PageLayout
-            title="Users"
-            description={refrigeratorOnly ? "Manage your team's roles and branch access." : undefined}
-            lucideIcon={Users}
-            patternBackground={refrigeratorOnly}
-            actions={
-                <button
-                    id="onboarding-users-add-btn"
-                    type="button"
-                    onClick={() => setShowInviteModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
-                >
-                    <UserPlus className="w-4 h-4" />
-                    Add User
-                </button>
-            }
-        >
-            {/* Filters */}
-            <section id="onboarding-users-filters" className="bg-white border border-line rounded-lg p-5">
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                    <div>
-                        <h2 className="text-base font-semibold text-black">Filters</h2>
-                        <p className="text-xs text-gray-500">Filter users by role or branch.</p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={handleReset}
-                        className="px-3 py-2 border border-line rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                        Reset Filters
-                    </button>
-                </div>
+                    {error && <div className="mt-4 text-sm text-red-500">{error}</div>}
 
-                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                    <div id="onboarding-users-filter-role" className="flex flex-col gap-2">
-                        <label className="text-xs font-semibold text-gray-600">Role</label>
-                        <select
-                            className="border border-line rounded-md px-3 py-2 text-sm"
-                            value={filters.role}
-                            onChange={(e) => setFilters((prev) => ({ ...prev, role: e.target.value }))}
-                        >
-                            {roleOptions.map((role) => (
-                                <option key={role} value={role}>{role}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div id="onboarding-users-filter-branch" className="flex flex-col gap-2">
-                        <label className="text-xs font-semibold text-gray-600">Branch</label>
-                        <select
-                            className="border border-line rounded-md px-3 py-2 text-sm"
-                            value={filters.branch}
-                            onChange={(e) => setFilters((prev) => ({ ...prev, branch: e.target.value }))}
-                        >
-                            {branchOptions.map((name) => (
-                                <option key={name} value={name}>{name}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-            </section>
-
-            {/* Results */}
-            <section id="onboarding-users-results" className="bg-white border border-line rounded-lg p-5">
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                    <div>
-                        <h2 className="text-base font-semibold text-black">Users</h2>
-                        <p className="text-xs text-gray-500">
-                            {loading
-                                ? "Loading users..."
-                                : `Showing ${filteredUsers.length} of ${users.length} users`}
-                        </p>
-                    </div>
-                </div>
-
-                {error && <div className="mt-4 text-sm text-red-500">{error}</div>}
-
-                <div id="onboarding-users-table" className="mt-4 overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                        <thead className="bg-surface">
-                            <tr>
-                                <th id="onboarding-users-col-name" className="px-4 py-3 text-left font-semibold text-primary">Name</th>
-                                <th id="onboarding-users-col-email" className="px-4 py-3 text-left font-semibold text-primary">Email</th>
-                                <th id="onboarding-users-col-role" className="px-4 py-3 text-left font-semibold text-primary">Role</th>
-                                <th id="onboarding-users-col-branch" className="px-4 py-3 text-left font-semibold text-primary">Branch</th>
-                                <th id="onboarding-users-col-status" className="px-4 py-3 text-left font-semibold text-primary">Status</th>
-                                <th id="onboarding-users-col-approved" className="px-4 py-3 text-left font-semibold text-primary">Approved</th>
-                                <th id="onboarding-users-col-lastlogin" className="px-4 py-3 text-left font-semibold text-primary">Last Login</th>
-                                <th id="onboarding-users-col-invite" className="px-4 py-3 text-left font-semibold text-primary">Invite</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading
-                                ? Array.from({ length: 6 }).map((_, i) => (
-                                    <tr key={i} className="border-b border-primary-bg bg-white">
-                                        {[120, 160, 80, 100, 70, 80, 110, 100].map((w, col) => (
-                                            <td key={col} className="px-4 py-3">
-                                                <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
-                                                    <div
-                                                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
-                                                        style={{ width: "50%", animationDelay: `${i * 0.08}s` }}
-                                                    />
+                    <div id="onboarding-users-table" ref={tableContainerRef} className="mt-4 overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-surface">
+                                <tr>
+                                    <th id="onboarding-users-col-name" className="px-4 py-3 text-left font-semibold text-primary">Name</th>
+                                    <th id="onboarding-users-col-email" className="px-4 py-3 text-left font-semibold text-primary">Email</th>
+                                    <th id="onboarding-users-col-role" className="px-4 py-3 text-left font-semibold text-primary">Role</th>
+                                    <th id="onboarding-users-col-branch" className="px-4 py-3 text-left font-semibold text-primary">Branch</th>
+                                    <th id="onboarding-users-col-status" className="px-4 py-3 text-left font-semibold text-primary">Status</th>
+                                    <th id="onboarding-users-col-approved" className="px-4 py-3 text-left font-semibold text-primary">Approved</th>
+                                    <th id="onboarding-users-col-lastlogin" className="px-4 py-3 text-left font-semibold text-primary">Last Login</th>
+                                    <th id="onboarding-users-col-invite" className="px-4 py-3 text-left font-semibold text-primary">Invite</th>
+                                    <th id="onboarding-users-col-actions" className="px-4 py-3 text-left font-semibold text-primary sticky right-0 z-10 bg-surface border-l border-primary-bg">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loading
+                                    ? Array.from({ length: 6 }).map((_, i) => (
+                                        <tr key={i} className="border-b border-primary-bg bg-white">
+                                            {[120, 160, 80, 100, 70, 80, 110, 100, 60].map((w, col) => (
+                                                <td key={col} className="px-4 py-3">
+                                                    <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
+                                                        <div
+                                                            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                                            style={{ width: "50%", animationDelay: `${i * 0.08}s` }}
+                                                        />
+                                                    </div>
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))
+                                    : filteredUsers.map((user) => (
+                                        <tr key={user.user_id} className="border-b border-primary-bg">
+                                            <td className="px-4 py-3 text-gray-700">
+                                                {user.invite_pending ? (
+                                                    <span className="text-gray-400 italic">Pending…</span>
+                                                ) : (
+                                                    `${user.first_name} ${user.last_name}`
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-700">{user.email}</td>
+                                            <td className="px-4 py-3 text-gray-700">{user.role}</td>
+                                            <td className="px-4 py-3 text-gray-700">{user.branch_name ?? "-"}</td>
+                                            <td className="px-4 py-3">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${user.status ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                                                    {user.status ? "Active" : "Inactive"}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${user.approved_status === "approved" ? "bg-green-100 text-green-700" :
+                                                        user.approved_status === "rejected" ? "bg-red-100 text-red-600" :
+                                                            "bg-amber-100 text-amber-700"
+                                                    }`}>
+                                                    {user.approved_status.charAt(0).toUpperCase() + user.approved_status.slice(1)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-700 text-xs whitespace-nowrap">
+                                                {user.last_login
+                                                    ? new Date(user.last_login).toLocaleString("en-GB", { timeZone: "UTC", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                                                    : <span className="text-gray-400">Never</span>}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {user.invite_pending ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleResendInvite(user.user_id)}
+                                                        disabled={resendingId === user.user_id}
+                                                        className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                                                    >
+                                                        {resendingId === user.user_id ? "Sending…" : "Resend Invite"}
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">—</span>
+                                                )}
+                                            </td>
+                                            <td className={`px-4 py-3 sticky right-0 bg-white border-l border-primary-bg ${openMenuId === user.user_id ? "z-20" : "z-10"}`}>
+                                                <div className="actions-menu relative inline-block">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => toggleActionsMenu(user.user_id, e)}
+                                                        className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
+                                                        aria-label="Row actions"
+                                                    >
+                                                        <MoreVertical className="w-4 h-4" />
+                                                    </button>
+                                                    {openMenuId === user.user_id && (
+                                                        <div className={`absolute right-0 z-20 w-44 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden ${menuDirection === "up" ? "bottom-full mb-1" : "top-full mt-1"}`}>
+                                                            {user.user_id !== currentUser?.user_id && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openEditUser(user)}
+                                                                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                                                >
+                                                                    Edit User
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleResetPassword(user)}
+                                                                disabled={resettingId === user.user_id}
+                                                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                                            >
+                                                                {resettingId === user.user_id ? "Sending..." : "Reset Password"}
+                                                            </button>
+                                                            {user.user_id !== currentUser?.user_id && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => requestStatusChange(user)}
+                                                                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${user.status ? "text-red-600" : "text-green-700"}`}
+                                                                >
+                                                                    {user.status ? "Deactivate User" : "Activate User"}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </td>
-                                        ))}
-                                    </tr>
-                                ))
-                                : filteredUsers.map((user) => (
-                                    <tr key={user.user_id} className="border-b border-primary-bg">
-                                        <td className="px-4 py-3 text-gray-700">
-                                            {user.invite_pending ? (
-                                                <span className="text-gray-400 italic">Pending…</span>
-                                            ) : (
-                                                `${user.first_name} ${user.last_name}`
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-700">{user.email}</td>
-                                        <td className="px-4 py-3 text-gray-700">{user.role}</td>
-                                        <td className="px-4 py-3 text-gray-700">{user.branch_name ?? "-"}</td>
-                                        <td className="px-4 py-3">
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${user.status ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                                                {user.status ? "Active" : "Inactive"}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                user.approved_status === "approved" ? "bg-green-100 text-green-700" :
-                                                user.approved_status === "rejected" ? "bg-red-100 text-red-600" :
-                                                "bg-amber-100 text-amber-700"
-                                            }`}>
-                                                {user.approved_status.charAt(0).toUpperCase() + user.approved_status.slice(1)}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-700 text-xs whitespace-nowrap">
-                                            {user.last_login
-                                                ? new Date(user.last_login).toLocaleString("en-GB", { timeZone: "UTC", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
-                                                : <span className="text-gray-400">Never</span>}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {user.invite_pending ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleResendInvite(user.user_id)}
-                                                    disabled={resendingId === user.user_id}
-                                                    className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
-                                                >
-                                                    {resendingId === user.user_id ? "Sending…" : "Resend Invite"}
-                                                </button>
-                                            ) : (
-                                                <span className="text-xs text-gray-400">—</span>
-                                            )}
+                                        </tr>
+                                    ))}
+                                {!loading && filteredUsers.length === 0 && (
+                                    <tr>
+                                        <td colSpan={9} className="px-4 py-6 text-center text-gray-400">
+                                            No users found.
                                         </td>
                                     </tr>
-                                ))}
-                            {!loading && filteredUsers.length === 0 && (
-                                <tr>
-                                    <td colSpan={8} className="px-4 py-6 text-center text-gray-400">
-                                        No users found.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        </PageLayout>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </PageLayout>
         </>
     );
 }
