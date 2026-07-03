@@ -21,6 +21,20 @@ COPY . .
 # Build the application
 RUN npm run build
 
+# Dev stage - live reload for local development via docker compose (bind-mounts source, runs vite dev server)
+FROM node:20-slim AS dev
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev"]
+
 # Production stage
 FROM node:20-slim
 

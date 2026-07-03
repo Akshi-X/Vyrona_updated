@@ -132,6 +132,7 @@ services:
     volumes:
       - ./backend/app:/app/app
       - ./backend/static:/app/static
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     networks:
       - mgscale-network
 
@@ -139,12 +140,16 @@ services:
     build:
       context: ./FrontEnd
       dockerfile: Dockerfile
-      args:
-        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
-        - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}
+      target: dev
     container_name: mgscale-frontend
     ports:
-      - "5173:80"
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
+      - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}
+    volumes:
+      - ./FrontEnd:/app
+      - /app/node_modules
     depends_on:
       - backend
     networks:
