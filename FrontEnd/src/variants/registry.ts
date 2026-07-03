@@ -40,18 +40,18 @@ import type { ComponentRegistry, LazyComponentLoader } from '../types/uiVariant'
  * Vite's glob import to discover all variant components.
  * This creates a map of file paths to dynamic import functions.
  *
- * Pattern: ./hospital-{number}/{ComponentName}.tsx
+ * Pattern: ./hospital-{number}/{ComponentName}.tsx or ./named-folders/{ComponentName}.tsx
  * Excludes: shared folder, test files, index files
  */
 const variantModules = import.meta.glob<{ default: React.ComponentType<unknown> }>(
-  './hospital-*/[A-Z]*.tsx',
+  './*/[A-Z]*.tsx',
   { eager: false }
 );
 
 /**
  * Parse a variant module path to extract hospital ID and component name.
  *
- * @param path - Module path like "./hospital-2/Dashboard.tsx"
+ * @param path - Module path like "./hospital-2/Dashboard.tsx" or "./cryocan-and-refrigerator-hospital/Dashboard.tsx"
  * @returns Parsed info or null if path doesn't match expected pattern
  */
 function parseVariantPath(path: string): {
@@ -60,24 +60,48 @@ function parseVariantPath(path: string): {
   componentKey: string;
 } | null {
   // Match pattern: ./hospital-{number}/{ComponentName}.tsx
-  const match = path.match(/^\.\/hospital-(\d+)\/([A-Z][a-zA-Z0-9]*)\.tsx$/);
+  const digitMatch = path.match(/^\.\/hospital-(\d+)\/([A-Z][a-zA-Z0-9]*)\.tsx$/);
 
-  if (!match) {
-    return null;
+  if (digitMatch) {
+    const hospitalId = parseInt(digitMatch[1], 10);
+    const componentName = digitMatch[2];
+
+    // Generate component key: {ComponentName}Hospital{id}
+    // e.g., "Dashboard" + "Hospital" + "2" = "DashboardHospital2"
+    const componentKey = `${componentName}Hospital${hospitalId}`;
+
+    return {
+      hospitalId,
+      componentName,
+      componentKey,
+    };
   }
 
-  const hospitalId = parseInt(match[1], 10);
-  const componentName = match[2];
+  // Match pattern: ./named-folder-slug/{ComponentName}.tsx
+  const namedMatch = path.match(/^\.\/([a-z][a-z0-9-]*)\/([A-Z][a-zA-Z0-9]*)\.tsx$/);
 
-  // Generate component key: {ComponentName}Hospital{id}
-  // e.g., "Dashboard" + "Hospital" + "2" = "DashboardHospital2"
-  const componentKey = `${componentName}Hospital${hospitalId}`;
+  if (namedMatch) {
+    const folderSlug = namedMatch[1]; // e.g., "cryocan-and-refrigerator-hospital"
+    const componentName = namedMatch[2]; // e.g., "Dashboard"
 
-  return {
-    hospitalId,
-    componentName,
-    componentKey,
-  };
+    // Convert slug to PascalCase, filtering out "and"
+    // "cryocan-and-refrigerator-hospital" → "CryocanRefrigeratorHospital"
+    const folderPascal = folderSlug
+      .split('-')
+      .filter((part) => part !== 'and')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join('');
+
+    const componentKey = `${folderPascal}${componentName}`;
+
+    return {
+      hospitalId: -1, // Named variants don't have a numeric hospital ID
+      componentName,
+      componentKey,
+    };
+  }
+
+  return null;
 }
 
 // ============================================================
