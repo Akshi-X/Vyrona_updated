@@ -28,6 +28,7 @@ import type { UIVariantMap, UIVariantMapping } from "../types/uiVariant";
 import { uiVariantService } from "../services/uiVariantService";
 import { useAuth } from "./AuthContext";
 import { FullPageLoader } from "../components/FullPageLoader";
+import { authUtils } from "../utils/auth";
 
 interface UIVariantContextType {
     /** Map of route_path → component_key */
@@ -85,7 +86,7 @@ export const UIVariantProvider: React.FC<UIVariantProviderProps> = ({
     const { isAuthenticated, token } = useAuth();
 
     const [variantMap, setVariantMap] = useState<UIVariantMap>(new Map());
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(() => !!authUtils.getToken());
     const [hasError, setHasError] = useState(false);
 
     /**

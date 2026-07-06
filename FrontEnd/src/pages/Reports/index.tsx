@@ -9,6 +9,7 @@ import { userService } from "../../services/userService";
 import { shipmentService } from "../../services/shipmentService";
 import MultiSelectDropdown from "../../components/MultiSelectDropdown";
 import { FilterSelect } from "../../components/FilterPanel";
+import { useHasVariant } from "../../components/VariantRoute";
 import {
     ivfReportsService,
     type CriticalAlertReportRow,
@@ -27,6 +28,14 @@ const REPORT_TYPES = [
     { value: "activity-logs", label: "Activity Logs" },
     { value: "embryo-tracking", label: "Embryo Tracking Report" },
 ] as const;
+
+// Refrigerator-only hospitals (gated by the "/reports#refrigerator-only" variant flag)
+// only see refrigerator-relevant reports.
+const REFRIGERATOR_REPORT_VALUES: string[] = [
+    "monthly-summary",
+    "critical-alerts",
+    "activity-logs",
+];
 
 type ReportType = (typeof REPORT_TYPES)[number]["value"];
 
@@ -455,6 +464,10 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
 
 export default function ReportsPage() {
     const { isAuthenticated, userRole } = useAuth();
+    const refrigeratorOnly = useHasVariant("/reports#refrigerator-only");
+    const reportOptions = refrigeratorOnly
+        ? REPORT_TYPES.filter((r) => REFRIGERATOR_REPORT_VALUES.includes(r.value))
+        : REPORT_TYPES;
     const today = new Date();
     const startOfMonth = new Date(
         today.getFullYear(),
@@ -1057,7 +1070,7 @@ export default function ReportsPage() {
     }
 
     return (
-                <PageLayout title="Reports" lucideIcon={Download}>
+                <PageLayout title="Reports" description={refrigeratorOnly ? "Generate monthly summary, critical alert and activity reports." : undefined} lucideIcon={Download} patternBackground={refrigeratorOnly}>
 
                     <section id="onboarding-reports-filters" className="bg-white border border-line rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -1098,7 +1111,7 @@ export default function ReportsPage() {
                                     onChange={(val) =>
                                         setFilters((prev) => ({ ...prev, reportType: val as ReportType }))
                                     }
-                                    options={REPORT_TYPES.map((r) => ({ label: r.label, value: r.value }))}
+                                    options={reportOptions.map((r) => ({ label: r.label, value: r.value }))}
                                 />
                             </div>
 

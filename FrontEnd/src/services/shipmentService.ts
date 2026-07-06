@@ -377,7 +377,9 @@ class ShipmentService extends BaseApiService {
         refrigerator_code: string | null;
         external_id: string | null;
         type: string | null;
+        zone_count: number | null;
         updated_at: string | null;
+        zones: Array<{ zone_id: string; zone_name: string }>;
       }>;
     }>;
     total: number;

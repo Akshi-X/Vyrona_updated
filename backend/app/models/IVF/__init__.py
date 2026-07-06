@@ -4,6 +4,7 @@ from .hospital_branch_model import HospitalBranch
 from .tank_model import Tank
 from .incubator_model import Incubator
 from .refrigerator_model import Refrigerator
+from .refrigerator_device_model import RefrigeratorDevice
 from .canister_ln2_log_model import CanisterLn2Log
 from .ivf_telemetry_data_model import IVFTelemetryData
 from .ivf_quality_log_model import IVFQualityLog

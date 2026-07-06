@@ -40,18 +40,19 @@ class KPI_NAMES:
     IVF_TIVE_BATTERY_PERCENTAGE = "tive_battery_percentage"
     IVF_LN2_LID_STATE = "ln2_lid_state"
 
-    REFRIGERATOR_FREEZER_TEMP = "freezer_temperature"
-    REFRIGERATOR_FRIDGE_TEMP = "refrigerator_temperature"
+    REFRIGERATOR_HUMIDITY = "refrigerator_humidity"
+    REFRIGERATOR_TEMP = "refrigerator_temp"
 
     def get_unit_for_kpi(kpi_name):
         """Return the unit for a given KPI name."""
         if kpi_name in [
             KPI_NAMES.IVF_TEMPERATURE_INTERNAL,
             KPI_NAMES.IVF_TEMPERATURE_EXTERNAL,
-            KPI_NAMES.REFRIGERATOR_FREEZER_TEMP,
-            KPI_NAMES.REFRIGERATOR_FRIDGE_TEMP,
+            KPI_NAMES.REFRIGERATOR_TEMP,
         ]:
             return "°C"
+        elif kpi_name in [KPI_NAMES.REFRIGERATOR_HUMIDITY]:
+            return "%"
         elif kpi_name in [KPI_NAMES.IVF_LN2_LEVEL]:
             return "Kg"
         elif kpi_name in [KPI_NAMES.IVF_LN2_EVAPORATION_RATE]:

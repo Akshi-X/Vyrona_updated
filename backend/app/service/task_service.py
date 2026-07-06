@@ -691,6 +691,46 @@ def get_tasks_by_refrigerator(
         raise DatabaseQueryException(operation="get refrigerator tasks", reason=str(e))
 
 
+def get_hospital_refrigerator_tasks(
+    current_user: User,
+    db: Session,
+    *,
+    status: Optional[TaskStatus] = None,
+) -> PatientTaskListResponse:
+    """
+    All refrigerator tasks for the current user's hospital (refrigerator_id IS NOT NULL).
+    Unlike get_all_tasks (the user's created/assigned tasks), this returns hospital-wide
+    refrigerator tasks so the dashboard list matches the refrigerator task count.
+    """
+    try:
+        query = (
+            db.query(Tasks)
+            .options(
+                selectinload(Tasks.assignee),
+                selectinload(Tasks.created_by),
+            )
+            .join(Refrigerator, Refrigerator.refrigerator_id == Tasks.refrigerator_id)
+            .filter(Tasks.refrigerator_id.isnot(None))
+        )
+        if current_user.hospital_id:
+            query = query.filter(Refrigerator.hospital_id == current_user.hospital_id)
+        if status:
+            query = query.filter(Tasks.status == status)
+
+        tasks = query.order_by(Tasks.created_at.desc()).all()
+        task_responses = [_build_task_response(task, current_user, db) for task in tasks]
+
+        return PatientTaskListResponse(
+            total=len(task_responses),
+            page=1,
+            page_size=max(len(task_responses), 1),
+            has_next=False,
+            tasks=task_responses,
+        )
+    except Exception as e:
+        raise DatabaseQueryException(operation="get hospital refrigerator tasks", reason=str(e))
+
+
 def get_task_by_id(task_id: int, current_user: User, db: Session) -> TaskResponse:
     """
     Get a specific task by ID.

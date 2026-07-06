@@ -17,7 +17,6 @@ import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg"
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
 import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
-import UserIcon from "../assets/DashBoardIcons/User.svg";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,7 +105,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const isOnboardingCtx = useOnboardingMode();
     const isOnboarding = isOnboardingCtx || location.pathname.startsWith("/onboarding");
 
-    const [sidebarHeight, setSidebarHeight] = useState(window.innerHeight);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [dashboardOpen, setDashboardOpen] = useState(false);
     const [alertConfigOpen, setAlertConfigOpen] = useState(false);
@@ -120,12 +118,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     // Prefix path with /onboarding when in onboarding mode
     const resolvePath = (path: string) =>
         isOnboarding ? `/onboarding${path}` : path;
-
-    useEffect(() => {
-        const handleResize = () => setSidebarHeight(window.innerHeight);
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-    }, []);
 
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -206,10 +198,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             />
 
             <aside
-                className={`fixed left-0 top-0 w-60 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out ${
+                className={`fixed md:static left-0 top-0 w-60 h-screen md:h-auto shrink-0 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out ${
                     isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
                 }`}
-                style={{ height: sidebarHeight }}
             >
                 {/* Decorative background */}
                 <div className="absolute left-0 w-full pointer-events-none bottom-[8%] h-[50%] overflow-hidden opacity-30">
@@ -375,7 +366,14 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     onClick={() => { navigate(resolvePath("/user-profile")); closeMobile(); }}
                     className="group w-full flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 flex-shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
                 >
-                    <img src={UserIcon} alt="" className="w-5 h-5 flex-shrink-0" />
+                    <span className="w-6 h-6 flex-shrink-0 rounded-full bg-white/20 text-white text-[10px] font-bold flex items-center justify-center uppercase">
+                        {(profileName || "User")
+                            .split(/\s+/)
+                            .filter(Boolean)
+                            .slice(0, 2)
+                            .map((s) => s[0])
+                            .join("") || "U"}
+                    </span>
                     <div className="flex-1 min-w-0 flex flex-col items-start">
                         <span className="font-semibold text-xs md:text-sm text-white truncate w-full">
                             {profileName || "\u00A0"}

@@ -60,9 +60,10 @@ from app.service.quality_service import (
     append_tank_kpi_snapshot_to_db,
     push_incubator_kpi_to_redis,
     push_ivf_quality_to_redis,
+    push_refrigerator_kpi_to_redis,
     push_tank_kpi_to_redis,
 )
-from app.service.redis_service import get_incubator_kpi_pubsub, get_ln2_pubsub, get_redis, get_tank_kpi_pubsub
+from app.service.redis_service import get_incubator_kpi_pubsub, get_ln2_pubsub, get_redis, get_refrigerator_kpi_pubsub, get_tank_kpi_pubsub
 from app.utils.ivf_helpers import get_branch_filter_info
 from app.utils.user_helpers import is_hospital_department, is_specific_department
 from app.utils.websocket_manager import ConnectionManager
@@ -679,6 +680,9 @@ def _kpi_config_metadata(row: KpiConfig) -> dict:
         "tank_id": row.tank_id,
         "incubator_id": row.incubator_id,
         "chamber_id": row.chamber_id,
+        "refrigerator_id": row.refrigerator_id,
+        "zone_id": row.zone_id,
+        "zone_name": row.zone_name,
         "kpi_name": row.kpi_name,
         "alert_name": row.alert_name,
         "min": float(row.min) if row.min is not None else None,
@@ -780,6 +784,7 @@ def list_kpi_config(
     incubator_id: Optional[int] = Query(None, description="Incubator ID"),
     chamber_id: Optional[str] = Query(None, description="Chamber ID filter (incubator only)"),
     refrigerator_id: Optional[int] = Query(None, description="Refrigerator ID"),
+    zone_id: Optional[str] = Query(None, description="Zone ID filter (refrigerator only). Send 'null' to filter zone_id IS NULL."),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -795,11 +800,12 @@ def list_kpi_config(
         ).first()
         if not refrigerator:
             raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
-        q = db.query(KpiConfig).filter(
-            KpiConfig.refrigerator_id == refrigerator_id,
-            KpiConfig.zone_id.is_(None),
-        )
-        rows = q.order_by(KpiConfig.kpi_name, KpiConfig.alert_name).all()
+        q = db.query(KpiConfig).filter(KpiConfig.refrigerator_id == refrigerator_id)
+        if zone_id == "null":
+            q = q.filter(KpiConfig.zone_id.is_(None))
+        elif zone_id:
+            q = q.filter(KpiConfig.zone_id == zone_id)
+        rows = q.order_by(KpiConfig.zone_id, KpiConfig.kpi_name, KpiConfig.alert_name).all()
         return {
             "refrigerator_id": refrigerator_id,
             "refrigerator_code": refrigerator.refrigerator_code or "",
@@ -1049,11 +1055,14 @@ def bulk_upsert_kpi_config_for_refrigerator(
     body: dict = Body(...),
 ):
     """
-    Bulk upsert KPI config for a single refrigerator.
-    Body: refrigerator_id (int), configs (list).
+    Bulk upsert KPI config for a single refrigerator zone.
+    Body: refrigerator_id (int), zone_id (str | null), zone_name (str | null), configs (list).
+    zone_id=null targets the zone-less legacy config.
     """
     _require_alert_setting_role(current_user)
     refrigerator_id = body.get("refrigerator_id")
+    zone_id = body.get("zone_id")
+    zone_name = body.get("zone_name")
     configs = body.get("configs")
     if not refrigerator_id:
         raise HTTPException(status_code=400, detail="refrigerator_id is required")
@@ -1063,6 +1072,8 @@ def bulk_upsert_kpi_config_for_refrigerator(
         refrigerator_id = int(refrigerator_id)
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="refrigerator_id must be an integer")
+    if zone_id is not None and not isinstance(zone_id, str):
+        raise HTTPException(status_code=400, detail="zone_id must be a string or null")
 
     refrigerator = db.query(Refrigerator).filter(
         Refrigerator.refrigerator_id == refrigerator_id,
@@ -1077,6 +1088,8 @@ def bulk_upsert_kpi_config_for_refrigerator(
         configs=configs,
         hospital_id=refrigerator.hospital_id,
         branch_id=refrigerator.branch_id,
+        zone_id=zone_id,
+        zone_name=zone_name,
     )
     db.commit()
 
@@ -1087,6 +1100,8 @@ def bulk_upsert_kpi_config_for_refrigerator(
         target=build_target("refrigerator", str(refrigerator_id)),
         metadata={
             "refrigerator_id": refrigerator_id,
+            "zone_id": zone_id,
+            "zone_name": zone_name,
             "updated": result.get("updated"),
             "created": result.get("created"),
         },
@@ -2108,8 +2123,8 @@ _CHAMBER_HEALTH_KPIS = {
 }
 
 _REFRIGERATOR_HEALTH_KPIS = {
-    "freezer_temperature": ("Freezer Temperature", "°C"),
-    "refrigerator_temperature": ("Refrigerator Temperature", "°C"),
+    "refrigerator_humidity": ("Humidity", "%"),
+    "refrigerator_temp": ("Temperature", "°C"),
 }
 
 
@@ -2173,13 +2188,55 @@ def get_incubator_chamber_latest(
     return result
 
 
-@router.get("/refrigerators/{refrigerator_id}/zone-latest")
-def get_refrigerator_zone_latest(
+@router.get("/refrigerators/{refrigerator_id}/zones")
+def get_refrigerator_zones(
     refrigerator_id: int = Path(..., description="Refrigerator ID"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Return the single latest reading for freezer_temperature and refrigerator_temperature."""
+    """Return the list of named zones defined for a refrigerator (derived from kpi_config)."""
+    refrigerator = (
+        db.query(Refrigerator)
+        .filter(
+            Refrigerator.refrigerator_id == refrigerator_id,
+            Refrigerator.hospital_id == current_user.hospital_id,
+        )
+        .first()
+    )
+    if not refrigerator:
+        raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
+    quality_service = QualityService(db)
+    return quality_service.get_refrigerator_zones(refrigerator_id)
+
+
+@router.get("/refrigerators/{refrigerator_id}/kpi-config")
+def get_refrigerator_kpi_config(
+    refrigerator_id: int = Path(..., description="Refrigerator ID"),
+    zone_id: Optional[str] = Query(None, description="Zone ID (e.g. 'fridge', 'freezer')"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI limits config for a refrigerator (optionally scoped to a zone)."""
+    refrigerator = db.query(Refrigerator).filter(
+        Refrigerator.refrigerator_id == refrigerator_id,
+        Refrigerator.hospital_id == current_user.hospital_id,
+    ).first()
+    if not refrigerator:
+        raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
+    quality_service = QualityService(db)
+    return quality_service.get_refrigerator_kpi_config(
+        refrigerator_id, refrigerator.refrigerator_code or f"R{refrigerator_id}", zone_id
+    )
+
+
+@router.get("/refrigerators/{refrigerator_id}/zone-latest")
+def get_refrigerator_zone_latest(
+    refrigerator_id: int = Path(..., description="Refrigerator ID"),
+    zone_id: Optional[str] = Query(None, description="Zone ID to scope to a specific zone"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the latest reading per KPI for a refrigerator. Optionally scoped to a zone."""
     refrigerator = (
         db.query(Refrigerator)
         .filter(
@@ -2191,40 +2248,40 @@ def get_refrigerator_zone_latest(
     if not refrigerator:
         raise HTTPException(status_code=404, detail=f"Refrigerator '{refrigerator_id}' not found")
 
-    from sqlalchemy import func as sa_func
+    # Step 1: Get kpi_config IDs for this refrigerator (and zone if provided)
+    config_q = db.query(KpiConfig).filter(KpiConfig.refrigerator_id == refrigerator_id)
+    if zone_id is not None:
+        config_q = config_q.filter(KpiConfig.zone_id == zone_id)
+    configs = config_q.all()
 
-    subq = (
-        db.query(
-            KpiConfig.kpi_name,
-            Readings.kpi_value,
-            KpiConfig.unit,
-            sa_func.row_number()
-            .over(
-                partition_by=KpiConfig.kpi_name,
-                order_by=Readings.timestamp.desc(),
-            )
-            .label("rn"),
-        )
-        .join(Readings, Readings.kpi_config_id == KpiConfig.id)
-        .filter(
-            Readings.refrigerator_id == refrigerator_id,
-            KpiConfig.kpi_name.in_(list(_REFRIGERATOR_HEALTH_KPIS.keys())),
-        )
-        .subquery()
-    )
-
-    rows = db.query(subq.c.kpi_name, subq.c.kpi_value, subq.c.unit).filter(subq.c.rn == 1).all()
-
+    # Step 2: For each config, get the latest reading by kpi_config_id
     result = []
-    for kpi_name, default_label_unit in _REFRIGERATOR_HEALTH_KPIS.items():
-        default_label, default_unit = default_label_unit
-        match = next((r for r in rows if r.kpi_name == kpi_name), None)
+    for config in configs:
+        reading = (
+            db.query(Readings)
+            .filter(Readings.kpi_config_id == config.id)
+            .order_by(Readings.timestamp.desc())
+            .first()
+        )
         result.append({
-            "kpi_name": kpi_name,
-            "label": default_label,
-            "value": float(match.kpi_value) if match else None,
-            "unit": (match.unit if match and match.unit else default_unit),
+            "kpi_name": config.kpi_name,
+            "label": config.kpi_name,
+            "value": float(reading.kpi_value) if reading and reading.kpi_value is not None else None,
+            "unit": config.unit or "°C",
+            "zone_id": zone_id,
+            "timestamp": reading.timestamp.isoformat() if reading and reading.timestamp else None,
         })
+
+    if not result:
+        for kpi_name, default_label_unit in _REFRIGERATOR_HEALTH_KPIS.items():
+            default_label, default_unit = default_label_unit
+            result.append({
+                "kpi_name": kpi_name,
+                "label": default_label,
+                "value": None,
+                "unit": default_unit,
+                "zone_id": zone_id,
+            })
 
     return result
 
@@ -2232,14 +2289,15 @@ def get_refrigerator_zone_latest(
 @router.get("/refrigerators/{refrigerator_id}/kpi-history")
 def get_refrigerator_kpi_history(
     refrigerator_id: int = Path(..., description="Refrigerator ID"),
+    zone_id: Optional[str] = Query(None, description="Zone ID to scope history to a specific zone"),
     duration_minutes: Optional[int] = Query(
         None,
-        description="LIVE=omit. Static: 60=1H, 1440=24H, 10080=7D.",
+        description="LIVE=omit. Static: 60=1H (1min buckets), 1440=24H (20min buckets), 10080=7D (3h buckets).",
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get KPI history for a refrigerator (freezer_temperature + refrigerator_temperature)."""
+    """Get KPI history for a refrigerator zone. Same time-range semantics as incubator endpoint."""
     refrigerator = db.query(Refrigerator).filter(
         Refrigerator.refrigerator_id == refrigerator_id,
         Refrigerator.hospital_id == current_user.hospital_id,
@@ -2255,29 +2313,60 @@ def get_refrigerator_kpi_history(
         if duration_minutes
         else None
     )
-
     if duration_minutes is not None and duration_minutes > 0:
-        raw = quality_service.get_readings_per_kpi_since_refrigerator(refrigerator_id, since)
+        per_kpi = quality_service.get_readings_per_kpi_since_refrigerator(refrigerator_id, since, zone_id) or {}
     else:
-        raw = quality_service.get_last_n_readings_per_kpi_refrigerator(refrigerator_id, DEFAULT_LIVE_READINGS_CAP)
+        per_kpi = quality_service.get_last_n_readings_per_kpi_refrigerator(
+            refrigerator_id, DEFAULT_LIVE_READINGS_CAP, zone_id
+        ) or {}
+    aggregated_order_asc = False
 
     kpi_series: dict = {}
-    for item in (raw or {}).get("kpis") or []:
+    for item in per_kpi.get("kpis") or []:
         name = (item.get("name") or "").strip()
         if not name:
             continue
-        kpi_series.setdefault(name, []).append({
-            "timestamp": item.get("timestamp"),
-            "value": item.get("value"),
-            "unit": item.get("unit") or "",
-        })
+        kpi_series.setdefault(name, []).append(
+            {
+                "timestamp": item.get("timestamp"),
+                "value": item.get("value"),
+                "avg": item.get("avg"),
+                "min": item.get("min"),
+                "max": item.get("max"),
+                "count": item.get("count"),
+                "unit": item.get("unit") or "",
+            }
+        )
 
-    for name in list(kpi_series.keys()):
-        kpi_series[name].reverse()
+    if not aggregated_order_asc:
+        for name in list(kpi_series.keys()):
+            kpi_series[name].reverse()
+
+    configs = db.query(KpiConfig).filter(
+        KpiConfig.refrigerator_id == refrigerator_id,
+    ).all()
+    if zone_id:
+        configs = [c for c in configs if c.zone_id == zone_id]
+
+    kpi_configs_out = [
+        {
+            "id": c.id,
+            "kpi_name": c.kpi_name,
+            "alert_name": c.alert_name,
+            "min": float(c.min) if c.min is not None else None,
+            "max": float(c.max) if c.max is not None else None,
+            "unit": c.unit or "",
+            "zone_id": c.zone_id,
+            "zone_name": c.zone_name,
+        }
+        for c in configs
+    ]
 
     return {
         "refrigerator_id": refrigerator_id,
         "refrigerator_code": refrigerator_code,
+        "zone_id": zone_id,
+        "kpi_configs": kpi_configs_out,
         "kpi_series": kpi_series,
     }
 
@@ -2510,3 +2599,196 @@ async def incubator_kpi_websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"Incubator KPI WebSocket error: {e}")
         incubator_kpi_manager.disconnect_by_websocket(websocket)
+
+
+# ===========================================================================
+# Refrigerator KPI REST WebSocket
+# ===========================================================================
+
+refrigerator_kpi_manager = ConnectionManager()
+
+
+async def refrigerator_kpi_redis_listener():
+    """Listen for refrigerator KPI readings from Redis and broadcast to WS clients."""
+    loop = asyncio.get_event_loop()
+    pubsub = None
+    while True:
+        try:
+            if pubsub is None:
+                try:
+                    pubsub = get_refrigerator_kpi_pubsub()
+                    logger.info("Refrigerator KPI Redis listener started")
+                except Exception as e:
+                    logger.error(f"Error connecting to refrigerator KPI Redis: {e}. Retrying in 5s...")
+                    await asyncio.sleep(5)
+                    continue
+            message = await loop.run_in_executor(
+                None,
+                lambda: pubsub.get_message(timeout=1.0, ignore_subscribe_messages=True),
+            )
+            if message and message.get("type") == "message":
+                try:
+                    raw = message.get("data")
+                    if isinstance(raw, bytes):
+                        raw = raw.decode("utf-8")
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict) and "data" in parsed and isinstance(parsed.get("data"), dict):
+                        payload = parsed["data"]
+                    else:
+                        payload = parsed
+                    await refrigerator_kpi_manager.broadcast_refrigerator(payload)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse refrigerator KPI message: {e}")
+                except Exception as e:
+                    logger.error(f"Error broadcasting refrigerator KPI message: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Error in refrigerator_kpi_redis_listener: {e}")
+            pubsub = None
+            await asyncio.sleep(5)
+
+
+@router.websocket("/refrigerator-kpi-ws")
+async def refrigerator_kpi_websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket for Refrigerator KPI Quality Tracking live graph.
+    Query: ?token=<jwt>&branch_id_override=<id> (optional, Manager only).
+    Send JSON: { "refrigerator_id": 1, "zone_id": "fridge", "live": true } to subscribe.
+    Receives type "refrigerator_kpi" messages for that refrigerator/zone.
+    """
+    connection_id = None
+    user_id = None
+    branch_id = None
+    role = None
+
+    try:
+        query_params = dict(websocket.query_params)
+        token = query_params.get("token")
+        if not token:
+            await websocket.close(code=4401)
+            return
+
+        branch_id_override = None
+        if query_params.get("branch_id_override"):
+            try:
+                branch_id_override = int(query_params["branch_id_override"])
+            except (ValueError, TypeError):
+                pass
+
+        try:
+            from app.auth.auth import verify_websocket_token
+            auth_info = verify_websocket_token(token)
+            user_id = auth_info["user_id"]
+        except InvalidTokenException as e:
+            logger.warning(f"Refrigerator KPI WebSocket rejected: invalid token - {e}")
+            await websocket.close(code=4401)
+            return
+        except Exception as e:
+            logger.warning(f"Refrigerator KPI WebSocket rejected: token verification failed - {e}")
+            await websocket.close(code=4401)
+            return
+
+        db_temp = SessionLocal()
+        try:
+            user = db_temp.query(User).filter(User.user_id == user_id).first()
+            if not user or not user.status:
+                await websocket.close(code=4403)
+                return
+            if getattr(user, "approved_status", None) != "approved":
+                await websocket.close(code=4403)
+                return
+            if not is_specific_department(user.department, "IVF"):
+                await websocket.close(code=4403)
+                return
+            role = user.role.value if hasattr(user.role, "value") else str(user.role)
+            branch_id = user.branch_id
+            if role == "Manager" and branch_id_override is not None:
+                branch_id = branch_id_override
+        finally:
+            db_temp.close()
+
+        await websocket.accept()
+        connection_id = await refrigerator_kpi_manager.connect(websocket)
+        refrigerator_kpi_manager.active_connections[connection_id]["user_id"] = user_id
+        refrigerator_kpi_manager.active_connections[connection_id]["branch_id"] = branch_id
+        refrigerator_kpi_manager.active_connections[connection_id]["role"] = role
+        logger.info(
+            f"Refrigerator KPI WebSocket authenticated: user={user_id}, branch={branch_id}, connection={connection_id}"
+        )
+
+    except Exception as e:
+        logger.error(f"Refrigerator KPI WebSocket auth error: {e}", exc_info=True)
+        try:
+            if connection_id:
+                refrigerator_kpi_manager.disconnect(connection_id)
+            await websocket.close(code=1011, reason=str(e))
+        except Exception:
+            pass
+        return
+
+    try:
+        db = SessionLocal()
+        try:
+            while True:
+                try:
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                    try:
+                        message = json.loads(data)
+                        if not isinstance(message, dict):
+                            continue
+                        refrigerator_id = message.get("refrigerator_id")
+                        live_val = message.get("live")
+                        if refrigerator_id is None:
+                            if live_val is not None:
+                                refrigerator_kpi_manager.set_live(connection_id, bool(live_val))
+                            else:
+                                await websocket.send_json({
+                                    "type": "error",
+                                    "message": "Subscription message must contain 'refrigerator_id'",
+                                })
+                            continue
+
+                        try:
+                            refrigerator_id_int = int(refrigerator_id)
+                        except (TypeError, ValueError):
+                            await websocket.send_json({"type": "error", "message": "Invalid 'refrigerator_id'"})
+                            continue
+
+                        zone_id = message.get("zone_id")
+                        if zone_id is not None:
+                            zone_id = str(zone_id)
+                        refrigerator = db.query(Refrigerator).filter(
+                            Refrigerator.refrigerator_id == refrigerator_id_int
+                        ).first()
+                        if not refrigerator:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": f"Refrigerator {refrigerator_id_int} not found",
+                            })
+                            continue
+
+                        refrigerator_kpi_manager.set_refrigerator_subscription(
+                            connection_id,
+                            refrigerator_id_int,
+                            zone_id,
+                            refrigerator.refrigerator_code,
+                        )
+                        refrigerator_kpi_manager.set_live(connection_id, bool(message.get("live", True)))
+                        await websocket.send_json({
+                            "type": "subscription_confirmed",
+                            "refrigerator_id": refrigerator_id_int,
+                            "refrigerator_code": refrigerator.refrigerator_code or "",
+                            "zone_id": zone_id,
+                            "branch_id": refrigerator.branch_id,
+                        })
+                    except json.JSONDecodeError:
+                        pass
+                except asyncio.TimeoutError:
+                    continue
+        finally:
+            db.close()
+    except WebSocketDisconnect:
+        refrigerator_kpi_manager.disconnect_by_websocket(websocket)
+        logger.info(f"Refrigerator KPI WebSocket disconnected: {connection_id}")
+    except Exception as e:
+        logger.error(f"Refrigerator KPI WebSocket error: {e}")
+        refrigerator_kpi_manager.disconnect_by_websocket(websocket)
