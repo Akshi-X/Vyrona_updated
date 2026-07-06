@@ -379,7 +379,6 @@ class IVFService:
                     .filter(
                         KpiConfig.refrigerator_id.in_(refrigerator_ids),
                         KpiConfig.zone_id.isnot(None),
-                        KpiConfig.alert_name.is_(None),
                     )
                     .distinct()
                     .all()
