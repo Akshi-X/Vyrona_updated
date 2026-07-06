@@ -227,7 +227,7 @@ export default function UsersPage() {
             title="Users"
             description={refrigeratorOnly ? "Manage your team's roles and branch access." : undefined}
             lucideIcon={Users}
-            patternBackground={refrigeratorOnly}
+            patternBackground
             actions={
                 <button
                     id="onboarding-users-add-btn"

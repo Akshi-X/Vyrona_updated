@@ -2020,7 +2020,7 @@ export default function AlertSetting() {
                     title="Alert Configuration"
                     description={refrigeratorOnly ? "Set temperature and humidity alert thresholds for each refrigerator." : undefined}
                     icon={CriticalAlertsIcon}
-                    patternBackground={refrigeratorOnly}
+                    patternBackground
                     actions={
                         <>
                             <div className="md:hidden">
