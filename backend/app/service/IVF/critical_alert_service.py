@@ -855,6 +855,308 @@ class CriticalAlertService:
 
         return alerts_created
 
+    def _get_refrigerator_hospital_branch(self, refrigerator_id: int) -> tuple:
+        """Get hospital_id and branch_id for a refrigerator."""
+        refrigerator = self.db.query(Refrigerator).filter(
+            Refrigerator.refrigerator_id == refrigerator_id
+        ).first()
+        if not refrigerator:
+            raise ValueError(f"Refrigerator {refrigerator_id} not found")
+        return refrigerator.hospital_id, refrigerator.branch_id
+
+    def _create_refrigerator_alert(
+        self,
+        refrigerator_id: int,
+        zone_id: Optional[str],
+        alert_type: AlertType,
+        source: AlertSource,
+        severity: AlertSeverity,
+        message: str,
+        occurred_at: datetime,
+        triggered_by: AlertTriggeredBy = AlertTriggeredBy.SYSTEM,
+        extra_info: Optional[str] = None,
+    ) -> CriticalAlert:
+        """Create a new refrigerator alert if it doesn't already exist (using dedup_key)."""
+        hospital_id, branch_id = self._get_refrigerator_hospital_branch(refrigerator_id)
+
+        zone_part = zone_id or "all"
+        timestamp_str = occurred_at.strftime("%Y-%m-%d_%H:%M:%S")
+        dedup_key = f"refrigerator:{refrigerator_id}:{zone_part}:{source.value}:{alert_type.value}:{timestamp_str}:{extra_info or ''}"
+
+        existing_alert = (
+            self.db.query(CriticalAlert)
+            .filter(
+                CriticalAlert.dedup_key == dedup_key,
+                CriticalAlert.status == AlertStatus.ACTIVE.value,
+            )
+            .first()
+        )
+        if existing_alert:
+            existing_alert.occurred_at = occurred_at
+            existing_alert.updated_at = datetime.now(timezone.utc)
+            return existing_alert
+
+        refrigerator = self.db.query(Refrigerator).filter(
+            Refrigerator.refrigerator_id == refrigerator_id
+        ).first()
+        refrigerator_code = refrigerator.refrigerator_code if refrigerator else None
+
+        try:
+            alert = CriticalAlert(
+                alert_id=str(uuid.uuid4()),
+                refrigerator_id=refrigerator_id,
+                zone_id=zone_id,
+                hospital_id=hospital_id,
+                branch_id=branch_id,
+                alert_type=alert_type.value,
+                source=source.value,
+                severity=severity.value,
+                message=message,
+                status=AlertStatus.ACTIVE.value,
+                triggered_by=triggered_by.value,
+                occurred_at=occurred_at,
+                dedup_key=dedup_key,
+                created_at=datetime.now(timezone.utc),
+            )
+            self.db.add(alert)
+            self.db.flush()
+            ActivityLogService(self.db).log_activity(
+                action="alert.created",
+                outcome=ActivityOutcome.SUCCESS.value,
+                actor=build_system_actor("critical_alert"),
+                target=build_target("refrigerator", str(refrigerator_id), refrigerator_code),
+                metadata={
+                    "alert_id": alert.alert_id,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "message": message,
+                    "refrigerator_id": refrigerator_id,
+                    "refrigerator_code": refrigerator_code,
+                    "zone_id": zone_id,
+                    "branch_id": branch_id,
+                },
+            )
+            return alert
+        except IntegrityError as e:
+            if isinstance(e.orig, UniqueViolation) and "dedup_key" in str(e.orig):
+                logger.info(
+                    f"Refrigerator alert with dedup_key={dedup_key} already exists (race condition), fetching existing"
+                )
+                self.db.rollback()
+                existing_alert = (
+                    self.db.query(CriticalAlert)
+                    .filter(
+                        CriticalAlert.dedup_key == dedup_key,
+                        CriticalAlert.status == AlertStatus.ACTIVE.value,
+                    )
+                    .first()
+                )
+                if existing_alert:
+                    existing_alert.occurred_at = occurred_at
+                    existing_alert.updated_at = datetime.now(timezone.utc)
+                    self.db.flush()
+                    return existing_alert
+            raise
+
+    def check_and_create_alert_for_refrigerator_kpi_deviations(
+        self,
+        refrigerator_id: int,
+        zone_id: Optional[str] = None,
+    ) -> list[dict]:
+        """
+        Check the readings table for unchecked KPI deviations on a refrigerator zone
+        and create CriticalAlert records for each confirmed deviation.
+        """
+        query = self.db.query(Readings).filter(
+            Readings.refrigerator_id == refrigerator_id,
+            Readings.deviation == True,
+            or_(Readings.checked.is_(None), Readings.checked == False),
+        )
+        if zone_id is not None:
+            query = query.filter(Readings.zone_id == zone_id)
+        deviations = query.all()
+
+        logger.info(
+            "Deviation count for refrigerator_id=%s zone_id=%s: %s",
+            refrigerator_id,
+            zone_id,
+            len(deviations),
+        )
+
+        alerts_created = []
+        checked_kpi_configs = []
+
+        for deviation in deviations:
+            kpi_config = (
+                self.db.query(KpiConfig)
+                .filter(
+                    KpiConfig.id == deviation.kpi_config_id,
+                    KpiConfig.status == True,
+                )
+                .first()
+            )
+            if not kpi_config or kpi_config.id in checked_kpi_configs:
+                deviation.checked = True
+                continue
+
+            now = datetime.now(timezone.utc)
+            cooldown_seconds = (
+                int(kpi_config.cooldown_minutes) * 60
+                if kpi_config.cooldown_minutes is not None
+                else 3600
+            )
+
+            # Dedup prefix: refrigerator variant keyed by refrigerator_id and kpi_config_id
+            zone_part = zone_id or "all"
+            dedup_prefix = (
+                f"refrigerator:{refrigerator_id}:{zone_part}"
+                f":{AlertSource.KPI.value}:{AlertType.DEVIATION_ALERT.value}:%:{kpi_config.id}"
+            )
+            last_alert = (
+                self.db.query(CriticalAlert)
+                .filter(
+                    CriticalAlert.refrigerator_id == refrigerator_id,
+                    CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                    or_(
+                        CriticalAlert.dedup_key.like(dedup_prefix),
+                        CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                    ),
+                    CriticalAlert.status != AlertStatus.ACKNOWLEDGED.value,
+                )
+                .order_by(CriticalAlert.created_at.desc())
+                .first()
+            )
+
+            if last_alert:
+                last_alert_time = last_alert.created_at
+                if last_alert_time:
+                    last_alert_time = (
+                        last_alert_time
+                        if last_alert_time.tzinfo
+                        else last_alert_time.replace(tzinfo=timezone.utc)
+                    )
+                    if abs((now - last_alert_time).total_seconds()) < cooldown_seconds:
+                        logger.info(
+                            "Skipping refrigerator alert for kpi_config_id=%s within cooldown (%s min)",
+                            kpi_config.id,
+                            kpi_config.cooldown_minutes,
+                        )
+                        deviation.checked = True
+                        checked_kpi_configs.append(kpi_config.id)
+                        continue
+
+            branch_name = (
+                self.db.query(HospitalBranch.branch_name)
+                .filter(HospitalBranch.branch_id == deviation.branch_id)
+                .scalar()
+            )
+            refrigerator = self.db.query(Refrigerator).filter(
+                Refrigerator.refrigerator_id == refrigerator_id
+            ).first()
+            refrigerator_code = refrigerator.refrigerator_code if refrigerator else str(refrigerator_id)
+
+            message = (
+                f"{kpi_config.alert_name} is deviated to {round(deviation.kpi_value, 2)}"
+                f" in {branch_name} branch for refrigerator {refrigerator_code}"
+                + (f" zone {zone_id}" if zone_id else "")
+            )
+
+            alert = self._create_refrigerator_alert(
+                refrigerator_id=refrigerator_id,
+                zone_id=zone_id,
+                alert_type=AlertType.DEVIATION_ALERT,
+                source=AlertSource.KPI,
+                severity=AlertSeverity.LOW if kpi_config.alert_type == "soft" else AlertSeverity.HIGH,
+                message=message,
+                occurred_at=deviation.timestamp,
+                triggered_by=AlertTriggeredBy.SYSTEM,
+                extra_info=str(kpi_config.id),
+            )
+
+            if kpi_config.alert_type == "critical":
+                (
+                    is_hospital_email_configured,
+                    is_hospital_whatsapp_configured,
+                ) = self._get_hospital_notification_config(alert.hospital_id)
+                if is_hospital_email_configured:
+                    if kpi_config.unack_escalation_threshold is not None:
+                        self._send_alert_email_to_users_only(alert)
+                    else:
+                        self._send_alert_email(alert)
+                else:
+                    logger.info(
+                        "Skipping email for alert_id=%s because hospital_id=%s has email notifications disabled",
+                        alert.alert_id,
+                        alert.hospital_id,
+                    )
+                if is_hospital_whatsapp_configured:
+                    self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+                else:
+                    logger.info(
+                        "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
+                        alert.alert_id,
+                        alert.hospital_id,
+                    )
+
+            if kpi_config.unack_escalation_threshold is not None:
+                if self._check_refrigerator_escalation_needed(kpi_config, refrigerator_id, zone_id):
+                    unack_alerts = (
+                        self.db.query(CriticalAlert)
+                        .filter(
+                            CriticalAlert.refrigerator_id == refrigerator_id,
+                            CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                            or_(
+                                CriticalAlert.dedup_key.like(dedup_prefix),
+                                CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                            ),
+                            CriticalAlert.status == AlertStatus.ACTIVE.value,
+                        )
+                        .order_by(CriticalAlert.created_at.desc())
+                        .all()
+                    )
+                    kpi_cfg_id = kpi_config.id
+                    alerts_snapshot = list(unack_alerts)
+                    count = len(alerts_snapshot)
+
+                    def _escalation_bg(
+                        kpi_id=kpi_cfg_id, rid=refrigerator_id, zid=zone_id, c=count, a=alerts_snapshot
+                    ):
+                        bg_db = SessionLocal()
+                        try:
+                            bg_kpi = bg_db.query(KpiConfig).filter(KpiConfig.id == kpi_id).first()
+                            if bg_kpi:
+                                CriticalAlertService(bg_db)._send_refrigerator_escalation_email_to_admins(
+                                    bg_kpi, rid, zid, c, a
+                                )
+                                bg_db.commit()
+                        except Exception as exc:
+                            logger.error(
+                                "Refrigerator escalation email failed for kpi_config_id=%s: %s",
+                                kpi_id, exc, exc_info=True,
+                            )
+                        finally:
+                            bg_db.close()
+
+                    threading.Thread(target=_escalation_bg, daemon=True).start()
+                    logger.info(
+                        "Started refrigerator escalation email thread for kpi_config_id=%s refrigerator_id=%s zone_id=%s (%s unacknowledged)",
+                        kpi_config.id, refrigerator_id, zone_id, count,
+                    )
+
+            deviation.alert_id = alert.alert_id
+            deviation.checked = True
+            checked_kpi_configs.append(kpi_config.id)
+            alerts_created.append(alert)
+
+        logger.info(
+            "Refrigerator alert creation complete for refrigerator_id=%s zone_id=%s: %s alert(s) created/updated",
+            refrigerator_id,
+            zone_id,
+            len(alerts_created),
+        )
+        self.db.commit()
+        return alerts_created
+
     def check_and_create_alerts(
         self,
         tank_id: Optional[int] = None,
@@ -1128,15 +1430,28 @@ class CriticalAlertService:
             )
             return
 
-        # Get tank directly (tank-level monitoring)
-        tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
-        if not tank:
+        # Resolve device label and branch — supports tank and refrigerator alerts
+        if alert.tank_id:
+            tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
+            if not tank:
+                return
+            device_label = tank.tank_code or f"Tank-{tank.tank_id}"
+            device_branch_id = tank.branch_id
+        elif alert.refrigerator_id:
+            refrigerator = self.db.query(Refrigerator).filter(
+                Refrigerator.refrigerator_id == alert.refrigerator_id
+            ).first()
+            if not refrigerator:
+                return
+            label = refrigerator.refrigerator_code or f"Refrigerator-{refrigerator.refrigerator_id}"
+            device_label = f"{label} {alert.zone_id}" if alert.zone_id else label
+            device_branch_id = refrigerator.branch_id
+        else:
             return
 
-        # Get branch and hospital info
         branch = (
             self.db.query(HospitalBranch)
-            .filter(HospitalBranch.branch_id == tank.branch_id)
+            .filter(HospitalBranch.branch_id == device_branch_id)
             .first()
         )
         if not branch:
@@ -1144,7 +1459,6 @@ class CriticalAlertService:
 
         hospital_id = branch.hospital_id
 
-        # Get all branches for the hospital (needed to find all managers)
         all_branches = (
             self.db.query(HospitalBranch)
             .filter(HospitalBranch.hospital_id == hospital_id)
@@ -1152,7 +1466,6 @@ class CriticalAlertService:
         )
         branch_ids = [b.branch_id for b in all_branches]
 
-        # All Managers across every branch of the hospital
         managers = (
             self.db.query(User)
             .filter(
@@ -1168,27 +1481,22 @@ class CriticalAlertService:
             .all()
         )
 
-        # Users (non-manager) in the tank's branch only
         branch_users = (
             self.db.query(User)
             .filter(
                 User.department == "IVF",
                 User.role == "User",
-                User.branch_id == tank.branch_id,
+                User.branch_id == device_branch_id,
                 User.status == True,
                 User.approved_status == ApprovalStatus.APPROVED,
             )
             .all()
         )
 
-        # Combine and deduplicate
         all_users = {user.user_id: user for user in managers + branch_users}.values()
 
-        # Send email to each user
-        # Navigate to dashboard with alert_id query param - Dashboard will open alerts modal automatically
         alerts_url = f"{settings.FRONTEND_URL}/dashboard?alert_id={alert.alert_id}"
 
-        # Load email template
         template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
         jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))
 
@@ -1198,15 +1506,11 @@ class CriticalAlertService:
             logger.error(f"Failed to load alert email template: {str(e)}")
             template = None
 
-        # Determine severity class for styling
         severity_class = "high-severity"
         if alert.severity == "Medium":
             severity_class = "medium-severity"
         elif alert.severity == "Low":
             severity_class = "low-severity"
-
-        # Get tank code for email (tank-level monitoring)
-        tank_code = tank.tank_code or f"Tank-{tank.tank_id}"
 
         for user in all_users:
             # Cross-process guard: claim this (alert, recipient) atomically so concurrent
@@ -1226,7 +1530,7 @@ class CriticalAlertService:
                     alert.alert_id, exc,
                 )
             try:
-                subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {tank_code}"
+                subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {device_label}"
                 ist = timezone(timedelta(hours=5, minutes=30))
                 utc_time = alert.occurred_at.replace(tzinfo=timezone.utc)  # mark as UTC
                 timestamp_string = utc_time.astimezone(ist).strftime(
@@ -1238,7 +1542,7 @@ class CriticalAlertService:
                         alert_type=alert.alert_type,
                         severity=alert.severity,
                         tank_id=alert.tank_id,
-                        tank_code=tank_code,
+                        tank_code=device_label,
                         branch_name=branch.branch_name or "N/A",
                         message=alert.message,
                         occurred_at=timestamp_string,
@@ -1253,7 +1557,7 @@ class CriticalAlertService:
                         <h2>Critical Alert Notification</h2>
                         <p><strong>Alert Type:</strong> {alert.alert_type}</p>
                         <p><strong>Severity:</strong> {alert.severity}</p>
-                        <p><strong>Tank:</strong> {tank_code}</p>
+                        <p><strong>Device:</strong> {device_label}</p>
                         <p><strong>Branch:</strong> {branch.branch_name or "N/A"}</p>
                         <p><strong>Message:</strong> {alert.message}</p>
                         <p><strong>Occurred At:</strong> {timestamp_string}</p>
@@ -1285,7 +1589,7 @@ class CriticalAlertService:
                         "message": alert.message,
                         "occurred_at": timestamp_string,
                         "tank_id": alert.tank_id,
-                        "tank_code": tank_code,
+                        "tank_code": device_label,
                         "branch_id": branch.branch_id if branch else None,
                         "branch_name": branch.branch_name if branch else None,
                     },
@@ -1327,13 +1631,27 @@ class CriticalAlertService:
             )
             return
 
-        tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
-        if not tank:
+        if alert.tank_id:
+            tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
+            if not tank:
+                return
+            device_label = tank.tank_code or f"Tank-{tank.tank_id}"
+            device_branch_id = tank.branch_id
+        elif alert.refrigerator_id:
+            refrigerator = self.db.query(Refrigerator).filter(
+                Refrigerator.refrigerator_id == alert.refrigerator_id
+            ).first()
+            if not refrigerator:
+                return
+            label = refrigerator.refrigerator_code or f"Refrigerator-{refrigerator.refrigerator_id}"
+            device_label = f"{label} {alert.zone_id}" if alert.zone_id else label
+            device_branch_id = refrigerator.branch_id
+        else:
             return
 
         branch = (
             self.db.query(HospitalBranch)
-            .filter(HospitalBranch.branch_id == tank.branch_id)
+            .filter(HospitalBranch.branch_id == device_branch_id)
             .first()
         )
         if not branch:
@@ -1344,7 +1662,7 @@ class CriticalAlertService:
             .filter(
                 User.department == "IVF",
                 User.role == "User",
-                User.branch_id == tank.branch_id,
+                User.branch_id == device_branch_id,
                 User.status == True,
                 User.approved_status == ApprovalStatus.APPROVED,
             )
@@ -1353,9 +1671,9 @@ class CriticalAlertService:
 
         if not branch_users:
             logger.info(
-                "No branch users found for tank_id=%s branch_id=%s — skipping users-only alert email",
-                alert.tank_id,
-                tank.branch_id,
+                "No branch users found for alert_id=%s branch_id=%s — skipping users-only alert email",
+                alert.alert_id,
+                device_branch_id,
             )
             return
 
@@ -1375,8 +1693,6 @@ class CriticalAlertService:
         elif alert.severity == "Low":
             severity_class = "low-severity"
 
-        tank_code = tank.tank_code or f"Tank-{tank.tank_id}"
-
         for user in branch_users:
             # Cross-process guard: claim this (alert, recipient) atomically so concurrent
             # runs / retries can never send the same alert to the same user twice. Fail-open
@@ -1395,7 +1711,7 @@ class CriticalAlertService:
                     alert.alert_id, exc,
                 )
             try:
-                subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {tank_code}"
+                subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {device_label}"
                 ist = timezone(timedelta(hours=5, minutes=30))
                 utc_time = alert.occurred_at.replace(tzinfo=timezone.utc)
                 timestamp_string = utc_time.astimezone(ist).strftime("%Y-%m-%d %H:%M:%S IST")
@@ -1405,7 +1721,7 @@ class CriticalAlertService:
                         alert_type=alert.alert_type,
                         severity=alert.severity,
                         tank_id=alert.tank_id,
-                        tank_code=tank_code,
+                        tank_code=device_label,
                         branch_name=branch.branch_name or "N/A",
                         message=alert.message,
                         occurred_at=timestamp_string,
@@ -1418,7 +1734,7 @@ class CriticalAlertService:
                         <h2>Critical Alert Notification</h2>
                         <p><strong>Alert Type:</strong> {alert.alert_type}</p>
                         <p><strong>Severity:</strong> {alert.severity}</p>
-                        <p><strong>Tank:</strong> {tank_code}</p>
+                        <p><strong>Device:</strong> {device_label}</p>
                         <p><strong>Branch:</strong> {branch.branch_name or "N/A"}</p>
                         <p><strong>Message:</strong> {alert.message}</p>
                         <p><strong>Occurred At:</strong> {timestamp_string}</p>
@@ -1446,7 +1762,7 @@ class CriticalAlertService:
                         "message": alert.message,
                         "occurred_at": timestamp_string,
                         "tank_id": alert.tank_id,
-                        "tank_code": tank_code,
+                        "tank_code": device_label,
                         "branch_id": branch.branch_id,
                         "branch_name": branch.branch_name,
                         "escalation_mode": True,
@@ -1847,6 +2163,205 @@ class CriticalAlertService:
             except Exception as e:
                 logger.error(
                     "Failed to send escalation email to %s: %s", user.email, str(e)
+                )
+
+        kpi_config.last_escalation_sent_at = datetime.now(timezone.utc)
+
+    def _check_refrigerator_escalation_needed(
+        self, kpi_config, refrigerator_id: int, zone_id: Optional[str]
+    ) -> bool:
+        """Return True when N consecutive unacknowledged alerts exist for a refrigerator KPI
+        and the escalation cooldown has passed."""
+        if kpi_config.unack_escalation_threshold is None:
+            return False
+
+        threshold = int(kpi_config.unack_escalation_threshold)
+        zone_part = zone_id or "all"
+        dedup_prefix = (
+            f"refrigerator:{refrigerator_id}:{zone_part}"
+            f":{AlertSource.KPI.value}:{AlertType.DEVIATION_ALERT.value}:%:{kpi_config.id}"
+        )
+
+        unack_count = (
+            self.db.query(CriticalAlert)
+            .filter(
+                CriticalAlert.refrigerator_id == refrigerator_id,
+                CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                or_(
+                    CriticalAlert.dedup_key.like(dedup_prefix),
+                    CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                ),
+                CriticalAlert.status == AlertStatus.ACTIVE.value,
+            )
+            .count()
+        )
+
+        if unack_count <= threshold:
+            logger.info(
+                "Escalation not triggered for kpi_config_id=%s refrigerator_id=%s zone_id=%s: %s unacknowledged <= threshold %s",
+                kpi_config.id, refrigerator_id, zone_id, unack_count, threshold,
+            )
+            return False
+
+        if kpi_config.last_escalation_sent_at is not None:
+            last_sent = kpi_config.last_escalation_sent_at
+            if not last_sent.tzinfo:
+                last_sent = last_sent.replace(tzinfo=timezone.utc)
+            cooldown_secs = (
+                int(kpi_config.cooldown_minutes) * 60
+                if kpi_config.cooldown_minutes is not None
+                else 3600
+            )
+            elapsed = (datetime.now(timezone.utc) - last_sent).total_seconds()
+            if elapsed < cooldown_secs:
+                logger.info(
+                    "Skipping refrigerator escalation for kpi_config_id=%s; last sent %.0fs ago (cooldown=%.0fs)",
+                    kpi_config.id, elapsed, cooldown_secs,
+                )
+                return False
+
+        logger.info(
+            "Escalation triggered for kpi_config_id=%s refrigerator_id=%s zone_id=%s: %s unacknowledged >= threshold %s",
+            kpi_config.id, refrigerator_id, zone_id, unack_count, threshold,
+        )
+        return True
+
+    def _send_refrigerator_escalation_email_to_admins(
+        self,
+        kpi_config,
+        refrigerator_id: int,
+        zone_id: Optional[str],
+        unack_count: int,
+        alerts: list,
+    ):
+        """Send escalation email to Admins and Managers when N unacknowledged refrigerator KPI
+        alerts exist. Updates kpi_config.last_escalation_sent_at — caller commits."""
+        refrigerator = self.db.query(Refrigerator).filter(
+            Refrigerator.refrigerator_id == refrigerator_id
+        ).first()
+        if not refrigerator:
+            return
+
+        branch = (
+            self.db.query(HospitalBranch)
+            .filter(HospitalBranch.branch_id == refrigerator.branch_id)
+            .first()
+        )
+        if not branch:
+            return
+
+        hospital_id = refrigerator.hospital_id
+        is_email_enabled, _ = self._get_hospital_notification_config(hospital_id)
+        if not is_email_enabled:
+            logger.info(
+                "Skipping refrigerator escalation email — hospital_id=%s has email notifications disabled",
+                hospital_id,
+            )
+            return
+
+        all_branch_ids = [
+            b.branch_id
+            for b in self.db.query(HospitalBranch)
+            .filter(HospitalBranch.hospital_id == hospital_id)
+            .all()
+        ]
+        recipients = (
+            self.db.query(User)
+            .filter(
+                User.department == "IVF",
+                User.role.in_(["Manager", "Admin"]),
+                User.branch_id.in_(all_branch_ids),
+                User.status.is_(True),
+                User.approved_status == ApprovalStatus.APPROVED,
+            )
+            .all()
+        )
+        recipients = list({u.user_id: u for u in recipients}.values())
+
+        if not recipients:
+            logger.warning(
+                "No admin/manager recipients for refrigerator escalation — kpi_config_id=%s refrigerator_id=%s",
+                kpi_config.id, refrigerator_id,
+            )
+            return
+
+        label = refrigerator.refrigerator_code or f"Refrigerator-{refrigerator_id}"
+        device_label = f"{label} {zone_id}" if zone_id else label
+        acknowledge_url = f"{settings.FRONTEND_URL}/dashboard"
+        template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
+        jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))
+
+        try:
+            template = jinja_env.get_template("escalation_alert_email.html")
+        except Exception:
+            template = None
+
+        subject = (
+            f"Escalation: {unack_count} Unacknowledged Alerts — "
+            f"{kpi_config.alert_name or kpi_config.kpi_name} — {device_label}"
+        )
+        alert_data = [
+            {
+                "occurred_at": str(a.occurred_at),
+                "message": a.message,
+                "alert_id": a.alert_id,
+            }
+            for a in alerts
+        ]
+
+        for user in recipients:
+            try:
+                if template:
+                    html_body = template.render(
+                        subject=subject,
+                        kpi_name=kpi_config.alert_name or kpi_config.kpi_name,
+                        tank_code=device_label,
+                        branch_name=branch.branch_name or "N/A",
+                        unack_count=unack_count,
+                        threshold=kpi_config.unack_escalation_threshold,
+                        alerts=alert_data,
+                        acknowledge_url=acknowledge_url,
+                    )
+                else:
+                    alert_rows = "".join(
+                        f"<li>{a['occurred_at']} — {a['message']}</li>" for a in alert_data
+                    )
+                    html_body = f"""
+                    <html><body>
+                        <h2>Escalation: {unack_count} Unacknowledged Alerts</h2>
+                        <p><strong>KPI:</strong> {kpi_config.alert_name or kpi_config.kpi_name}</p>
+                        <p><strong>Device:</strong> {device_label} — {branch.branch_name or "N/A"}</p>
+                        <p><strong>Threshold:</strong> {kpi_config.unack_escalation_threshold} consecutive unacknowledged alerts</p>
+                        <ul>{alert_rows}</ul>
+                        <a href="{acknowledge_url}">View &amp; Acknowledge</a>
+                    </body></html>
+                    """
+
+                send_email(user.email, subject, html_body)
+                logger.info(
+                    "Sent refrigerator escalation email to %s for kpi_config_id=%s refrigerator_id=%s",
+                    user.email, kpi_config.id, refrigerator_id,
+                )
+                ActivityLogService(self.db).log_activity(
+                    action="email.escalation_sent",
+                    outcome=ActivityOutcome.SUCCESS.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.email),
+                    metadata={
+                        "recipient_email": user.email,
+                        "recipient_user_id": user.user_id,
+                        "kpi_config_id": kpi_config.id,
+                        "kpi_name": kpi_config.kpi_name,
+                        "refrigerator_id": refrigerator_id,
+                        "zone_id": zone_id,
+                        "device_label": device_label,
+                        "unack_count": unack_count,
+                        "threshold": kpi_config.unack_escalation_threshold,
+                    },
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to send refrigerator escalation email to %s: %s", user.email, str(e)
                 )
 
         kpi_config.last_escalation_sent_at = datetime.now(timezone.utc)
@@ -2518,6 +3033,52 @@ class CriticalAlertService:
 
         active_count = sum(1 for a in alerts if a.status == AlertStatus.ACTIVE.value)
         acknowledged_count = len(alerts) - active_count
+
+        return HospitalAlertsResponse(
+            alerts=alert_responses,
+            total_count=len(alert_responses),
+            active_count=active_count,
+            acknowledged_count=acknowledged_count,
+        )
+
+    def get_hospital_refrigerator_alerts(
+        self,
+        branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
+        role: Optional[str] = None,
+        status: Optional[AlertStatus] = None,
+    ) -> HospitalAlertsResponse:
+        """
+        Get refrigerator alerts for the hospital. Unlike get_hospital_alerts
+        (which inner-joins Tank and so excludes refrigerator alerts), this joins
+        Refrigerator and returns alerts where refrigerator_id IS NOT NULL.
+        """
+        query = (
+            self.db.query(CriticalAlert, Refrigerator.refrigerator_code)
+            .join(Refrigerator, CriticalAlert.refrigerator_id == Refrigerator.refrigerator_id)
+        )
+
+        if role and role == "User" and branch_id:
+            query = query.filter(Refrigerator.branch_id == branch_id)
+        elif hospital_id is not None:
+            query = query.filter(Refrigerator.hospital_id == hospital_id)
+
+        if status:
+            query = query.filter(CriticalAlert.status == status.value)
+
+        rows = query.order_by(desc(CriticalAlert.occurred_at)).all()
+
+        alert_responses = []
+        active_count = 0
+        for alert, refrigerator_code in rows:
+            alert_dict = {
+                **alert.__dict__,
+                "refrigerator_code": refrigerator_code or f"Refrigerator-{alert.refrigerator_id}",
+            }
+            alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
+            if alert.status == AlertStatus.ACTIVE.value:
+                active_count += 1
+        acknowledged_count = len(alert_responses) - active_count
 
         return HospitalAlertsResponse(
             alerts=alert_responses,

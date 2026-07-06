@@ -114,3 +114,8 @@ WHERE tank_id = 92;
 to fix-conflict
 
 1. backend % poetry run python fix-conflict/add_reservoir_weights_and_seed.py   
+
+
+npm run dev --  --port 5174
+
+poetry run uvicorn main:app --port 8001

@@ -82,6 +82,12 @@ export async function checkVariantHealth(
 
     // Check 1: DB variants that are missing from the registry
     for (const variant of dbVariants) {
+        // Rows whose route_path contains a "#" fragment are synchronous config
+        // flags (read via useHasVariant), not component swaps — they intentionally
+        // have no registry component, so skip the registry check for them.
+        if (variant.route_path.includes("#")) {
+            continue;
+        }
         if (!registryKeys.has(variant.component_key)) {
             issues.push({
                 type: "missing_from_registry",

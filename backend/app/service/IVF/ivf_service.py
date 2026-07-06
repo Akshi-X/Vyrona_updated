@@ -364,17 +364,52 @@ class IVFService:
 
             results = self.db.execute(stmt).fetchall()
 
+            refrigerator_ids = [r.refrigerator_id for r, _, _ in results]
+
+            # Fetch user-assigned zone names from kpi_config in one batch query.
+            # zone_ids that have no kpi_config row will fall back to "Zone N" labels.
+            kpi_zone_names: Dict[int, Dict[str, str]] = defaultdict(dict)  # ref_id → {zone_id → zone_name}
+            if refrigerator_ids:
+                zone_rows = (
+                    self.db.query(
+                        KpiConfig.refrigerator_id,
+                        KpiConfig.zone_id,
+                        KpiConfig.zone_name,
+                    )
+                    .filter(
+                        KpiConfig.refrigerator_id.in_(refrigerator_ids),
+                        KpiConfig.zone_id.isnot(None),
+                        KpiConfig.alert_name.is_(None),
+                    )
+                    .distinct()
+                    .all()
+                )
+                for ref_id, z_id, z_name in zone_rows:
+                    if z_id and z_id not in kpi_zone_names[ref_id]:
+                        kpi_zone_names[ref_id][z_id] = z_name or z_id
+
             branches_dict: Dict[int, Any] = {}
             total = 0
             for refrigerator, b_id, b_name in results:
                 if b_id not in branches_dict:
                     branches_dict[b_id] = {"branch_id": b_id, "branch_name": b_name or "Unknown", "refrigerators": []}
+                zone_count = refrigerator.zone_count or 0
+                ref_names = kpi_zone_names.get(refrigerator.refrigerator_id, {})
+                zones = [
+                    {
+                        "zone_id": f"zone_{i}",
+                        "zone_name": ref_names.get(f"zone_{i}") or f"Zone {i}",
+                    }
+                    for i in range(1, zone_count + 1)
+                ]
                 branches_dict[b_id]["refrigerators"].append({
                     "refrigerator_id": refrigerator.refrigerator_id,
                     "refrigerator_code": refrigerator.refrigerator_code,
                     "external_id": refrigerator.external_id,
                     "type": refrigerator.type,
+                    "zone_count": zone_count,
                     "updated_at": refrigerator.updated_at,
+                    "zones": zones,
                 })
                 total += 1
 
@@ -1243,3 +1278,62 @@ class IVFService:
                 "total": 0,
                 "site_name_counts": {}, "status_counts": {}, "goblet_color_counts": {}, "crylock_color_counts": {},
             }
+
+    def get_branch_map_metrics(self, hospital_id: int) -> List[Dict[str, Any]]:
+        """
+        Return all branches for the hospital with refrigerator count and active alert count.
+        Used by the hospital-8 dashboard map to display every branch location,
+        marking branches that have refrigerators as clickable.
+        """
+        from ...models.IVF.critical_alert_model import CriticalAlert
+
+        branches = (
+            self.db.query(HospitalBranch)
+            .filter(HospitalBranch.hospital_id == hospital_id)
+            .all()
+        )
+
+        branch_ids = [b.branch_id for b in branches]
+
+        refrig_counts: Dict[int, int] = {}
+        if branch_ids:
+            rows = (
+                self.db.query(Refrigerator.branch_id, func.count(Refrigerator.refrigerator_id))
+                .filter(
+                    Refrigerator.hospital_id == hospital_id,
+                    Refrigerator.branch_id.in_(branch_ids),
+                    Refrigerator.is_active == True,
+                )
+                .group_by(Refrigerator.branch_id)
+                .all()
+            )
+            refrig_counts = {branch_id: count for branch_id, count in rows}
+
+        alert_counts: Dict[int, int] = {}
+        if branch_ids:
+            rows = (
+                self.db.query(CriticalAlert.branch_id, func.count(CriticalAlert.alert_id))
+                .filter(
+                    CriticalAlert.hospital_id == hospital_id,
+                    CriticalAlert.branch_id.in_(branch_ids),
+                    CriticalAlert.status == "Active",
+                    CriticalAlert.refrigerator_id.isnot(None),
+                )
+                .group_by(CriticalAlert.branch_id)
+                .all()
+            )
+            alert_counts = {branch_id: count for branch_id, count in rows}
+
+        return [
+            {
+                "branch_id": b.branch_id,
+                "branch_name": b.branch_name,
+                "latitude": float(b.latitude) if b.latitude is not None else None,
+                "longitude": float(b.longitude) if b.longitude is not None else None,
+                "district_name": b.district_name,
+                "state_name": b.state_name,
+                "refrigerator_count": refrig_counts.get(b.branch_id, 0),
+                "active_alerts": alert_counts.get(b.branch_id, 0),
+            }
+            for b in branches
+        ]

@@ -5,13 +5,16 @@
       "name": "FastAPI (uvicorn)",
       "type": "debugpy",
       "request": "launch",
-      "module": "uvicorn",
+      "program": "${workspaceFolder}/backend/.venv/bin/uvicorn",
       "args": [
         "app.main:app",
-        "--host", "0.0.0.0",
-        "--port", "8000",
-        "--reload"
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
       ],
+      "cwd": "${workspaceFolder}/backend",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
       "justMyCode": true
     }
   ]

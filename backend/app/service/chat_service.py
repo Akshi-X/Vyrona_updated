@@ -311,6 +311,58 @@ def get_refrigerator_unread_count(
     ).scalar() or 0
 
 
+def get_refrigerator_unread_messages(
+    user_id: str, hospital_id: int, db: Session
+) -> UnreadMessagesResponse:
+    """
+    Unread refrigerator chat messages across all refrigerators of a hospital.
+    Mirrors the refrigerator unread-count logic (messages after the user's
+    last_read per refrigerator), so the list matches the dashboard count.
+    """
+    rows = (
+        db.query(ChatMessage, Refrigerator.refrigerator_code)
+        .join(Refrigerator, Refrigerator.refrigerator_id == ChatMessage.refrigerator_id)
+        .outerjoin(
+            ChatReadStatusRefrigerator,
+            and_(
+                ChatReadStatusRefrigerator.refrigerator_id == ChatMessage.refrigerator_id,
+                ChatReadStatusRefrigerator.user_id == user_id,
+            ),
+        )
+        .filter(
+            ChatMessage.refrigerator_id.isnot(None),
+            Refrigerator.hospital_id == hospital_id,
+            ChatMessage.id > func.coalesce(ChatReadStatusRefrigerator.last_read_message_id, 0),
+        )
+        .order_by(desc(ChatMessage.created_at))
+        .all()
+    )
+
+    sender_ids = {msg.sender_id for msg, _ in rows if msg.sender_id}
+    sender_map: Dict[str, str] = {}
+    if sender_ids:
+        senders = db.query(User).filter(User.user_id.in_(sender_ids)).all()
+        sender_map = {u.user_id: f"{u.first_name} {u.last_name}".strip() for u in senders}
+
+    unread = [
+        UnreadMessageResponse(
+            message_id=msg.id,
+            message_content=msg.message_content,
+            refrigerator_id=msg.refrigerator_id,
+            refrigerator_code=code,
+            sender_id=msg.sender_id,
+            sender_name=sender_map.get(msg.sender_id, "Unknown"),
+            created_at=msg.created_at,
+        )
+        for msg, code in rows
+    ]
+    return UnreadMessagesResponse(
+        unread_messages=unread,
+        total_unread=len(unread),
+        unread_by_patient={},
+    )
+
+
 def mark_refrigerator_as_read(
     user_id: str, refrigerator_id: int, db: Session
 ) -> int:
