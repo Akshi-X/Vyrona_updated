@@ -597,7 +597,7 @@ const ControlTower = () => {
                             onChange={(v) => setDeviceType(v as "cryotanks" | "incubators")}
                             options={[
                                 { label: "Cryotanks", value: "cryotanks" },
-                                { label: "Incubators", value: "incubators" },
+                                { label: "Incubators", value: "incubators", disabled: true },
                             ]}
                         />
                     )}
@@ -672,7 +672,7 @@ const ControlTower = () => {
                                             onChange={(v) => setDeviceType(v as "cryotanks" | "incubators")}
                                             options={[
                                                 { label: "Cryotanks", value: "cryotanks" },
-                                                { label: "Incubators", value: "incubators" },
+                                                { label: "Incubators", value: "incubators", disabled: true },
                                             ]}
                                         />
                                     </div>
