@@ -652,7 +652,7 @@ const ControlTower = () => {
 
 
   return (
-        <PageLayout title="Control Tower" icon={ControlTowerIconDark} patternBackground actions={
+        <PageLayout title="Control Tower" description="Monitor live status and readings across all connected devices." icon={ControlTowerIconDark} patternBackground actions={
             <div className="lg:hidden">
                 <FilterPanel activeCount={activeFilterCount}>
                     {isIvfUser && (
