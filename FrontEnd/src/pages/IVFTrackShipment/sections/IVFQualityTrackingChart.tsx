@@ -1235,6 +1235,7 @@ export default function IVFQualityTrackingChart({
     });
     const padding = maxY != null && minY != null ? (maxY - minY) * 0.1 || 1 : 5;
     return {
+      animation: false,
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
