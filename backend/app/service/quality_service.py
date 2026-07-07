@@ -1338,6 +1338,72 @@ class QualityService:
             )
         return {"tank_id": tank_id, "tank_code": tank_code, "kpis": kpis}
 
+    def get_lid_open_events_by_bucket(
+        self,
+        tank_id: int,
+        since: datetime,
+        bucket_minutes: int,
+        lid_kpi_name: str = "ln2_lid_state",
+        until: Optional[datetime] = None,
+    ) -> dict:
+        """Count lid 'open events' per time bucket for the lid_state KPI.
+
+        An open event = a transition from closed (<0.5) to open (>=0.5) in the raw
+        reading sequence. Continuity is evaluated within each bucket (LAG partitioned
+        by bucket): a bucket that is open from its first reading counts as 1 open, and
+        a bucket that toggles open->closed->open counts each open span. Returns
+        { bucket_start_iso: open_events }.
+        """
+        bucket_seconds = bucket_minutes * 60
+        until_clause = "AND r.timestamp <= :until" if until is not None else ""
+        sql = text(f"""
+            WITH bucketed AS (
+                SELECT
+                    to_timestamp(
+                        floor(extract(epoch from r.timestamp AT TIME ZONE 'UTC') / :bucket_sec) * :bucket_sec
+                    ) AT TIME ZONE 'UTC' AS bucket_start,
+                    r.timestamp AS ts,
+                    r.kpi_value::double precision AS v
+                FROM readings r
+                JOIN kpi_config k ON r.kpi_config_id = k.id
+                WHERE r.tank_id = :tank_id
+                  AND k.kpi_name = :lid_name
+                  AND r.timestamp >= :since
+                  {until_clause}
+            ),
+            ordered AS (
+                SELECT bucket_start, v,
+                       LAG(v) OVER (PARTITION BY bucket_start ORDER BY ts) AS prev_v
+                FROM bucketed
+            )
+            SELECT bucket_start,
+                   SUM(CASE WHEN v >= 0.5 AND (prev_v IS NULL OR prev_v < 0.5) THEN 1 ELSE 0 END)::integer AS open_events
+            FROM ordered
+            GROUP BY bucket_start
+            ORDER BY bucket_start ASC
+        """)
+        try:
+            rows = self.db.execute(
+                sql,
+                {
+                    "tank_id": tank_id,
+                    "since": since,
+                    "until": until,
+                    "bucket_sec": bucket_seconds,
+                    "lid_name": lid_kpi_name,
+                },
+            ).fetchall()
+        except Exception as e:
+            logger.error(f"Error in get_lid_open_events_by_bucket: {e}", exc_info=True)
+            self.db.rollback()
+            return {}
+        result: dict = {}
+        for row in rows:
+            bs = row.bucket_start
+            key = bs.isoformat() if hasattr(bs, "isoformat") else str(bs)
+            result[key] = int(row.open_events or 0)
+        return result
+
     def get_latest_tank_kpi_timestamp(self, tank_id: int) -> Optional[datetime]:
         """Return latest readings.timestamp for a tank (None when no data)."""
         try:

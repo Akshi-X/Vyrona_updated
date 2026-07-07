@@ -1456,6 +1456,41 @@ export class IvfService extends BaseApiService {
             },
         );
     }
+
+    async getRefillLogPageData(): Promise<{
+        tanks: Array<{
+            tank_id: number;
+            tank_code: string;
+            branch_name: string;
+            branch_id: number;
+            last_refill_date: string | null;
+            last_refill_time: string | null;
+            last_refilled_by: string | null;
+            last_description: string | null;
+            kpi_config_id: number | null;
+            kpi_status: boolean | null;
+            ln2_mass_kg: number | null;
+            ln2_config_min: number | null;
+            tank_max_capacity: number | null;
+            tank_min_capacity: number | null;
+        }>;
+        logs: Array<{
+            tank_id: number;
+            tank_code: string;
+            branch_name: string;
+            refill_date: string | null;
+            refill_time: string | null;
+            refilled_by: string | null;
+            description: string | null;
+            status: string | null;
+            refill_weight: number | null;
+        }>;
+    }> {
+        return await this.request("/api/quality-tracking/refill-log/page-data", {
+            method: "GET",
+        });
+    }
+
     // ── IVF Cycles ────────────────────────────────────────────────────────────
 
     async listCycles(params?: { his_id?: string; status?: string; incubator_id?: number; chamber_position?: string; skip?: number; limit?: number }): Promise<IvfCycle[]> {
@@ -1569,6 +1604,21 @@ export class IvfService extends BaseApiService {
 
     async deleteLog(cycleId: number, logId: number): Promise<void> {
         return this.request<void>(`/api/ivf/cycles/${cycleId}/logs/${logId}`, { method: 'DELETE' });
+    }
+
+    async getRefrigeratorDeviationsByCategory(fromTs: number, toTs: number): Promise<{
+        total: number;
+        categories: { kpi_name: string; label: string; count: number }[];
+    }> {
+        return this.request(`/api/ivf/refrigerator-dashboard/deviations-by-category?from_ts=${fromTs}&to_ts=${toTs}`);
+    }
+
+    async getRefrigeratorTopKpi(fromTs: number, toTs: number): Promise<{
+        kpi_name: string | null;
+        label: string;
+        count: number;
+    }> {
+        return this.request(`/api/ivf/refrigerator-dashboard/top-kpi?from_ts=${fromTs}&to_ts=${toTs}`);
     }
 }
 

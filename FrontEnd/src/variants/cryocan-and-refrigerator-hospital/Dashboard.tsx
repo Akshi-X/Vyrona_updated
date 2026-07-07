@@ -1,3 +1,10 @@
+/**
+ * @variant CryocanRefrigeratorHospitalDashboard
+ * @hospital ID: 9
+ * @route /dashboard
+ * @description Standard dashboard for hospital 9 (Cryocan & Refrigerator Hospital)
+ */
+
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
@@ -42,7 +49,6 @@ import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import ContainersIcon from '../../assets/DashBoardIcons/Containers.svg';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTracking.svg';
 import OutboundModelIcon from '../../assets/OutboundModel.svg';
-import IncubatorQualityTrackingIcon from '../../assets/DashBoardIcons/IncubatorQualityTracking.svg';
 //import QualityDeviationsIcon from '../../assets/DashBoardIcons/QualityDeviations.svg';
 import DeviationDriverIcon from '../../assets/flag-icon.svg';
 // import OutboundShipmentIcon from '../../assets/DashBoardIcons/OutbondShipment.svg';
@@ -50,7 +56,7 @@ import DeviationDriverIcon from '../../assets/flag-icon.svg';
 import { ivfService } from '../../services/ivfService';
 import type { IVFTreatment } from '../../types/ivf.ts';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
-import { Microscope } from 'lucide-react';
+import { Microscope, Refrigerator } from 'lucide-react';
 import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
 
 interface StakeholderChat {
@@ -87,6 +93,7 @@ export default function Dashboard({ }: DashboardProps) {
   const [trackError, setTrackError] = useState<string | undefined>(undefined);
   const [showTrackCanister, setShowTrackCanister] = useState(false);
   const [canisterError, setCanisterError] = useState<string | undefined>(undefined);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const [showOutboundQualityTracking, setShowOutboundQualityTracking] = useState(false);
   const [outboundQualityTrackingError, setOutboundQualityTrackingError] = useState<string | undefined>(undefined);
   const [loadingChats, setLoadingChats] = useState(false);
@@ -168,10 +175,10 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfTopDeviationDriverError, setIvfTopDeviationDriverError] = useState<string | null>(null);
 
 
-  // IVF incubator deviations metric
-  const [ivfIncubatorDeviations, setIvfIncubatorDeviations] = useState<number | null>(null);
-  const [ivfIncubatorTopDriver, setIvfIncubatorTopDriver] = useState<string | null>(null);
-  const [loadingIvfIncubatorDeviations, setLoadingIvfIncubatorDeviations] = useState(false);
+  // Refrigerator performance metrics
+  const [refrigeratorDeviations, setRefrigeratorDeviations] = useState<number | null>(null);
+  const [refrigeratorTopDriver, setRefrigeratorTopDriver] = useState<string | null>(null);
+  const [loadingRefrigeratorDeviations, setLoadingRefrigeratorDeviations] = useState(false);
 
   // IVF quality deviation chart data (live API data)
   const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
@@ -655,36 +662,41 @@ export default function Dashboard({ }: DashboardProps) {
     };
   }, [userDepartment, isAuthenticated]);
 
-
-  // Fetch IVF incubator deviations from API
+  // Fetch Refrigerator performance deviations from API
   useEffect(() => {
-    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    const shouldFetch = isAuthenticated;
     if (!shouldFetch) return;
 
     let cancelled = false;
-    const fetchIncubatorDeviations = async () => {
-      setLoadingIvfIncubatorDeviations(true);
+    const fetchRefrigeratorDeviations = async () => {
+      setLoadingRefrigeratorDeviations(true);
       try {
-        const response = await ivfService.getIncubatorDeviations();
+        const now = new Date();
+        const fromTs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        const toTs = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
+
+        const [devRes, topRes] = await Promise.all([
+          ivfService.getRefrigeratorDeviationsByCategory(fromTs, toTs),
+          ivfService.getRefrigeratorTopKpi(fromTs, toTs),
+        ]);
+
         if (!cancelled) {
-          setIvfIncubatorDeviations(response?.total_deviations ?? 0);
-          const sorted = Object.entries(response.deviations_by_kpi ?? {})
-            .sort(([, a], [, b]) => b - a);
-          setIvfIncubatorTopDriver(sorted[0]?.[0] ?? 'N/A');
+          setRefrigeratorDeviations(devRes?.total ?? 0);
+          setRefrigeratorTopDriver(topRes?.label ?? 'N/A');
         }
       } catch {
         if (!cancelled) {
-          setIvfIncubatorDeviations(0);
-          setIvfIncubatorTopDriver('N/A');
+          setRefrigeratorDeviations(0);
+          setRefrigeratorTopDriver('N/A');
         }
       } finally {
-        if (!cancelled) setLoadingIvfIncubatorDeviations(false);
+        if (!cancelled) setLoadingRefrigeratorDeviations(false);
       }
     };
 
-    fetchIncubatorDeviations();
+    fetchRefrigeratorDeviations();
     return () => { cancelled = true; };
-  }, [userDepartment, isAuthenticated]);
+  }, [isAuthenticated]);
 
   // Fetch IVF quality deviation chart from API
   useEffect(() => {
@@ -822,6 +834,10 @@ export default function Dashboard({ }: DashboardProps) {
       const severity: 'Low' | 'Medium' | 'High' | 'Critical' =
         ivfAlert.severity === 'High' ? 'High' :
         ivfAlert.severity === 'Medium' ? 'Medium' : 'Low';
+      // Determine device type based on presence of refrigerator_id or canister_id
+      const deviceType: 'CRYOCAN' | 'REFRIGERATOR' | undefined =
+        ivfAlert.refrigerator_id != null ? 'REFRIGERATOR' :
+        (ivfAlert.canister_id != null) ? 'CRYOCAN' : undefined;
       return {
         id: ivfAlert.alert_id,
         type: ivfAlert.alert_type,
@@ -838,7 +854,8 @@ export default function Dashboard({ }: DashboardProps) {
         message: ivfAlert.message,
         timestamp: new Date(ivfAlert.occurred_at+"Z")+"",
         status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated',
-        acknowledgementReason: ivfAlert.acknowledgment_reason
+        acknowledgementReason: ivfAlert.acknowledgment_reason,
+        deviceType
       };
     } else {
       const cgtAlert = alert as ServiceCriticalAlert;
@@ -1036,7 +1053,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   return (
     <>
-      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop patternBackground>
+      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop>
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
@@ -1044,7 +1061,7 @@ export default function Dashboard({ }: DashboardProps) {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex flex-col gap-0.5">
                   <p className="text-sm text-gray-500 font-normal min-h-[1.25rem]">
-                    {userWorkspaceName || '\u00A0'}
+                    {userWorkspaceName || ' '}
                   </p>
                   {(() => {
                     const hour = new Date().getHours();
@@ -1160,7 +1177,7 @@ export default function Dashboard({ }: DashboardProps) {
 
                   {/* Outbound Shipments Section */}
                   <section id="onboarding-dashboard-incubator">
-                    <h2 className="font-semibold text-black text-base mb-4">Incubator Performance</h2>
+                    <h2 className="font-semibold text-black text-base mb-4">Refrigerator Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Outbound Shipments */}
                       <div id="onboarding-dashboard-incubator-deviations" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
@@ -1172,14 +1189,14 @@ export default function Dashboard({ }: DashboardProps) {
                             Quality Deviations<br className="sm:hidden" /> Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {loadingIvfIncubatorDeviations
+                            {loadingRefrigeratorDeviations
                               ? '--'
-                              : <AnimatedNumber value={ivfIncubatorDeviations ?? 0} />}
+                              : <AnimatedNumber value={refrigeratorDeviations ?? 0} />}
                           </div>
                         </div>
                       </div>
 
-                      {/* Incubator Top Deviation Driver */}
+                      {/* Refrigerator Top Deviation Driver */}
                       <div id="onboarding-dashboard-incubator-driver" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
@@ -1188,10 +1205,10 @@ export default function Dashboard({ }: DashboardProps) {
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
                             Top Deviation<br className="sm:hidden" /> Driver
                           </div>
-                          <div className="font-semibold text-black text-[23px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={ivfIncubatorTopDriver || undefined}>
-                            {loadingIvfIncubatorDeviations
+                          <div className="font-semibold text-black text-[23px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={refrigeratorTopDriver || undefined}>
+                            {loadingRefrigeratorDeviations
                               ? '--'
-                              : ivfIncubatorTopDriver ?? 'N/A'}
+                              : refrigeratorTopDriver ?? 'N/A'}
                           </div>
                         </div>
                       </div>
@@ -1267,9 +1284,7 @@ export default function Dashboard({ }: DashboardProps) {
                       {/* Embryo Grading */}
                       <div
                         className="flex-1 bg-primary rounded-lg hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5 cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
-                        onClick={() => {
-                          // Embryo Grading: no redirect for now
-                        }}
+                        onClick={() => setShowComingSoon(true)}
                       >
                         {/* Background Graphic - Subtle Icon */}
                         <div className="absolute bottom-0 right-0 opacity-5 translate-x-[0%] translate-y-[15%]">
@@ -1294,7 +1309,7 @@ export default function Dashboard({ }: DashboardProps) {
                               className="w-[26px] h-[24px] bg-primary-muted rounded-tl-lg flex items-center justify-center transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Embryo Grading: no redirect for now
+                                setShowComingSoon(true);
                               }}
                             >
                               <img
@@ -1307,31 +1322,23 @@ export default function Dashboard({ }: DashboardProps) {
                         </div>
                       </div>
 
-                      {/* Incubator Quality Tracking */}
+                      {/* Refrigerator Quality Tracking */}
                       <div className="flex-1 bg-primary rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden  hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5">
                         {/* Background Graphic - Subtle Icon */}
                         <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
-                          <img
-                            className="w-24 h-24"
-                            alt="Incubator Quality Tracking background"
-                            src={IncubatorQualityTrackingIcon}
-                          />
+                          <Refrigerator size={96} className="text-white" />
                         </div>
 
                         {/* Content */}
                         <div className="relative h-full px-3 py-4">
                           {/* Icon at Top Left */}
                           <div className="absolute top-4 left-4">
-                            <img
-                              className="w-[18px] h-[18px] brightness-0 invert"
-                              alt="Incubator Quality Tracking"
-                              src={IncubatorQualityTrackingIcon}
-                            />
+                            <Refrigerator size={18} className="text-white" />
                           </div>
 
                           {/* Title - Left aligned */}
                           <div className="font-semibold text-white text-[11px] md:text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
-                            Incubator <br /> Quality Tracking
+                            Refrigerator <br /> Quality Tracking
                           </div>
 
                           {/* Arrow Button at Bottom Right */}
@@ -1376,7 +1383,7 @@ export default function Dashboard({ }: DashboardProps) {
 
               {/* Ongoing Treatments Section */}
               <section id="onboarding-dashboard-shipments" className="w-full">
-                <div className="flex flex-col bg-white border border-line rounded-2xl p-4 w-full overflow-x-auto">
+                <div className="flex flex-col border border-line rounded-2xl p-4 w-full overflow-x-auto">
                 <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
                   <div className="w-full">
@@ -2049,6 +2056,22 @@ export default function Dashboard({ }: DashboardProps) {
           navigate(`/outbound-quality-tracking/${encodeURIComponent(canisterId)}`);
         }}
       />
+
+      {/* Coming Soon Modal */}
+      {showComingSoon && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={() => setShowComingSoon(false)}>
+          <div className="bg-white rounded-2xl p-8 max-w-sm mx-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Coming Soon</h2>
+            <p className="text-gray-600 mb-6">This feature is currently under development. Stay tuned!</p>
+            <button
+              onClick={() => setShowComingSoon(false)}
+              className="w-full bg-primary text-white py-2 px-4 rounded-lg font-semibold hover:bg-[#7a1a88] transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
