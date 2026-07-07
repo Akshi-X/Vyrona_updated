@@ -10,7 +10,9 @@ services:
     volumes:
       - ..:/workspace:cached
       - devcontainer-bashhistory:/root/commandhistory
-      - vscode-server:/root/.vscode-server
+      - vscode-server:/home/vscode/.vscode-server
+      - claude-home:/home/vscode/.claude
+      - ${HOME}/.ssh:/home/vscode/.ssh-host:ro
     environment:
       - TERM=xterm-256color
     ports:
@@ -153,5 +155,5 @@ services:
 volumes:
   postgres_data:
   devcontainer-bashhistory:
-  azurite_data:
   vscode-server:
+  claude-home:
