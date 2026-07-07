@@ -141,8 +141,13 @@ class KPI_NAMES:
                 "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_LN2_EVAPORATION_RATE)
             })
         # Fix: Map lid_state string to 0 (closed) or 1 (open)
+        # Only publish this KPI when the reed switch itself reported the
+        # state (lid_state_kpi_eligible); a missing/0/unparsable reading
+        # falls back to the algorithmic estimate for internal use only and
+        # must not be surfaced as a KPI or trigger deviation alerts.
         lid_state = payload.get("lid_state")
-        if lid_state is not None:
+        lid_state_kpi_eligible = payload.get("lid_state_kpi_eligible", True)
+        if lid_state is not None and lid_state_kpi_eligible:
             if isinstance(lid_state, str):
                 if lid_state.upper() == "CLOSED":
                     lid_state_val = 0
