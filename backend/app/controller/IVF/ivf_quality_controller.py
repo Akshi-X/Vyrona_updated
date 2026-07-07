@@ -272,6 +272,32 @@ def _floor_to_bucket_iso(ts, bucket_minutes: int) -> str:
         return ''
 
 
+_LID_KPI_NAME = "ln2_lid_state"
+
+
+def _attach_lid_open_events(quality_service, tank_id: int, kpi_series: dict,
+                            since_utc: datetime, until_utc: datetime, bucket_minutes: int) -> None:
+    """Attach open_count (number of closed->open lid events per bucket, with cross-bucket
+    continuity) to the lid_state series, replacing the naive raw-reading open count."""
+    points = kpi_series.get(_LID_KPI_NAME)
+    if not points:
+        return
+    events_by_bucket = quality_service.get_lid_open_events_by_bucket(
+        tank_id, since_utc, bucket_minutes, lid_kpi_name=_LID_KPI_NAME, until=until_utc
+    )
+    if not events_by_bucket:
+        for point in points:
+            point['open_count'] = 0
+        return
+    remapped = {
+        _floor_to_bucket_iso(bucket_iso, bucket_minutes): count
+        for bucket_iso, count in events_by_bucket.items()
+    }
+    for point in points:
+        bucket_iso = _floor_to_bucket_iso(point.get('timestamp'), bucket_minutes)
+        point['open_count'] = remapped.get(bucket_iso, 0)
+
+
 def _attach_alert_counts(db: Session, tank_id: int, kpi_series: dict,
                           since_utc: datetime, until_utc: datetime, bucket_minutes: int) -> None:
     """Query critical_alerts for the time range, resolve kpi_config_id (extra_info) → kpi_name,
@@ -495,6 +521,7 @@ def get_tank_kpi_history(
         bucket_min = bucket_map.get(duration_minutes, AGG_BUCKET_MINUTES_24H)
         until_ts = latest_timestamp or datetime.now(timezone.utc)
         _attach_alert_counts(db, tank_id, kpi_series, since, until_ts, bucket_min)
+        _attach_lid_open_events(quality_service, tank_id, kpi_series, since, until_ts, bucket_min)
 
     return {
         "tank_code": tank.tank_code or f"T{tank_id}",
@@ -572,6 +599,7 @@ def get_tank_kpi_history_by_date(
 
     # aggregated returns oldest-first already; attach alert counts for custom date
     _attach_alert_counts(db, tank_id, kpi_series, since_utc, until_utc, bucket_minutes)
+    _attach_lid_open_events(quality_service, tank_id, kpi_series, since_utc, until_utc, bucket_minutes)
 
     return {
         "tank_code": tank.tank_code or f"T{tank_id}",

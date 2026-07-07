@@ -2018,9 +2018,9 @@ export default function AlertSetting() {
         <>
                 <PageLayout
                     title="Alert Configuration"
-                    description={refrigeratorOnly ? "Set temperature and humidity alert thresholds for each refrigerator." : undefined}
+                    description="Set alert thresholds for each device and KPI."
                     icon={CriticalAlertsIcon}
-                    patternBackground={refrigeratorOnly}
+                    patternBackground
                     actions={
                         <>
                             <div className="md:hidden">
@@ -2062,13 +2062,6 @@ export default function AlertSetting() {
                                                 className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "cryotanks" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
                                             >
                                                 Cryotanks
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setDirectionFilter("incubators")}
-                                                className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "incubators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
-                                            >
-                                                Incubators
                                             </button>
                                             <button
                                                 type="button"

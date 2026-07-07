@@ -50,9 +50,9 @@ const isDropdown = (item: NavItem): item is NavGroup =>
 const DASHBOARD_CHILD_PATHS = [
     "/dashboard",
     "/ivf-track-shipment",
-    "/incubator-tracking",
+    // "/incubator-tracking",
     "/refrigerator-tracking",
-    "/embryo-console",
+    // "/embryo-console",
 ];
 
 const isDashboardRoute = (pathname: string) =>
@@ -73,9 +73,9 @@ const ALL_NAV_ITEMS: NavItem[] = [
         children: [
             { label: "Overview",                  path: "/dashboard"          },
             { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
-            { label: "Incubator Tracking",         path: "/incubator-tracking" },
-            { label: "Refrigerator Tracking",      path: "/refrigerator-tracking" },
-            { label: "Embryo Console",              path: "/embryo-console"     },
+            // { label: "Incubator Tracking",      path: "/incubator-tracking"    },
+            { label: "Refrigerator Tracking",     path: "/refrigerator-tracking" },
+            // { label: "Embryo Console",          path: "/embryo-console"        },
         ],
     },
     { icon: DatabaseIconWhite,    label: "Database",            path: "/database"      },
@@ -87,7 +87,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
         dropdown: true,
         children: [
             { label: "Cryotanks",  path: "/alert-setting" },
-            { label: "Incubators", path: "/alert-setting?direction=incubators" },
+            // { label: "Incubators",    path: "/alert-setting?direction=incubators"    },
             { label: "Refrigerators", path: "/alert-setting?direction=refrigerators" },
         ],
     },
@@ -105,7 +105,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const isOnboardingCtx = useOnboardingMode();
     const isOnboarding = isOnboardingCtx || location.pathname.startsWith("/onboarding");
 
-    const [sidebarHeight, setSidebarHeight] = useState(window.innerHeight);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [dashboardOpen, setDashboardOpen] = useState(false);
     const [alertConfigOpen, setAlertConfigOpen] = useState(false);
@@ -119,12 +118,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     // Prefix path with /onboarding when in onboarding mode
     const resolvePath = (path: string) =>
         isOnboarding ? `/onboarding${path}` : path;
-
-    useEffect(() => {
-        const handleResize = () => setSidebarHeight(window.innerHeight);
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-    }, []);
 
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -205,10 +198,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             />
 
             <aside
-                className={`fixed left-0 top-0 w-60 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out ${
+                className={`fixed md:static left-0 top-0 w-60 h-screen md:h-auto shrink-0 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out ${
                     isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
                 }`}
-                style={{ height: sidebarHeight }}
             >
                 {/* Decorative background */}
                 <div className="absolute left-0 w-full pointer-events-none bottom-[8%] h-[50%] overflow-hidden opacity-30">

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import PageLayout from "../../components/PageLayout";
+import Modal from "../../components/Modal";
 import ContainersIcon from "../../assets/DashBoardIcons/Containers.svg";
 import { useAuth } from "../../contexts/AuthContext";
 import { ivfService, type IvfBranch, type RefillLogItem } from "../../services/ivfService";
-import { shipmentService } from "../../services/shipmentService";
 import { userService, type UserListItem } from "../../services/userService";
 
 type ContainerItem = {
@@ -19,6 +19,8 @@ type ContainerItem = {
     lastDescription?: string;
     lastLogDate?: string;
     lastLogTime?: string;
+    kpiConfigId?: number | null;   // kpi_config_id for ln2_level
+    kpiStatus?: boolean | null;    // status of ln2_level kpi_config
     ln2LevelKg?: number | null;   // raw kg from ln2_mass_kg
     ln2ConfigMin?: number | null;
     tankMaxCapacity?: number | null;
@@ -74,6 +76,8 @@ const RefillLog = () => {
     const [rejectSubmitting, setRejectSubmitting] = useState(false);
     const [pendingAddDetectionId, setPendingAddDetectionId] = useState<number | null>(null);
     const [detectionsLoading, setDetectionsLoading] = useState(true);
+    const [showAllDetectionsModal, setShowAllDetectionsModal] = useState(false);
+    const [detectionsModalBranch, setDetectionsModalBranch] = useState<string>("All");
     const detectionScrollRef = useRef<HTMLDivElement>(null);
     const scrollDetections = (dir: "left" | "right") => {
         if (!detectionScrollRef.current) return;
@@ -179,82 +183,61 @@ const RefillLog = () => {
     }, []);
 
     useEffect(() => {
-        const loadContainers = async () => {
+        const loadPageData = async () => {
             setContainersLoading(true);
+            setActivityLoading(true);
             try {
-                const data = await shipmentService.getActiveCanisters();
-                if (data?.branches && Array.isArray(data.branches)) {
-                    const flattened = data.branches.flatMap((branch, branchIndex: number) => {
-                        const list = branch.tanks || [];
-                        return (Array.isArray(list) ? list : []).map(
-                            (c: { tank_id: number; tank_code: string; updated_at: string | null }, idx: number): ContainerItem => ({
-                                id: String(c.tank_id ?? branchIndex * 1000 + idx),
-                                tankId: String(c.tank_id ?? branchIndex * 1000 + idx),
-                                tankCode: String(c.tank_code ?? `T${idx + 1}`),
-                                containerNo: String(c.tank_code ?? `Container ${idx + 1}`),
-                                branch: branch.branch_name ?? "N/A",
-                                branchId: branch.branch_id ?? null,
-                                lastRefillDate: c.updated_at
-                                    ? new Date(c.updated_at).toLocaleDateString("en-GB")
-                                    : "NA",
-                            }),
-                        );
-                    });
-                    // Single bulk call instead of 4 per tank
-                    const tankIdList = flattened.map((c) => Number(c.tankId));
-                    const summaryRes = await ivfService.getTanksRefillSummary(tankIdList).catch(() => null);
-                    const summary = summaryRes?.summary ?? {};
+                const pageData = await ivfService.getRefillLogPageData();
 
-                    const withLogs = flattened.map((c) => {
-                        const s = summary[c.tankId] ?? {};
-                        return {
-                            ...c,
-                            lastRefilledBy: s.last_refilled_by ?? "-",
-                            lastDescription: s.last_description ?? "-",
-                            lastLogDate: s.last_refill_date ?? "-",
-                            lastLogTime: s.last_refill_time ?? "-",
-                            ln2LevelKg: s.ln2_mass_kg ?? null,
-                            ln2ConfigMin: s.ln2_config_min ?? null,
-                            tankMaxCapacity: s.tank_max_capacity ?? null,
-                            tankMinCapacity: s.tank_min_capacity ?? null,
-                        };
-                    });
-                    setContainers(withLogs);
+                // Map tanks to containers
+                const containers: ContainerItem[] = (pageData?.tanks ?? []).map((tank) => ({
+                    id: String(tank.tank_id),
+                    tankId: String(tank.tank_id),
+                    tankCode: tank.tank_code ?? "-",
+                    containerNo: tank.tank_code ?? "-",
+                    branch: tank.branch_name ?? "N/A",
+                    branchId: tank.branch_id ?? null,
+                    lastRefillDate: tank.last_refill_date ? new Date(tank.last_refill_date).toLocaleDateString("en-GB") : "NA",
+                    lastRefilledBy: tank.last_refilled_by ?? "-",
+                    lastDescription: tank.last_description ?? "-",
+                    lastLogDate: tank.last_refill_date ?? "-",
+                    lastLogTime: tank.last_refill_time ?? "-",
+                    kpiConfigId: tank.kpi_config_id ?? null,
+                    kpiStatus: tank.kpi_status ?? null,
+                    ln2LevelKg: tank.ln2_mass_kg ?? null,
+                    ln2ConfigMin: tank.ln2_config_min ?? null,
+                    tankMaxCapacity: tank.tank_max_capacity ?? null,
+                    tankMinCapacity: tank.tank_min_capacity ?? null,
+                }));
+                setContainers(containers);
 
-                    // Single bulk call for all refill logs (activity log)
-                    setActivityLoading(true);
-                    try {
-                        const logsRes = await ivfService.getAllTanksRefillLogs(tankIdList).catch(() => null);
-                        const merged = (logsRes?.logs ?? []).map((log) => ({
-                            timestamp: (() => {
-                                if (!log.refill_date) return "-";
-                                const dt = new Date(`${log.refill_date}T${log.refill_time ?? "00:00:00"}`);
-                                const date = dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-                                const time = log.refill_time ? dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : null;
-                                return time ? `${date}, ${time}` : date;
-                            })(),
-                            sortKey: `${log.refill_date ?? ""}T${log.refill_time ?? ""}`,
-                            tankCode: log.tank_code ?? "-",
-                            branch: log.branch_name ?? "-",
-                            operator: log.refilled_by ?? "-",
-                            description: log.description ?? "-",
-                            status: log.status ?? "-",
-                            refillWeight: log.refill_weight ?? null,
-                        }));
-                        setAllActivityLogs(merged);
-                    } finally {
-                        setActivityLoading(false);
-                    }
-                } else {
-                    setContainers([]);
-                }
+                // Map logs to activity logs
+                const activityLogs = (pageData?.logs ?? []).map((log) => ({
+                    timestamp: (() => {
+                        if (!log.refill_date) return "-";
+                        const dt = new Date(`${log.refill_date}T${log.refill_time ?? "00:00:00"}`);
+                        const date = dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                        const time = log.refill_time ? dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : null;
+                        return time ? `${date}, ${time}` : date;
+                    })(),
+                    sortKey: `${log.refill_date ?? ""}T${log.refill_time ?? ""}`,
+                    tankCode: log.tank_code ?? "-",
+                    branch: log.branch_name ?? "-",
+                    operator: log.refilled_by ?? "-",
+                    description: log.description ?? "-",
+                    status: log.status ?? "-",
+                    refillWeight: log.refill_weight ?? null,
+                }));
+                setAllActivityLogs(activityLogs);
             } catch {
                 setContainers([]);
+                setAllActivityLogs([]);
             } finally {
                 setContainersLoading(false);
+                setActivityLoading(false);
             }
         };
-        if (isAuthenticated) loadContainers();
+        if (isAuthenticated) loadPageData();
     }, [isAuthenticated]);
 
     useEffect(() => {
@@ -338,6 +321,52 @@ const RefillLog = () => {
         if (selectedBranch === "All") return containers;
         return containers.filter((c) => c.branch === selectedBranch);
     }, [containers, selectedBranch]);
+
+    const sortedDetections = useMemo(() => {
+        return [...pendingDetections].sort((a, b) => {
+            if (!a.detected_at) return 1;
+            if (!b.detected_at) return -1;
+            return new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime();
+        });
+    }, [pendingDetections]);
+
+    const visibleDetections = useMemo(() => {
+        return sortedDetections.slice(0, 10);
+    }, [sortedDetections]);
+
+    const detectionBranchOptions = useMemo(() => {
+        const options = new Set<string>();
+        sortedDetections.forEach((d) => { if (d?.branch_name?.trim()) options.add(d.branch_name.trim()); });
+        return ["All", ...Array.from(options)];
+    }, [sortedDetections]);
+
+    const filteredDetectionsForModal = useMemo(() => {
+        if (detectionsModalBranch === "All") return sortedDetections;
+        return sortedDetections.filter((d) => d.branch_name === detectionsModalBranch);
+    }, [sortedDetections, detectionsModalBranch]);
+
+    const getDateLabel = (isoStr: string | null): string => {
+        if (!isoStr) return "Unknown";
+        const parsed = new Date(isoStr);
+        const today = new Date();
+        const itemDate = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const yesterdayDate = new Date(todayDate);
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        if (itemDate.getTime() === todayDate.getTime()) return "Today";
+        if (itemDate.getTime() === yesterdayDate.getTime()) return "Yesterday";
+        return itemDate.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    };
+
+    const groupedDetectionsForModal = useMemo(() => {
+        const grouped: Record<string, typeof filteredDetectionsForModal> = {};
+        filteredDetectionsForModal.forEach((d) => {
+            const label = getDateLabel(d.detected_at);
+            if (!grouped[label]) grouped[label] = [];
+            grouped[label].push(d);
+        });
+        return grouped;
+    }, [filteredDetectionsForModal]);
 
     const formatDetectedAt = (isoStr: string | null): string => {
         if (!isoStr) return "—";
@@ -469,6 +498,7 @@ const RefillLog = () => {
         <>
         <PageLayout
                 title="Refill Logs"
+                description="Track LN2 refill activities and reservoir inventory."
                 icon={ContainersIcon}
                 actions={
                     <button
@@ -535,6 +565,15 @@ const RefillLog = () => {
                                     <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-white text-[10px] font-bold">
                                         {pendingDetections.length}
                                     </span>
+                                    {pendingDetections.length > 10 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAllDetectionsModal(true)}
+                                            className="text-xs font-medium text-primary hover:text-[#5a0e63] transition-colors underline"
+                                        >
+                                            View All
+                                        </button>
+                                    )}
                                 </div>
                                 {/* Scroll arrows */}
                                 {pendingDetections.length > 1 && (
@@ -565,7 +604,7 @@ const RefillLog = () => {
                                 className="flex gap-3 overflow-x-auto pb-1 w-fit max-w-full"
                                 style={{ scrollbarWidth: "none" }}
                             >
-                                {pendingDetections.map((detection, detIdx) => {
+                                {visibleDetections.map((detection, detIdx) => {
                                     const isDismissing = dismissingId === detection.id;
                                     const detectedAtParts = detection.detected_at
                                         ? (() => {
@@ -580,7 +619,7 @@ const RefillLog = () => {
                                         <div
                                             key={detection.id}
                                             id={detIdx === 0 ? "onboarding-refill-first-card" : undefined}
-                                            className="flex-none w-[460px] rounded-xl border-2 border-[#E7D4F0] bg-gradient-to-br from-primary-bg/60 to-white p-4 flex flex-col gap-3"
+                                            className="flex-none w-[380px] rounded-xl border-2 border-[#E7D4F0] bg-gradient-to-br from-primary-bg/60 to-white p-4 flex flex-col gap-3"
                                             style={{
                                                 transition: "opacity 0.25s ease, transform 0.25s ease",
                                                 opacity: isDismissing ? 0 : 1,
@@ -649,6 +688,16 @@ const RefillLog = () => {
                                         </div>
                                     );
                                 })}
+                                {pendingDetections.length > 10 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAllDetectionsModal(true)}
+                                        className="flex-none w-[180px] rounded-xl border-2 border-dashed border-[#E7D4F0] flex flex-col items-center justify-center gap-2 text-primary text-xs font-medium hover:bg-primary-bg transition-colors"
+                                    >
+                                        <span>View All</span>
+                                        <span className="text-[10px] text-gray-400">{pendingDetections.length} detections</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                 )}
@@ -685,6 +734,9 @@ const RefillLog = () => {
                                     </div>
                                 ))
                             )}
+                            {!containersLoading && filteredContainers.length === 0 && (
+                                <div className="p-4 text-xs text-gray-500">No containers found.</div>
+                            )}
                             {!containersLoading && filteredContainers.map((container, cIdx) => (
                                 <div
                                     key={container.id}
@@ -698,20 +750,19 @@ const RefillLog = () => {
                                         <span className="text-xs text-gray-500 truncate block">{container.branch}</span>
                                     </div>
                                     {/* LN2 Level progress bar */}
-                                    <div className="px-2">
-                                        {container.ln2LevelKg != null ? (() => {
-                                            const ln2_100per =
-                                                container.tankMaxCapacity != null && container.tankMinCapacity != null
-                                                    ? container.tankMaxCapacity - container.tankMinCapacity
-                                                    : null;
-                                            const ln2Pct = container.ln2LevelKg != null && ln2_100per != null && ln2_100per > 0
-                                                ? Math.min(100, Math.floor((container.ln2LevelKg / ln2_100per) * 100))
+                                    <div className="px-2 flex flex-col items-stretch gap-0.5">
+                                        {container.ln2LevelKg != null && container.kpiStatus === true ? (() => {
+                                            const usableCapacity = container.tankMaxCapacity != null && container.tankMinCapacity != null
+                                                ? container.tankMaxCapacity - container.tankMinCapacity
                                                 : null;
-                                            const l2Pct = container.ln2ConfigMin != null && ln2_100per != null && ln2_100per > 0
-                                                ? Math.floor((container.ln2ConfigMin / ln2_100per) * 100)
+                                            const ln2Pct = container.ln2LevelKg != null && usableCapacity != null && usableCapacity > 0
+                                                ? Math.min(100, Math.max(0, Math.floor((container.ln2LevelKg / usableCapacity) * 100)))
+                                                : null;
+                                            const l2Pct = container.ln2ConfigMin != null && usableCapacity != null && usableCapacity > 0
+                                                ? Math.floor((container.ln2ConfigMin / usableCapacity) * 100)
                                                 : null;
                                             return (
-                                                <div className="flex flex-col items-stretch gap-0.5">
+                                                <>
                                                     {/* Bar */}
                                                     <div className="relative h-2.5 rounded-full bg-[#E7D4F0] overflow-visible">
                                                         {ln2Pct != null && (
@@ -734,10 +785,10 @@ const RefillLog = () => {
                                                             <span className="text-[10px] text-orange-500 font-medium">L2 - {l2Pct}%</span>
                                                         )}
                                                     </div>
-                                                </div>
+                                                </>
                                             );
                                         })() : (
-                                            <span className="text-xs text-gray-400">—</span>
+                                            <span className="text-xs text-gray-400 self-center">—</span>
                                         )}
                                     </div>
                                     <div className="flex items-center justify-center gap-1.5">
@@ -771,8 +822,8 @@ const RefillLog = () => {
                             <div id="onboarding-refill-reservoir-svg-panel" className="relative flex flex-col items-center justify-center shrink-0 px-3 py-3 gap-3 border-r border-line max-[880px]:border-r-0 max-[880px]:border-b">
                                 {/* Coming Soon overlay — hidden during onboarding */}
                                 {!isOnboarding && (
-                                    <div className="absolute inset-0 backdrop-blur-sm bg-white/40 rounded z-10 flex items-center justify-center">
-                                        <span className="px-3 py-1 text-xs font-semibold text-primary bg-primary-bg border border-[#d8b4fe] rounded-full shadow-sm">Coming Soon</span>
+                                    <div className="absolute inset-0 backdrop-blur-3xl bg-white/40 rounded z-10 flex items-center justify-center">
+                                        <img src="/res.png" alt="Coming Soon" className="max-w-[90%] max-h-[90%] object-contain" />
                                     </div>
                                 )}
                                 {(() => {
@@ -1028,59 +1079,51 @@ const RefillLog = () => {
                         </div>
                     </div>
                     <div className="flex-1 overflow-auto min-h-0">
-                        {activityLoading ? (
-                            <table className="w-full text-sm">
-                                <tbody>
-                                    {[0,1,2,3,4].map((i) => (
-                                        <tr key={i} className="border-b border-gray-100">
-                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-32 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
-                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-12 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
-                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-20 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
-                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-24 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
-                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-36 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
-                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-16 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        ) : (
-                        <table className="w-full text-sm">
-                            <thead className="sticky top-0 bg-white z-10">
-                                <tr className="border-b border-line">
-                                    <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Timestamp</th>
-                                    <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Tank</th>
-                                    <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Branch</th>
-                                    <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Operator</th>
-                                    <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Description</th>
-                                    <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Refill Weight</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {allActivityLogs.filter((r) => activityBranch === "All" || r.branch === activityBranch).map((row, i) => (
-                                    <tr key={i} className="hover:bg-gray-50">
-                                        <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{row.timestamp}</td>
-                                        <td className="px-4 py-2.5 font-semibold text-primary whitespace-nowrap">{row.tankCode}</td>
-                                        <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{row.branch}</td>
-                                        <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{row.operator}</td>
-                                        <td className="px-4 py-2.5 text-gray-500 max-w-[160px] truncate">{row.description}</td>
-                                        <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{row.refillWeight != null ? `${row.refillWeight} kg` : "-"}</td>
-                                    </tr>
-                                ))}
-                                {allActivityLogs.filter((r) => activityBranch === "All" || r.branch === activityBranch).length === 0 && (
-                                    <tr>
-                                        <td colSpan={6} className="px-5 py-6 text-center text-sm text-gray-400">No recent activity.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                        )}
+                        {/* Header */}
+                        <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,120px)_minmax(0,110px)_minmax(0,110px)_minmax(0,140px)_minmax(0,100px)] px-4 py-2 bg-primary-bg text-xs font-semibold text-primary shrink-0 sticky top-0 z-10">
+                            <div>Timestamp</div>
+                            <div>Tank</div>
+                            <div>Branch</div>
+                            <div>Operator</div>
+                            <div>Description</div>
+                            <div className="text-right">Refill Weight</div>
+                        </div>
+
+                        {/* Rows */}
+                        <div className="divide-y divide-gray-100">
+                            {activityLoading && (
+                                [0,1,2,3,4].map((i) => (
+                                    <div key={i} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,120px)_minmax(0,110px)_minmax(0,110px)_minmax(0,140px)_minmax(0,100px)] px-4 py-2.5 items-center gap-x-2">
+                                        <div className="relative overflow-hidden h-3 w-32 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                        <div className="relative overflow-hidden h-3 w-12 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                        <div className="relative overflow-hidden h-3 w-20 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                        <div className="relative overflow-hidden h-3 w-24 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                        <div className="relative overflow-hidden h-3 w-36 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                        <div className="relative overflow-hidden h-3 w-16 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                    </div>
+                                ))
+                            )}
+                            {!activityLoading && allActivityLogs.filter((r) => activityBranch === "All" || r.branch === activityBranch).map((row, i) => (
+                                <div key={i} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,120px)_minmax(0,110px)_minmax(0,110px)_minmax(0,140px)_minmax(0,100px)] px-4 py-2.5 items-center hover:bg-gray-50">
+                                    <div className="text-xs text-gray-600">{row.timestamp}</div>
+                                    <div className="text-xs font-semibold text-primary">{row.tankCode}</div>
+                                    <div className="text-xs text-gray-600">{row.branch}</div>
+                                    <div className="text-xs text-gray-600">{row.operator}</div>
+                                    <div className="text-xs text-gray-500 truncate">{row.description}</div>
+                                    <div className="text-right text-xs text-gray-600">{row.refillWeight != null ? `${row.refillWeight} kg` : "-"}</div>
+                                </div>
+                            ))}
+                            {!activityLoading && allActivityLogs.filter((r) => activityBranch === "All" || r.branch === activityBranch).length === 0 && (
+                                <div className="px-5 py-6 text-center text-sm text-gray-400">No recent activity.</div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </PageLayout>
 
             {/* Add Refill / Reservoir Modal */}
             {isAddRefillOpen && (
-                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[110] bg-black/40 flex items-center justify-center p-4">
                     <div id="onboarding-refill-add-modal" className="w-full max-w-xl bg-white rounded-lg border border-line p-5">
                         {/* Header */}
                         <div className="flex items-center justify-between mb-4">
@@ -1390,6 +1433,123 @@ const RefillLog = () => {
                     </div>
                 </div>
             )}
+            {/* All Detections Modal */}
+            <Modal
+                isOpen={showAllDetectionsModal}
+                onClose={() => setShowAllDetectionsModal(false)}
+                title="Refill Detected"
+                description={`${pendingDetections.length} pending detections`}
+                containerClassName="max-w-[700px]"
+                headerAction={
+                    <select
+                        value={detectionsModalBranch}
+                        onChange={(e) => setDetectionsModalBranch(e.target.value)}
+                        className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors"
+                    >
+                        {detectionBranchOptions.map((branch) => (
+                            <option key={branch} value={branch}>
+                                {branch === "All" ? "All Branches" : branch}
+                            </option>
+                        ))}
+                    </select>
+                }
+            >
+                <div className="space-y-4">
+                    {Object.entries(groupedDetectionsForModal).map(([dateLabel, detections]) => (
+                        <div key={dateLabel} className="space-y-2">
+                            <div className="inline-flex items-center rounded-full bg-[#f0f0f0] px-3 py-1 text-sm font-medium text-[#3a3a3a]">
+                                {dateLabel}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {detections.map((detection) => {
+                                    const isDismissing = dismissingId === detection.id;
+                                    const detectedAtParts = detection.detected_at
+                                        ? (() => {
+                                            const dt = new Date(detection.detected_at);
+                                            return {
+                                                date: dt.toISOString().slice(0, 10),
+                                                time: dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+                                            };
+                                          })()
+                                        : null;
+                                    return (
+                                        <div
+                                            key={detection.id}
+                                            className="rounded-xl border-2 border-[#E7D4F0] bg-gradient-to-br from-primary-bg/60 to-white p-3 flex flex-col gap-3"
+                                            style={{
+                                                transition: "opacity 0.25s ease, transform 0.25s ease",
+                                                opacity: isDismissing ? 0 : 1,
+                                                transform: isDismissing ? "scale(0.95)" : "scale(1)",
+                                            }}
+                                        >
+                                            {/* Tile top row: tank badge + dismiss */}
+                                            <div className="flex items-start justify-between">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary-bg text-primary text-xs font-semibold">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                                                    </svg>
+                                                    {detection.tank_code ?? "—"}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setRejectDialogId(detection.id); setRejectReason(""); }}
+                                                    className="w-6 h-6 rounded-md flex items-center justify-center bg-white border border-gray-200 hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+                                                    aria-label="Reject detection"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                        <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+
+                                            {/* Info */}
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[11px] text-gray-400 w-20 shrink-0">Branch</span>
+                                                    <span className="text-[12px] font-medium text-gray-800 truncate">{detection.branch_name ?? "—"}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[11px] text-gray-400 w-20 shrink-0">Date & Time</span>
+                                                    <span className="text-[12px] font-medium text-gray-800">{formatDetectedAt(detection.detected_at)}</span>
+                                                </div>
+                                                {detection.refill_weight !== null && (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[11px] text-gray-400 w-20 shrink-0">Weight</span>
+                                                        <span className="text-[12px] font-medium text-gray-800">{detection.refill_weight} kg</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Add Logs button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setPendingAddDetectionId(detection.id);
+                                                    resetAddForm(detectedAtParts?.date, detectedAtParts?.time, detection.refill_weight);
+                                                    setSelectedTankId(String(detection.tank_id));
+                                                    setAddModalTab("refill");
+                                                    setIsAddRefillOpen(true);
+                                                }}
+                                                className="w-full flex items-center justify-center gap-1.5 px-5 h-9 rounded-lg bg-primary text-white text-xs font-medium hover:bg-[#5a0e63] transition-colors"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                    <path d="M12 5v14M5 12h14" />
+                                                </svg>
+                                                Add Logs
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                    {Object.keys(groupedDetectionsForModal).length === 0 && (
+                        <div className="text-center py-8">
+                            <p className="text-sm text-gray-400">No detections found for this branch.</p>
+                        </div>
+                    )}
+                </div>
+            </Modal>
         </>
     );
 };
