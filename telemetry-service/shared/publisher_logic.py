@@ -1138,6 +1138,10 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
             device_code,
             explicit_lid_state,
         )
+        # Only a reed-switch value of 1 (CLOSED) or 2 (OPEN) makes lid_state
+        # eligible for KPI/alerting; missing, 0, or unparsable values fall
+        # back to the algorithmic state machine for internal use only.
+        lid_state_kpi_eligible = explicit_lid_state is not None
 
         if not device_code or not timestamp_str:
             logger.warning("Missing required CUSTOM_IOT fields (deviceid or timestamp)")
@@ -1619,6 +1623,7 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
             "evaporation_rate_kg_per_day": round(cfg.static_evap_kg_per_hour * 24.0, 8),
             "rate_source": rate_source,
             "lid_state": current_state.value,
+            "lid_state_kpi_eligible": lid_state_kpi_eligible,
             "refill_detected": refill_detected,
             "refill_event": refill_event_triggered,
             "refill_amount_kg": refill_amount_kg,
