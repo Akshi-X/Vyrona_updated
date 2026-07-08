@@ -4,9 +4,11 @@
   "service": "backend",
   "workspaceFolder": "/workspace",
   "postCreateCommand": "cd /workspace/backend && poetry config virtualenvs.in-project true && poetry install --only=main && cd /workspace/FrontEnd && npm install",
+  "postStartCommand": "bash .devcontainer/postStart.sh",
   "customizations": {
     "vscode": {
       "extensions": [
+        "anthropic.claude-code",
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-python.debugpy",
@@ -18,7 +20,7 @@
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "editor.formatOnSave": true,
+        "editor.formatOnSave": false,
         "[python]": {
           "editor.defaultFormatter": "charliermarsh.ruff"
         }
