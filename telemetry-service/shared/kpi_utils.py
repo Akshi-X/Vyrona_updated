@@ -1,7 +1,7 @@
 
 from sqlalchemy import text
 from .redis_client import get_redis_client
-from shared.alert_api_client import trigger_immediate_alert_email, check_and_create_alerts
+from shared.alert_api_client import trigger_immediate_alert_email, check_and_create_alerts, check_and_create_refrigerator_kpi_alerts
 
 import json
 import logging
@@ -51,10 +51,15 @@ class KPI_NAMES:
     IVF_TIVE_BATTERY_PERCENTAGE = "tive_battery_percentage"
     IVF_LN2_LID_STATE = "ln2_lid_state"
 
+    REFRIGERATOR_TEMP = "refrigerator_temp"
+    REFRIGERATOR_HUMIDITY = "refrigerator_humidity"
+
     def get_unit_for_kpi(kpi_name):
         """Return the unit for a given KPI name."""
-        if kpi_name in [KPI_NAMES.IVF_TEMPERATURE_INTERNAL, KPI_NAMES.IVF_TEMPERATURE_EXTERNAL]:
+        if kpi_name in [KPI_NAMES.IVF_TEMPERATURE_INTERNAL, KPI_NAMES.IVF_TEMPERATURE_EXTERNAL, KPI_NAMES.REFRIGERATOR_TEMP]:
             return "°C"
+        elif kpi_name in [KPI_NAMES.REFRIGERATOR_HUMIDITY]:
+            return "%"
         elif kpi_name in [KPI_NAMES.IVF_LN2_LEVEL]:
             return "Kg"
         elif kpi_name in [KPI_NAMES.IVF_LN2_EVAPORATION_RATE]:
@@ -312,6 +317,20 @@ def get_kpi_config_for_kpi_name(db_session, kpi_name: str, tank_id: str) -> list
         config_list.append(dict(r))
     return config_list
 
+def get_kpi_config_for_refrigerator_zone(db_session, kpi_name: str, refrigerator_id: int, zone_id: str) -> list[dict]:
+    query = text("""
+        SELECT * FROM kpi_config
+        WHERE refrigerator_id = :refrigerator_id
+          AND zone_id = :zone_id
+          AND kpi_name = :kpi_name
+    """)
+    result = db_session.execute(query, {
+        "refrigerator_id": refrigerator_id,
+        "zone_id": zone_id,
+        "kpi_name": kpi_name,
+    })
+    return [dict(row._mapping) for row in result.fetchall()]
+
 def get_tank_code_for_device_code(db_session, device_code: str) -> str:
     """
     Fetch the tank code associated with a given device code.
@@ -440,6 +459,110 @@ def publish_kpi_readings_to_redis(tank_id, tank_code, kpi_readings: list[dict]):
     except Exception as e:
         logger.error(f"Error publishing KPI readings to Redis: {e}")
         return False  # Non-criticalv
+
+def publish_refrigerator_kpi_readings_to_redis(refrigerator_id: int, refrigerator_code: str, zone_id: str, kpi_readings: list[dict]):
+    try:
+        r = get_redis_client()
+        data_json = json.dumps({
+            "refrigerator_id": refrigerator_id,
+            "refrigerator_code": refrigerator_code,
+            "zone_id": zone_id,
+            "kpis": kpi_readings,
+        })
+        r.publish("refrigerator_kpi_readings_channel", data_json)
+        logger.info(f"Published to refrigerator_kpi_readings_channel (refrigerator_code={refrigerator_code}, zone_id={zone_id})")
+        return True
+    except Exception as e:
+        logger.error(f"Error publishing refrigerator KPI readings to Redis: {e}")
+        return False
+
+def save_refrigerator_kpi_readings(
+    db_session,
+    refrigerator_id: int,
+    zone_id: str,
+    refrigerator_code: str,
+    hospital_id: int,
+    branch_id: int,
+    kpi_readings: list[dict],
+):
+    VALID_REFRIGERATOR_KPI_NAMES = {
+        KPI_NAMES.REFRIGERATOR_TEMP,
+        KPI_NAMES.REFRIGERATOR_HUMIDITY,
+        KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE,
+    }
+
+    for reading in kpi_readings:
+        kpi_name = reading["name"]
+
+        if kpi_name not in VALID_REFRIGERATOR_KPI_NAMES:
+            logger.warning(f"KPI name '{kpi_name}' not valid for refrigerator. Skipping.")
+            continue
+
+        kpi_configs = get_kpi_config_for_refrigerator_zone(db_session, kpi_name, refrigerator_id, zone_id)
+        logger.info(f"Fetched KPI configs for '{kpi_name}', refrigerator_id={refrigerator_id}, zone_id={zone_id}: {kpi_configs}")
+
+        if reading.get("value") is None:
+            logger.info(f"KPI value is None for '{kpi_name}'. Skipping.")
+            continue
+
+        try:
+            kpi_value = float(reading["value"])
+        except Exception as e:
+            logger.error(f"Failed to convert KPI value for '{kpi_name}': {e}")
+            continue
+
+        alert_level, kpi_config_id, send_alert = KPI_ALERTS.check_deviation_from_thresholds(kpi_value, kpi_configs)
+        logger.info(f"Deviation check for '{kpi_name}': alert_level={alert_level}, kpi_config_id={kpi_config_id}")
+
+        if kpi_config_id is None and kpi_configs:
+            kpi_config_id = kpi_configs[0].get("id")
+
+        if kpi_config_id is None:
+            logger.info(f"No kpi_config_id for '{kpi_name}' on refrigerator {refrigerator_id}/{zone_id}. Skipping insert.")
+            continue
+
+        query = text("""
+            INSERT INTO readings (hospital_id, branch_id, refrigerator_id, zone_id,
+                                  kpi_config_id, kpi_value, timestamp,
+                                  deviation_alert_sent, deviation)
+            VALUES (:hospital_id, :branch_id, :refrigerator_id, :zone_id,
+                    :kpi_config_id, :kpi_value, :timestamp,
+                    :deviation_alert_sent, :deviation)
+        """)
+        try:
+            db_session.execute(query, {
+                "hospital_id": hospital_id,
+                "branch_id": branch_id,
+                "refrigerator_id": refrigerator_id,
+                "zone_id": zone_id,
+                "kpi_config_id": kpi_config_id,
+                "kpi_value": kpi_value,
+                "timestamp": reading["timestamp"],
+                "deviation_alert_sent": send_alert if send_alert is not None else False,
+                "deviation": alert_level != KPI_ALERTS.NO_ALERT,
+            })
+            logger.info(f"Inserted refrigerator KPI reading for '{kpi_name}' (kpi_config_id={kpi_config_id}).")
+        except Exception as e:
+            logger.error(f"Failed to insert refrigerator KPI reading for '{kpi_name}': {e}")
+
+    try:
+        db_session.commit()
+        logger.info("Committed refrigerator KPI readings to database.")
+    except Exception as e:
+        logger.error(f"Failed to commit refrigerator KPI readings: {e}")
+
+    try:
+        publish_refrigerator_kpi_readings_to_redis(refrigerator_id, refrigerator_code, zone_id, kpi_readings)
+    except Exception as e:
+        logger.error(f"Failed to publish refrigerator KPI readings to Redis: {e}")
+
+    try:
+        check_and_create_refrigerator_kpi_alerts(refrigerator_id, zone_id)
+        logger.info(f"Triggered alert check for refrigerator_id={refrigerator_id}, zone_id={zone_id}")
+    except Exception as e:
+        logger.error(f"Failed to trigger refrigerator alert check: {e}")
+
+    return True
 
 def save_kpi_readings(db_session, device_code:str, kpi_readings: list[dict]):
     """

@@ -131,6 +131,29 @@ def get_hospital_alerts(
         raise HTTPException(status_code=500, detail=f"Error getting hospital alerts: {str(e)}")
 
 
+@router.get("/hospital/refrigerators", response_model=HospitalAlertsResponse)
+def get_hospital_refrigerator_alerts(
+    request: Request,
+    status: Optional[AlertStatus] = Query(None, description="Filter by alert status (Active, Acknowledged)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all refrigerator alerts for the hospital (refrigerator_id IS NOT NULL).
+    Scoped to the user's branch (User) or hospital (Manager/Admin).
+    """
+    try:
+        branch_id, role = get_branch_filter_info(request)
+        hospital_id = getattr(getattr(request.state, "current_user", None), "hospital_id", None)
+        service = CriticalAlertService(db)
+        return service.get_hospital_refrigerator_alerts(
+            branch_id=branch_id, hospital_id=hospital_id, role=role, status=status
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting hospital refrigerator alerts: {str(e)}")
+
+
 @router.post("/acknowledge", response_model=AcknowledgeAlertResponse)
 def acknowledge_alert(
     request_data: AcknowledgeAlertRequest,
@@ -287,6 +310,45 @@ def check_and_create_kpi_deviation_alerts(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking and creating alerts: {str(e)}")
+
+
+class CheckRefrigeratorKpiRequest(BaseModel):
+    refrigerator_id: int
+    zone_id: Optional[str] = None
+
+
+@router.post("/check_kpi_refrigerator")
+def check_and_create_refrigerator_kpi_deviation_alerts(
+    payload: CheckRefrigeratorKpiRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Check unchecked KPI deviation readings for a refrigerator zone and create alerts.
+
+    Request Body:
+    refrigerator_id: the refrigerator id to check.
+    zone_id: optional zone to scope the check.
+
+    Returns:
+    A list of newly created alerts.
+    """
+    try:
+        service = CriticalAlertService(db)
+        alerts = service.check_and_create_alert_for_refrigerator_kpi_deviations(
+            payload.refrigerator_id, payload.zone_id
+        )
+        return CriticalAlertListResponse(
+            acknowledged_count=0,
+            active_count=len(alerts),
+            alerts=alerts,
+            total_count=len(alerts),
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking refrigerator alerts: {str(e)}")
 
 
 @router.post("/check", response_model=CriticalAlertListResponse)

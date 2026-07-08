@@ -1036,7 +1036,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   return (
     <>
-      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop>
+      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop patternBackground>
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
@@ -1376,7 +1376,7 @@ export default function Dashboard({ }: DashboardProps) {
 
               {/* Ongoing Treatments Section */}
               <section id="onboarding-dashboard-shipments" className="w-full">
-                <div className="flex flex-col border border-line rounded-2xl p-4 w-full overflow-x-auto">
+                <div className="flex flex-col bg-white border border-line rounded-2xl p-4 w-full overflow-x-auto">
                 <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
                   <div className="w-full">

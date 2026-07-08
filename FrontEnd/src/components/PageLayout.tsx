@@ -10,11 +10,20 @@ type PageLayoutProps = {
     actions?: ReactNode;
     children: ReactNode;
     hideHeaderOnDesktop?: boolean;
+    /** Repeating refrigerator pattern behind the content (hospital-8 variant). */
+    patternBackground?: boolean;
 };
 
-const PageLayout = ({ title, description, icon, iconAlt, lucideIcon, actions, children, hideHeaderOnDesktop = false }: PageLayoutProps) => {
+const PageLayout = ({ title, description, icon, iconAlt, lucideIcon, actions, children, hideHeaderOnDesktop = false, patternBackground = false }: PageLayoutProps) => {
     return (
-        <main id="onboarding-page-layout" className="flex flex-col h-screen overflow-hidden page-enter">
+        <main id="onboarding-page-layout" className={`flex flex-col h-screen overflow-hidden page-enter ${patternBackground ? "relative isolate" : ""}`}>
+            {patternBackground && (
+                <div
+                    aria-hidden
+                    className="absolute inset-0 -z-10 pointer-events-none"
+                    style={{ backgroundImage: "url(/ivf_pattern.png)", backgroundSize: "20%", backgroundRepeat: "repeat", opacity: 0.35 }}
+                />
+            )}
             <div className={`${hideHeaderOnDesktop ? "md:hidden" : "md:px-6 md:pt-10 md:pb-6"} flex-shrink-0 px-4`}>
                 <PageHeader title={title} description={description} icon={icon} iconAlt={iconAlt} lucideIcon={lucideIcon} actions={actions} />
             </div>
