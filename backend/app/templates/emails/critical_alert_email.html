@@ -32,7 +32,7 @@
                     <tr>
                         <td style="padding: 30px;">
                             <h2 style="margin: 0 0 15px 0; font-size: 18px; color: #6B1176; font-weight: 600;">Critical Alert Detected</h2>
-                            <p style="margin: 0 0 20px 0; font-size: 14px; color: #374151; line-height: 1.6;">A critical alert has been triggered for one of your canisters. Please review the details below:</p>
+                            <p style="margin: 0 0 20px 0; font-size: 14px; color: #374151; line-height: 1.6;">A critical alert has been triggered. Please review the details below:</p>
                             
                             <!-- Alert Details Card -->
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {% if severity == 'High' %}#FEF2F2{% elif severity == 'Medium' %}#FFFBEB{% else %}#EFF6FF{% endif %}; border-left: 4px solid {% if severity == 'High' %}#DC2626{% elif severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %}; margin: 20px 0;">
@@ -47,11 +47,6 @@
                                             <tr>
                                                 <td style="padding: 8px 0; font-size: 14px; color: #374151;">
                                                     <strong style="color: {% if severity == 'High' %}#DC2626{% elif severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %};">⚡ Severity:</strong> {{ severity }}
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td style="padding: 8px 0; font-size: 14px; color: #374151;">
-                                                    <strong style="color: {% if severity == 'High' %}#DC2626{% elif severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %};">📦 Canister Number:</strong> {{ canister_number or canister_id }}
                                                 </td>
                                             </tr>
                                             <tr>

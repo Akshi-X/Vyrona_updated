@@ -159,6 +159,8 @@ class UnreadMessageResponse(BaseModel):
     message_content: str
     patient_id: Optional[str] = None  # For CGT flow
     tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
+    refrigerator_id: Optional[int] = None  # For refrigerator flow
+    refrigerator_code: Optional[str] = None  # For refrigerator flow
     patient_name: Optional[str] = None  # Patient name for CGT
     sender_id: str
     sender_name: str

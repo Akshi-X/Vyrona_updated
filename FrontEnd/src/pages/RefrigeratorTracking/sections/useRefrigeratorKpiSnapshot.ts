@@ -4,18 +4,18 @@ import { authUtils } from '../../../utils/auth';
 import { ivfService } from '../../../services/ivfService';
 
 const REFRIGERATOR_KPI_ORDER = [
-  'freezer_temperature',
-  'refrigerator_temperature',
+  'refrigerator_humidity',
+  'refrigerator_temp',
 ] as const;
 
 const KPI_LABELS: Record<string, string> = {
-  freezer_temperature: 'Freezer Temperature',
-  refrigerator_temperature: 'Refrigerator Temperature',
+  refrigerator_humidity: 'Humidity',
+  refrigerator_temp: 'Temperature',
 };
 
 const KPI_UNITS: Record<string, string> = {
-  freezer_temperature: '°C',
-  refrigerator_temperature: '°C',
+  refrigerator_humidity: '%',
+  refrigerator_temp: '°C',
 };
 
 const parseTimestampToMs = (timestamp?: string): number | null => {
@@ -26,6 +26,17 @@ const parseTimestampToMs = (timestamp?: string): number | null => {
   const normalized = hasTimezone ? trimmedMicroseconds : `${trimmedMicroseconds}Z`;
   const parsed = new Date(normalized).getTime();
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const parseDbTimestamp = (ts: string): { tsMs: number; isoIST: string } | null => {
+  if (!ts) return null;
+  const norm = ts.trim().replace(' ', 'T');
+  const withZ = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(norm) ? norm : `${norm}Z`;
+  const d = new Date(withZ);
+  if (isNaN(d.getTime())) return null;
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istMs = d.getTime() + istOffset;
+  return { tsMs: d.getTime(), isoIST: new Date(istMs).toISOString() };
 };
 
 const normalizeKpiValue = (rawValue: unknown): number | null => {
@@ -56,12 +67,13 @@ const formatTimeAgo = (nowTs: number, timestampMs: number | null): string | null
 };
 
 export type RefrigeratorSensorTile = {
-  id: 'freezer_temperature' | 'refrigerator_temperature';
+  id: 'temp_external' | 'probe_temp';
   label: string;
   value: string;
   timestamp: string | null;
   isMissing: boolean;
   history: number[];
+  unit: string;
 };
 
 type LatestKpi = {
@@ -74,18 +86,20 @@ type LatestKpi = {
 
 export type RefrigeratorKpiSnapshot = {
   sensorTiles: RefrigeratorSensorTile[];
-  freezerTemp: number | null;
-  fridgeTemp: number | null;
+  tempExternal: number | null;
+  probeTemp: number | null;
   isInitialLoading: boolean;
 };
 
 type UseRefrigeratorKpiSnapshotOptions = {
   refrigeratorId?: string;
+  zoneId?: string | null;
   enabled?: boolean;
 };
 
 export function useRefrigeratorKpiSnapshot({
   refrigeratorId,
+  zoneId,
   enabled = true,
 }: UseRefrigeratorKpiSnapshotOptions): RefrigeratorKpiSnapshot {
   const normalizedRefrigeratorId = refrigeratorId != null ? String(refrigeratorId) : undefined;
@@ -107,7 +121,7 @@ export function useRefrigeratorKpiSnapshot({
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
     const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
-    return `${baseUrl.replace(/^http/, 'ws')}/api/kpi/ws`;
+    return `${baseUrl.replace(/^http/, 'ws')}/api/ivf/quality/refrigerator-kpi-ws`;
   };
 
   const updateLatest = (incoming: LatestKpi[]) => {
@@ -144,26 +158,29 @@ export function useRefrigeratorKpiSnapshot({
     }
 
     ivfService
-      .getRefrigeratorZoneLatest(idNum)
+      .getRefrigeratorZoneLatest(idNum, zoneId ?? undefined)
       .then((rows) => {
         if (!isMountedRef.current) return;
         const now = Date.now();
         const entries: LatestKpi[] = rows
           .filter((r) => r.value != null)
-          .map((r) => ({
-            name: r.kpi_name,
-            value: Number(r.value),
-            unit: r.unit || '',
-            timestamp: new Date(now).toISOString(),
-            tsMs: now,
-          }));
+          .map((r) => {
+            const parsed = r.timestamp ? parseDbTimestamp(r.timestamp) : null;
+            return {
+              name: r.kpi_name,
+              value: Number(r.value),
+              unit: r.unit || '',
+              timestamp: parsed?.isoIST ?? new Date(now).toISOString(),
+              tsMs: parsed?.tsMs ?? now,
+            };
+          });
         updateLatest(entries);
       })
       .catch(() => {})
       .finally(() => {
         if (isMountedRef.current) setIsInitialLoading(false);
       });
-  }, [normalizedRefrigeratorId, enabled]);
+  }, [normalizedRefrigeratorId, zoneId, enabled]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -178,6 +195,7 @@ export function useRefrigeratorKpiSnapshot({
       const idNum = Number(normalizedRefrigeratorId);
       ws.send(JSON.stringify({
         refrigerator_id: Number.isFinite(idNum) ? idNum : normalizedRefrigeratorId,
+        ...(zoneId != null ? { zone_id: zoneId } : {}),
       }));
     };
 
@@ -209,7 +227,9 @@ export function useRefrigeratorKpiSnapshot({
         const messageMatches =
           data.refrigerator_id == null ||
           String(data.refrigerator_id) === normalizedRefrigeratorId;
-        if (messageMatches && incomingKpis.length) updateLatest(incomingKpis);
+        const zoneMatches =
+          zoneId == null || data.zone_id == null || data.zone_id === zoneId;
+        if (messageMatches && zoneMatches && incomingKpis.length) updateLatest(incomingKpis);
       } catch {}
     };
 
@@ -224,28 +244,34 @@ export function useRefrigeratorKpiSnapshot({
       } catch {}
       wsRef.current = null;
     };
-  }, [normalizedRefrigeratorId, token, enabled]);
+  }, [normalizedRefrigeratorId, zoneId, token, enabled]);
 
   const sensorTiles = useMemo<RefrigeratorSensorTile[]>(() => {
-    return REFRIGERATOR_KPI_ORDER.map((id) => {
+    const dynamicKeys = Object.keys(latestByName);
+    const orderedKeys = dynamicKeys.length > 0
+      ? dynamicKeys
+      : Array.from(REFRIGERATOR_KPI_ORDER);
+    return orderedKeys.map((id) => {
       const latest = latestByName[id];
       const value = latest ? latest.value : null;
       const tsMs = latest ? latest.tsMs : null;
+      const unit = latest?.unit || KPI_UNITS[id] || '°C';
       return {
-        id,
-        label: KPI_LABELS[id],
-        value: formatKpiValue(value, latest?.unit || KPI_UNITS[id]),
+        id: id as 'temp_external' | 'probe_temp',
+        label: KPI_LABELS[id] ?? id,
+        value: formatKpiValue(value, unit),
         timestamp: formatTimeAgo(nowTs, tsMs),
         isMissing: value == null,
         history: kpiHistoryRef.current[id]?.slice() ?? [],
+        unit,
       };
     });
   }, [latestByName, nowTs]);
 
   return {
     sensorTiles,
-    freezerTemp: latestByName['freezer_temperature']?.value ?? null,
-    fridgeTemp: latestByName['refrigerator_temperature']?.value ?? null,
+    tempExternal: latestByName['temp_external']?.value ?? null,
+    probeTemp: latestByName['probe_temp']?.value ?? null,
     isInitialLoading,
   };
 }

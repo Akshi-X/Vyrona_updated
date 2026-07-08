@@ -692,6 +692,11 @@ export class IvfService extends BaseApiService {
             }
         } else if (type === "refrigerator") {
             param = `refrigerator_id=${encodeURIComponent(id)}`;
+            if (scopeId) {
+                param += `&zone_id=${encodeURIComponent(scopeId)}`;
+            } else if (scopeId === null) {
+                param += `&zone_id=null`;
+            }
         } else {
             param = `tank_id=${encodeURIComponent(id)}`;
         }
@@ -791,6 +796,7 @@ export class IvfService extends BaseApiService {
 
     async bulkUpsertKpiConfigForRefrigerator(
         refrigeratorId: number,
+        zoneId: string | null,
         configs: Array<{
             kpi_name: string;
             alert_name?: string | null;
@@ -802,20 +808,59 @@ export class IvfService extends BaseApiService {
             unack_escalation_threshold?: number | null;
             status?: boolean;
         }>,
+        zoneName?: string | null,
     ): Promise<{ updated: number; created: number }> {
         return await this.request("/api/ivf/quality/kpi-config/bulk-refrigerator", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refrigerator_id: refrigeratorId, configs }),
+            body: JSON.stringify({ refrigerator_id: refrigeratorId, zone_id: zoneId, zone_name: zoneName ?? null, configs }),
         });
+    }
+
+    /** Get named zones defined for a refrigerator (derived from kpi_config). */
+    async getRefrigeratorZones(refrigeratorId: number): Promise<Array<{ zone_id: string; zone_name: string }>> {
+        return this.request(
+            `/api/ivf/quality/refrigerators/${encodeURIComponent(refrigeratorId)}/zones`,
+            { method: "GET" },
+        );
+    }
+
+    /** Get KPI limits config for a refrigerator zone (for threshold lines on the chart). */
+    async getRefrigeratorKpiConfig(refrigeratorId: number, zoneId?: string): Promise<{
+        refrigerator_id: number;
+        refrigerator_code: string;
+        zone_id?: string | null;
+        branch_id?: number | null;
+        branch_name?: string | null;
+        kpi_limits: Record<string, Record<string, { min?: number | null; max?: number | null; alert_type?: string | null }>>;
+    }> {
+        const params = new URLSearchParams();
+        if (zoneId != null) params.set("zone_id", zoneId);
+        const qs = params.toString();
+        return await this.request(
+            `/api/ivf/quality/refrigerators/${encodeURIComponent(refrigeratorId)}/kpi-config${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+        );
     }
 
     async getRefrigeratorKpiHistory(
         refrigeratorId: number,
         durationMinutes?: number,
+        zoneId?: string,
     ): Promise<{
         refrigerator_id: number;
         refrigerator_code: string;
+        zone_id?: string | null;
+        kpi_configs: Array<{
+            id: number;
+            kpi_name: string;
+            alert_name: string | null;
+            min: number | null;
+            max: number | null;
+            unit: string;
+            zone_id: string | null;
+            zone_name: string | null;
+        }>;
         kpi_series: Record<string, Array<{
             timestamp: string;
             value: number;
@@ -828,6 +873,7 @@ export class IvfService extends BaseApiService {
     }> {
         const params = new URLSearchParams();
         if (durationMinutes != null && durationMinutes > 0) params.set("duration_minutes", String(durationMinutes));
+        if (zoneId != null) params.set("zone_id", zoneId);
         const qs = params.toString();
         return await this.request(
             `/api/ivf/quality/refrigerators/${encodeURIComponent(refrigeratorId)}/kpi-history${qs ? `?${qs}` : ""}`,
@@ -835,15 +881,20 @@ export class IvfService extends BaseApiService {
         );
     }
 
-    /** Latest single reading for freezer_temperature and refrigerator_temperature. */
-    async getRefrigeratorZoneLatest(refrigeratorId: number): Promise<Array<{
+    /** Latest single reading per KPI for a refrigerator zone. */
+    async getRefrigeratorZoneLatest(refrigeratorId: number, zoneId?: string): Promise<Array<{
         kpi_name: string;
         label: string;
         value: number | null;
         unit: string;
+        zone_id?: string | null;
+        timestamp?: string | null;
     }>> {
+        const params = new URLSearchParams();
+        if (zoneId != null) params.set("zone_id", zoneId);
+        const qs = params.toString();
         return this.request(
-            `/api/ivf/quality/refrigerators/${encodeURIComponent(refrigeratorId)}/zone-latest`,
+            `/api/ivf/quality/refrigerators/${encodeURIComponent(refrigeratorId)}/zone-latest${qs ? `?${qs}` : ""}`,
             { method: "GET" },
         );
     }
@@ -1405,6 +1456,41 @@ export class IvfService extends BaseApiService {
             },
         );
     }
+
+    async getRefillLogPageData(): Promise<{
+        tanks: Array<{
+            tank_id: number;
+            tank_code: string;
+            branch_name: string;
+            branch_id: number;
+            last_refill_date: string | null;
+            last_refill_time: string | null;
+            last_refilled_by: string | null;
+            last_description: string | null;
+            kpi_config_id: number | null;
+            kpi_status: boolean | null;
+            ln2_mass_kg: number | null;
+            ln2_config_min: number | null;
+            tank_max_capacity: number | null;
+            tank_min_capacity: number | null;
+        }>;
+        logs: Array<{
+            tank_id: number;
+            tank_code: string;
+            branch_name: string;
+            refill_date: string | null;
+            refill_time: string | null;
+            refilled_by: string | null;
+            description: string | null;
+            status: string | null;
+            refill_weight: number | null;
+        }>;
+    }> {
+        return await this.request("/api/quality-tracking/refill-log/page-data", {
+            method: "GET",
+        });
+    }
+
     // ── IVF Cycles ────────────────────────────────────────────────────────────
 
     async listCycles(params?: { his_id?: string; status?: string; incubator_id?: number; chamber_position?: string; skip?: number; limit?: number }): Promise<IvfCycle[]> {
@@ -1518,6 +1604,21 @@ export class IvfService extends BaseApiService {
 
     async deleteLog(cycleId: number, logId: number): Promise<void> {
         return this.request<void>(`/api/ivf/cycles/${cycleId}/logs/${logId}`, { method: 'DELETE' });
+    }
+
+    async getRefrigeratorDeviationsByCategory(fromTs: number, toTs: number): Promise<{
+        total: number;
+        categories: { kpi_name: string; label: string; count: number }[];
+    }> {
+        return this.request(`/api/ivf/refrigerator-dashboard/deviations-by-category?from_ts=${fromTs}&to_ts=${toTs}`);
+    }
+
+    async getRefrigeratorTopKpi(fromTs: number, toTs: number): Promise<{
+        kpi_name: string | null;
+        label: string;
+        count: number;
+    }> {
+        return this.request(`/api/ivf/refrigerator-dashboard/top-kpi?from_ts=${fromTs}&to_ts=${toTs}`);
     }
 }
 
