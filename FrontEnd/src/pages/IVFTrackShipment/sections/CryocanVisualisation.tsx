@@ -4262,17 +4262,9 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   const ring = palette?.ring ?? "rgba(123,92,139,0.08)";
                   const border = "#e6d6ee";
                   const ln2Clamped = typeof ln2Level === "number" ? Math.max(0, Math.min(100, ln2Level)) : null;
-                  const ln2CapacitySpan =
-                    tankMaxCapacity != null && tankMinCapacity != null
-                      ? tankMaxCapacity - tankMinCapacity
-                      : null;
-                  const ln2Percent =
-                    ln2Clamped != null && ln2CapacitySpan != null && ln2CapacitySpan > 0
-                      ? Math.floor((ln2Clamped / ln2CapacitySpan) * 100)
-                      : null;
                   const valueText =
                     tile.id === "ln2_level"
-                      ? (ln2Percent != null ? `${Math.min(100, Math.max(0, ln2Percent))}%` : tile.value)
+                      ? (ln2Clamped != null ? `${ln2Clamped}%` : tile.value)
                       : tile.value;
                   return (
                     <button

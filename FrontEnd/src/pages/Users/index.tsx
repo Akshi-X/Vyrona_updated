@@ -221,7 +221,9 @@ export default function UsersPage() {
         )}
         <PageLayout
             title="Users"
+            description="Manage your team's roles and branch access."
             lucideIcon={Users}
+            patternBackground
             actions={
                 <button
                     id="onboarding-users-add-btn"

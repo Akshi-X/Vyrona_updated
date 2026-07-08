@@ -77,7 +77,7 @@ const ControlTower = () => {
     const [routesError, setRoutesError] = useState<string | null>(null);
 
     // Active canisters via API
-    const [deviceType, setDeviceType] = useState<"cryotanks" | "incubators">("cryotanks");
+    const [deviceType, setDeviceType] = useState<"cryotanks" | "incubators" | "refrigerators">("cryotanks");
     const [canisters, setCanisters] = useState<
         Array<{
             id: string;
@@ -107,6 +107,21 @@ const ControlTower = () => {
     >([]);
     const [loadingIncubators, setLoadingIncubators] = useState(false);
     const [incubatorsError, setIncubatorsError] = useState<string | null>(null);
+
+    const [refrigerators, setRefrigerators] = useState<
+        Array<{
+            id: string;
+            canisterId: string;
+            tankId: string;
+            branchName: string;
+            branchId: string;
+            status: string;
+            deviations?: number;
+            date: string;
+        }>
+    >([]);
+    const [loadingRefrigerators, setLoadingRefrigerators] = useState(false);
+    const [refrigeratorsError, setRefrigeratorsError] = useState<string | null>(null);
     const [zoomToLocation, setZoomToLocation] = useState<{
         lat: number;
         lng: number;
@@ -447,6 +462,51 @@ const ControlTower = () => {
         fetchIncubators();
     }, [isAuthenticated, isIvfUser]);
 
+    useEffect(() => {
+        if (!isIvfUser || !isAuthenticated) {
+            setRefrigerators([]);
+            setRefrigeratorsError(null);
+            setLoadingRefrigerators(false);
+            return;
+        }
+
+        const fetchRefrigerators = async () => {
+            setLoadingRefrigerators(true);
+            setRefrigeratorsError(null);
+            try {
+                const data = await shipmentService.getActiveRefrigerators();
+                const flattened = (data.branches || []).flatMap((branch) =>
+                    (branch.refrigerators || []).map((ref) => {
+                        let date = "NA";
+                        if (ref.updated_at) {
+                            const d = new Date(ref.updated_at);
+                            if (!isNaN(d.getTime())) {
+                                date = d.toLocaleDateString("en-GB");
+                            }
+                        }
+                        return {
+                            id: `refrigerator-${branch.branch_id}-${ref.refrigerator_id}`,
+                            canisterId: ref.refrigerator_code || String(ref.refrigerator_id),
+                            tankId: String(ref.refrigerator_id),
+                            branchId: String(branch.branch_id),
+                            branchName: branch.branch_name || "N/A",
+                            status: "Active",
+                            deviations: undefined,
+                            date,
+                        };
+                    }),
+                );
+                setRefrigerators(flattened);
+            } catch (e: any) {
+                setRefrigeratorsError(e?.message || "Failed to load active refrigerators");
+                setRefrigerators([]);
+            } finally {
+                setLoadingRefrigerators(false);
+            }
+        };
+        fetchRefrigerators();
+    }, [isAuthenticated, isIvfUser]);
+
 
     // Build filter option lists from routes data
     const regionOptions = useMemo(() => {
@@ -460,8 +520,13 @@ const ControlTower = () => {
         return ["All", ...Array.from(set).sort()];
     }, [routes]);
 
-    // Active list switches between cryotanks and incubators based on device type toggle
-    const activeList = deviceType === "incubators" ? incubators : canisters;
+    // Active list switches based on device type toggle
+    const activeList =
+        deviceType === "incubators" ? incubators : deviceType === "refrigerators" ? refrigerators : canisters;
+    const activeLoading =
+        deviceType === "incubators" ? loadingIncubators : deviceType === "refrigerators" ? loadingRefrigerators : loadingCanisters;
+    const activeError =
+        deviceType === "incubators" ? incubatorsError : deviceType === "refrigerators" ? refrigeratorsError : canistersError;
 
     // Status options for inbound (from active list)
     const statusOptionsInbound = useMemo(() => {
@@ -587,17 +652,17 @@ const ControlTower = () => {
 
 
   return (
-        <PageLayout title="Control Tower" icon={ControlTowerIconDark} actions={
+        <PageLayout title="Control Tower" description="Monitor live status and readings across all connected devices." icon={ControlTowerIconDark} patternBackground actions={
             <div className="lg:hidden">
                 <FilterPanel activeCount={activeFilterCount}>
                     {isIvfUser && (
                         <FilterToggle
                             label="Device Type"
                             value={deviceType}
-                            onChange={(v) => setDeviceType(v as "cryotanks" | "incubators")}
+                            onChange={(v) => setDeviceType(v as "cryotanks" | "incubators" | "refrigerators")}
                             options={[
                                 { label: "Cryotanks", value: "cryotanks" },
-                                { label: "Incubators", value: "incubators", disabled: true },
+                                { label: "Refrigerators", value: "refrigerators" },
                             ]}
                         />
                     )}
@@ -669,10 +734,10 @@ const ControlTower = () => {
                                         <FilterToggle
                                             label="Device Type"
                                             value={deviceType}
-                                            onChange={(v) => setDeviceType(v as "cryotanks" | "incubators")}
+                                            onChange={(v) => setDeviceType(v as "cryotanks" | "incubators" | "refrigerators")}
                                             options={[
                                                 { label: "Cryotanks", value: "cryotanks" },
-                                                { label: "Incubators", value: "incubators", disabled: true },
+                                                { label: "Refrigerators", value: "refrigerators" },
                                             ]}
                                         />
                                     </div>
@@ -745,19 +810,19 @@ const ControlTower = () => {
                             <div id="onboarding-control-active-containers" className="bg-white border border-line rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
                                 <h2 className="font-bold text-black text-base mb-2">
                                     {isIvfUser
-                                        ? deviceType === "incubators" ? "Active Incubators" : "Active Containers"
+                                        ? deviceType === "incubators" ? "Active Incubators" : deviceType === "refrigerators" ? "Active Refrigerators" : "Active Containers"
                                         : "Active Routes"}
                                 </h2>
                                 <div className="grid grid-cols-3 pl-2 pr-2 py-2 rounded-t-lg bg-primary-bg text-xs font-semibold text-primary gap-3">
                                     <div className="text-left">
                                         {isIvfUser
-                                            ? deviceType === "incubators" ? "Incubators #" : "Containers #"
+                                            ? deviceType === "incubators" ? "Incubators #" : deviceType === "refrigerators" ? "Refrigerators #" : "Containers #"
                                             : "Routes ID"}
                                     </div>
                                     <div className="text-center">Deviation</div>
                                     <div className="text-center">
                                         {isIvfUser
-                                            ? deviceType === "incubators" ? "Last Updated" : "Last Refill Date"
+                                            ? deviceType === "cryotanks" ? "Last Refill Date" : "Last Updated"
                                             : "Date"}
                                     </div>
                                 </div>
@@ -768,7 +833,7 @@ const ControlTower = () => {
                                         scrollbarWidth: "thin",
                                     }}
                                 >
-                                    {(loadingRoutes || loadingCanisters || loadingIncubators) && (
+                                    {(loadingRoutes || activeLoading) && (
                                         <div className="flex flex-col divide-y divide-gray-100">
                                             {Array.from(
                                                 { length: 10 },
@@ -825,21 +890,19 @@ const ControlTower = () => {
                                         </div>
                                     )}
                                     {!loadingRoutes &&
-                                        !loadingCanisters &&
-                                        !loadingIncubators &&
+                                        !activeLoading &&
                                         ((isCgtUser && routesError) ||
-                                            (isIvfUser && (deviceType === "incubators" ? incubatorsError : canistersError))) && (
+                                            (isIvfUser && activeError)) && (
                                             <div className="p-4 text-xs text-red-600">
                                                 {isIvfUser
-                                                    ? (deviceType === "incubators" ? incubatorsError : canistersError)
+                                                    ? activeError
                                                     : routesError}
                                             </div>
                                         )}
                                     {!loadingRoutes &&
-                                        !loadingCanisters &&
-                                        !loadingIncubators &&
+                                        !activeLoading &&
                                         ((isCgtUser && !routesError) ||
-                                            (isIvfUser && !(deviceType === "incubators" ? incubatorsError : canistersError))) && (
+                                            (isIvfUser && !activeError)) && (
                                             <>
                                                 {/* Display Routes (CGT users only) */}
                                                 {isCgtUser &&
@@ -1012,6 +1075,8 @@ const ControlTower = () => {
                                                                             const prefix = isOnboarding ? "/onboarding" : "";
                                                                             if (deviceType === "incubators") {
                                                                                 navigate(`${prefix}/incubator-tracking/${canister.tankId}`);
+                                                                            } else if (deviceType === "refrigerators") {
+                                                                                navigate(`${prefix}/refrigerator-tracking/${canister.tankId}`);
                                                                             } else {
                                                                                 if (
                                                                                     canister.branchId &&
@@ -1035,14 +1100,14 @@ const ControlTower = () => {
                                                                     <div className="min-w-0 text-left overflow-hidden">
                                                                         {canister.canisterId ? (
                                                                             <span className="text-primary text-xs font-bold hover:underline truncate block">
-                                                                                {deviceType === "incubators" ? "Incubator" : "Container"}{" "}
+                                                                                {deviceType === "incubators" ? "Incubator" : deviceType === "refrigerators" ? "Refrigerator" : "Container"}{" "}
                                                                                 {
                                                                                     canister.canisterId
                                                                                 }
                                                                             </span>
                                                                         ) : (
                                                                             <span className="text-primary text-xs font-bold">
-                                                                                {deviceType === "incubators" ? "Incubator" : "Container"}{" "}
+                                                                                {deviceType === "incubators" ? "Incubator" : deviceType === "refrigerators" ? "Refrigerator" : "Container"}{" "}
                                                                                 {
                                                                                     canister.canisterId
                                                                                 }
@@ -1081,9 +1146,9 @@ const ControlTower = () => {
                                                     (!filteredCanisters ||
                                                         filteredCanisters.length ===
                                                             0) &&
-                                                    !loadingCanisters && (
+                                                    !activeLoading && (
                                                         <div className="p-4 text-xs text-gray-500">
-                                                            {deviceType === "incubators" ? "No active incubators found." : "No active containers found."}
+                                                            {deviceType === "incubators" ? "No active incubators found." : deviceType === "refrigerators" ? "No active refrigerators found." : "No active containers found."}
                                                         </div>
                                                     )}
                                                 {isCgtUser &&

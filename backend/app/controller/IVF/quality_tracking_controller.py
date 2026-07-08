@@ -568,9 +568,13 @@ def get_tanks_refill_summary(
     if not id_list:
         return {"summary": {}}
 
+    ids_str = ",".join(str(id_) for id_ in id_list)
     rows = db.execute(
-        sa_text("""
-            WITH latest_log AS (
+        sa_text(f"""
+            WITH tank_list AS (
+                SELECT * FROM (VALUES {','.join(f"({id_})" for id_ in id_list)}) AS t(tank_id)
+            ),
+            latest_log AS (
                 SELECT DISTINCT ON (tank_id)
                     tank_id,
                     refill_date,
@@ -578,25 +582,29 @@ def get_tanks_refill_summary(
                     refilled_by,
                     description
                 FROM canister_ln2_logs
-                WHERE tank_id = ANY(:ids)
+                WHERE tank_id = ANY(ARRAY[{ids_str}])
                 ORDER BY tank_id, refill_date DESC NULLS LAST, refill_time DESC NULLS LAST
             ),
             latest_ln2 AS (
-                SELECT DISTINCT ON (tank_id)
-                    tank_id,
-                    ln2_mass_kg
-                FROM ln2_readings
-                WHERE tank_id = ANY(:ids)
-                ORDER BY tank_id, reading_timestamp DESC
+                SELECT DISTINCT ON (r.tank_id)
+                    r.tank_id,
+                    r.kpi_config_id,
+                    r.kpi_value AS ln2_mass_kg,
+                    k.status AS kpi_status
+                FROM readings r
+                JOIN kpi_config k ON k.id = r.kpi_config_id
+                WHERE r.tank_id = ANY(ARRAY[{ids_str}])
+                  AND k.kpi_name = 'ln2_level'
+                ORDER BY r.tank_id, r.timestamp DESC
             ),
             kpi AS (
                 SELECT DISTINCT ON (tank_id)
                     tank_id,
                     min AS ln2_config_min
                 FROM kpi_config
-                WHERE tank_id = ANY(:ids)
+                WHERE tank_id = ANY(ARRAY[{ids_str}])
                   AND kpi_name = 'ln2_level'
-                  AND alert_name IS NULL
+                  AND alert_name = 'LN2'
                   AND status = true
                 ORDER BY tank_id, id DESC
             ),
@@ -606,8 +614,8 @@ def get_tanks_refill_summary(
                     tank_max_capacity_reading,
                     tank_min_capacity_reading
                 FROM ln2_iot_devices
-                WHERE tank_id = ANY(:ids)
-                ORDER BY tank_id, id DESC
+                WHERE tank_id = ANY(ARRAY[{ids_str}])
+                ORDER BY tank_id, updated_at DESC
             )
             SELECT
                 t.tank_id,
@@ -615,26 +623,29 @@ def get_tanks_refill_summary(
                 ll.refill_time,
                 ll.refilled_by,
                 ll.description,
+                ln.kpi_config_id,
+                ln.kpi_status,
                 ln.ln2_mass_kg,
                 k.ln2_config_min,
                 c.tank_max_capacity_reading,
                 c.tank_min_capacity_reading
-            FROM unnest(:ids::int[]) AS t(tank_id)
+            FROM tank_list t
             LEFT JOIN latest_log ll ON ll.tank_id = t.tank_id
             LEFT JOIN latest_ln2 ln ON ln.tank_id = t.tank_id
             LEFT JOIN kpi k ON k.tank_id = t.tank_id
             LEFT JOIN capacity c ON c.tank_id = t.tank_id
-        """),
-        {"ids": id_list},
+        """)
     ).fetchall()
 
     summary: dict = {}
     for r in rows:
-        summary[r.tank_id] = {
+        summary[str(r.tank_id)] = {
             "last_refill_date": str(r.refill_date) if r.refill_date else None,
             "last_refill_time": str(r.refill_time) if r.refill_time else None,
             "last_refilled_by": r.refilled_by,
             "last_description": r.description,
+            "kpi_config_id": r.kpi_config_id,
+            "kpi_status": r.kpi_status,
             "ln2_mass_kg": float(r.ln2_mass_kg) if r.ln2_mass_kg is not None else None,
             "ln2_config_min": float(r.ln2_config_min) if r.ln2_config_min is not None else None,
             "tank_max_capacity": float(r.tank_max_capacity_reading) if r.tank_max_capacity_reading is not None else None,
@@ -804,3 +815,185 @@ def review_refill_detection(
         }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/refill-log/page-data")
+def get_refill_log_page_data(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Fetch all data needed for the Refill Log page in one call.
+    Returns tanks with refill summary and activity logs for the user's hospital.
+    """
+    try:
+        from sqlalchemy import text as sa_text
+        from app.models.IVF.hospital_branch_model import HospitalBranch
+        from app.models.IVF.tank_model import Tank
+
+        # Get all tanks for user's hospital (and branch if non-admin)
+        query = db.query(Tank.tank_id).join(HospitalBranch)
+
+        if current_user.hospital_id:
+            query = query.filter(HospitalBranch.hospital_id == current_user.hospital_id)
+
+        if current_user.branch_id and current_user.role not in ("Admin", "Manager", "Mygrape_admin"):
+            query = query.filter(Tank.branch_id == current_user.branch_id)
+
+        tank_ids = [r.tank_id for r in query.all()]
+
+        if not tank_ids:
+            return {"tanks": [], "logs": []}
+
+        ids_str = ",".join(str(id_) for id_ in tank_ids)
+
+        # Fetch tanks with refill summary
+        tanks_rows = db.execute(
+            sa_text(f"""
+                WITH tank_list AS (
+                    SELECT * FROM (VALUES {','.join(f"({id_})" for id_ in tank_ids)}) AS t(tank_id)
+                ),
+                latest_log AS (
+                    SELECT DISTINCT ON (tank_id)
+                        tank_id,
+                        refill_date,
+                        refill_time,
+                        refilled_by,
+                        description
+                    FROM canister_ln2_logs
+                    WHERE tank_id = ANY(ARRAY[{ids_str}])
+                    ORDER BY tank_id, refill_date DESC NULLS LAST, refill_time DESC NULLS LAST
+                ),
+                latest_ln2 AS (
+                    SELECT DISTINCT ON (r.tank_id)
+                        r.tank_id,
+                        r.kpi_config_id,
+                        r.kpi_value AS ln2_mass_kg,
+                        k.status AS kpi_status
+                    FROM readings r
+                    JOIN kpi_config k ON k.id = r.kpi_config_id
+                    WHERE r.tank_id = ANY(ARRAY[{ids_str}])
+                      AND k.kpi_name = 'ln2_level'
+                    ORDER BY r.tank_id, r.timestamp DESC
+                ),
+                kpi AS (
+                    SELECT DISTINCT ON (tank_id)
+                        tank_id,
+                        min AS ln2_config_min
+                    FROM kpi_config
+                    WHERE tank_id = ANY(ARRAY[{ids_str}])
+                      AND kpi_name = 'ln2_level'
+                      AND alert_name = 'LN2'
+                      AND status = true
+                    ORDER BY tank_id, id DESC
+                ),
+                capacity AS (
+                    SELECT DISTINCT ON (tank_id)
+                        tank_id,
+                        tank_max_capacity_reading,
+                        tank_min_capacity_reading
+                    FROM ln2_iot_devices
+                    WHERE tank_id = ANY(ARRAY[{ids_str}])
+                    ORDER BY tank_id, updated_at DESC
+                )
+                SELECT
+                    t.tank_id,
+                    tbl.tank_code,
+                    hb.branch_name,
+                    hb.branch_id,
+                    ll.refill_date,
+                    ll.refill_time,
+                    ll.refilled_by,
+                    ll.description,
+                    ln.kpi_config_id,
+                    ln.kpi_status,
+                    ln.ln2_mass_kg,
+                    k.ln2_config_min,
+                    c.tank_max_capacity_reading,
+                    c.tank_min_capacity_reading
+                FROM tank_list t
+                JOIN tanks tbl ON tbl.tank_id = t.tank_id
+                JOIN hospital_branches hb ON hb.branch_id = tbl.branch_id
+                LEFT JOIN latest_log ll ON ll.tank_id = t.tank_id
+                LEFT JOIN latest_ln2 ln ON ln.tank_id = t.tank_id
+                LEFT JOIN kpi k ON k.tank_id = t.tank_id
+                LEFT JOIN capacity c ON c.tank_id = t.tank_id
+            """)
+        ).fetchall()
+
+        tanks = [
+            {
+                "tank_id": r.tank_id,
+                "tank_code": r.tank_code,
+                "branch_name": r.branch_name,
+                "branch_id": r.branch_id,
+                "last_refill_date": str(r.refill_date) if r.refill_date else None,
+                "last_refill_time": str(r.refill_time) if r.refill_time else None,
+                "last_refilled_by": r.refilled_by,
+                "last_description": r.description,
+                "kpi_config_id": r.kpi_config_id,
+                "kpi_status": r.kpi_status,
+                "ln2_mass_kg": float(r.ln2_mass_kg) if r.ln2_mass_kg is not None else None,
+                "ln2_config_min": float(r.ln2_config_min) if r.ln2_config_min is not None else None,
+                "tank_max_capacity": float(r.tank_max_capacity_reading) if r.tank_max_capacity_reading is not None else None,
+                "tank_min_capacity": float(r.tank_min_capacity_reading) if r.tank_min_capacity_reading is not None else None,
+            }
+            for r in tanks_rows
+        ]
+
+        # Fetch activity logs
+        hospital_clause = ""
+        branch_clause = ""
+        params: dict = {"ids": tank_ids}
+
+        if current_user.hospital_id:
+            hospital_clause = "AND b.hospital_id = :hospital_id"
+            params["hospital_id"] = current_user.hospital_id
+
+        if current_user.branch_id and current_user.role not in ("Admin", "Manager", "Mygrape_admin"):
+            branch_clause = "AND t.branch_id = :branch_id"
+            params["branch_id"] = current_user.branch_id
+
+        logs_rows = db.execute(
+            sa_text(f"""
+                SELECT
+                    l.tank_id,
+                    t.tank_code,
+                    b.branch_name,
+                    l.refill_date,
+                    l.refill_time,
+                    l.refilled_by,
+                    l.description,
+                    l.status,
+                    l.refill_weight
+                FROM canister_ln2_logs l
+                JOIN tanks t ON t.tank_id = l.tank_id
+                JOIN hospital_branches b ON b.branch_id = t.branch_id
+                WHERE l.tank_id = ANY(:ids)
+                {hospital_clause}
+                {branch_clause}
+                ORDER BY l.refill_date DESC NULLS LAST, l.refill_time DESC NULLS LAST
+            """),
+            params,
+        ).fetchall()
+
+        logs = [
+            {
+                "tank_id": r.tank_id,
+                "tank_code": r.tank_code,
+                "branch_name": r.branch_name,
+                "refill_date": str(r.refill_date) if r.refill_date else None,
+                "refill_time": str(r.refill_time) if r.refill_time else None,
+                "refilled_by": r.refilled_by,
+                "description": r.description,
+                "status": str(r.status) if r.status else None,
+                "refill_weight": float(r.refill_weight) if r.refill_weight is not None else None,
+            }
+            for r in logs_rows
+        ]
+
+        return {"tanks": tanks, "logs": logs}
+
+    except Exception as e:
+        logger.error(f"Error in get_refill_log_page_data: {str(e)}", exc_info=True)
+        raise
