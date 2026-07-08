@@ -146,6 +146,15 @@ def is_custom_iot_source(webhook_payload: Dict[str, Any]) -> bool:
     )
 
 
+def is_custom_composite_iot_source(webhook_payload: Dict[str, Any]) -> bool:
+    """
+    Detect CUSTOM_COMPOSITE_IOT source from payload field.
+    CUSTOM_COMPOSITE_IOT payloads bundle LN2 weight/lid state with ambient
+    temperature/humidity and device battery/charging state in one object.
+    """
+    return webhook_payload.get("source") == "CUSTOM_COMPOSITE_IOT"
+
+
 def find_ivf_shipment_by_identifiers(
     db_session, shipment_id: Optional[str] = None, device_id: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
@@ -360,7 +369,11 @@ def _close_refill_session(
     refill_event_start_ts = None
     refill_event_end_ts = None
 
-    if refill_active and refill_min_smoothed_kg is not None and refill_max_smoothed_kg is not None:
+    if (
+        refill_active
+        and refill_min_smoothed_kg is not None
+        and refill_max_smoothed_kg is not None
+    ):
         refill_amount_kg = max(0.0, refill_max_smoothed_kg - refill_min_smoothed_kg)
         if refill_amount_kg >= cfg.refill_threshold_kg:
             refill_event_triggered = True
@@ -625,7 +638,9 @@ def append_ln2_window_point(
         logger.error(f"Error appending LN2 window point for {device_code}: {e}")
 
 
-def append_ln2_refill_point(device_code: str, timestamp: datetime, mass_kg: float) -> None:
+def append_ln2_refill_point(
+    device_code: str, timestamp: datetime, mass_kg: float
+) -> None:
     """Append (timestamp, mass) to refill-session buffer (synchronous)."""
     try:
         r = get_redis_client()
@@ -800,11 +815,14 @@ def update_ln2_rate_bucket(
         if state and state.get("bucket_start") == bucket_start:
             sum_mass = float(state.get("sum_mass", 0.0)) + mass_kg
             count = int(state.get("count", 0)) + 1
-            r.hset(state_key, mapping={
-                "bucket_start": bucket_start,
-                "sum_mass": str(round(sum_mass, 6)),
-                "count": str(count),
-            })
+            r.hset(
+                state_key,
+                mapping={
+                    "bucket_start": bucket_start,
+                    "sum_mass": str(round(sum_mass, 6)),
+                    "count": str(count),
+                },
+            )
             r.expire(state_key, 86400)
             return
 
@@ -816,7 +834,10 @@ def update_ln2_rate_bucket(
                 if prev_count > 0:
                     avg_mass = prev_sum / prev_count
                     entry = json.dumps(
-                        {"ts": state.get("bucket_start"), "avg_mass": round(avg_mass, 6)}
+                        {
+                            "ts": state.get("bucket_start"),
+                            "avg_mass": round(avg_mass, 6),
+                        }
                     )
                     max_len = _rate_bucket_max_len(bucket_minutes, window_hours)
                     pipe.rpush(bucket_key, entry)
@@ -825,11 +846,14 @@ def update_ln2_rate_bucket(
             except (ValueError, TypeError):
                 pass
 
-        pipe.hset(state_key, mapping={
-            "bucket_start": bucket_start,
-            "sum_mass": str(round(mass_kg, 6)),
-            "count": "1",
-        })
+        pipe.hset(
+            state_key,
+            mapping={
+                "bucket_start": bucket_start,
+                "sum_mass": str(round(mass_kg, 6)),
+                "count": "1",
+            },
+        )
         pipe.expire(state_key, 86400)
         pipe.execute()
     except Exception as e:
@@ -1305,13 +1329,11 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
         append_ln2_window_point(device_code, timestamp, sensor_reading.ln2_mass_kg, cfg)
         window_points = get_ln2_window_points(device_code, cutoff_ts)
 
-        smoothed_mass_kg, smoothed_level_pct, smoothed_volume_l = (
-            compute_smoothed_ln2(
-                window_points,
-                timestamp,
-                cfg,
-                avg_minutes=LN2_LEVEL_AVG_MINUTES,
-            )
+        smoothed_mass_kg, smoothed_level_pct, smoothed_volume_l = compute_smoothed_ln2(
+            window_points,
+            timestamp,
+            cfg,
+            avg_minutes=LN2_LEVEL_AVG_MINUTES,
         )
 
         if explicit_lid_state is not None:
@@ -1325,7 +1347,10 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
                 open_ctr = 0
 
         # 7c. Lid-close candidate tracking (Case C vs D)
-        if explicit_lid_state is None and weight_event.event_type == WeightEventType.LID_CLOSE_CANDIDATE:
+        if (
+            explicit_lid_state is None
+            and weight_event.event_type == WeightEventType.LID_CLOSE_CANDIDATE
+        ):
             lid_candidate_ts = timestamp.isoformat()
             logger.info(
                 f"[LID CANDIDATE] {device_code} — lid-close candidate started at {lid_candidate_ts} "
@@ -1494,15 +1519,17 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
                         refill_event_start_ts,
                         refill_event_end_ts,
                     )
-                    send_refill_detection_to_backend(tank_id=cfg.tank_id, refill_data={"refill_weight": refill_amount_kg}, detected_at=refill_event_end_ts)
+                    send_refill_detection_to_backend(
+                        tank_id=cfg.tank_id,
+                        refill_data={"refill_weight": refill_amount_kg},
+                        detected_at=refill_event_end_ts,
+                    )
                 else:
                     logger.info(
                         "[REFILL EVENT] not triggered for %s (amount=%s)",
                         device_code,
                         refill_amount_kg,
                     )
-
-                
 
             # 9b. Precaution advisory (near threshold + lid just opened)
             if state_step.new_state == LidState.OPEN:
@@ -1564,9 +1591,7 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
         )
 
         # 9c. Low-level alert check (Step 5)
-        low_level = check_low_level_alert(
-            smoothed_mass_kg, low_level_ctr, cfg
-        )
+        low_level = check_low_level_alert(smoothed_mass_kg, low_level_ctr, cfg)
         low_level_ctr = low_level.consecutive_count
 
         low_level_alert_fired = False
@@ -1617,9 +1642,9 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
             "ln2_level_pct": smoothed_level_pct,
             "ln2_volume_l": smoothed_volume_l,
             "sensor_status": sensor_reading.status.value,
-            #"evaporation_rate_kg_per_h": effective_rate_kg_per_h,
+            # "evaporation_rate_kg_per_h": effective_rate_kg_per_h,
             "evaporation_rate_kg_per_h": cfg.static_evap_kg_per_hour,
-            #"evaporation_rate_kg_per_day": effective_rate_kg_per_day,
+            # "evaporation_rate_kg_per_day": effective_rate_kg_per_day,
             "evaporation_rate_kg_per_day": round(cfg.static_evap_kg_per_hour * 24.0, 8),
             "rate_source": rate_source,
             "lid_state": current_state.value,
@@ -1667,6 +1692,562 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
 
     except Exception as e:
         logger.error(f"Error processing CUSTOM_IOT LN2: {e}", exc_info=True)
+        raise
+
+
+def process_custom_composite_iot(db_session, webhook_payload: Dict[str, Any]) -> bool:
+    """
+    Process CUSTOM_COMPOSITE_IOT payloads.
+
+    Reimplements the LN2 weight/lid detection pipeline from process_custom_iot_ln2
+    (taring, smoothing, spike/refill detection, evaporation-rate estimation, lid
+    state machine) using the same helper functions, because this payload also
+    carries ln2_temperature, ambient_temperature, ambient_humidity, device_battery,
+    and device_charging_state — fields CUSTOM_IOT does not have — which need to be
+    folded into the same quality_data/KPI conversion before save_kpi_readings().
+
+    Differences from process_custom_iot_ln2:
+    - ln2_lid_closed_state arrives as an explicit boolean (or NULL), so there is no
+      reed-switch 0/1/2 decoding.
+    - ln2_tank_weight may be NULL ("no data/data loss"); when it is, the entire
+      weight/lid pipeline is skipped for this reading, but the temperature/
+      humidity/battery/charging KPIs are still saved.
+    - A weight sensor fault only invalidates the weight-derived KPIs; it does not
+      skip saving the other (independent) sensor KPIs.
+    """
+    try:
+        device_code = webhook_payload.get("device_id")
+        timestamp_str = webhook_payload.get("timestamp_utc_iso")
+
+        if not device_code or not timestamp_str:
+            logger.warning(
+                "Missing required CUSTOM_COMPOSITE_IOT fields (device_id or timestamp_utc_iso)"
+            )
+            return False
+
+        if timestamp_str.endswith("Z"):
+            timestamp_str = timestamp_str[:-1] + "+00:00"
+        timestamp = datetime.fromisoformat(timestamp_str)
+
+        cfg = get_ln2_device_config(db_session, device_code)
+        if cfg is None:
+            logger.warning(f"Device {device_code} not registered - skipping")
+            return False
+
+        from .ln2_iot.ln2_logic import (
+            EVAP_RATE_BUCKET_MINUTES,
+            EVAP_RATE_MIN_BUCKETS,
+            EVAP_RATE_WINDOW_HOURS,
+            LidState,
+            WeightEventType,
+            check_low_level_alert,
+            check_precaution_advisory,
+            classify_weight_event,
+            compute_smoothed_ln2,
+            confirm_lid_close_candidate,
+            detect_refill,
+            detect_transient_spike,
+            estimate_rate_from_buckets,
+            step_state_machine,
+            validate_and_convert,
+        )
+        from .ln2_iot import config as ln2_config
+
+        weight_kg = _parse_optional_float(webhook_payload.get("ln2_tank_weight"))
+        lid_closed = webhook_payload.get("ln2_lid_closed_state")
+        explicit_lid_state = (
+            "CLOSED" if lid_closed is True else "OPEN" if lid_closed is False else None
+        )
+        lid_state_kpi_eligible = explicit_lid_state is not None
+
+        quality_data: Dict[str, Any] = {
+            "device_code": device_code,
+            "tank_code": cfg.tank_code,
+            "tank_id": cfg.tank_id,
+            "timestamp": timestamp.isoformat(),
+            "temp_internal": webhook_payload.get("ln2_temperature"),
+            "temp_external": webhook_payload.get("ambient_temperature"),
+            "ambient_humidity": webhook_payload.get("ambient_humidity"),
+            "battery_percentage": webhook_payload.get("device_battery"),
+            "device_charging_state": webhook_payload.get("device_charging_state"),
+        }
+
+        if weight_kg is None:
+            logger.info(
+                f"No LN2 weight data for {device_code} at {timestamp.isoformat()} - "
+                "skipping weight/lid processing for this reading"
+            )
+        else:
+            sensor_reading = validate_and_convert(timestamp, weight_kg, cfg)
+
+            # Insert raw data (always, while weight is present) — archive the
+            # full composite payload so ambient/battery/charging fields aren't
+            # lost from the raw audit trail.
+            insert_ln2_iot_raw_data(
+                db_session,
+                cfg.tank_id,
+                cfg.device_pk,
+                weight_kg,
+                webhook_payload,
+                timestamp,
+            )
+
+            if sensor_reading.status.value != "OK":
+                logger.warning(
+                    f"Sensor fault {sensor_reading.status.value} for {device_code}"
+                )
+                quality_data["sensor_status"] = sensor_reading.status.value
+                quality_data["ln2_level_pct"] = sensor_reading.ln2_level_pct
+                alert_conditions = {
+                    "sensor_fault": True,
+                    "excessive_evaporation": False,
+                    "lid_open_beyond_threshold": False,
+                }
+                trigger_ln2_alerts(
+                    cfg.tank_id, device_code, alert_conditions, quality_data
+                )
+                # Note: unlike process_custom_iot_ln2, we do NOT return here —
+                # the other (independent) sensor KPIs below still get saved.
+            else:
+                state_data = get_ln2_device_state(device_code)
+                current_state = LidState(state_data.get("current_state", "UNKNOWN"))
+                previous_state = current_state
+                open_ctr = state_data.get("open_counter", 0)
+                closed_ctr = state_data.get("closed_counter", 0)
+                low_level_ctr = state_data.get("low_level_counter", 0)
+                lid_candidate_ts = state_data.get("lid_candidate_since")
+                refill_active = state_data.get("refill_active", False)
+                refill_start_ts = state_data.get("refill_start_ts")
+                refill_lid_weight_kg = state_data.get("refill_lid_weight_kg")
+                refill_min_raw_kg = state_data.get("refill_min_raw_kg")
+                refill_max_raw_kg = state_data.get("refill_max_raw_kg")
+                refill_min_smoothed_kg = state_data.get("refill_min_smoothed_kg")
+                refill_max_smoothed_kg = state_data.get("refill_max_smoothed_kg")
+                refill_last_updated = state_data.get("refill_last_updated")
+                refill_event_triggered = False
+                refill_amount_kg = None
+                refill_amount_l = None
+                refill_event_start_ts = None
+                refill_event_end_ts = None
+
+                r = get_redis_client()
+                last_known_rate_key_h = f"ln2:{device_code}:last_known_rate_kg_per_h"
+                last_known_rate_key_d = f"ln2:{device_code}:last_known_rate_kg_per_day"
+                last_known_rate_kg_per_h = _parse_optional_float(
+                    r.get(last_known_rate_key_h)
+                )
+                last_known_rate_kg_per_day = _parse_optional_float(
+                    r.get(last_known_rate_key_d)
+                )
+
+                # Transient spike detection (Case B) — before refill detection
+                cutoff_ts = timestamp - timedelta(minutes=cfg.window_minutes)
+                window_points = get_ln2_window_points(device_code, cutoff_ts)
+
+                spike = detect_transient_spike(
+                    window_points, timestamp, sensor_reading.ln2_mass_kg, cfg
+                )
+                refill_detected = False
+
+                if spike:
+                    logger.info(
+                        f"[SPIKE IGNORED] {device_code} at {timestamp.isoformat()} — "
+                        "place-and-remove detected, removing spike points."
+                    )
+                    spike_cutoff = timestamp - timedelta(
+                        seconds=cfg.spike_max_duration_s
+                    )
+                    remove_ln2_spike_points(device_code, spike_cutoff)
+                    window_points = get_ln2_window_points(device_code, cutoff_ts)
+                else:
+                    refill_detected = detect_refill(
+                        window_points, sensor_reading.ln2_mass_kg, cfg
+                    )
+
+                    if refill_detected:
+                        logger.info(f"[REFILL] detected for {device_code}")
+                        last_rate_signed = state_data.get("last_rate_kg_per_h")
+                        last_loss_rate = None
+                        if last_rate_signed is not None:
+                            last_loss_rate = max(0.0, -float(last_rate_signed))
+                        elif last_known_rate_kg_per_h is not None:
+                            last_loss_rate = last_known_rate_kg_per_h
+
+                        if last_loss_rate is not None:
+                            last_known_rate_kg_per_h = round(last_loss_rate, 8)
+                            last_known_rate_kg_per_day = round(last_loss_rate * 24.0, 8)
+                            r.set(last_known_rate_key_h, str(last_known_rate_kg_per_h))
+                            r.set(
+                                last_known_rate_key_d, str(last_known_rate_kg_per_day)
+                            )
+                            r.expire(last_known_rate_key_h, 86400)
+                            r.expire(last_known_rate_key_d, 86400)
+
+                        clear_ln2_window(device_code)
+                        clear_ln2_rate_buckets(device_code)
+                        window_points = []
+
+                # Weight-event classification (Cases C, canister, product)
+                weight_event = classify_weight_event(
+                    window_points, sensor_reading.ln2_mass_kg, cfg
+                )
+                if weight_event.event_type != WeightEventType.NONE:
+                    logger.info(
+                        f"[WEIGHT EVENT] {device_code}  type={weight_event.event_type.value}  "
+                        f"delta={weight_event.delta_kg:.3f} kg  at {timestamp.isoformat()}"
+                    )
+
+                # Append to window
+                append_ln2_window_point(
+                    device_code, timestamp, sensor_reading.ln2_mass_kg, cfg
+                )
+                window_points = get_ln2_window_points(device_code, cutoff_ts)
+
+                smoothed_mass_kg, smoothed_level_pct, smoothed_volume_l = (
+                    compute_smoothed_ln2(
+                        window_points,
+                        timestamp,
+                        cfg,
+                        avg_minutes=LN2_LEVEL_AVG_MINUTES,
+                    )
+                )
+
+                if explicit_lid_state is not None:
+                    current_state = LidState(explicit_lid_state)
+                    lid_candidate_ts = None
+                    if current_state == LidState.OPEN:
+                        open_ctr = cfg.consecutive_windows_for_state
+                        closed_ctr = 0
+                    else:
+                        closed_ctr = cfg.consecutive_windows_for_state
+                        open_ctr = 0
+
+                # Lid-close candidate tracking (Case C vs D) — only when lid
+                # state must be inferred from weight (no explicit sensor value)
+                if (
+                    explicit_lid_state is None
+                    and weight_event.event_type == WeightEventType.LID_CLOSE_CANDIDATE
+                ):
+                    lid_candidate_ts = timestamp.isoformat()
+                    logger.info(
+                        f"[LID CANDIDATE] {device_code} — lid-close candidate started at {lid_candidate_ts} "
+                        f"(confirming over next {cfg.lid_confirm_stable_points} readings)."
+                    )
+
+                if explicit_lid_state is None and lid_candidate_ts is not None:
+                    candidate_dt = datetime.fromisoformat(lid_candidate_ts)
+                    confirmation = confirm_lid_close_candidate(
+                        window_points, candidate_dt, cfg
+                    )
+
+                    if confirmation is True:
+                        logger.warning(
+                            f"[LID CLOSE CONFIRMED] {device_code} tank {cfg.tank_id} at {timestamp.isoformat()} — "
+                            "lid weight band + stable → Lid_Status = CLOSED."
+                        )
+                        current_state = LidState.CLOSED
+                        open_ctr = 0
+                        closed_ctr = cfg.consecutive_windows_for_state
+                        lid_candidate_ts = None
+                    elif confirmation is False:
+                        logger.info(
+                            f"[LID CANDIDATE REJECTED] {device_code} — weight still rising, treating as refill."
+                        )
+                        lid_candidate_ts = None
+
+                # Rate estimation (bucketed for daily stability)
+                update_ln2_rate_bucket(
+                    device_code,
+                    timestamp,
+                    sensor_reading.ln2_mass_kg,
+                    bucket_minutes=EVAP_RATE_BUCKET_MINUTES,
+                    window_hours=EVAP_RATE_WINDOW_HOURS,
+                )
+                rate_cutoff = timestamp - timedelta(hours=EVAP_RATE_WINDOW_HOURS)
+                rate_buckets = get_ln2_rate_buckets(device_code, rate_cutoff)
+                rate_estimate = estimate_rate_from_buckets(
+                    rate_buckets,
+                    min_points=EVAP_RATE_MIN_BUCKETS,
+                )
+                effective_rate_kg_per_h = None
+                rate_source = None
+
+                if rate_estimate is not None:
+                    effective_rate_kg_per_h = rate_estimate.loss_rate_kg_per_h
+                    rate_source = "measured"
+                elif last_known_rate_kg_per_h is not None:
+                    effective_rate_kg_per_h = last_known_rate_kg_per_h
+                    rate_source = "carried_forward"
+
+                # State machine step (delta-based contract) — run on every valid sample
+                baseline_mass_kg = (
+                    sum(mass for _, mass in window_points[:-1])
+                    / len(window_points[:-1])
+                    if len(window_points) >= 2
+                    else sensor_reading.ln2_mass_kg
+                )
+                if explicit_lid_state is None:
+                    state_step = step_state_machine(
+                        baseline_mass_kg=baseline_mass_kg,
+                        new_mass_kg=sensor_reading.ln2_mass_kg,
+                        current_state=current_state,
+                        open_counter=open_ctr,
+                        closed_counter=closed_ctr,
+                        refill_detected=refill_detected,
+                        cfg=cfg,
+                    )
+                    current_state = state_step.new_state
+                    open_ctr = state_step.open_counter
+                    closed_ctr = state_step.closed_counter
+                else:
+                    state_step = SimpleNamespace(
+                        previous_state=previous_state,
+                        new_state=current_state,
+                        state_changed=previous_state != current_state,
+                        open_counter=open_ctr,
+                        closed_counter=closed_ctr,
+                    )
+
+                if state_step.state_changed:
+                    logger.warning(
+                        f"[STATE CHANGE] {device_code}: {state_step.previous_state.value} → {state_step.new_state.value}"
+                    )
+
+                    if (
+                        state_step.previous_state == LidState.CLOSED
+                        and state_step.new_state == LidState.OPEN
+                    ):
+                        start_state = _start_refill_session(
+                            device_code,
+                            timestamp,
+                            baseline_mass_kg,
+                            sensor_reading.ln2_mass_kg,
+                            smoothed_mass_kg,
+                            cfg,
+                        )
+                        refill_active = start_state["refill_active"]
+                        refill_start_ts = start_state["refill_start_ts"]
+                        refill_lid_weight_kg = start_state["refill_lid_weight_kg"]
+                        refill_min_raw_kg = start_state["refill_min_raw_kg"]
+                        refill_max_raw_kg = start_state["refill_max_raw_kg"]
+                        refill_min_smoothed_kg = start_state["refill_min_smoothed_kg"]
+                        refill_max_smoothed_kg = start_state["refill_max_smoothed_kg"]
+                        refill_last_updated = start_state["refill_last_updated"]
+
+                    if (
+                        state_step.previous_state == LidState.OPEN
+                        and state_step.new_state == LidState.CLOSED
+                        and refill_active
+                    ):
+                        close_state = _close_refill_session(
+                            device_code,
+                            timestamp,
+                            baseline_mass_kg,
+                            sensor_reading.ln2_mass_kg,
+                            refill_active,
+                            refill_start_ts,
+                            refill_min_smoothed_kg,
+                            refill_max_smoothed_kg,
+                            cfg,
+                            ln2_config.LN2_DENSITY_KG_PER_L,
+                        )
+                        refill_active = close_state["refill_active"]
+                        refill_start_ts = close_state["refill_start_ts"]
+                        refill_min_raw_kg = close_state["refill_min_raw_kg"]
+                        refill_max_raw_kg = close_state["refill_max_raw_kg"]
+                        refill_min_smoothed_kg = close_state["refill_min_smoothed_kg"]
+                        refill_max_smoothed_kg = close_state["refill_max_smoothed_kg"]
+                        refill_last_updated = close_state["refill_last_updated"]
+                        refill_event_triggered = close_state["refill_event_triggered"]
+                        refill_amount_kg = close_state["refill_amount_kg"]
+                        refill_amount_l = close_state["refill_amount_l"]
+                        refill_event_start_ts = close_state["refill_event_start_ts"]
+                        refill_event_end_ts = close_state["refill_event_end_ts"]
+                        refill_lid_weight_kg = close_state[
+                            "refill_lid_weight_kg_override"
+                        ]
+
+                        if refill_event_triggered:
+                            logger.info(
+                                "[REFILL EVENT] %s amount=%.3f kg (start=%s end=%s)",
+                                device_code,
+                                refill_amount_kg or 0.0,
+                                refill_event_start_ts,
+                                refill_event_end_ts,
+                            )
+                            send_refill_detection_to_backend(
+                                tank_id=cfg.tank_id,
+                                refill_data={"refill_weight": refill_amount_kg},
+                                detected_at=refill_event_end_ts,
+                            )
+                        else:
+                            logger.info(
+                                "[REFILL EVENT] not triggered for %s (amount=%s)",
+                                device_code,
+                                refill_amount_kg,
+                            )
+
+                    if state_step.new_state == LidState.OPEN:
+                        if check_precaution_advisory(
+                            smoothed_level_pct, state_step.new_state, cfg
+                        ):
+                            logger.warning(
+                                f"[PRECAUTION] {device_code} tank {cfg.tank_id} — lid opened while "
+                                f"LN2 level {smoothed_level_pct:.1f}% ≤ precaution threshold "
+                                f"{cfg.precaution_level_pct:.1f}%.  Advisory notification recommended."
+                            )
+
+                if current_state == LidState.OPEN and refill_active:
+                    update_state = _update_refill_session(
+                        device_code,
+                        timestamp,
+                        refill_start_ts,
+                        refill_lid_weight_kg,
+                        refill_min_raw_kg,
+                        refill_max_raw_kg,
+                        refill_min_smoothed_kg,
+                        refill_max_smoothed_kg,
+                        REFILL_ANALYSIS_WINDOW_MINUTES,
+                        smoothed_mass_kg,
+                        sensor_reading.ln2_mass_kg,
+                        cfg,
+                    )
+                    refill_min_raw_kg = update_state["refill_min_raw_kg"]
+                    refill_max_raw_kg = update_state["refill_max_raw_kg"]
+                    refill_min_smoothed_kg = update_state["refill_min_smoothed_kg"]
+                    refill_max_smoothed_kg = update_state["refill_max_smoothed_kg"]
+                    refill_last_updated = update_state["refill_last_updated"]
+
+                # Insert reading (include all computed fields) — persist every valid sample
+                lid_state_val = current_state.value
+                insert_ln2_reading(
+                    db_session,
+                    cfg.device_pk,
+                    cfg.tank_id,
+                    smoothed_level_pct,
+                    (
+                        effective_rate_kg_per_h
+                        if effective_rate_kg_per_h is not None
+                        else 0.0
+                    ),
+                    timestamp,
+                    raw_weight_kg=weight_kg,
+                    ln2_mass_kg=smoothed_mass_kg,
+                    ln2_volume_l=smoothed_volume_l,
+                    sensor_status=sensor_reading.status.value,
+                    lid_state=lid_state_val,
+                    refill_detected=refill_detected,
+                    quality_status="Good",
+                )
+
+                # Low-level alert check (Step 5)
+                low_level = check_low_level_alert(smoothed_mass_kg, low_level_ctr, cfg)
+                low_level_ctr = low_level.consecutive_count
+
+                low_level_alert_fired = False
+                if (
+                    low_level.alert_triggered
+                    and low_level.consecutive_count
+                    == cfg.low_level_consecutive_readings
+                ):
+                    low_level_alert_fired = True
+                    logger.warning(
+                        f"[LOW-LEVEL ALERT] {device_code} tank {cfg.tank_id} — LN2 mass "
+                        f"{smoothed_mass_kg:.3f} kg ≤ {cfg.low_level_threshold_kg:.3f} kg "
+                        f"for {low_level.consecutive_count} consecutive readings. Refill needed."
+                    )
+
+                # Persist updated state (all counters + candidate)
+                save_ln2_device_state(
+                    device_code,
+                    {
+                        "current_state": current_state.value,
+                        "open_counter": open_ctr,
+                        "closed_counter": closed_ctr,
+                        "last_rate_kg_per_h": rate_estimate.rate_kg_per_h
+                        if rate_estimate
+                        else state_data.get("last_rate_kg_per_h"),
+                        "last_updated": timestamp.isoformat(),
+                        "low_level_counter": low_level_ctr,
+                        "lid_candidate_since": lid_candidate_ts,
+                        "refill_active": refill_active,
+                        "refill_start_ts": refill_start_ts,
+                        "refill_lid_weight_kg": refill_lid_weight_kg,
+                        "refill_min_raw_kg": refill_min_raw_kg,
+                        "refill_max_raw_kg": refill_max_raw_kg,
+                        "refill_min_smoothed_kg": refill_min_smoothed_kg,
+                        "refill_max_smoothed_kg": refill_max_smoothed_kg,
+                        "refill_last_updated": refill_last_updated,
+                    },
+                )
+
+                # Merge weight-derived fields into quality_data
+                quality_data.update(
+                    {
+                        "raw_weight_kg": weight_kg,
+                        "ln2_mass_kg": smoothed_mass_kg,
+                        "ln2_level_pct": smoothed_level_pct,
+                        "ln2_volume_l": smoothed_volume_l,
+                        "sensor_status": sensor_reading.status.value,
+                        "evaporation_rate_kg_per_h": cfg.static_evap_kg_per_hour,
+                        "evaporation_rate_kg_per_day": round(
+                            cfg.static_evap_kg_per_hour * 24.0, 8
+                        ),
+                        "rate_source": rate_source,
+                        "lid_state": current_state.value,
+                        "lid_state_kpi_eligible": lid_state_kpi_eligible,
+                        "refill_detected": refill_detected,
+                        "refill_event": refill_event_triggered,
+                        "refill_amount_kg": refill_amount_kg,
+                        "refill_amount_l": refill_amount_l,
+                        "refill_start_ts": refill_event_start_ts,
+                        "refill_end_ts": refill_event_end_ts,
+                        "refill_active": refill_active,
+                        "weight_event": weight_event.event_type.value
+                        if weight_event.event_type != WeightEventType.NONE
+                        else None,
+                        "weight_event_delta_kg": weight_event.delta_kg
+                        if weight_event.event_type != WeightEventType.NONE
+                        else None,
+                        "transient_spike_ignored": spike,
+                        "low_level_alert": low_level_alert_fired,
+                        "quality_status": "Good",
+                    }
+                )
+
+                publish_ln2_to_redis(device_code, quality_data)
+
+                alert_conditions = check_ln2_alert_conditions(
+                    rate_estimate,
+                    state_step,
+                    sensor_reading,
+                    cfg,
+                    state_data.get("last_updated"),
+                )
+                alert_conditions["low_level_refill"] = low_level_alert_fired
+                # trigger_ln2_alerts(
+                #     cfg.tank_id, device_code, alert_conditions, quality_data
+                # )
+
+        kpi_data = (
+            KPI_NAMES.convert_custom_composite_iot_payload_to_kpi_names_mapped_array(
+                quality_data
+            )
+        )
+        if kpi_data:
+            save_kpi_readings(db_session, device_code, kpi_data)
+        else:
+            logger.warning(
+                f"No KPI data derived from CUSTOM_COMPOSITE_IOT payload for {device_code}"
+            )
+
+        logger.info(
+            f"✓ Processed CUSTOM_COMPOSITE_IOT for {device_code}, tank {cfg.tank_id}"
+        )
+        return True
+
+    except Exception as e:
+        logger.error(f"Error processing CUSTOM_COMPOSITE_IOT: {e}", exc_info=True)
         raise
 
 
@@ -3677,7 +4258,6 @@ def transform_webhook_to_ivf_quality_data(
     if "Temperature" in webhook_data and webhook_data["Temperature"]:
         temp_obj = webhook_data["Temperature"]
 
-
         if "External" in temp_obj:
             external_obj = temp_obj["External"]
             if isinstance(external_obj, dict):
@@ -4064,6 +4644,28 @@ def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
                     return 0
             except Exception as e:
                 logger.error(f"Error in CUSTOM_IOT processing: {e}", exc_info=True)
+                db.rollback()
+                raise
+
+        # 2b. CUSTOM_COMPOSITE_IOT (LN2 + ambient/battery composite payload)
+        if is_custom_composite_iot_source(webhook_payload):
+            logger.info("Processing CUSTOM_COMPOSITE_IOT webhook...")
+            try:
+                success = process_custom_composite_iot(db, webhook_payload)
+                if success:
+                    mark_message_processed(
+                        db, message_id, json.dumps(webhook_payload)[:200]
+                    )
+                    db.commit()
+                    return 1
+                else:
+                    logger.warning("CUSTOM_COMPOSITE_IOT processing failed")
+                    db.rollback()
+                    return 0
+            except Exception as e:
+                logger.error(
+                    f"Error in CUSTOM_COMPOSITE_IOT processing: {e}", exc_info=True
+                )
                 db.rollback()
                 raise
 

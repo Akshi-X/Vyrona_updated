@@ -50,6 +50,8 @@ class KPI_NAMES:
     IVF_SHOCK = "shock"
     IVF_TIVE_BATTERY_PERCENTAGE = "tive_battery_percentage"
     IVF_LN2_LID_STATE = "ln2_lid_state"
+    IVF_AMBIENT_HUMIDITY = "ambient_humidity"
+    IVF_DEVICE_CHARGING_STATE = "device_charging_state"
 
     def get_unit_for_kpi(kpi_name):
         """Return the unit for a given KPI name."""
@@ -64,6 +66,10 @@ class KPI_NAMES:
         elif kpi_name in [KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE]:
             return "%"
         elif kpi_name in [KPI_NAMES.IVF_LN2_LID_STATE]:
+            return "state"
+        elif kpi_name in [KPI_NAMES.IVF_AMBIENT_HUMIDITY]:
+            return "%"
+        elif kpi_name in [KPI_NAMES.IVF_DEVICE_CHARGING_STATE]:
             return "state"
         else:
             return ""
@@ -157,6 +163,94 @@ class KPI_NAMES:
                 "name": KPI_NAMES.IVF_LN2_LID_STATE,
                 "value": lid_state_val,
                 "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_LN2_LID_STATE)
+            })
+        return kpi_data
+
+    def convert_custom_composite_iot_payload_to_kpi_names_mapped_array(payload: dict) -> list:
+        """
+        Convert a CUSTOM_COMPOSITE_IOT quality_data dict to a list of KPI name-value-unit mappings.
+
+        Unlike CUSTOM_IOT, this payload already carries internal/ambient temperature,
+        ambient humidity, and device battery/charging state as flat, ready-to-use values
+        alongside the LN2 weight-derived fields (ln2_mass_kg/evaporation_rate/lid_state),
+        which are only present when the source payload's ln2_tank_weight was not NULL.
+
+        Arguments:
+        payload -- A dictionary containing the quality_data built from the raw IoT payload.
+
+        Returns:
+        A list of dictionaries, each containing 'timestamp', 'name', 'value', and 'unit' for a KPI reading.
+        """
+        kpi_data = []
+        timestamp = payload.get("timestamp")
+
+        if "ln2_mass_kg" in payload:
+            kpi_data.append({
+                "timestamp": timestamp,
+                "name": KPI_NAMES.IVF_LN2_LEVEL,
+                "value": payload["ln2_mass_kg"],
+                "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_LN2_LEVEL)
+            })
+        evap_rate_day = payload.get("evaporation_rate_kg_per_day")
+        if evap_rate_day is not None:
+            kpi_data.append({
+                "timestamp": timestamp,
+                "name": KPI_NAMES.IVF_LN2_EVAPORATION_RATE,
+                "value": evap_rate_day,
+                "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_LN2_EVAPORATION_RATE)
+            })
+        lid_state = payload.get("lid_state")
+        lid_state_kpi_eligible = payload.get("lid_state_kpi_eligible", True)
+        if lid_state is not None and lid_state_kpi_eligible:
+            if isinstance(lid_state, str):
+                if lid_state.upper() == "CLOSED":
+                    lid_state_val = 0
+                elif lid_state.upper() == "OPEN":
+                    lid_state_val = 1
+                else:
+                    lid_state_val = 0  # Default to closed if unknown
+            else:
+                lid_state_val = lid_state
+            kpi_data.append({
+                "timestamp": timestamp,
+                "name": KPI_NAMES.IVF_LN2_LID_STATE,
+                "value": lid_state_val,
+                "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_LN2_LID_STATE)
+            })
+        if payload.get("temp_internal") is not None:
+            kpi_data.append({
+                "timestamp": timestamp,
+                "name": KPI_NAMES.IVF_TEMPERATURE_INTERNAL,
+                "value": payload["temp_internal"],
+                "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_TEMPERATURE_INTERNAL)
+            })
+        if payload.get("temp_external") is not None:
+            kpi_data.append({
+                "timestamp": timestamp,
+                "name": KPI_NAMES.IVF_TEMPERATURE_EXTERNAL,
+                "value": payload["temp_external"],
+                "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_TEMPERATURE_EXTERNAL)
+            })
+        if payload.get("ambient_humidity") is not None:
+            kpi_data.append({
+                "timestamp": timestamp,
+                "name": KPI_NAMES.IVF_AMBIENT_HUMIDITY,
+                "value": payload["ambient_humidity"],
+                "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_AMBIENT_HUMIDITY)
+            })
+        if payload.get("battery_percentage") is not None:
+            kpi_data.append({
+                "timestamp": timestamp,
+                "name": KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE,
+                "value": payload["battery_percentage"],
+                "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE)
+            })
+        if payload.get("device_charging_state") is not None:
+            kpi_data.append({
+                "timestamp": timestamp,
+                "name": KPI_NAMES.IVF_DEVICE_CHARGING_STATE,
+                "value": 1 if payload["device_charging_state"] else 0,
+                "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_DEVICE_CHARGING_STATE)
             })
         return kpi_data
 
