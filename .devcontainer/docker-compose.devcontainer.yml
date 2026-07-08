@@ -10,8 +10,13 @@ services:
     volumes:
       - ..:/workspace:cached
       - devcontainer-bashhistory:/root/commandhistory
+      - vscode-server:/home/vscode/.vscode-server
+      - claude-home:/home/vscode/.claude
+      - ${HOME}/.ssh:/home/vscode/.ssh-host:ro
     environment:
       - TERM=xterm-256color
+    ports:
+      - "8000:8000"
     depends_on:                     # ← added, wait for postgres/redis
       postgres:
         condition: service_healthy
@@ -50,6 +55,103 @@ services:
       - "5000:80"
       - "2525:25"
       - "110:110"
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: mgscale-azurite
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'const http = require(\"http\"); const req = http.get(\"http://127.0.0.1:10000/\", res => { process.exit([200,400,404].includes(res.statusCode) ? 0 : 1); }); req.on(\"error\", () => process.exit(1));'"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  eventhub-emulator:
+    image: mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest
+    container_name: mgscale-eventhub-emulator
+    ports:
+      - "5672:5672"
+      - "9092:9092"
+    environment:
+      BLOB_SERVER: azurite
+      METADATA_SERVER: azurite
+      ACCEPT_EULA: "Y"
+    depends_on:
+      azurite:
+        condition: service_healthy
+    volumes:
+      - ../eventhub-config/config.json:/Eventhubs_Emulator/ConfigFiles/Config.json
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5672 || exit 0"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+  telemetry-service:
+    build:
+      context: ../telemetry-service
+      dockerfile: Dockerfile
+    container_name: mgscale-telemetry
+    ports:
+      - "7071:80"
+    volumes:
+      - ../telemetry-service:/home/site/wwwroot
+    depends_on:
+      azurite:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      eventhub-emulator:
+        condition: service_started
+    environment:
+      - AzureWebJobsStorage=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+      - FUNCTIONS_WORKER_RUNTIME=python
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-mygrape}
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - ALERT_API_BASE_URL=http://backend:8000
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - EVENT_HUB_CONNECTION_STRING=Endpoint=sb://eventhub-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+      - EVENT_HUB_NAME=telemetry-events
+
+  iot-ingestion-service:
+    build:
+      context: ../tive-ingestion-function
+      dockerfile: Dockerfile
+    container_name: mgscale-iot-ingestion
+    ports:
+      - "7072:80"
+    volumes:
+      - ../tive-ingestion-function:/home/site/wwwroot
+    depends_on:
+      azurite:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      eventhub-emulator:
+        condition: service_started
+    environment:
+      - AzureWebJobsStorage=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+      - FUNCTIONS_WORKER_RUNTIME=python
+      - TIVE_WEBHOOK_KEY=${TIVE_WEBHOOK_KEY:-dev-test-key}
+      - TIVE_WEBHOOK_SECRET=${TIVE_WEBHOOK_SECRET:-}
+      - ALLOW_UNAUTHENTICATED_FOR_DEBUG=true
+      - EVENTHUB_CONNECTION=Endpoint=sb://eventhub-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+      - EVENTHUB_NAME=telemetry-events
 volumes:
   postgres_data:
   devcontainer-bashhistory:
+  vscode-server:
+  claude-home:

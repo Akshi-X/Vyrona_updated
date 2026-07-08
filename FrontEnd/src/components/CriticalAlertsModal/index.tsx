@@ -13,6 +13,7 @@ interface CriticalAlert {
     timestamp: string;
     status: "Active" | "Acknowledged" | "Resolved" | "Escalated";
     acknowledgementReason?: string;
+    deviceType?: "CRYOCAN" | "REFRIGERATOR";
 }
 
 interface CriticalAlertsModalProps {
@@ -52,6 +53,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
     // Filter states
     const [priorityFilter, setPriorityFilter] = useState<string>("all");
     const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [deviceTypeFilter, setDeviceTypeFilter] = useState<string>("all");
 
     // Single filter panel toggle
     const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
@@ -62,6 +64,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
         if (!isOpen) {
             setPriorityFilter("all");
             setStatusFilter("all");
+            setDeviceTypeFilter("all");
             setIsFilterPanelOpen(false);
             setExpandedGroupKeys(new Set());
             setPendingAcknowledgeAlertIds(null);
@@ -99,14 +102,21 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
         if (statusFilter !== "all" && alert.status !== statusFilter) {
             return false;
         }
+        // Apply device type filter
+        if (deviceTypeFilter !== "all" && alert.deviceType !== deviceTypeFilter) {
+            return false;
+        }
         return true;
     });
 
     const priorities: ("Low" | "High")[] = ["Low", "High"];
     const statuses: ("Active" | "Acknowledged")[] = ["Active", "Acknowledged"];
+    const deviceTypes: ("CRYOCAN" | "REFRIGERATOR")[] = ["CRYOCAN", "REFRIGERATOR"];
 
     const activeFilterCount =
-        (priorityFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0);
+        (priorityFilter !== "all" ? 1 : 0) +
+        (statusFilter !== "all" ? 1 : 0) +
+        (deviceTypeFilter !== "all" ? 1 : 0);
 
     const handleAcknowledgeRequest = (alertIds: string | string[]) => {
         setPendingAcknowledgeAlertIds(
@@ -491,6 +501,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                     onClick={() => {
                                         setPriorityFilter("all");
                                         setStatusFilter("all");
+                                        setDeviceTypeFilter("all");
                                     }}
                                     className="text-xs text-gray-400 hover:text-primary transition-colors"
                                 >
@@ -524,7 +535,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                         </div>
 
                         {/* Status */}
-                        <div>
+                        <div className="mb-3">
                             <p className="text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">
                                 Status
                             </p>
@@ -540,6 +551,28 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                         }`}
                                     >
                                         {s === "all" ? "All" : s}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Device Type */}
+                        <div>
+                            <p className="text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">
+                                Device Type
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {(["all", ...deviceTypes] as string[]).map((d) => (
+                                    <button
+                                        key={d}
+                                        onClick={() => setDeviceTypeFilter(d)}
+                                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                                            deviceTypeFilter === d
+                                                ? "bg-primary text-white"
+                                                : "bg-[#f5f5f5] text-[#555] hover:bg-[#f0d6f5] hover:text-primary"
+                                        }`}
+                                    >
+                                        {d === "all" ? "All" : d}
                                     </button>
                                 ))}
                             </div>

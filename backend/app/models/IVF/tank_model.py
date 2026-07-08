@@ -29,6 +29,9 @@ class Tank(Base):
         index=True,
         comment="Tive device identifier mapped to this tank (e.g., EntityName like 'J712149' or a device id) for tank-level monitoring"
     )
+    empty_weight_kg = Column(Numeric(10, 2), nullable=True, comment="Tank tare weight (kg) with no LN2")
+    full_weight_kg = Column(Numeric(10, 2), nullable=True, comment="Tank weight (kg) when LN2 is full")
+    static_evap_rate_l_per_day = Column(Numeric(10, 4), nullable=True, comment="Manufacturer static evaporation rate (L/day)")
     
     # Relationships
     branch = relationship("HospitalBranch", back_populates="tanks")

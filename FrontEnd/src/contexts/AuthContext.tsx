@@ -22,6 +22,8 @@ interface AuthContextType {
     setIsEmailNotificationsEnabled: (enabled: boolean) => void;
     login: (token: string, role?: string, rememberMe?: boolean, onboardingCompleted?: boolean) => void;
     logout: () => void;
+    /** Mark onboarding complete in-session (e.g. after the final level) without a reload. */
+    markOnboardingComplete: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,6 +48,7 @@ export const useAuth = () => {
             setIsEmailNotificationsEnabled: () => {},
             login: () => {},
             logout: () => {},
+            markOnboardingComplete: () => {},
         } as AuthContextType;
     }
     return context;
@@ -59,15 +62,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [token, setToken] = useState<string | undefined>(undefined);
     const [userRole, setUserRole] = useState<string | undefined>(undefined);
-    const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | undefined>(() => {
-        // Read from localStorage so the value is immediately known on page reload.
-        // undefined = unauthenticated / not yet fetched.
-        try {
-            const stored = localStorage.getItem("onboarding_completed");
-            if (stored !== null) return stored === "true";
-        } catch {}
-        return undefined;
-    });
+    // Always start undefined so the onboarding redirect waits for the authoritative
+    // profile fetch. A cached value can be stale (e.g. it was false at session start
+    // but the user has since completed onboarding / it was set true), which would
+    // wrongly redirect a completed user back into onboarding on reload.
+    const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | undefined>(undefined);
     const [isLoading, setIsLoading] = useState(true);
     const [rememberMe, setRememberMe] = useState<boolean>(false);
     const sessionTimeoutRef = useRef<number | null>(null);
@@ -242,7 +241,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 }
                 const completed = profile?.onboarding_completed ?? true;
                 setOnboardingCompleted(completed);
-                try { localStorage.setItem("onboarding_completed", String(completed)); } catch {}
             } catch {
                 // Profile fetch failed — default to completed so user isn't stuck
                 setOnboardingCompleted(true);
@@ -336,11 +334,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (onboardingCompleted !== undefined) {
             setOnboardingCompleted(onboardingCompleted);
-            localStorage.setItem("onboarding_completed", String(onboardingCompleted));
         }
 
         // Set session timeout
         setSessionTimeoutHandler(rememberMe);
+    };
+
+    const markOnboardingComplete = () => {
+        setOnboardingCompleted(true);
     };
 
     const logout = () => {
@@ -368,6 +369,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setIsEmailNotificationsEnabled,
         login,
         logout,
+        markOnboardingComplete,
     };
 
     // Run variant health check once the user becomes authenticated (dev/staging only).

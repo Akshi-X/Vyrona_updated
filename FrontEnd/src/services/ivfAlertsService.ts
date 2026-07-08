@@ -116,6 +116,15 @@ export class IvfAlertsService extends BaseApiService {
     );
   }
 
+  /** Hospital alerts scoped to refrigerators only (refrigerator_id IS NOT NULL) */
+  async getHospitalRefrigeratorAlerts(status?: 'Active' | 'Acknowledged'): Promise<HospitalAlertsResponse> {
+    const queryParam = status ? `?status=${encodeURIComponent(status)}` : '';
+    return await this.request<HospitalAlertsResponse>(
+      `/api/ivf/alerts/hospital/refrigerators${queryParam}`,
+      { method: 'GET' }
+    );
+  }
+
   /**
    * Acknowledge an alert
    */

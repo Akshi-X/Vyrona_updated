@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { Switch } from "../../components/ui/switch";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
+import { useHasVariant } from "../../components/VariantRoute";
 
 interface ContainerRow {
     tank_id: number;
@@ -75,8 +76,8 @@ const KPI_NAMES = {
     INCUBATOR_PH: "incubator_ph",
     INCUBATOR_VOC: "incubator_voc",
     INCUBATOR_LID_STATE: "incubator_lid_state",
-    REFRIGERATOR_FREEZER_TEMP: "freezer_temperature",
-    REFRIGERATOR_FRIDGE_TEMP: "refrigerator_temperature",
+    REFRIGERATOR_HUMIDITY: "refrigerator_humidity",
+    REFRIGERATOR_TEMP: "refrigerator_temp",
 } as const;
 
 const isActiveAlertType = (alertType?: string | null) =>
@@ -388,30 +389,30 @@ const KPI_FORM_CONFIG: KpiFormConfig[] = [
         tank_type: "incubator",
     },
     {
-        kpi_name: KPI_NAMES.REFRIGERATOR_FREEZER_TEMP,
+        kpi_name: KPI_NAMES.REFRIGERATOR_HUMIDITY,
         alert_name: null,
-        label: "Freezer Temperature",
-        description: "Track freezer compartment temperature for the refrigerator",
-        icon: <ThermometerSun size={20} />,
-        unit: "°C",
+        label: "Humidity",
+        description: "Track relative humidity inside the refrigerator zone",
+        icon: <Droplets size={20} />,
+        unit: "%",
         min_available: true,
         max_available: true,
-        both_required: true,
+        both_required: false,
         min_label: null,
         max_label: null,
-        min_bound: null,
-        max_bound: null,
+        min_bound: 0,
+        max_bound: 100,
         cooldown_available: true,
         custom_dropdown: null,
-        default_alert_type: "critical",
+        default_alert_type: "soft",
         tank_type: "refrigerator",
     },
     {
-        kpi_name: KPI_NAMES.REFRIGERATOR_FRIDGE_TEMP,
+        kpi_name: KPI_NAMES.REFRIGERATOR_TEMP,
         alert_name: null,
-        label: "Refrigerator Temperature",
-        description: "Track refrigerator compartment temperature",
-        icon: <ThermometerSun size={20} />,
+        label: "Temperature",
+        description: "Track probe sensor temperature for the refrigerator zone",
+        icon: <Thermometer size={20} />,
         unit: "°C",
         min_available: true,
         max_available: true,
@@ -628,7 +629,12 @@ export default function AlertSetting() {
     const isOnboarding = useOnboardingMode();
     const [searchParams, setSearchParams] = useSearchParams();
 
+    // Refrigerator-only hospitals (gated by the "/alert-setting#refrigerator-only"
+    // variant flag) are locked to refrigerators and never see the Direction tabs.
+    const refrigeratorOnly = useHasVariant("/alert-setting#refrigerator-only");
+
     const directionFilter: "cryotanks" | "incubators" | "refrigerators" = (() => {
+        if (refrigeratorOnly) return "refrigerators";
         const v = searchParams.get("direction");
         if (v === "incubators") return "incubators";
         if (v === "refrigerators") return "refrigerators";
@@ -701,6 +707,19 @@ export default function AlertSetting() {
     >([]);
     const primaryContainer = selectedContainers[0] ?? null;
     const [selectedChamberId, setSelectedChamberId] = useState<string | null>(null);
+    const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+    const [refrigeratorZones, setRefrigeratorZones] = useState<Array<{ zone_id: string; zone_name: string }>>([]);
+    const [refrigeratorZoneName, setRefrigeratorZoneName] = useState<string>('');
+    // Zone name to persist when saving — comes from the editable text input.
+    const effectiveZoneName: string | null = refrigeratorZoneName.trim() || null;
+    // A refrigerator zone has been renamed when the input differs from the
+    // stored name of the currently selected zone.
+    const originalZoneName =
+        refrigeratorZones.find((z) => z.zone_id === selectedZoneId)?.zone_name ?? '';
+    const zoneNameDirty =
+        !!primaryContainer?.is_refrigerator &&
+        selectedZoneId != null &&
+        refrigeratorZoneName.trim() !== originalZoneName.trim();
     // Common = incubator-level (no chamber); only external temp applies at this scope
     const effectiveKpiNames = directionFilter === "refrigerators"
         ? REFRIGERATOR_KPI_NAMES
@@ -1041,21 +1060,40 @@ export default function AlertSetting() {
     // even when selectedChamberId stays null (Common → Common)
     }, [primaryContainer?.tank_id, selectedChamberId, refetchKpiConfig]);
 
-    // Refrigerator KPI config fetch — refrigerator-level (zone_id=null) for
-    // now. When a future zone selector is added, swap `null` for the picked
-    // zone, mirroring the incubator chamber pattern above.
+    // Refrigerator: fetch zones, then load KPI config for the selected zone.
+    useEffect(() => {
+        if (!primaryContainer?.is_refrigerator) {
+            setRefrigeratorZones([]);
+            setSelectedZoneId(null);
+            setRefrigeratorZoneName('');
+            return;
+        }
+        const refId = primaryContainer.refrigerator_id ?? primaryContainer.tank_id;
+        ivfService.getRefrigeratorZones(refId).then((zones) => {
+            setRefrigeratorZones(zones);
+            const first = zones[0] ?? null;
+            setSelectedZoneId(first ? first.zone_id : null);
+            setRefrigeratorZoneName(first ? first.zone_name : '');
+        }).catch(() => {
+            setRefrigeratorZones([]);
+            setSelectedZoneId(null);
+            setRefrigeratorZoneName('');
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [primaryContainer?.tank_id, primaryContainer?.is_refrigerator]);
+
     useEffect(() => {
         if (!primaryContainer?.is_refrigerator) return;
         setConfigLoading(true);
         setConfigError(null);
         refetchKpiConfig(
             primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
-            { isRefrigerator: true, zoneId: null },
+            { isRefrigerator: true, zoneId: selectedZoneId },
         ).catch((e: any) => {
             setConfigError(e?.message || "Failed to fetch KPI config");
             setConfigList([]);
         }).finally(() => setConfigLoading(false));
-    }, [primaryContainer?.tank_id, primaryContainer?.is_refrigerator, refetchKpiConfig]);
+    }, [primaryContainer?.tank_id, primaryContainer?.is_refrigerator, selectedZoneId, refetchKpiConfig]);
 
     useEffect(() => {
         if (primaryContainer) {
@@ -1366,7 +1404,7 @@ export default function AlertSetting() {
             await refetchForPrimary(primaryContainer, {
                 showLoading: true,
                 chamberId: selectedChamberId,
-                zoneId: null,
+                zoneId: selectedZoneId,
             });
         } catch (e: any) {
             setFormError(e?.message || "Create failed");
@@ -1394,7 +1432,7 @@ export default function AlertSetting() {
                 await refetchForPrimary(primaryContainer, {
                     showLoading: true,
                     chamberId: selectedChamberId,
-                    zoneId: null,
+                    zoneId: selectedZoneId,
                 });
             }
         } catch (e: any) {
@@ -1551,6 +1589,28 @@ export default function AlertSetting() {
                 }
             }
 
+            // Renaming a zone that has no KPI config rows yet: zone names are stored
+            // on those rows, so scaffold the refrigerator's KPIs (disabled, no
+            // thresholds) to give the new zone name somewhere to persist.
+            if (
+                zoneNameDirty &&
+                primaryContainer?.is_refrigerator &&
+                configsToApply.length === 0
+            ) {
+                for (const kpiName of effectiveKpiNames) {
+                    const metadata = getKpiMetadata(kpiName);
+                    configsToApply.push({
+                        kpi_name: kpiName,
+                        alert_name: metadata.label,
+                        min: null,
+                        max: null,
+                        unit: metadata.unit ?? null,
+                        alert_type: null,
+                        status: false,
+                    });
+                }
+            }
+
             if (configsToApply.length === 0) return;
 
             setSaveAllLoading(true);
@@ -1558,7 +1618,9 @@ export default function AlertSetting() {
                 if (primaryContainer?.is_refrigerator) {
                     await ivfService.bulkUpsertKpiConfigForRefrigerator(
                         primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
+                        selectedZoneId,
                         configsToApply,
+                        effectiveZoneName,
                     );
                 } else if (primaryContainer?.is_incubator) {
                     await ivfService.bulkUpsertKpiConfigForIncubator(
@@ -1571,19 +1633,25 @@ export default function AlertSetting() {
                     await ivfService.bulkUpsertKpiConfig(tankIds, configsToApply);
                 }
                 setMultiDraftConfig({});
+                // Re-sync zone names after a refrigerator save (zone_name label may have changed).
+                if (primaryContainer?.is_refrigerator) {
+                    const refId = primaryContainer.refrigerator_id ?? primaryContainer.tank_id;
+                    const freshZones = await ivfService.getRefrigeratorZones(refId).catch(() => refrigeratorZones);
+                    setRefrigeratorZones(freshZones);
+                }
                 // For multi-container, deselect all. For single container, reload config.
                 if (selectedContainers.length > 1) {
                     await refetchForPrimary(selectedContainers[0], {
                         showLoading: true,
                         chamberId: selectedChamberId,
-                        zoneId: null,
+                        zoneId: selectedZoneId,
                     });
                     setSelectedContainers([]);
                 } else if (primaryContainer) {
                     await refetchForPrimary(primaryContainer, {
                         showLoading: true,
                         chamberId: selectedChamberId,
-                        zoneId: null,
+                        zoneId: selectedZoneId,
                     });
                 }
                 toast.success("Changes saved successfully");
@@ -1596,9 +1664,30 @@ export default function AlertSetting() {
         }
         const ids = Object.keys(draftConfig).map(Number);
         const hasTemplateDrafts = Object.keys(multiDraftConfig).length > 0;
-        if (ids.length === 0 && !hasTemplateDrafts) return;
+        if (ids.length === 0 && !hasTemplateDrafts && !zoneNameDirty) return;
         setSaveAllLoading(true);
         try {
+            // Persist a zone rename: re-upsert the zone's existing configs (unchanged
+            // values) carrying the new zone_name. Runs before the per-id updates below,
+            // which don't touch zone_name, so threshold edits aren't clobbered.
+            if (zoneNameDirty && primaryContainer?.is_refrigerator) {
+                await ivfService.bulkUpsertKpiConfigForRefrigerator(
+                    primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
+                    selectedZoneId,
+                    configList.map((c) => ({
+                        kpi_name: c.kpi_name,
+                        alert_name: c.alert_name,
+                        min: c.min,
+                        max: c.max,
+                        unit: c.unit,
+                        alert_type: c.alert_type,
+                        cooldown_minutes: c.cooldown_minutes,
+                        unack_escalation_threshold: c.unack_escalation_threshold,
+                        status: c.status,
+                    })),
+                    effectiveZoneName,
+                );
+            }
             for (const id of ids) {
                 const d = draftConfig[id];
                 if (!d) continue;
@@ -1699,7 +1788,9 @@ export default function AlertSetting() {
                     if (primaryContainer.is_refrigerator) {
                         await ivfService.bulkUpsertKpiConfigForRefrigerator(
                             primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
+                            selectedZoneId,
                             configsToApply,
+                            effectiveZoneName,
                         );
                     } else if (primaryContainer.is_incubator) {
                         await ivfService.bulkUpsertKpiConfigForIncubator(
@@ -1714,11 +1805,17 @@ export default function AlertSetting() {
             }
             setDraftConfig({});
             setMultiDraftConfig({});
+            // Re-sync zone names after refrigerator save (zone_name label may have changed).
+            if (primaryContainer?.is_refrigerator) {
+                const refId = primaryContainer.refrigerator_id ?? primaryContainer.tank_id;
+                const freshZones = await ivfService.getRefrigeratorZones(refId).catch(() => refrigeratorZones);
+                setRefrigeratorZones(freshZones);
+            }
             if (primaryContainer) {
                 await refetchForPrimary(primaryContainer, {
                     showLoading: true,
                     chamberId: selectedChamberId,
-                    zoneId: null,
+                    zoneId: selectedZoneId,
                 });
             }
             toast.success("Changes saved successfully");
@@ -1739,7 +1836,7 @@ export default function AlertSetting() {
                 await refetchForPrimary(primaryContainer, {
                     showLoading: true,
                     chamberId: selectedChamberId,
-                    zoneId: null,
+                    zoneId: selectedZoneId,
                 });
             }
         } catch (e: any) {
@@ -1807,10 +1904,11 @@ export default function AlertSetting() {
 
     const isMultiMode =
         selectedContainers.length > 1 || configList.length === 0;
-    const hasPendingChanges = isMultiMode
-        ? Object.keys(multiDraftConfig).length > 0
-        : Object.keys(draftConfig).length > 0 ||
-          Object.keys(multiDraftConfig).length > 0;
+    const hasPendingChanges =
+        (isMultiMode
+            ? Object.keys(multiDraftConfig).length > 0
+            : Object.keys(draftConfig).length > 0 ||
+              Object.keys(multiDraftConfig).length > 0) || zoneNameDirty;
 
     // ─── Shared input renderer driven by KPI_FORM_CONFIG ─────────────────────
     const renderKpiInputs = (
@@ -1920,7 +2018,9 @@ export default function AlertSetting() {
         <>
                 <PageLayout
                     title="Alert Configuration"
+                    description="Set alert thresholds for each device and KPI."
                     icon={CriticalAlertsIcon}
+                    patternBackground
                     actions={
                         <>
                             <div className="md:hidden">
@@ -1952,33 +2052,27 @@ export default function AlertSetting() {
                         <div className="w-full xl1:w-[380px] xl1:shrink-0 flex flex-col gap-6">
                             {/* Filters card - hidden on mobile (shown via header filter icon) */}
                             <div id="onboarding-alert-filters" className="hidden md:flex bg-white border border-line rounded-lg px-3 py-3 flex-col gap-3">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Direction</label>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setDirectionFilter("cryotanks")}
-                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "cryotanks" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
-                                        >
-                                            Cryotanks
-                                        </button>
-                                        <button
-                                            type="button"
-                                            disabled
-                                            // onClick={() => setDirectionFilter("incubators")}
-                                            className="flex-1 px-3 h-12 border rounded-lg text-sm font-medium border-line bg-white text-gray-300 cursor-not-allowed"
-                                        >
-                                            Incubators
-                                        </button>
-                                        {/* <button
-                                            type="button"
-                                            onClick={() => setDirectionFilter("refrigerators")}
-                                            className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "refrigerators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
-                                        >
-                                            Refrigerators
-                                        </button> */}
+                                {!refrigeratorOnly && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Direction</label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setDirectionFilter("cryotanks")}
+                                                className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "cryotanks" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
+                                            >
+                                                Cryotanks
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setDirectionFilter("refrigerators")}
+                                                className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${directionFilter === "refrigerators" ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-line hover:bg-gray-50"}`}
+                                            >
+                                                Refrigerators
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Branch
@@ -2065,7 +2159,7 @@ export default function AlertSetting() {
                                     </h2>
                                 </div>
                                 <div className="pl-2 pr-2 py-2 rounded-t-lg bg-primary-bg text-xs font-semibold text-primary">
-                                    {directionFilter === "incubators" ? "Incubators #" : "Containers #"}
+                                    {directionFilter === "incubators" ? "Incubators #" : directionFilter === "refrigerators" ? "Refrigerators #" : "Containers #"}
                                 </div>
                                 <div
                                     className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
@@ -2146,7 +2240,7 @@ export default function AlertSetting() {
                                                     } ${lockContainerSelection ? "opacity-70 cursor-not-allowed" : ""}`}
                                                 >
                                                     <span className="text-primary text-xs font-bold block truncate">
-                                                        {directionFilter === "incubators" ? "Incubator" : "Container"} {c.canisterId}
+                                                        {directionFilter === "incubators" ? "Incubator" : directionFilter === "refrigerators" ? "Refrigerator" : "Container"} {c.canisterId}
                                                     </span>
                                                     {c.branchName && c.branchName !== "N/A" && (
                                                         <div className="text-xs text-gray-900 leading-snug truncate">
@@ -2180,7 +2274,7 @@ export default function AlertSetting() {
                                 <h2 className="font-bold text-black text-base">
                                     Alert Configuration{" "}
                                     {selectedContainers.length > 1
-                                        ? `- ${selectedContainers.length} ${directionFilter === "incubators" ? "Incubators" : "Containers"} Selected`
+                                        ? `- ${selectedContainers.length} ${directionFilter === "incubators" ? "Incubators" : directionFilter === "refrigerators" ? "Refrigerators" : "Containers"} Selected`
                                         : primaryContainer
                                           ? `- ${directionFilter === "incubators" ? "Incubator" : "Cryocan"} ${primaryContainer.canisterId}`
                                           : ""}
@@ -2308,6 +2402,63 @@ export default function AlertSetting() {
                                                             </div>
                                                         </div>
                                                     )}
+                                                {primaryContainer?.is_refrigerator &&
+                                                    refrigeratorZones.length > 0 && (
+                                                        <div className="mb-3">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                                                    Select Zone
+                                                                </p>
+                                                                <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">
+                                                                    {selectedZoneId
+                                                                        ? (refrigeratorZones.find((z) => z.zone_id === selectedZoneId)?.zone_name ?? selectedZoneId)
+                                                                        : "All Zones"}
+                                                                </span>
+                                                            </div>
+                                                            <div className="w-full max-w-sm mx-auto rounded-xl p-3 space-y-2">
+                                                                {refrigeratorZones.map((zone) => {
+                                                                    const active = selectedZoneId === zone.zone_id;
+                                                                    return (
+                                                                        <button
+                                                                            key={zone.zone_id}
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                if (active) {
+                                                                                    setSelectedZoneId(null);
+                                                                                    setRefrigeratorZoneName('');
+                                                                                } else {
+                                                                                    setSelectedZoneId(zone.zone_id);
+                                                                                    setRefrigeratorZoneName(zone.zone_name);
+                                                                                }
+                                                                            }}
+                                                                            className={`w-full h-10 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                                                                                active
+                                                                                    ? "bg-primary text-white scale-105"
+                                                                                    : "bg-white text-gray-500 border border-gray-200 hover:border-primary hover:text-primary hover:scale-105"
+                                                                            }`}
+                                                                        >
+                                                                            {zone.zone_name}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                {/* Zone Name input — create new zone or rename existing (refrigerators only) */}
+                                                {primaryContainer?.is_refrigerator && selectedContainers.length === 1 && (
+                                                    <div className="mb-3">
+                                                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">
+                                                            Zone Name
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={refrigeratorZoneName}
+                                                            onChange={(e) => setRefrigeratorZoneName(e.target.value)}
+                                                            placeholder="e.g. Fridge, Freezer, Zone A"
+                                                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-gray-300"
+                                                        />
+                                                    </div>
+                                                )}
                                                 {/* Multi-container mode OR single container with no config: show all KPI types with empty values */}
                                                 {selectedContainers.length >
                                                     1 ||
@@ -3442,7 +3593,7 @@ export default function AlertSetting() {
                                                                                             className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
                                                                                         />
                                                                                         <div className="min-w-0">
-                                                                                            <div className="text-xs font-semibold text-primary truncate">{directionFilter === "incubators" ? "Incubator" : "Container"} {c.canisterId}</div>
+                                                                                            <div className="text-xs font-semibold text-primary truncate">{directionFilter === "incubators" ? "Incubator" : directionFilter === "refrigerators" ? "Refrigerator" : "Container"} {c.canisterId}</div>
                                                                                             <div className="text-xs text-gray-500 truncate">{c.branchName}</div>
                                                                                         </div>
                                                                                     </label>
@@ -3470,7 +3621,7 @@ export default function AlertSetting() {
                                                                                                 await refetchForPrimary(primaryContainer, {
                                                                                                     showLoading: true,
                                                                                                     chamberId: selectedChamberId,
-                                                                                                    zoneId: null,
+                                                                                                    zoneId: selectedZoneId,
                                                                                                 });
                                                                                             }
                                                                                             toast.success(`Copied to ${selectedTankIds.length} tank(s) successfully`);

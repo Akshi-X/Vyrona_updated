@@ -224,6 +224,7 @@ interface KpiReading {
     max?: number;
     count?: number;
     alert_count?: number;
+    open_count?: number;
     unit: string;
   }>;
 }
@@ -570,6 +571,7 @@ export default function IVFQualityTrackingChart({
                 max?: number;
                 count?: number;
                 alert_count?: number;
+                open_count?: number;
                 unit?: string;
               }
             ) => {
@@ -584,6 +586,7 @@ export default function IVFQualityTrackingChart({
               const countValue = typeof point.count === 'number' ? point.count : Number(point.count ?? NaN);
               const existing = byTs.get(timestamp);
               const alertCount = typeof point.alert_count === 'number' ? point.alert_count : 0;
+              const openCount = typeof point.open_count === 'number' ? point.open_count : undefined;
               const nextKpi = {
                 name: kpiName,
                 value,
@@ -592,6 +595,7 @@ export default function IVFQualityTrackingChart({
                 max: Number.isFinite(maxValue) ? maxValue : undefined,
                 count: Number.isFinite(countValue) ? countValue : undefined,
                 alert_count: alertCount,
+                open_count: openCount,
                 unit: point.unit ?? '',
               };
               if (existing) {
@@ -991,6 +995,8 @@ export default function IVFQualityTrackingChart({
             r.kpis.find((x: any) => x.name === activeTab) ??
             r.kpis.find((x: any) => x.name === 'lid_state');
           if (!k) return null;
+          // Prefer backend open-event count (closed->open transitions, continuity-aware).
+          if (typeof k.open_count === 'number') return k.open_count;
           const avg = typeof k.avg === 'number' ? k.avg : typeof k.value === 'number' ? k.value : null;
           const count = typeof k.count === 'number' ? k.count : 1;
           if (avg == null) return null;
@@ -1062,6 +1068,7 @@ export default function IVFQualityTrackingChart({
       fill: !showCandlestick,
       spanGaps: true,
       order: 2,
+      _isAvg: true,
     });
 
     const thresholds = kpiThresholds[activeTab];
@@ -1083,17 +1090,18 @@ export default function IVFQualityTrackingChart({
       }));
     })();
 
-    mergedThresholdLines.forEach((line, idx) => {
+    mergedThresholdLines.forEach((line) => {
       datasets.push({
-        label: line.label,
+        label: 'Threshold Range',
         data: values.map(() => line.value),
-        borderColor: line.kind === 'max' ? 'rgba(220, 38, 38, 0.45)' : 'rgba(249, 115, 22, 0.45)',
+        borderColor: '#C2410C',
         borderWidth: 1.5,
-        borderDash: idx % 2 === 0 ? [4, 4] : [8, 4],
+        borderDash: [6, 4],
         pointRadius: 0,
         tension: 0,
         fill: false,
         spanGaps: true,
+        _isThreshold: true,
       });
     });
 
@@ -1124,6 +1132,87 @@ export default function IVFQualityTrackingChart({
   const isLidKpi = activeTab === 'lid_state' || activeTab === 'ln2_lid_state';
   const showLidCountChart = isLidKpi && timeRange !== 'LIVE';
 
+  const alertCounts = useMemo(() => {
+    if (timeRange === 'LIVE') return [] as number[];
+    return plottedReadings.map((r) => {
+      const kpi =
+        r.kpis?.find((k: any) => k.name === activeTab) ??
+        (activeTab === 'ln2_lid_state' ? r.kpis?.find((k: any) => k.name === 'lid_state') : null);
+      const count = kpi?.alert_count;
+      return typeof count === 'number' && count > 0 ? count : 0;
+    });
+  }, [plottedReadings, activeTab, timeRange]);
+
+  const hasAlertBadges = useMemo(() => alertCounts.some((c) => c > 0), [alertCounts]);
+
+  // react-chartjs-2 does not re-init an inline plugin when its closure changes,
+  // so the plugin object stays stable and reads the latest counts from a ref.
+  const alertCountsRef = useRef<number[]>(alertCounts);
+  alertCountsRef.current = alertCounts;
+
+  const alertBadgePlugin = useMemo(
+    () => ({
+      id: 'alertBadges',
+      afterDatasetsDraw: (chart: any) => {
+        const counts = alertCountsRef.current;
+        if (!counts.some((c) => c > 0)) return;
+        // Badges anchor to the main avg line dataset, or the lid-count bar when the
+        // Lid State tab renders a bar chart (no line dataset present).
+        let datasetIndex = chart.data.datasets.findIndex(
+          (d: any) => d.type === 'line' && !d.borderDash && d.data?.some((v: any) => v != null)
+        );
+        if (datasetIndex < 0) {
+          datasetIndex = chart.data.datasets.findIndex((d: any) => d._isLidCount);
+        }
+        if (datasetIndex < 0) return;
+        const meta = chart.getDatasetMeta(datasetIndex);
+        if (!meta || meta.hidden) return;
+        const { ctx } = chart;
+        meta.data.forEach((point: any, i: number) => {
+          const count = counts[i];
+          if (!count || !point || !Number.isFinite(point.y)) return;
+          const label = count > 99 ? '99+' : String(count);
+          ctx.save();
+          ctx.font = '700 10px sans-serif';
+          const textW = ctx.measureText(label).width;
+          const padX = 6;
+          const bw = Math.max(18, textW + padX * 2);
+          const bh = 16;
+          const tail = 5;
+          const cx = point.x;
+          const bottom = point.y - 8;
+          const top = bottom - bh - tail;
+          const left = cx - bw / 2;
+          const radius = 5;
+
+          ctx.fillStyle = '#E11D2A';
+          ctx.beginPath();
+          ctx.moveTo(left + radius, top);
+          ctx.lineTo(left + bw - radius, top);
+          ctx.arcTo(left + bw, top, left + bw, top + radius, radius);
+          ctx.lineTo(left + bw, top + bh - radius);
+          ctx.arcTo(left + bw, top + bh, left + bw - radius, top + bh, radius);
+          ctx.lineTo(cx + tail, top + bh);
+          ctx.lineTo(cx, top + bh + tail);
+          ctx.lineTo(cx - tail, top + bh);
+          ctx.lineTo(left + radius, top + bh);
+          ctx.arcTo(left, top + bh, left, top + bh - radius, radius);
+          ctx.lineTo(left, top + radius);
+          ctx.arcTo(left, top, left + radius, top, radius);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label, cx, top + bh / 2 + 0.5);
+          ctx.restore();
+        });
+      },
+    }),
+    []
+  );
+
   const chartOptions = useMemo(() => {
     const sorted = plottedReadings;
     const stats = sorted.map((r) => getKpiStats(r, activeTab)).filter((v): v is { avg: number; min: number | null; max: number | null } => v != null);
@@ -1146,6 +1235,7 @@ export default function IVFQualityTrackingChart({
     });
     const padding = maxY != null && minY != null ? (maxY - minY) * 0.1 || 1 : 5;
     return {
+      animation: false,
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
@@ -1159,6 +1249,13 @@ export default function IVFQualityTrackingChart({
             color: '#4B4B4B',
             usePointStyle: true,
             font: { size: 11 },
+            // Collapse the multiple threshold-line datasets into a single legend entry.
+            filter: (item: any, data: any) => {
+              const ds = data.datasets[item.datasetIndex];
+              if (!ds?._isThreshold) return true;
+              const firstThresholdIdx = data.datasets.findIndex((d: any) => d._isThreshold);
+              return item.datasetIndex === firstThresholdIdx;
+            },
           },
         },
         tooltip: {
@@ -1169,6 +1266,22 @@ export default function IVFQualityTrackingChart({
           boxPadding: 2,
           titleFont: { size: 12 },
           bodyFont: { size: 11 },
+          filter: (item: any) => {
+            const ds = item.chart.data.datasets[item.datasetIndex];
+            if (!ds?._isThreshold) return true;
+            const firstThresholdIdx = item.chart.data.datasets.findIndex((d: any) => d._isThreshold);
+            return item.datasetIndex === firstThresholdIdx;
+          },
+          itemSort: (a: any, b: any) => {
+            const rank = (item: any) => {
+              const ds = item.chart.data.datasets[item.datasetIndex];
+              if (ds?._isRange) return 0;   // Min / Max
+              if (ds?._isAvg) return 1;
+              if (ds?._isThreshold) return 2;
+              return 3;
+            };
+            return rank(a) - rank(b);
+          },
           callbacks: {
             title: (items: any[]) => {
               if (!items?.length) return '';
@@ -1197,18 +1310,28 @@ export default function IVFQualityTrackingChart({
               if (Boolean(context?.dataset?._isLidCount)) {
                 return `Open: ${Math.round(parsedY)} time${Math.round(parsedY) !== 1 ? 's' : ''}`;
               }
+              if (Boolean(context?.dataset?._isThreshold)) {
+                const thresholdVals = context.chart.data.datasets
+                  .filter((d: any) => d._isThreshold)
+                  .map((d: any) => (Array.isArray(d.data) ? Number(d.data[0]) : NaN))
+                  .filter((v: number) => Number.isFinite(v));
+                if (thresholdVals.length === 0) return '';
+                const lo = Math.min(...thresholdVals);
+                const hi = Math.max(...thresholdVals);
+                return lo === hi
+                  ? `Threshold Range: ${formatNum(lo)}`
+                  : `Threshold Range: ${formatNum(lo)} to ${formatNum(hi)}`;
+              }
               const isRangeDataset = Boolean(context?.dataset?._isRange);
               if (isRangeDataset) {
                 const raw = context.raw;
                 const min = Array.isArray(raw) ? raw[0] : null;
                 const max = Array.isArray(raw) ? raw[1] : null;
                 if (min == null || max == null) return '';
-                const idx = context.dataIndex;
-                const reading = idx < sorted.length ? sorted[idx] : null;
-                const kpi = reading?.kpis?.find((k: any) => k.name === activeTab) ??
-                  (activeTab === 'ln2_lid_state' ? reading?.kpis?.find((k: any) => k.name === 'lid_state') : null);
-                const count = typeof kpi?.count === 'number' ? kpi.count : null;
-                return `Range: ${formatNum(Number(min))}–${formatNum(Number(max))}${count != null ? ` (n=${count})` : ''}`;
+                return [
+                  `Min: ${formatNum(Number(min))}`,
+                  `Max: ${formatNum(Number(max))}`,
+                ];
               }
               if (activeTab === 'lid_state' || activeTab === 'ln2_lid_state') {
                 const shortLabel = toShortLabel(label);
@@ -1244,7 +1367,7 @@ export default function IVFQualityTrackingChart({
           },
         },
       },
-      layout: { padding: { top: 0, right: 8, bottom: 0, left: 0 } },
+      layout: { padding: { top: hasAlertBadges ? 34 : 0, right: 8, bottom: 0, left: 0 } },
       interaction: { mode: 'index' as const, intersect: false },
       scales: {
         x: {
@@ -1301,7 +1424,7 @@ export default function IVFQualityTrackingChart({
             },
       },
     };
-  }, [plottedReadings, activeTab, kpiTabs, kpiThresholds, timeRange, bucketMinutes, showLidCountChart, isLidKpi]);
+  }, [plottedReadings, activeTab, kpiTabs, kpiThresholds, timeRange, bucketMinutes, showLidCountChart, isLidKpi, hasAlertBadges]);
 
   const hasData = displayReadings.length > 0;
 
@@ -1423,7 +1546,7 @@ export default function IVFQualityTrackingChart({
           )
         ) : (
           <>
-            <Chart type="line" data={chartData} options={chartOptions as any} />
+            <Chart type="line" data={chartData} options={chartOptions as any} plugins={[alertBadgePlugin]} />
             {isRangeLoading && (
               <div
                 className="absolute inset-0 bg-white/75 flex items-center justify-center z-10"
