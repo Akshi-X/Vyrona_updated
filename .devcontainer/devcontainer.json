@@ -20,7 +20,7 @@
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "editor.formatOnSave": true,
+        "editor.formatOnSave": false,
         "[python]": {
           "editor.defaultFormatter": "charliermarsh.ruff"
         }
