@@ -252,7 +252,7 @@ export default function OnboardingShell() {
                             ) : (
                                 <div className="bg-surface flex w-full min-h-screen overflow-x-hidden">
                                     <Sidebar onLogout={handleLogout} />
-                                    <div className="flex-1 ml-0 md:ml-60 min-w-0">
+                                    <div className="flex-1 min-w-0">
                                         <Outlet />
                                     </div>
                                 </div>

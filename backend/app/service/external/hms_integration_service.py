@@ -218,7 +218,7 @@ class HMSIntegrationService:
             self.db.add(record)
             self.db.flush()
 
-            diff = {field: {"old": None, "new": new_values[field]} for field in _LOGGABLE_DIFF_FIELDS}
+            diff = {field: {"old": None, "new": self._serialize(new_values[field])} for field in _LOGGABLE_DIFF_FIELDS}
             self._log_record(
                 hospital_id=hospital_id,
                 actor_user=actor_user,
