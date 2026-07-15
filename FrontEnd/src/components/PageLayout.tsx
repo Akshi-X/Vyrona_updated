@@ -27,7 +27,7 @@ const PageLayout = ({ title, description, icon, iconAlt, lucideIcon, actions, ch
             <div className={`${hideHeaderOnDesktop ? "md:hidden" : "md:px-6 md:pt-10 md:pb-6"} flex-shrink-0 px-4`}>
                 <PageHeader title={title} description={description} icon={icon} iconAlt={iconAlt} lucideIcon={lucideIcon} actions={actions} />
             </div>
-            <div className={`flex-1 p-4 ${hideHeaderOnDesktop ? "pt-0 md:pt-10" : "pt-4 md:pt-0"} md:p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0`}>
+            <div className={`flex-1 p-4 ${hideHeaderOnDesktop ? "pt-0 md:pt-10" : "pt-4 md:pt-0"} md:p-6 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-h-0`}>
                 {children}
             </div>
         </main>
