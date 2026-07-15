@@ -33,7 +33,6 @@ from ...models.IVF.critical_alert_model import (
     CriticalAlert,
 )
 from ...models.IVF.hospital_branch_model import HospitalBranch
-from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.incubator_model import Incubator
@@ -334,23 +333,18 @@ class CriticalAlertService:
 
         return branch.hospital_id, branch.branch_id
 
-    def _get_hospital_notification_config(
-        self, hospital_id: Optional[int]
-    ) -> tuple[bool, bool]:
-        """Return hospital notification config as (email_enabled, whatsapp_enabled)."""
-        if hospital_id is None:
-            return False, False
-
-        config = (
-            self.db.query(Hospital.is_email_notifify, Hospital.is_whatsapp_notify)
-            .filter(Hospital.hospital_id == hospital_id)
+    def _tank_has_email_alert_enabled(self, tank_id: int) -> bool:
+        """True when any active KPI config for the tank has per-KPI email alerts on."""
+        return (
+            self.db.query(KpiConfig.id)
+            .filter(
+                KpiConfig.tank_id == tank_id,
+                KpiConfig.status == True,
+                KpiConfig.email_alert == True,
+            )
             .first()
+            is not None
         )
-        if not config:
-            return False, False
-
-        email_enabled, whatsapp_enabled = config
-        return bool(email_enabled), bool(whatsapp_enabled)
 
     def _generate_dedup_key(
         self,
@@ -755,38 +749,29 @@ class CriticalAlertService:
             )  # Set branch_id on alert for better filtering and notification targeting
             alert.tank_id = tank_id  # Set tank_id on alert for better filtering and notification targeting
 
-            # Notify only when a new alert row was actually created. When a concurrent
-            # run already created this alert, _create_alert returns the existing row with
-            # created=False and we must not re-send (root cause of duplicate emails).
-            # Fetch both notification flags in a single DB query.
-            if created and kpi_config.alert_type == "critical":
-                (
-                    is_hospital_email_configured,
-                    is_hospital_whatsapp_configured,
-                ) = self._get_hospital_notification_config(alert.hospital_id)
-                if is_hospital_email_configured:
-                    if kpi_config.unack_escalation_threshold is not None:
-                        # Escalation mode: initial alert goes to branch users only.
-                        # Admins/Managers are notified when unack_escalation_threshold is reached.
-                        self._send_alert_email_to_users_only(alert)
-                    else:
-                        # Original behavior: Managers + Admins + branch Users all notified.
-                        self._send_alert_email(alert)
+            # Per-KPI notification channels (kpi_config.email_alert / whatsapp_alert).
+            if kpi_config.email_alert:
+                if kpi_config.unack_escalation_threshold is not None:
+                    # Escalation mode: initial alert goes to branch users only.
+                    # Admins/Managers are notified when unack_escalation_threshold is reached.
+                    self._send_alert_email_to_users_only(alert)
                 else:
-                    logger.info(
-                        "Skipping email for alert_id=%s because hospital_id=%s has email notifications disabled",
-                        alert.alert_id,
-                        alert.hospital_id,
-                    )
-                logger.info(f"WHATSAPPAlert created for {is_hospital_whatsapp_configured} tank_id={tank_id} kpi_config_id={kpi_config.id}")
-                if is_hospital_whatsapp_configured:
-                    self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
-                else:
-                    logger.info(
-                        "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
-                        alert.alert_id,
-                        alert.hospital_id,
-                    )
+                    # Original behavior: Managers + Admins + branch Users all notified.
+                    self._send_alert_email(alert)
+            else:
+                logger.info(
+                    "Skipping email for alert_id=%s because kpi_config_id=%s has email_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+            if kpi_config.whatsapp_alert:
+                self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+            else:
+                logger.info(
+                    "Skipping WhatsApp for alert_id=%s because kpi_config_id=%s has whatsapp_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
 
             # Escalation check: fires a background email to Admins/Managers when N
             # consecutive unacknowledged alerts exist for this KPI. Only evaluate when a
@@ -1073,30 +1058,25 @@ class CriticalAlertService:
                 extra_info=str(kpi_config.id),
             )
 
-            if kpi_config.alert_type == "critical":
-                (
-                    is_hospital_email_configured,
-                    is_hospital_whatsapp_configured,
-                ) = self._get_hospital_notification_config(alert.hospital_id)
-                if is_hospital_email_configured:
-                    if kpi_config.unack_escalation_threshold is not None:
-                        self._send_alert_email_to_users_only(alert)
-                    else:
-                        self._send_alert_email(alert)
+            if kpi_config.email_alert:
+                if kpi_config.unack_escalation_threshold is not None:
+                    self._send_alert_email_to_users_only(alert)
                 else:
-                    logger.info(
-                        "Skipping email for alert_id=%s because hospital_id=%s has email notifications disabled",
-                        alert.alert_id,
-                        alert.hospital_id,
-                    )
-                if is_hospital_whatsapp_configured:
-                    self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
-                else:
-                    logger.info(
-                        "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
-                        alert.alert_id,
-                        alert.hospital_id,
-                    )
+                    self._send_alert_email(alert)
+            else:
+                logger.info(
+                    "Skipping email for alert_id=%s because kpi_config_id=%s has email_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+            if kpi_config.whatsapp_alert:
+                self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+            else:
+                logger.info(
+                    "Skipping WhatsApp for alert_id=%s because kpi_config_id=%s has whatsapp_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
 
             if kpi_config.unack_escalation_threshold is not None:
                 if self._check_refrigerator_escalation_needed(kpi_config, refrigerator_id, zone_id):
@@ -1391,6 +1371,7 @@ class CriticalAlertService:
                 # Create new database session for background thread
                 bg_db = SessionLocal()
                 try:
+                    bg_service = CriticalAlertService(bg_db)
                     for alert in alerts_to_email:
                         try:
                             # Refresh alert from database for background thread
@@ -1402,6 +1383,8 @@ class CriticalAlertService:
                             if (
                                 alert_refreshed
                                 and alert_refreshed.severity == AlertSeverity.HIGH.value
+                                and alert_refreshed.tank_id is not None
+                                and bg_service._tank_has_email_alert_enabled(alert_refreshed.tank_id)
                             ):
                                 self._send_alert_email(alert_refreshed)
                         except Exception as e:
@@ -2046,10 +2029,9 @@ class CriticalAlertService:
             return
 
         hospital_id = branch.hospital_id
-        is_email_enabled, _ = self._get_hospital_notification_config(hospital_id)
-        if not is_email_enabled:
+        if not (kpi_config.email_alert or kpi_config.whatsapp_alert):
             logger.info(
-                "Skipping escalation email — hospital_id=%s has email notifications disabled", hospital_id
+                "Skipping escalation email — kpi_config_id=%s has no notification channel enabled", kpi_config.id
             )
             return
 
@@ -2251,11 +2233,10 @@ class CriticalAlertService:
             return
 
         hospital_id = refrigerator.hospital_id
-        is_email_enabled, _ = self._get_hospital_notification_config(hospital_id)
-        if not is_email_enabled:
+        if not (kpi_config.email_alert or kpi_config.whatsapp_alert):
             logger.info(
-                "Skipping refrigerator escalation email — hospital_id=%s has email notifications disabled",
-                hospital_id,
+                "Skipping refrigerator escalation email — kpi_config_id=%s has no notification channel enabled",
+                kpi_config.id,
             )
             return
 

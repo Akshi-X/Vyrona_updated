@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ChevronRight, Download, Users } from "lucide-react";
+import RefillIcon from "./RefillIcon";
 
 import { useSidebar } from "../contexts/SidebarContext";
 import { useOnboardingMode } from "../contexts/OnboardingModeContext";
@@ -15,7 +16,6 @@ import DatabaseIconDark from "../assets/DashBoardIcons/DatabaseDark.svg";
 import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
 import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg";
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
-import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
         ],
     },
     { icon: "", lucideIcon: Download, label: "Reports",         path: "/reports"       },
-    { icon: ContainersIcon,       label: "Refill log",          path: "/refill-log"    },
+    { icon: "", lucideIcon: RefillIcon, label: "Refill log",     path: "/refill-log"    },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -329,8 +329,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
 
                         const needsInvert =
                             (label === "Pending approvals" ||
-                             label === "Alert Config" ||
-                             label === "Refill log") && !isActive;
+                             label === "Alert Config") && !isActive;
 
                         return (
                             <button
