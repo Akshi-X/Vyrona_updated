@@ -889,6 +889,9 @@ export class IvfService extends BaseApiService {
         unit: string;
         zone_id?: string | null;
         timestamp?: string | null;
+        min?: number | null;
+        max?: number | null;
+        within_threshold?: boolean;
     }>> {
         const params = new URLSearchParams();
         if (zoneId != null) params.set("zone_id", zoneId);

@@ -74,6 +74,7 @@ export type RefrigeratorSensorTile = {
   isMissing: boolean;
   history: number[];
   unit: string;
+  withinThreshold: boolean;
 };
 
 type LatestKpi = {
@@ -82,6 +83,7 @@ type LatestKpi = {
   unit: string;
   timestamp: string;
   tsMs: number;
+  withinThreshold?: boolean;
 };
 
 export type RefrigeratorKpiSnapshot = {
@@ -133,7 +135,12 @@ export function useRefrigeratorKpiSnapshot({
         const prevTs = latestKpiTimestampRef.current[kpi.name];
         if (prevTs != null && kpi.tsMs < prevTs) continue;
         latestKpiTimestampRef.current[kpi.name] = kpi.tsMs;
-        next[kpi.name] = kpi;
+        // The live WebSocket push doesn't carry threshold info — keep
+        // whatever was last known from the zone-latest REST fetch.
+        next[kpi.name] = {
+          ...kpi,
+          withinThreshold: kpi.withinThreshold ?? prev[kpi.name]?.withinThreshold,
+        };
         const hist = kpiHistoryRef.current[kpi.name] ?? [];
         hist.push(kpi.value);
         if (hist.length > 20) hist.splice(0, hist.length - 20);
@@ -172,6 +179,7 @@ export function useRefrigeratorKpiSnapshot({
               unit: r.unit || '',
               timestamp: parsed?.isoIST ?? new Date(now).toISOString(),
               tsMs: parsed?.tsMs ?? now,
+              withinThreshold: r.within_threshold ?? true,
             };
           });
         updateLatest(entries);
@@ -264,6 +272,7 @@ export function useRefrigeratorKpiSnapshot({
         isMissing: value == null,
         history: kpiHistoryRef.current[id]?.slice() ?? [],
         unit,
+        withinThreshold: latest?.withinThreshold ?? true,
       };
     });
   }, [latestByName, nowTs]);
