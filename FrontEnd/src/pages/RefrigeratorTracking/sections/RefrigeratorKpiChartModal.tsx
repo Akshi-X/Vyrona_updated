@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -34,7 +35,14 @@ const TIME_RANGES = [
 ] as const;
 type RangeId = (typeof TIME_RANGES)[number]['id'];
 
-type DataPoint = { timestamp: string; value: number };
+type DataPoint = {
+  timestamp: string;
+  value: number;
+  avg?: number | null;
+  min?: number | null;
+  max?: number | null;
+  count?: number | null;
+};
 
 type Props = {
   refrigeratorId: number;
@@ -52,7 +60,7 @@ function parseTimestamp(ts: string): Date | null {
   } catch { return null; }
 }
 
-type BucketedChart = { labels: string[]; values: (number | null)[] };
+type BucketedChart = { labels: string[]; values: (number | null)[]; timestampsMs: number[] };
 
 function buildBucketedChart(
   series: DataPoint[],
@@ -67,15 +75,25 @@ function buildBucketedChart(
 
   const labels: string[] = [];
   const values: (number | null)[] = [];
+  const timestampsMs: number[] = [];
 
-  const slotMap = new Map<number, number>();
+  // Weight each backend point by its own sample count (when the backend
+  // already aggregated it) so re-bucketing on the client doesn't let a
+  // heavily-sampled point count the same as a barely-sampled one — keeps
+  // the chart line consistent with the count-weighted footer stats.
+  const slotMap = new Map<number, { weightedSum: number; totalWeight: number }>();
   for (const p of series) {
     const d = parseTimestamp(p.timestamp);
     if (!d) continue;
     const offsetMs = d.getTime() - rangeStartMs;
     if (offsetMs < 0 || offsetMs > nowMs - rangeStartMs) continue;
     const slotIdx = Math.floor(offsetMs / slotMs);
-    if (!slotMap.has(slotIdx)) slotMap.set(slotIdx, p.value);
+    const weight = p.count ?? 1;
+    const value = p.avg ?? p.value;
+    const entry = slotMap.get(slotIdx) ?? { weightedSum: 0, totalWeight: 0 };
+    entry.weightedSum += value * weight;
+    entry.totalWeight += weight;
+    slotMap.set(slotIdx, entry);
   }
 
   const totalMs = nowMs - rangeStartMs;
@@ -89,10 +107,12 @@ function buildBucketedChart(
         ? d.toLocaleDateString([], { month: 'short', day: 'numeric' })
         : `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
     labels.push(label);
-    values.push(slotMap.get(i) ?? null);
+    timestampsMs.push(slotTimeMs);
+    const bucket = slotMap.get(i);
+    values.push(bucket && bucket.totalWeight > 0 ? bucket.weightedSum / bucket.totalWeight : null);
   }
 
-  return { labels, values };
+  return { labels, values, timestampsMs };
 }
 
 export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zoneId, onClose }: Props) {
@@ -103,26 +123,91 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [kpiConfigs, setKpiConfigs] = useState<KpiConfigMeta[]>([]);
+  const [latestSnapshot, setLatestSnapshot] = useState<Record<string, { value: number; timestamp: string }>>({});
   const backdropRef               = useRef<HTMLDivElement>(null);
   const wsRef                     = useRef<WebSocket | null>(null);
   const latestKpiTimestampRef     = useRef<Record<string, string>>({});
   const chartRef                  = useRef<any>(null);
+  const prevActiveTabRef          = useRef<string>(activeTab);
 
-  // Fetch history
+  // Fetch history. For LIVE, `minutes` is undefined so the backend returns
+  // the last-N-raw-readings-per-KPI path (same "omit duration_minutes = live"
+  // convention used by the tanks kpi-history endpoint), giving an instant
+  // snapshot before the WebSocket's first push arrives.
   useEffect(() => {
+    let ignore = false;
     setLoading(true);
     setError(null);
     const minutes = TIME_RANGES.find((r) => r.id === range)?.minutes;
     ivfService
       .getRefrigeratorKpiHistory(refrigeratorId, minutes, zoneId ?? undefined)
       .then((res) => {
+        if (ignore) return;
         setKpiConfigs(res.kpi_configs ?? []);
         const raw = res.kpi_series?.[activeTab] ?? [];
-        setSeries(raw.map((p) => ({ timestamp: p.timestamp, value: p.value })));
+        const points = raw.map((p) => ({
+          timestamp: p.timestamp,
+          value: p.value,
+          avg: p.avg,
+          min: p.min,
+          max: p.max,
+          count: p.count,
+        }));
+        setSeries(points);
+        const last = points[points.length - 1];
+        if (last) latestKpiTimestampRef.current[activeTab] = last.timestamp;
       })
-      .catch(() => setError('Failed to load chart data.'))
-      .finally(() => setLoading(false));
-  }, [refrigeratorId, activeTab, range]);
+      .catch(() => { if (!ignore) setError('Failed to load chart data.'); })
+      .finally(() => { if (!ignore) setLoading(false); });
+    return () => { ignore = true; };
+  }, [refrigeratorId, activeTab, range, zoneId]);
+
+  // The header's current value/timestamp always reflects the zone-latest
+  // snapshot, independent of whichever Range tab (LATEST/1H/24H/7D) is
+  // selected for the graph below — switching ranges must not change it.
+  // While range === 'LIVE' the WebSocket below keeps this fresh in real time
+  // (see its onmessage handler), so polling here is only needed as the
+  // fallback for static ranges where no WebSocket is open.
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchLatest = () => {
+      ivfService
+        .getRefrigeratorZoneLatest(refrigeratorId, zoneId ?? undefined)
+        .then((res) => {
+          if (cancelled || !res) return;
+          setLatestSnapshot((prev) => {
+            const next = { ...prev };
+            for (const r of res) {
+              if (r.value != null && r.timestamp) {
+                next[r.kpi_name] = { value: r.value, timestamp: r.timestamp };
+              }
+            }
+            return next;
+          });
+        })
+        .catch(() => {});
+    };
+
+    fetchLatest();
+    if (range === 'LIVE') return () => { cancelled = true; };
+
+    const interval = setInterval(fetchLatest, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [refrigeratorId, zoneId, range]);
+
+  // Clear series when switching tabs in LIVE mode (not on initial mount) —
+  // the history fetch above will immediately repopulate it for the new tab.
+  useEffect(() => {
+    if (range === 'LIVE' && prevActiveTabRef.current !== activeTab) {
+      setSeries([]);
+      latestKpiTimestampRef.current = {};
+    }
+    prevActiveTabRef.current = activeTab;
+  }, [activeTab, range]);
 
   // WebSocket for LIVE mode
   useEffect(() => {
@@ -134,12 +219,15 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
 
     if (wsRef.current) return;
 
+    let dataReceived = false;
+
     try {
       const wsBase = import.meta.env.VITE_API_BASE_URL?.replace(/^http/, 'ws') || 'ws://localhost:8001';
       const wsUrl = `${wsBase}/api/ivf/quality/refrigerator-kpi-ws?token=${token}`;
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
+        setError(null);
         ws.send(JSON.stringify({ refrigerator_id: refrigeratorId, zone_id: zoneId ?? null }));
       };
 
@@ -148,8 +236,27 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
           const parsed = JSON.parse(event.data);
           if (!parsed.kpis || !Array.isArray(parsed.kpis)) return;
 
+          // Keep the header's latestSnapshot fresh for every KPI the socket
+          // pushes, not just the active tab, so it doesn't need to be
+          // separately polled while this WebSocket is already live.
+          setLatestSnapshot((prev) => {
+            const next = { ...prev };
+            let changed = false;
+            for (const kpi of parsed.kpis) {
+              if (kpi?.name && kpi.value != null && kpi.timestamp) {
+                next[kpi.name] = { value: kpi.value, timestamp: kpi.timestamp };
+                changed = true;
+              }
+            }
+            return changed ? next : prev;
+          });
+
           const kpiName = activeTab;
           const relevantKpis = parsed.kpis.filter((k: any) => k.name === kpiName);
+          if (relevantKpis.length === 0) return;
+
+          dataReceived = true;
+          setLoading(false);
 
           setSeries((prev) => {
             let updated = [...prev];
@@ -172,11 +279,22 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
       };
 
       ws.onerror = () => {
-        setError('Connection error');
+        if (!dataReceived) {
+          setError('Connection error');
+        }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         wsRef.current = null;
+        if (!dataReceived && event.code !== 1000) {
+          const messageMap: Record<number, string> = {
+            4401: 'Session expired — please log in again.',
+            4403: 'You don\'t have access to live refrigerator data.',
+            1006: 'Connection lost.',
+          };
+          const message = messageMap[event.code] || 'Connection error';
+          setError(message);
+        }
       };
 
       wsRef.current = ws;
@@ -205,13 +323,10 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
   } : { label: activeTab, unit: '°C', accent: '#6b7280' };
   const accent = tab.accent;
 
-  const latestReading = useMemo(() => {
-    if (!series || series.length === 0) return null;
-    return series[series.length - 1];
-  }, [series]);
+  const latestReading = latestSnapshot[activeTab] ?? null;
 
   const latestValue = useMemo(() => {
-    if (!latestReading?.value || latestReading.value == null) return '—';
+    if (latestReading?.value == null) return '—';
     return `${latestReading.value.toFixed(1)}${tab.unit}`;
   }, [latestReading, tab.unit]);
 
@@ -236,7 +351,7 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
   const nowMs = Date.now();
   const rangeStartMs = rangeMinutes != null ? nowMs - rangeMinutes * 60_000 : null;
 
-  const { labels: chartLabels, values: chartValues } = useMemo(() => {
+  const { labels: chartLabels, values: chartValues, timestampsMs: chartTimestamps } = useMemo(() => {
     if (range === 'LIVE' || rangeStartMs == null) {
       return {
         labels: series.map((p) => {
@@ -246,20 +361,49 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
           return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
         }),
         values: series.map((p) => p.value),
+        timestampsMs: series.map((p) => parseTimestamp(p.timestamp)?.getTime() ?? NaN),
       };
     }
     return buildBucketedChart(series, range, rangeStartMs, nowMs);
   }, [series, range, rangeStartMs, nowMs]);
 
-  const values = useMemo(() => series.map((p) => p.value), [series]);
-
+  // Prefer the backend's own DB-computed MIN/MAX/AVG (per aggregation bucket)
+  // over re-deriving stats from whatever raw/bucketed points happen to be
+  // loaded client-side. Falls back to client-side math only when the backend
+  // didn't return aggregates (e.g. LIVE mode, which is raw per-reading data).
   const stats = useMemo(() => {
-    if (values.length === 0) return { min: null, max: null, avg: null };
+    if (series.length === 0) return { min: null, max: null, avg: null };
+
+    const hasBackendAggregates = series.every((p) => p.avg != null && p.count != null);
+    if (hasBackendAggregates) {
+      const mins = series.map((p) => p.min ?? p.value);
+      const maxs = series.map((p) => p.max ?? p.value);
+      let weightedSum = 0;
+      let totalCount = 0;
+      for (const p of series) {
+        weightedSum += p.avg! * p.count!;
+        totalCount += p.count!;
+      }
+      return {
+        min: Math.min(...mins),
+        max: Math.max(...maxs),
+        avg: totalCount > 0 ? weightedSum / totalCount : null,
+      };
+    }
+
+    const values = series.map((p) => p.value);
     const min = Math.min(...values);
     const max = Math.max(...values);
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
     return { min, max, avg };
-  }, [values]);
+  }, [series]);
+
+  const yAxisRange = useMemo(() => {
+    if (stats.min == null || stats.max == null) return { min: undefined, max: undefined };
+    if (stats.min === stats.max) return { min: stats.min - 1, max: stats.max + 1 };
+    const padding = (stats.max - stats.min) * 0.1;
+    return { min: stats.min - padding, max: stats.max + padding };
+  }, [stats.min, stats.max]);
 
   const chartData = useMemo(() => ({
     labels: chartLabels,
@@ -269,7 +413,9 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
       borderColor: accent,
       backgroundColor: range === 'LIVE' ? `${accent}18` : `${accent}18`,
       borderWidth: 2,
-      pointRadius: range === 'LIVE' ? 0 : (chartValues.length > 82 ? 0 : 2),
+      pointRadius: range === 'LIVE' ? 2 : (chartValues.length > 82 ? 0 : 2),
+      pointHoverRadius: 4,
+      pointHitRadius: 8,
       fill: range === 'LIVE',
       tension: 0.3,
       spanGaps: false,
@@ -287,23 +433,39 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
         titleColor: '#d4b8e0',
         bodyColor: '#ffffff',
         padding: 10,
-        callbacks: { label: (ctx: { parsed: { y: number } }) => `${ctx.parsed.y?.toFixed(2)} ${tab.unit}` },
+        callbacks: {
+          title: (items: Array<{ dataIndex: number }>) => {
+            const idx = items[0]?.dataIndex;
+            const ms = idx != null ? chartTimestamps[idx] : NaN;
+            if (idx == null || !Number.isFinite(ms)) return '';
+            return new Date(ms).toLocaleString([], {
+              month: 'short', day: 'numeric', year: 'numeric',
+              hour: '2-digit', minute: '2-digit',
+            });
+          },
+          label: (ctx: { parsed: { y: number } }) => `${ctx.parsed.y?.toFixed(2)} ${tab.unit}`,
+        },
       },
     },
     scales: {
       x: { ticks: { maxTicksLimit: range === '7D' ? 8 : 6, font: { size: 10 }, color: '#9ca3af' }, grid: { color: '#f0ecf6' } },
-      y: { ticks: { font: { size: 10 }, color: '#9ca3af', callback: (v: number | string) => `${v} ${tab.unit}` }, grid: { color: '#f0ecf6' } },
+      y: {
+        min: yAxisRange.min,
+        max: yAxisRange.max,
+        ticks: { font: { size: 10 }, color: '#9ca3af', callback: (v: number | string) => `${Number(v).toFixed(1)} ${tab.unit}` },
+        grid: { color: '#f0ecf6' },
+      },
     },
-  }), [tab.unit, range]);
+  }), [tab.unit, range, yAxisRange.min, yAxisRange.max, chartTimestamps]);
 
   useEffect(() => {
     chartRef.current?.update();
   }, [series]);
 
-  return (
+  return createPortal(
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
       onClick={(e) => { if (e.target === backdropRef.current) onClose(); }}
     >
       <div
@@ -403,9 +565,18 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
                 }}
               >
                 <div style={{ fontSize: 9, fontWeight: 600, color: '#a07ab8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{key}</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: accent, marginTop: 2 }}>
-                  {stats[key] !== null ? `${stats[key]!.toFixed(1)}` : '—'}<span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 2 }}>{tab.unit}</span>
-                </div>
+                {loading ? (
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center' }}>
+                    <div
+                      className="animate-pulse"
+                      style={{ width: 36, height: 16, borderRadius: 4, background: '#ece3f2' }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 18, fontWeight: 700, color: accent, marginTop: 2 }}>
+                    {stats[key] !== null ? `${stats[key]!.toFixed(1)}` : '—'}<span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 2 }}>{tab.unit}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -433,6 +604,7 @@ export default function RefrigeratorKpiChartModal({ refrigeratorId, kpiKey, zone
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
