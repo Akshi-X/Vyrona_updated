@@ -2291,13 +2291,27 @@ def get_refrigerator_zone_latest(
             .order_by(Readings.timestamp.desc())
             .first()
         )
+        value = float(reading.kpi_value) if reading and reading.kpi_value is not None else None
+        min_val = float(config.min) if config.min is not None else None
+        max_val = float(config.max) if config.max is not None else None
+
+        within_threshold = True
+        if value is not None:
+            if min_val is not None and value < min_val:
+                within_threshold = False
+            if max_val is not None and value > max_val:
+                within_threshold = False
+
         result.append({
             "kpi_name": config.kpi_name,
             "label": config.kpi_name,
-            "value": float(reading.kpi_value) if reading and reading.kpi_value is not None else None,
+            "value": value,
             "unit": config.unit or "°C",
             "zone_id": zone_id,
             "timestamp": reading.timestamp.isoformat() if reading and reading.timestamp else None,
+            "min": min_val,
+            "max": max_val,
+            "within_threshold": within_threshold,
         })
 
     if not result:
@@ -2309,6 +2323,9 @@ def get_refrigerator_zone_latest(
                 "value": None,
                 "unit": default_unit,
                 "zone_id": zone_id,
+                "min": None,
+                "max": None,
+                "within_threshold": True,
             })
 
     return result
@@ -2341,13 +2358,34 @@ def get_refrigerator_kpi_history(
         if duration_minutes
         else None
     )
-    if duration_minutes is not None and duration_minutes > 0:
+    latest_timestamp = None
+    if duration_minutes in {DURATION_1H, DURATION_24H, DURATION_7D}:
+        latest_timestamp = quality_service.get_latest_refrigerator_kpi_timestamp(refrigerator_id, zone_id)
+        if latest_timestamp is not None:
+            since = latest_timestamp - timedelta(minutes=duration_minutes)
+
+    aggregated_order_asc = False
+    if duration_minutes == DURATION_1H:
+        per_kpi = quality_service.get_refrigerator_kpi_history_aggregated(
+            refrigerator_id, zone_id, since, AGG_BUCKET_MINUTES_1H, until=latest_timestamp
+        ) or {}
+        aggregated_order_asc = True
+    elif duration_minutes == DURATION_24H:
+        per_kpi = quality_service.get_refrigerator_kpi_history_aggregated(
+            refrigerator_id, zone_id, since, AGG_BUCKET_MINUTES_24H, until=latest_timestamp
+        ) or {}
+        aggregated_order_asc = True
+    elif duration_minutes == DURATION_7D:
+        per_kpi = quality_service.get_refrigerator_kpi_history_aggregated(
+            refrigerator_id, zone_id, since, AGG_BUCKET_MINUTES_7D, until=latest_timestamp
+        ) or {}
+        aggregated_order_asc = True
+    elif duration_minutes is not None and duration_minutes > 0:
         per_kpi = quality_service.get_readings_per_kpi_since_refrigerator(refrigerator_id, since, zone_id) or {}
     else:
         per_kpi = quality_service.get_last_n_readings_per_kpi_refrigerator(
             refrigerator_id, DEFAULT_LIVE_READINGS_CAP, zone_id
         ) or {}
-    aggregated_order_asc = False
 
     kpi_series: dict = {}
     for item in per_kpi.get("kpis") or []:
