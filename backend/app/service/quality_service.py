@@ -1334,7 +1334,7 @@ class QualityService:
                     "count": int(row.sample_count) if row.sample_count is not None else 0,
                     "unit": row.unit or "",
                     "timestamp": ts,
-                }
+                }                
             )
         return {"tank_id": tank_id, "tank_code": tank_code, "kpis": kpis}
 
@@ -1403,6 +1403,79 @@ class QualityService:
             key = bs.isoformat() if hasattr(bs, "isoformat") else str(bs)
             result[key] = int(row.open_events or 0)
         return result
+
+    def get_lid_open_periods_with_exact_times(
+        self,
+        tank_id: int,
+        since: datetime,
+        until: Optional[datetime] = None,
+        lid_kpi_name: str = "ln2_lid_state",
+    ) -> list:
+        """Get exact start and stop timestamps for continuous lid open periods.
+
+        Returns a list of dicts: [{"start": timestamp, "stop": timestamp}, ...]
+        Each represents a continuous period where lid was open (value >= 0.5).
+        """
+        until_clause = "AND r.timestamp <= :until" if until is not None else ""
+        sql = text(f"""
+            WITH ordered AS (
+                SELECT
+                    r.timestamp,
+                    r.kpi_value::double precision AS v,
+                    LAG(r.kpi_value::double precision) OVER (ORDER BY r.timestamp) AS prev_v
+                FROM readings r
+                JOIN kpi_config k ON r.kpi_config_id = k.id
+                WHERE r.tank_id = :tank_id
+                  AND k.kpi_name = :lid_name
+                  AND r.timestamp >= :since
+                  {until_clause}
+                ORDER BY r.timestamp
+            ),
+            periods AS (
+                SELECT
+                    timestamp,
+                    v,
+                    SUM(CASE
+                        WHEN v >= 0.5 AND (prev_v IS NULL OR prev_v < 0.5) THEN 1
+                        ELSE 0
+                    END) OVER (ORDER BY timestamp) AS period_id
+                FROM ordered
+            ),
+            grouped AS (
+                SELECT
+                    period_id,
+                    MIN(timestamp) AS period_start,
+                    MAX(timestamp) AS period_end
+                FROM periods
+                WHERE v >= 0.5
+                GROUP BY period_id
+            )
+            SELECT period_start, period_end
+            FROM grouped
+            WHERE period_id > 0
+            ORDER BY period_start
+        """)
+        try:
+            rows = self.db.execute(
+                sql,
+                {
+                    "tank_id": tank_id,
+                    "since": since,
+                    "until": until,
+                    "lid_name": lid_kpi_name,
+                },
+            )
+            periods = []
+            for row in rows:
+                periods.append({
+                    "start": row.period_start.isoformat() if hasattr(row.period_start, "isoformat") else str(row.period_start),
+                    "stop": row.period_end.isoformat() if hasattr(row.period_end, "isoformat") else str(row.period_end),
+                })
+            return periods
+        except Exception as e:
+            logger.error(f"Error getting lid open periods for tank {tank_id}: {e}")
+            self.db.rollback()
+            return []
 
     def get_latest_tank_kpi_timestamp(self, tank_id: int) -> Optional[datetime]:
         """Return latest readings.timestamp for a tank (None when no data)."""

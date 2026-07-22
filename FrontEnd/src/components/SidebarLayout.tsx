@@ -16,13 +16,13 @@ export default function SidebarLayout() {
   };
 
   return (
-    <div className="bg-surface flex w-full min-h-screen">
+    <div className="bg-surface flex w-full h-dvh overflow-hidden">
       <VariantRoute
         routePath="/_sidebar"
         defaultComponent={<Sidebar onLogout={() => setShowLogoutConfirm(true)} />}
         componentProps={{ onLogout: () => setShowLogoutConfirm(true) }}
       />
-      <div className="flex-1 min-w-0 overflow-x-hidden">
+      <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
         <Outlet />
       </div>
 

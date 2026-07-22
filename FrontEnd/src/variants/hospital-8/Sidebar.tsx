@@ -63,14 +63,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
     `p-2.5 transition-colors rounded-lg ${isActive(path) ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}`;
 
   return (
-    <div className="w-20 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col items-center py-6 gap-6 flex-shrink-0 h-screen relative z-[100]">
+    <div className="w-20 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col items-center py-6 gap-6 shrink-0 h-dvh relative z-[100] overflow-hidden">
       {/* Logo */}
-      <div className="w-12 h-12 flex items-center justify-center cursor-pointer">
+      <div className="w-12 h-12 flex items-center justify-center cursor-pointer shrink-0">
         <img src="/tabLogowhite.svg" alt="Logo" className="w-full h-full object-contain" />
       </div>
 
       {/* Nav */}
-      <nav className="flex flex-col gap-8 flex-1 justify-center">
+      <nav className="flex flex-col gap-8 flex-1 justify-center overflow-y-auto scrollbar-none min-h-0 py-2">
         {navItems.map(({ id, icon: Icon, label, path }) => (
           <NavButton key={id} onClick={() => navigate(path)} className={navCls(path)} tooltip={label}>
             <Icon size={22} />
@@ -79,7 +79,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
       </nav>
 
       {/* Bottom */}
-      <div className="flex flex-col gap-4 items-center">
+      <div className="flex flex-col gap-4 items-center shrink-0">
         <NavButton onClick={() => navigate('/user-profile')} className={navCls('/user-profile')} tooltip="Profile">
           <span className="w-6 h-6 rounded-full bg-white/20 text-white text-[10px] font-bold flex items-center justify-center uppercase">
             {initials}
