@@ -538,7 +538,7 @@ export class IvfService extends BaseApiService {
                 count?: number;
                 unit: string;
             }>
-        >;
+        > & { lid_open_periods?: Array<{ start: string; stop: string; alert_count?: number }> };
     }> {
         const params = new URLSearchParams();
         if (durationMinutes != null && durationMinutes > 0) {
@@ -572,7 +572,7 @@ export class IvfService extends BaseApiService {
                 count?: number;
                 unit: string;
             }>
-        >;
+        > & { lid_open_periods?: Array<{ start: string; stop: string; alert_count?: number }> };
     }> {
         return await this.request(
             `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-history-date?date=${encodeURIComponent(date)}`,
@@ -889,6 +889,9 @@ export class IvfService extends BaseApiService {
         unit: string;
         zone_id?: string | null;
         timestamp?: string | null;
+        min?: number | null;
+        max?: number | null;
+        within_threshold?: boolean;
     }>> {
         const params = new URLSearchParams();
         if (zoneId != null) params.set("zone_id", zoneId);

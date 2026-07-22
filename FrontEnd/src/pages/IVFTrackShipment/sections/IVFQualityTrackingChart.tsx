@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import { authUtils } from '../../../utils/auth';
+import { LidStateGanttChart } from '../../IncubatorTracking/LidStateGanttChart';
 
 ChartJS.register(
   CategoryScale,
@@ -382,6 +383,7 @@ export default function IVFQualityTrackingChart({
   const reconnectDelay = 3000;
 
   const [kpiReadings, setKpiReadings] = useState<KpiReading[]>([]);
+  const [lidOpenPeriods, setLidOpenPeriods] = useState<Array<{ start: string; stop: string; alert_count?: number }>>([]);
   /** Time range: 1H / 24H / 7D; drives API fetch and chart window; live data still appends. */
   const [timeRange, setTimeRange] = useState<TimeRangeId>('LIVE');
   /** Tabs strictly from DB kpi_config; until loaded, keep null-state. */
@@ -551,7 +553,8 @@ export default function IVFQualityTrackingChart({
     apiCall
       .then((res) => {
         if (!isMountedRef.current || requestSeq != historyRequestSeqRef.current) return;
-        const series = res?.kpi_series || {};
+        const { lid_open_periods, ...series } = res?.kpi_series || {};
+        setLidOpenPeriods(Array.isArray(lid_open_periods) ? lid_open_periods : []);
         const entries = Object.entries(series);
         if (entries.length === 0 && timeRange === 'CUSTOM') {
           setNoDataForCustomDate(true);
@@ -952,6 +955,19 @@ export default function IVFQualityTrackingChart({
     return sorted;
   }, [displayReadings, timeRange, activeTab]);
 
+  const isLidKpi = activeTab === 'lid_state' || activeTab === 'ln2_lid_state';
+  const showLidGantt = isLidKpi && timeRange !== 'LIVE';
+  const showLidCountChart = false; // Disable bar chart, use Gantt instead for non-LIVE
+
+  const lidEvents = useMemo(() => {
+    if (!isLidKpi || timeRange === 'LIVE') return [];
+    return lidOpenPeriods.map((p) => ({
+      start_timestamp: p.start,
+      stop_timestamp: p.stop,
+      alert_count: p.alert_count ?? 0,
+    }));
+  }, [lidOpenPeriods, isLidKpi, timeRange]);
+
   const chartData = useMemo(() => {
     const sorted = plottedReadings;
     const labels = sorted.map((r) => formatTimeLabel(r.timestamp, timeRange));
@@ -985,11 +1001,8 @@ export default function IVFQualityTrackingChart({
       ? `${tab?.label ?? activeTab} (${unit})`
       : `${tab?.label ?? activeTab}`;
     const showCandlestick = timeRange !== 'LIVE';
-    const isLidKpi = activeTab === 'lid_state' || activeTab === 'ln2_lid_state';
-    const showLidBar = isLidKpi && timeRange !== 'LIVE';
-
     // For lid state in non-LIVE: count open events per bucket (avg * count = open readings)
-    const lidOpenCounts = showLidBar
+    const lidOpenCounts = showLidCountChart
       ? sorted.map((r) => {
           const k =
             r.kpis.find((x: any) => x.name === activeTab) ??
@@ -1006,7 +1019,7 @@ export default function IVFQualityTrackingChart({
 
     const datasets: any[] = [];
 
-    if (showLidBar) {
+    if (showLidCountChart) {
       datasets.push({
         type: 'bar',
         label: 'Lid Open Count',
@@ -1128,9 +1141,6 @@ export default function IVFQualityTrackingChart({
     const end = new Date(start.getTime() + bucketMinutes * 60 * 1000);
     return `${fmt(start)} to ${fmt(end)}`;
   };
-
-  const isLidKpi = activeTab === 'lid_state' || activeTab === 'ln2_lid_state';
-  const showLidCountChart = isLidKpi && timeRange !== 'LIVE';
 
   const alertCounts = useMemo(() => {
     if (timeRange === 'LIVE') return [] as number[];
@@ -1400,7 +1410,6 @@ export default function IVFQualityTrackingChart({
               border: { display: false },
             }
           : {
-              // Keep binary ticks at 0/1, but add headroom for visual breathing space.
               min: isLidKpi ? -0.2 : (minY != null ? minY - padding : undefined),
               max: isLidKpi ? 1.2 : (maxY != null ? maxY + padding : undefined),
               grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false, borderDash: [2, 8] },
@@ -1544,6 +1553,38 @@ export default function IVFQualityTrackingChart({
               })()}
             </div>
           )
+        ) : showLidGantt ? (
+          <>
+            <LidStateGanttChart events={lidEvents} timeRange={timeRange} />
+            {isRangeLoading && (
+              <div
+                className="absolute inset-0 bg-white/75 flex items-center justify-center z-10"
+                aria-hidden="true"
+              >
+                <svg
+                  className="animate-spin h-8 w-8 text-primary"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  aria-label="Loading"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <Chart type="line" data={chartData} options={chartOptions as any} plugins={[alertBadgePlugin]} />
