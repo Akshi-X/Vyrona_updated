@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import { authUtils } from '../../utils/auth';
+import { LidStateGanttChart } from './LidStateGanttChart';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
 
@@ -404,6 +405,8 @@ export default function IncubatorQualityTrackingChart({
                 count: Number.isFinite(countValue) ? countValue : undefined,
                 alert_count: alertCount,
                 unit: point.unit ?? '',
+                start_timestamp: point.start_timestamp,
+                stop_timestamp: point.stop_timestamp,
               };
               const existing = byTs.get(timestamp);
               if (existing) {
@@ -699,7 +702,30 @@ export default function IncubatorQualityTrackingChart({
   };
 
   const isLidKpi = activeTab === 'incubator_lid_state';
-  const showLidCountChart = isLidKpi && timeRange !== 'LIVE';
+  const showLidGantt = isLidKpi && timeRange !== 'LIVE';
+  const showLidCountChart = false; // Disable bar chart, use Gantt instead for non-LIVE
+
+  const lidEvents = useMemo(() => {
+    if (!isLidKpi || timeRange === 'LIVE') return [];
+    const uniquePeriods = new Map<string, { start_timestamp: string; stop_timestamp: string; isLatest: boolean }>();
+    const reversed = [...kpiReadings].reverse();
+
+    reversed.forEach((r, idx) => {
+      const k = r.kpis.find((x) => x.name === activeTab);
+      if (!k || !k.start_timestamp || !k.stop_timestamp) return;
+
+      const key = `${k.start_timestamp}|${k.stop_timestamp}`;
+      if (!uniquePeriods.has(key)) {
+        uniquePeriods.set(key, {
+          start_timestamp: k.start_timestamp,
+          stop_timestamp: k.stop_timestamp,
+          isLatest: idx === 0,
+        });
+      }
+    });
+
+    return Array.from(uniquePeriods.values());
+  }, [kpiReadings, activeTab, isLidKpi, timeRange]);
 
   const chartData = useMemo(() => {
     const sorted = plottedReadings;
@@ -959,6 +985,18 @@ export default function IncubatorQualityTrackingChart({
                 : 'No data available'}
             </div>
           )
+        ) : showLidGantt ? (
+          <>
+            <LidStateGanttChart events={lidEvents} timeRange={timeRange} />
+            {isRangeLoading && (
+              <div className="absolute inset-0 bg-white/75 flex items-center justify-center z-10" aria-hidden="true">
+                <svg className="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-label="Loading">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <Chart type="line" data={chartData} options={chartOptions as any} />
