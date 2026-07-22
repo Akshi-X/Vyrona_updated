@@ -227,8 +227,6 @@ interface KpiReading {
     alert_count?: number;
     open_count?: number;
     unit: string;
-    start_timestamp?: string;
-    stop_timestamp?: string;
   }>;
 }
 
@@ -602,8 +600,6 @@ export default function IVFQualityTrackingChart({
                 alert_count: alertCount,
                 open_count: openCount,
                 unit: point.unit ?? '',
-                start_timestamp: point.start_timestamp,
-                stop_timestamp: point.stop_timestamp,
               };
               if (existing) {
                 const filtered = existing.kpis.filter((k) => k.name !== kpiName);

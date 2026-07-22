@@ -267,8 +267,9 @@ export function useIvfKpiSnapshot({ tankId, enabled = true }: UseIvfKpiSnapshotO
       .getKpiHistory(normalizedTankId)
       .then((res) => {
         if (!isMountedRef.current || !res?.kpi_series) return;
+        const { lid_open_periods: _lidOpenPeriods, ...series } = res.kpi_series;
         const latestEntries: LatestKpi[] = [];
-        Object.entries(res.kpi_series).forEach(([name, points]) => {
+        Object.entries(series).forEach(([name, points]) => {
           const kpiName = name.trim();
           if (!kpiName) return;
           if (!Array.isArray(points) || points.length === 0) return;
