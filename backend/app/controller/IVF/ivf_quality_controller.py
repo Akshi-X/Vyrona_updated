@@ -276,26 +276,59 @@ _LID_KPI_NAME = "ln2_lid_state"
 
 
 def _attach_lid_open_events(quality_service, tank_id: int, kpi_series: dict,
-                            since_utc: datetime, until_utc: datetime, bucket_minutes: int) -> None:
-    """Attach open_count (number of closed->open lid events per bucket, with cross-bucket
-    continuity) to the lid_state series, replacing the naive raw-reading open count."""
-    points = kpi_series.get(_LID_KPI_NAME)
-    if not points:
+                            since_utc: datetime, until_utc: datetime) -> None:
+    """Replace the bucketed lid_state series with exact continuous open periods
+    ("lid_open_periods"), each carrying the count of lid alerts that occurred within it."""
+    if kpi_series.pop(_LID_KPI_NAME, None) is None:
         return
-    events_by_bucket = quality_service.get_lid_open_events_by_bucket(
-        tank_id, since_utc, bucket_minutes, lid_kpi_name=_LID_KPI_NAME, until=until_utc
+
+    periods = quality_service.get_lid_open_periods_with_exact_times(
+        tank_id, since_utc, until=until_utc, lid_kpi_name=_LID_KPI_NAME
     )
-    if not events_by_bucket:
-        for point in points:
-            point['open_count'] = 0
-        return
-    remapped = {
-        _floor_to_bucket_iso(bucket_iso, bucket_minutes): count
-        for bucket_iso, count in events_by_bucket.items()
-    }
-    for point in points:
-        bucket_iso = _floor_to_bucket_iso(point.get('timestamp'), bucket_minutes)
-        point['open_count'] = remapped.get(bucket_iso, 0)
+
+    def _parse_ts(value) -> Optional[datetime]:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            return None
+
+    # Exact lid alert timestamps in range, resolved via dedup_key → kpi_config → kpi_name
+    from app.models.IVF.critical_alert_model import CriticalAlert
+    from app.models.kpi_config_model import KpiConfig
+    lid_alert_times: list = []
+    try:
+        alerts = quality_service.db.query(CriticalAlert).filter(
+            CriticalAlert.tank_id == tank_id,
+            CriticalAlert.occurred_at >= since_utc,
+            CriticalAlert.occurred_at <= until_utc,
+        ).all()
+        config_ids = {
+            int(raw_id) for alert in alerts
+            if (raw_id := _parse_kpi_from_dedup(alert.dedup_key or '')) and raw_id.isdigit()
+        }
+        id_to_name = dict(
+            quality_service.db.query(KpiConfig.id, KpiConfig.kpi_name)
+            .filter(KpiConfig.id.in_(config_ids)).all()
+        ) if config_ids else {}
+        for alert in alerts:
+            raw_id = _parse_kpi_from_dedup(alert.dedup_key or '')
+            name = id_to_name.get(int(raw_id)) if raw_id and raw_id.isdigit() else raw_id
+            if name == _LID_KPI_NAME and alert.occurred_at is not None:
+                occurred = alert.occurred_at if alert.occurred_at.tzinfo else alert.occurred_at.replace(tzinfo=timezone.utc)
+                lid_alert_times.append(occurred)
+    except Exception:
+        pass
+
+    for period in periods:
+        start = _parse_ts(period['start'])
+        stop = _parse_ts(period['stop'])
+        period['alert_count'] = sum(
+            1 for occurred in lid_alert_times
+            if start is not None and stop is not None and start <= occurred <= stop
+        )
+
+    kpi_series["lid_open_periods"] = periods
 
 
 def _attach_alert_counts(db: Session, tank_id: int, kpi_series: dict,
@@ -521,7 +554,7 @@ def get_tank_kpi_history(
         bucket_min = bucket_map.get(duration_minutes, AGG_BUCKET_MINUTES_24H)
         until_ts = latest_timestamp or datetime.now(timezone.utc)
         _attach_alert_counts(db, tank_id, kpi_series, since, until_ts, bucket_min)
-        _attach_lid_open_events(quality_service, tank_id, kpi_series, since, until_ts, bucket_min)
+        _attach_lid_open_events(quality_service, tank_id, kpi_series, since, until_ts)
 
     return {
         "tank_code": tank.tank_code or f"T{tank_id}",
@@ -599,7 +632,7 @@ def get_tank_kpi_history_by_date(
 
     # aggregated returns oldest-first already; attach alert counts for custom date
     _attach_alert_counts(db, tank_id, kpi_series, since_utc, until_utc, bucket_minutes)
-    _attach_lid_open_events(quality_service, tank_id, kpi_series, since_utc, until_utc, bucket_minutes)
+    _attach_lid_open_events(quality_service, tank_id, kpi_series, since_utc, until_utc)
 
     return {
         "tank_code": tank.tank_code or f"T{tank_id}",
