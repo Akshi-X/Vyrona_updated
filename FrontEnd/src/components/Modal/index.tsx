@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
 import { useTourNavContext } from "../../contexts/TourNavContext";
 
@@ -33,7 +34,7 @@ const Modal: React.FC<ModalProps> = ({
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div
             className="fixed inset-0 bg-black/70 z-[100] md:flex md:items-center md:justify-center md:p-4"
             onClick={isTourActive ? undefined : onClose}
@@ -76,7 +77,8 @@ const Modal: React.FC<ModalProps> = ({
                     {children}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

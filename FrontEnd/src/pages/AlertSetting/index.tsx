@@ -2423,13 +2423,9 @@ export default function AlertSetting() {
                                                                             key={zone.zone_id}
                                                                             type="button"
                                                                             onClick={() => {
-                                                                                if (active) {
-                                                                                    setSelectedZoneId(null);
-                                                                                    setRefrigeratorZoneName('');
-                                                                                } else {
-                                                                                    setSelectedZoneId(zone.zone_id);
-                                                                                    setRefrigeratorZoneName(zone.zone_name);
-                                                                                }
+                                                                                if (active) return;
+                                                                                setSelectedZoneId(zone.zone_id);
+                                                                                setRefrigeratorZoneName(zone.zone_name);
                                                                             }}
                                                                             className={`w-full h-10 rounded-lg text-sm font-semibold transition-all duration-150 ${
                                                                                 active

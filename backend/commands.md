@@ -118,4 +118,28 @@ to fix-conflict
 
 npm run dev --  --port 5174
 
-poetry run uvicorn main:app --port 8001
+poetry run uvicorn main:app --port 8001 --reload
+
+
+
+## Stress Test — readings table (CTE + 6h buckets + window functions)
+cd backend
+poetry run python other/stress_test_readings.py
+
+# override tank or run count:
+poetry run python other/stress_test_readings.py --tank-id 3 --runs 10
+
+
+## TimescaleDB comparison benchmark (plain vs hyper vs continuous agg)
+cd backend
+poetry run python other/stress_test_compare.py
+# Report auto-written to: backend/other/timescaledb-report.md
+# Setup steps: see backend/other/timescaledb-setup.md
+
+## Stress Test — readings multi-query suite (Q1–Q4)
+# Q1 large row scan | Q2 derived-table subquery | Q3 multi-join | Q4 GROUP BY daily agg
+cd backend
+poetry run python other/stress_test_readings_q1.py
+
+# override tank or run count:
+poetry run python other/stress_test_readings_q1.py --tank-id 3 --runs 10

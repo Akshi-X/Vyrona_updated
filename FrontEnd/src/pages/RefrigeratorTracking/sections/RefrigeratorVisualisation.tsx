@@ -29,7 +29,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { Droplets, MessageSquare, Thermometer, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, Droplets, MessageSquare, Thermometer, TrendingUp } from 'lucide-react';
 import type { ActivityLogRecord } from '../../../services/activityLogService';
 import { tasksService, type Task } from '../../../services/tasksService';
 import type { RefrigeratorSensorTile } from './useRefrigeratorKpiSnapshot';
@@ -1054,7 +1054,7 @@ export default function RefrigeratorVisualisation({
     <>
     <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_320px] gap-4 h-full min-h-0">
 
-      {/* Left: Live Conditions (top) + Messages (bottom) */}
+      {/* Left: Live Conditions (top) + Tasks (bottom) */}
       <aside className="flex flex-col gap-3 min-h-0">
 
         {/* Live Conditions card */}
@@ -1075,7 +1075,7 @@ export default function RefrigeratorVisualisation({
             ) : (
               sensorTiles.map((tile) => {
                 const isSelected = selectedSensorId === tile.id;
-                const isAlert = hasAlert && !tile.isMissing;
+                const isAlert = !tile.isMissing && tile.withinThreshold === false;
                 const isTemp = (tile.id as any) === 'refrigerator_temp';
                 const accent = isAlert ? '#dc2626' : (isTemp ? '#1a7abb' : '#7a22c8');
                 const ring = isAlert ? 'rgba(220,38,38,0.12)' : (isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)');
@@ -1084,7 +1084,7 @@ export default function RefrigeratorVisualisation({
                     key={tile.id}
                     type="button"
                     onClick={() => { onSensorSelect?.(tile.id); setKpiModalKey(tile.id); }}
-                    className={['text-left w-full rfg-kpi-card', isAlert ? 'ring-1 ring-red-300' : ''].join(' ')}
+                    className={['text-left w-full rfg-kpi-card group', isAlert ? 'ring-1 ring-red-300' : ''].join(' ')}
                     style={{
                       borderRadius: 16,
                       padding: '12px 14px',
@@ -1117,6 +1117,20 @@ export default function RefrigeratorVisualisation({
                     <div className="rfg-kpi-sheen" style={{ position: 'absolute', inset: '12px 12px auto auto', width: 46, height: 46, borderRadius: 10, border: '1px solid rgba(230,214,238,0.9)', opacity: 0.45, transform: 'rotate(12deg)' }} />
                     <div className="rfg-kpi-curve" style={{ position: 'absolute', left: -18, bottom: -22, width: 160, height: 90, borderRadius: '100%', border: '1px solid rgba(214,198,228,0.5)', transform: 'rotate(-8deg)', opacity: 0.55 }} />
                     <div className="rfg-kpi-wave" style={{ position: 'absolute', right: -40, top: 28, width: 180, height: 80, borderRadius: '100%', border: '1px dashed rgba(214,198,228,0.45)', transform: 'rotate(10deg)', opacity: 0.5 }} />
+                    <div
+                      className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 ease-out"
+                      style={{
+                        position: 'absolute', right: 0, bottom: 0, zIndex: 2,
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '5px 10px 5px 8px',
+                        borderTopLeftRadius: 12, borderBottomRightRadius: 16,
+                        background: accent, color: '#fff',
+                        boxShadow: '0 2px 8px rgba(64,17,83,0.3)',
+                      }}
+                    >
+                      <ArrowUpRight size={13} />
+                      <span style={{ fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>View trend</span>
+                    </div>
                   </button>
                 );
               })
@@ -1124,23 +1138,20 @@ export default function RefrigeratorVisualisation({
           </div>
         </div>
 
-        {/* Messages card */}
-        <div className="shrink-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ height: 220 }}>
-          <div
-            className="flex items-center justify-between px-4 py-3 shrink-0"
-            style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}
-          >
-            <div>
-              <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>Messages</span>
-              <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Stakeholder communications</span>
-            </div>
-            <MessageSquare size={16} style={{ color: '#6b4a78' }} />
-          </div>
-          <StakeholderChatBox
+        {/* Tasks card */}
+        <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
+          <MyTasksModal
             embedded
             isOpen={false}
             onClose={() => {}}
-            refrigeratorId={refrigeratorId}
+            variant="refrigerator"
+            tasks={myTasks}
+            defaultRefrigeratorId={refrigeratorId}
+            currentUserName={currentUserName}
+            currentUserId={currentUserId}
+            onAdd={() => {}}
+            onEdit={handleEditTask}
+            onTaskCreated={onTaskCreated}
           />
         </div>
       </aside>
@@ -1290,7 +1301,7 @@ export default function RefrigeratorVisualisation({
         )}
       </section>
 
-      {/* Right: System Activity (top) + Tasks (bottom) */}
+      {/* Right: System Activity (top) + Messages (bottom) */}
       <aside className="flex flex-col gap-3 min-h-0">
 
         {/* System Activity card */}
@@ -1352,20 +1363,23 @@ export default function RefrigeratorVisualisation({
           </div>
         </div>
 
-        {/* Tasks card */}
+        {/* Messages card */}
         <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
-          <MyTasksModal
+          <div
+            className="flex items-center justify-between px-4 py-3 shrink-0"
+            style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}
+          >
+            <div>
+              <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>Messages</span>
+              <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Stakeholder communications</span>
+            </div>
+            <MessageSquare size={16} style={{ color: '#6b4a78' }} />
+          </div>
+          <StakeholderChatBox
             embedded
             isOpen={false}
             onClose={() => {}}
-            variant="refrigerator"
-            tasks={myTasks}
-            defaultRefrigeratorId={refrigeratorId}
-            currentUserName={currentUserName}
-            currentUserId={currentUserId}
-            onAdd={() => {}}
-            onEdit={handleEditTask}
-            onTaskCreated={onTaskCreated}
+            refrigeratorId={refrigeratorId}
           />
         </div>
       </aside>

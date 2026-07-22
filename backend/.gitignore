@@ -67,3 +67,7 @@ ivf_admins.json
 publisher/
 # Uploads
 uploads/feedback/
+
+# Stress test / benchmark scripts (not for commit)
+other/
+docs/
