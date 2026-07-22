@@ -100,6 +100,8 @@ interface IncubatorKpiReading {
     count?: number;
     alert_count?: number;
     unit: string;
+    start_timestamp?: string;
+    stop_timestamp?: string;
   }>;
 }
 
@@ -385,7 +387,7 @@ export default function IncubatorQualityTrackingChart({
             const byTs = new Map<string, IncubatorKpiReading>();
             const appendPoint = (
               kpiName: string,
-              point: { timestamp?: string; value?: number; avg?: number; min?: number; max?: number; count?: number; alert_count?: number; unit?: string }
+              point: { timestamp?: string; value?: number; avg?: number; min?: number; max?: number; count?: number; alert_count?: number; unit?: string; start_timestamp?: string; stop_timestamp?: string }
             ) => {
               const timestamp = typeof point.timestamp === 'string' ? point.timestamp : '';
               if (!timestamp) return;

@@ -460,8 +460,9 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     latestKpiTimestampRef.current = {};
     ivfService.getKpiHistory(normalizedTankId).then((res) => {
       if (!isMountedRef.current || !res?.kpi_series) return;
+      const { lid_open_periods: _lidOpenPeriods, ...series } = res.kpi_series;
       const latestByKpi = new Map<string, { name: string; value: number; unit: string; timestamp: string }>();
-      Object.entries(res.kpi_series).forEach(([name, points]) => {
+      Object.entries(series).forEach(([name, points]) => {
         const kpiName = name.trim();
         if (!kpiName) return;
         if (!Array.isArray(points) || points.length === 0) return;
