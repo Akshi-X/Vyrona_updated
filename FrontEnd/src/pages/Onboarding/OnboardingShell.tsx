@@ -250,9 +250,9 @@ export default function OnboardingShell() {
                                 // Pages with their own full-width layout — no sidebar, no offset wrapper.
                                 <Outlet />
                             ) : (
-                                <div className="bg-surface flex w-full min-h-screen overflow-x-hidden">
+                                <div className="bg-surface flex w-full h-dvh overflow-hidden">
                                     <Sidebar onLogout={handleLogout} />
-                                    <div className="flex-1 min-w-0">
+                                    <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
                                         <Outlet />
                                     </div>
                                 </div>
