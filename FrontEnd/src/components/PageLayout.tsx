@@ -16,7 +16,7 @@ type PageLayoutProps = {
 
 const PageLayout = ({ title, description, icon, iconAlt, lucideIcon, actions, children, hideHeaderOnDesktop = false, patternBackground = false }: PageLayoutProps) => {
     return (
-        <main id="onboarding-page-layout" className={`flex flex-col h-screen overflow-hidden page-enter ${patternBackground ? "relative isolate" : ""}`}>
+        <main id="onboarding-page-layout" className={`flex flex-col h-dvh overflow-hidden page-enter ${patternBackground ? "relative isolate" : ""}`}>
             {patternBackground && (
                 <div
                     aria-hidden

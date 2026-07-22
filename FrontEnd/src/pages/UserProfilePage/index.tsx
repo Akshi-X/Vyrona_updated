@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { COLORS } from '../../constants/colors';
 import { feedbackApi, type UserTicketSummary } from '../../api/feedbackApi';
@@ -8,6 +8,7 @@ import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
 import { useHasVariant } from '../../components/VariantRoute';
 import Header from '../../components/Header';
 import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
+import { COUNTRIES, DEFAULT_COUNTRY_ISO, findCountryByIso, findCountryByPhone, flagEmoji } from '../../constants/countryCodes';
  
  
 interface Ticket {
@@ -24,14 +25,85 @@ interface Ticket {
 const NAME_MAX = 80;
 const FIRST_NAME_REGEX = /^[A-Za-z ,.'-]{1,80}$/; // allows letters, spaces, common punctuation for first name
 const LAST_NAME_REGEX = /^[A-Za-z ,.'-]{1,80}$/; // allows letters, spaces, common punctuation for last name
-const PHONE_REGEX = /^[+]?[\d\s\-().]{7,20}$/;
+const PHONE_DIGITS_REGEX = /^\d{10}$/;
+
+/** Split a stored E.164 number like "+919876543210" into country iso and local digits. */
+const splitPhoneNumber = (raw: string | null | undefined): { iso: string; digits: string } => {
+  const digitsOnly = (raw ?? '').replace(/\D/g, '');
+  if (!digitsOnly) return { iso: DEFAULT_COUNTRY_ISO, digits: '' };
+  const country = findCountryByPhone(digitsOnly);
+  if (country && digitsOnly.length > country.dial.length - 1) {
+    return { iso: country.iso, digits: digitsOnly.slice(country.dial.length - 1) };
+  }
+  return { iso: DEFAULT_COUNTRY_ISO, digits: digitsOnly.slice(-10) };
+};
  
+/** Closed state shows only flag + dial code; open list shows full country names for lookup. */
+const CountryCodeSelect: React.FC<{
+  value: string;
+  onChange: (iso: string) => void;
+  disabled?: boolean;
+}> = ({ value, onChange, disabled }) => {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected = findCountryByIso(value) ?? COUNTRIES[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className={`w-24 px-2 py-2 border rounded-md flex items-center justify-between gap-1 h-[42px] focus:outline-none focus:ring-2 ${
+          disabled
+            ? 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
+            : 'border-gray-300 bg-white text-gray-900 focus:ring-primary-light'
+        }`}
+      >
+        <span>{flagEmoji(selected.iso)} {selected.dial}</span>
+        <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <ul className="absolute z-30 mt-1 w-64 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg py-1">
+          {COUNTRIES.map((c) => (
+            <li key={c.iso}>
+              <button
+                type="button"
+                onClick={() => { onChange(c.iso); setOpen(false); }}
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 flex items-center gap-2 ${
+                  c.iso === value ? 'bg-gray-50 font-semibold' : ''
+                }`}
+              >
+                <span>{flagEmoji(c.iso)}</span>
+                <span className="text-gray-500 w-14 shrink-0">{c.dial}</span>
+                <span className="truncate">{c.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 const UserProfilePage: React.FC = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [firstNameError, setFirstNameError] = useState<string | null>(null);
   const [lastNameError, setLastNameError] = useState<string | null>(null);
+  const [countryIso, setCountryIso] = useState(DEFAULT_COUNTRY_ISO);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneNumberError, setPhoneNumberError] = useState<string | null>(null);
   const [workEmail, setWorkEmail] = useState("");
@@ -146,7 +218,9 @@ const UserProfilePage: React.FC = () => {
         setWorkEmail(profile.email || '');
         setRole(profile.role || '');
         setUserId(profile.user_id || '');
-        setPhoneNumber(profile.phone_number || '');
+        const { iso, digits } = splitPhoneNumber(profile.phone_number);
+        setCountryIso(iso);
+        setPhoneNumber(digits);
       } catch (error) {
         if (!isMounted) return;
         setFirstName('');
@@ -329,9 +403,9 @@ const UserProfilePage: React.FC = () => {
     return null;
   };
 
-  const validatePhoneNumber = (phone: string) => {
-    if (!phone || !phone.trim()) return null; // optional
-    if (!PHONE_REGEX.test(phone.trim())) return 'Enter a valid phone number (digits, spaces, + - () allowed)';
+  const validatePhoneNumber = (digits: string) => {
+    if (!digits.trim()) return null; // optional
+    if (!PHONE_DIGITS_REGEX.test(digits.trim())) return 'Phone number must be exactly 10 digits';
     return null;
   };
  
@@ -367,7 +441,9 @@ const UserProfilePage: React.FC = () => {
       await userService.updateProfile(userId, {
         first_name: firstName,
         last_name: lastName,
-        phone_number: phoneNumber.trim() || null,
+        phone_number: phoneNumber.trim()
+          ? `${findCountryByIso(countryIso)?.dial ?? '+91'}${phoneNumber.trim()}`
+          : null,
       });
      
       // Success - exit edit mode
@@ -387,7 +463,9 @@ const UserProfilePage: React.FC = () => {
       setFirstName(profile.first_name || '');
       setLastName(profile.last_name || '');
       setWorkEmail(profile.email || '');
-      setPhoneNumber(profile.phone_number || '');
+      const { iso, digits } = splitPhoneNumber(profile.phone_number);
+      setCountryIso(iso);
+      setPhoneNumber(digits);
     } catch (error) {
       // Keep current values if API fails
     }
@@ -620,32 +698,48 @@ const UserProfilePage: React.FC = () => {
               </div>
             </div>
             <div id="onboarding-profile-phone">
-              <label className="block text-sm font-bold text-black mb-2">
+              <label className="flex items-center gap-1.5 text-sm font-bold text-black mb-2">
                 Phone Number <span className="text-gray-400 font-normal">(optional)</span>
+                <span className="relative group inline-flex">
+                  <span className="w-4 h-4 rounded-full border border-gray-400 text-gray-500 text-[10px] font-bold flex items-center justify-center cursor-help select-none">i</span>
+                  <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block bg-gray-900 text-white text-xs font-normal px-2.5 py-1.5 rounded-md whitespace-nowrap z-20 shadow-lg">
+                    Will be used to send WhatsApp alerts
+                  </span>
+                </span>
               </label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setPhoneNumber(value);
-                  if (phoneNumberError) setPhoneNumberError(null);
-                  if (value.trim()) {
-                    const err = validatePhoneNumber(value);
-                    if (err) setPhoneNumberError(err);
-                  }
-                }}
-                maxLength={20}
-                disabled={!isEditingProfile}
-                placeholder="e.g. +91 98765 43210"
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-                  isEditingProfile
-                    ? phoneNumberError
-                      ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300 bg-white text-gray-900 focus:ring-primary-light'
-                    : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
-                }`}
-              />
+              <div className="flex gap-2">
+                <CountryCodeSelect
+                  value={countryIso}
+                  onChange={(iso) => {
+                    setCountryIso(iso);
+                    if (phoneNumberError) setPhoneNumberError(null);
+                  }}
+                  disabled={!isEditingProfile}
+                />
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setPhoneNumber(value);
+                    if (phoneNumberError) setPhoneNumberError(null);
+                    if (value) {
+                      const err = validatePhoneNumber(value);
+                      if (err) setPhoneNumberError(err);
+                    }
+                  }}
+                  maxLength={10}
+                  disabled={!isEditingProfile}
+                  placeholder="9876543210"
+                  className={`flex-1 px-3 py-2 h-[42px] border rounded-md focus:outline-none focus:ring-2 ${
+                    isEditingProfile
+                      ? phoneNumberError
+                        ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-primary-light'
+                      : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
+                  }`}
+                />
+              </div>
               {phoneNumberError && (<p className="mt-1 text-xs text-red-600">{phoneNumberError}</p>)}
             </div>
           </div>

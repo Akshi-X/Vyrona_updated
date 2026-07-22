@@ -82,7 +82,7 @@ export default function OnboardingSidebar({ onLogout }: OnboardingSidebarProps) 
                 onClick={closeMobile}
             />
 
-            <aside className={`fixed left-0 top-0 w-60 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out h-screen ${
+            <aside className={`fixed left-0 top-0 w-60 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out h-dvh ${
                 isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
             }`}>
                 {/* Decorative background */}
