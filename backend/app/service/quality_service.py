@@ -1334,8 +1334,7 @@ class QualityService:
                     "count": int(row.sample_count) if row.sample_count is not None else 0,
                     "unit": row.unit or "",
                     "timestamp": ts,
-                }
-                
+                }                
             )
         return {"tank_id": tank_id, "tank_code": tank_code, "kpis": kpis}
 
