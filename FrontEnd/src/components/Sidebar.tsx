@@ -52,7 +52,7 @@ const DASHBOARD_CHILD_PATHS = [
     "/ivf-track-shipment",
     "/incubator-tracking",
     "/refrigerator-tracking",
-    // "/embryo-console",
+    "/embryo-console",
 ];
 
 const isDashboardRoute = (pathname: string) =>
@@ -75,7 +75,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
             { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
             { label: "Incubator Tracking",      path: "/incubator-tracking"    },
             { label: "Refrigerator Tracking",     path: "/refrigerator-tracking" },
-            // { label: "Embryo Console",          path: "/embryo-console"        },
+            { label: "Embryo Console",          path: "/embryo-console"        },
         ],
     },
     { icon: DatabaseIconWhite,    label: "Database",            path: "/database"      },
