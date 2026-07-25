@@ -11,6 +11,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { GoogleMapsProvider } from "./contexts/GoogleMapsProvider";
 import { UIVariantProvider } from "./contexts/UIVariantContext";
 import { SidebarProvider } from "./contexts/SidebarContext";
+import { InstallPromptProvider } from "./contexts/InstallPromptContext";
 
 createRoot(document.getElementById("root")!).render(
     <StrictMode>
@@ -18,8 +19,10 @@ createRoot(document.getElementById("root")!).render(
             <UIVariantProvider>
                 <GoogleMapsProvider>
                     <SidebarProvider>
-                        <RouterProvider router={router} />
-                        <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover />
+                        <InstallPromptProvider>
+                            <RouterProvider router={router} />
+                            <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover />
+                        </InstallPromptProvider>
                     </SidebarProvider>
                 </GoogleMapsProvider>
             </UIVariantProvider>
