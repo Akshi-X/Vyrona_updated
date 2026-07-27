@@ -84,6 +84,16 @@ _ADVISORY_LOCK_NS_KPI = 4711
 # Cross-process guard so a given alert is emailed to a given recipient only once.
 _EMAIL_DEDUP_TTL_SECONDS = 21600  # 6 hours
 
+# WhatsApp throttle, independent of kpi_config.cooldown_minutes and email.
+# Redis holds, per kpi_config + role group ("user" = role User, "admin" =
+# Manager/Admin), the reading timestamp of the last WhatsApp actually delivered to
+# that group. Windows compare reading (device) timestamps, not wall clock. A newer
+# deviation=False reading means the KPI recovered — fresh episode, that group is
+# notified again regardless of its window. Fail-open when Redis is unreachable.
+_WA_USER_COOLDOWN_SECONDS = 60 * 60
+_WA_ADMIN_COOLDOWN_SECONDS = 2 * 60 * 60
+_wa_last_sent_key = lambda kpi_config_id, group: f"alert:whatsapp:last_sent:{kpi_config_id}:{group}"
+
 # WhatsApp Content Template SIDs
 _WA_TEMPLATE_DEVIATION = "HX890c0696439223c8f7b952d35360ea25"   # "{{1}} is deviated to {{2}} in {{3}} branch for {{4}} tank"
 _WA_TEMPLATE_LID_STATE = "HXb0f2ec1db58e9f6ac5be31473a6a6cf7"   # "{{1}} is {{2}} in {{3}} branch for {{4}} tank"
@@ -1895,6 +1905,65 @@ class CriticalAlertService:
             )
             return
 
+        role_group = lambda u: "user" if u.role == "User" else "admin"
+        sent_groups: set = set()
+        if kpi_config is not None and alert.occurred_at is not None:
+            _aware = lambda ts: ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+            current_ts = _aware(alert.occurred_at)
+            latest_clear_reading = (
+                self.db.query(Readings)
+                .filter(
+                    Readings.tank_id == alert.tank_id,
+                    Readings.kpi_config_id == kpi_config.id,
+                    Readings.deviation == False,
+                )
+                .order_by(Readings.timestamp.desc())
+                .first()
+            )
+            clear_ts = _aware(latest_clear_reading.timestamp) if latest_clear_reading else None
+
+            # Baseline per group = reading timestamp of the group's last delivered
+            # WhatsApp (not the last alert — alerts whose WhatsApp was suppressed or
+            # disabled must not slide the window forward). Missing/unreadable key
+            # counts as never sent, so Redis outages can only over-notify.
+            def _last_sent_from_redis(group: str):
+                try:
+                    v = get_redis().get(_wa_last_sent_key(kpi_config.id, group))
+                    return datetime.fromisoformat(v) if v else None
+                except Exception as exc:
+                    logger.warning(
+                        "Redis WhatsApp last-sent lookup failed for kpi_config_id=%s %s (%s); treating as fresh",
+                        kpi_config.id, group, exc,
+                    )
+                    return None
+
+            group_last_sent = {
+                "user": _last_sent_from_redis("user"),
+                "admin": _last_sent_from_redis("admin"),
+            }
+            group_cooldowns = {
+                "user": _WA_USER_COOLDOWN_SECONDS,
+                "admin": _WA_ADMIN_COOLDOWN_SECONDS,
+            }
+            skipped_groups: set = set()
+            for group, last_sent in group_last_sent.items():
+                if last_sent is None:
+                    continue  # never messaged this group for this KPI — fresh
+                last_sent = _aware(last_sent)
+                if clear_ts is not None and clear_ts > last_sent:
+                    continue  # KPI recovered since this group's last message — fresh
+                elapsed = (current_ts - last_sent).total_seconds()
+                if elapsed < group_cooldowns[group]:
+                    skipped_groups.add(group)
+                    logger.info(
+                        "Skipping WhatsApp %s recipients for alert_id=%s kpi_config_id=%s: "
+                        "last delivered %.0fs before this reading (cooldown=%ss)",
+                        group, alert.alert_id, kpi_config.id, elapsed, group_cooldowns[group],
+                    )
+            recipients = [u for u in recipients if role_group(u) not in skipped_groups]
+            if not recipients:
+                return
+
         for user in recipients:
             try:
                 to_number = _to_whatsapp_number(user.phone_number)
@@ -1908,6 +1977,7 @@ class CriticalAlertService:
                     "Sent WhatsApp alert to %s for alert_id=%s (template=%s twilio_sid=%s)",
                     to_number, alert.alert_id, template_sid, msg.sid,
                 )
+                sent_groups.add(role_group(user))
                 ActivityLogService(self.db).log_activity(
                     action="whatsapp.critical_alert_sent",
                     outcome=ActivityOutcome.SUCCESS.value,
@@ -1954,6 +2024,24 @@ class CriticalAlertService:
                         "error": str(e),
                     },
                 )
+
+        # Stamp the delivered groups with this reading's timestamp.
+        if kpi_config is not None and alert.occurred_at is not None and sent_groups:
+            occurred = alert.occurred_at if alert.occurred_at.tzinfo else alert.occurred_at.replace(tzinfo=timezone.utc)
+            for group in sent_groups:
+                try:
+                    get_redis().set(
+                        _wa_last_sent_key(kpi_config.id, group),
+                        occurred.isoformat(),
+                        # Key lives exactly as long as the group's window; once it
+                        # expires the next alert is fresh by definition.
+                        ex=_WA_USER_COOLDOWN_SECONDS if group == "user" else _WA_ADMIN_COOLDOWN_SECONDS,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to store WhatsApp last-sent in Redis for kpi_config_id=%s %s: %s",
+                        kpi_config.id, group, exc,
+                    )
 
     def _check_escalation_needed(self, kpi_config, tank_id: int) -> bool:
         """Return True when N consecutive unacknowledged alerts exist for a KPI and the

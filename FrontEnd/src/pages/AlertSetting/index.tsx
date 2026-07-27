@@ -6,7 +6,7 @@ import { shipmentService } from "../../services/shipmentService";
 import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
 import PageLayout from "../../components/PageLayout";
 import FilterPanel, { FilterSelect } from "../../components/FilterPanel";
-import { ChevronDown, History, Sparkles, X } from "lucide-react";
+import { ChevronDown, History, Sparkles } from "lucide-react";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import CryoBentoGrid, { type CryoBentoGridHandle } from "./CryoBentoGrid";
 import CryoHistoryModal from "./CryoHistoryModal";
@@ -42,6 +42,7 @@ export default function AlertSetting() {
     const [branchFilter, setBranchFilter] = useState<string>("All");
     const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
     const branchDropdownRef = useRef<HTMLDivElement>(null);
+    const tankDropdownRef = useRef<HTMLDivElement>(null);
 
     // Sync URL branch_id (numeric) → branchFilter (name) once branches are loaded
     useEffect(() => {
@@ -74,9 +75,20 @@ export default function AlertSetting() {
     const [selectedContainers, setSelectedContainers] = useState<ContainerRow[]>([]);
     const primaryContainer = selectedContainers[0] ?? null;
     const [showBranchDropdown, setShowBranchDropdown] = useState(false);
-    const [showKpiPanel, setShowKpiPanel] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const bentoGridRef = useRef<CryoBentoGridHandle>(null);
+
+    // Below xl1 (1200px) the selector pill bar moves inside the panel, under the
+    // "Tank Monitoring" header row; at xl1+ it's the notch overlapping the panel's top edge.
+    const [isXl1, setIsXl1] = useState(() =>
+        typeof window !== "undefined" ? window.matchMedia("(min-width: 1200px)").matches : true,
+    );
+    useEffect(() => {
+        const mql = window.matchMedia("(min-width: 1200px)");
+        const onChange = () => setIsXl1(mql.matches);
+        mql.addEventListener("change", onChange);
+        return () => mql.removeEventListener("change", onChange);
+    }, []);
 
     useEffect(() => {
         const loadBranches = async () => {
@@ -170,13 +182,6 @@ export default function AlertSetting() {
             .finally(() => setContainersLoading(false));
     }, [isAuthenticated, directionFilter]);
 
-    useEffect(() => {
-        if (primaryContainer) {
-            setShowKpiPanel(true);
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [primaryContainer?.tank_id]);
-
     const branchOptions = useMemo(
         () => ["All", ...branches.map((b) => b.branch_name)],
         [branches],
@@ -222,6 +227,12 @@ export default function AlertSetting() {
             ) {
                 setIsBranchDropdownOpen(false);
             }
+            if (
+                tankDropdownRef.current &&
+                !tankDropdownRef.current.contains(event.target as Node)
+            ) {
+                setShowBranchDropdown(false);
+            }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () =>
@@ -241,6 +252,7 @@ export default function AlertSetting() {
                     title="Alert Configuration"
                     description="Set alert thresholds for each device and KPI."
                     icon={CriticalAlertsIcon}
+                    patternBackground
                     actions={
                         <div className="md:hidden">
                             <FilterPanel activeCount={activeFilterCount}>
@@ -255,162 +267,155 @@ export default function AlertSetting() {
                         </div>
                     }
                 >
-                    {/* Header: Branch + Tank Selection */}
-                    <div className="bg-white border border-line rounded-xl p-4 w-full">
-                        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 xl1:gap-6">
-                            {/* Branch Selection */}
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Branch Selection</label>
-                                <div className="relative" ref={branchDropdownRef}>
-                                    <button
-                                        id="onboarding-alert-branch-dropdown"
-                                        type="button"
-                                        onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-                                        className="w-full h-12 px-4 bg-primary/10 border border-primary/20 rounded-lg text-sm text-left flex items-center justify-between hover:border-primary/40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                    >
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-                                                <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9h10v2H7z"/></svg>
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="font-semibold text-gray-900 truncate">{branchFilter === "All" ? "All Branches" : branchFilter}</p>
-                                            </div>
-                                        </div>
-                                        <ChevronDown className={`w-5 h-5 text-gray-400 shrink-0 transition-transform ${isBranchDropdownOpen ? "rotate-180" : ""}`} />
-                                    </button>
-                                    {isBranchDropdownOpen && (
-                                        <div id="onboarding-alert-branch-dropdown-list" className="absolute top-full mt-2 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                                            {branchOptions.map((opt) => {
-                                                const branchObj = branches.find((b) => b.branch_name === opt);
-                                                return (
-                                                    <button
-                                                        key={opt}
-                                                        id={branchObj ? `onboarding-alert-branch-${branchObj.branch_id}` : undefined}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setBranchFilter(opt);
-                                                            setIsBranchDropdownOpen(false);
-                                                        }}
-                                                        className={`w-full text-left px-4 py-3 text-sm transition-colors duration-150 ${
-                                                            branchFilter === opt
-                                                                ? "bg-primary/10 text-primary font-medium"
-                                                                : "text-gray-700 hover:bg-gray-50"
-                                                        }`}
-                                                    >
-                                                        {opt === "All" ? "All Branches" : opt}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Tank Selection */}
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                                    {directionFilter === "incubators" ? "Incubator Selection" : "Tank Selection"}
-                                </label>
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (!containersLoading && filteredContainers.length > 0) {
-                                                setShowBranchDropdown(!showBranchDropdown);
-                                            }
-                                        }}
-                                        disabled={containersLoading || filteredContainers.length === 0}
-                                        className="w-full h-12 px-4 bg-primary/10 border border-primary/20 rounded-lg text-sm text-left flex items-center justify-between hover:border-primary/40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-                                                <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11z"/></svg>
-                                            </div>
-                                            <div className="min-w-0">
-                                                {containersLoading ? (
-                                                    <p className="text-sm text-gray-500">Loading...</p>
-                                                ) : primaryContainer ? (
-                                                    <>
-                                                        <p className="font-semibold text-gray-900 truncate">
-                                                            {deviceLabel} {primaryContainer.canisterId}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 truncate">{primaryContainer.branchName}</p>
-                                                    </>
-                                                ) : (
-                                                    <p className="font-semibold text-gray-500">Select a container</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <ChevronDown className={`w-5 h-5 text-gray-400 shrink-0 transition-transform ${showBranchDropdown ? "rotate-180" : ""}`} />
-                                    </button>
-
-                                    {showBranchDropdown && filteredContainers.length > 0 && (
-                                        <div className="absolute top-full mt-2 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                                            {filteredContainers.map((c) => {
-                                                const isSelected = selectedContainers.some((s) => s.tank_id === c.tank_id);
-                                                return (
-                                                    <button
-                                                        key={`${c.branch_id}-${c.tank_id}-${c.canisterId}`}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setSelectedContainers([c]);
-                                                            setShowBranchDropdown(false);
-                                                        }}
-                                                        className={`w-full text-left px-4 py-3 text-sm transition-colors duration-150 border-b border-gray-100 last:border-b-0 ${
-                                                            isSelected
-                                                                ? "bg-primary/10 text-primary font-medium"
-                                                                : "text-gray-700 hover:bg-gray-50"
-                                                        }`}
-                                                    >
-                                                        <div>
-                                                            <p className="font-medium">{deviceLabel} {c.canisterId}</p>
-                                                            <p className="text-xs text-gray-500">{c.branchName}</p>
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                                {containersError && (
-                                    <p className="mt-3 text-xs text-red-600">{containersError}</p>
+                    {(() => {
+                    const pillBar = (
+                        <div className={`relative flex flex-row flex-wrap items-center justify-center gap-1.5 px-2.5 bg-primary max-w-full ${isXl1 ? "py-2 rounded-b-[26px]" : "py-1.5 rounded-[26px] min-[490px]:rounded-full"}`}>
+                            {/* Inverted corner curls so the notch flows into the panel edge — xl1 only */}
+                            {isXl1 && (
+                                <>
+                                    <span
+                                        aria-hidden
+                                        className="absolute top-0 -left-4 w-4 h-4"
+                                        style={{ background: "radial-gradient(circle at 0 100%, transparent 15.5px, #6b1176 16px)" }}
+                                    />
+                                    <span
+                                        aria-hidden
+                                        className="absolute top-0 -right-4 w-4 h-4"
+                                        style={{ background: "radial-gradient(circle at 100% 100%, transparent 15.5px, #6b1176 16px)" }}
+                                    />
+                                </>
+                            )}
+                            {/* Branch pill */}
+                            <div className="relative max-[490px]:flex-1 max-[490px]:basis-[calc(50%-0.1875rem)] max-[490px]:min-w-0" ref={branchDropdownRef}>
+                                <button
+                                    id="onboarding-alert-branch-dropdown"
+                                    type="button"
+                                    onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
+                                    className={`h-9 px-4 rounded-full text-[13px] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors focus:outline-none max-[490px]:w-full ${
+                                        branchFilter !== "All"
+                                            ? "bg-white text-primary"
+                                            : "text-white/90 border border-white/15 hover:bg-white/10"
+                                    }`}
+                                >
+                                    {branchFilter === "All" ? "All Branches" : branchFilter}
+                                    <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${isBranchDropdownOpen ? "rotate-180" : ""}`} />
+                                </button>
+                                {isBranchDropdownOpen && (
+                                    <div id="onboarding-alert-branch-dropdown-list" className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                        {branchOptions.map((opt) => {
+                                            const branchObj = branches.find((b) => b.branch_name === opt);
+                                            return (
+                                                <button
+                                                    key={opt}
+                                                    id={branchObj ? `onboarding-alert-branch-${branchObj.branch_id}` : undefined}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setBranchFilter(opt);
+                                                        setIsBranchDropdownOpen(false);
+                                                    }}
+                                                    className={`w-full text-left px-3 py-2 text-xs transition-colors duration-150 ${
+                                                        branchFilter === opt
+                                                            ? "bg-primary/10 text-primary font-medium"
+                                                            : "text-gray-700 hover:bg-gray-50"
+                                                    }`}
+                                                >
+                                                    {opt === "All" ? "All Branches" : opt}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 )}
                             </div>
 
-                            {/* History */}
-                            <div className="flex flex-col">
-                                <span className="hidden md:block text-xs font-bold text-transparent uppercase tracking-widest mb-2 select-none" aria-hidden>History</span>
+                            {/* Tank / Incubator pill */}
+                            <div className="relative max-[490px]:flex-1 max-[490px]:basis-[calc(50%-0.1875rem)] max-[490px]:min-w-0" ref={tankDropdownRef}>
                                 <button
                                     type="button"
-                                    onClick={() => setShowHistory(true)}
-                                    className="h-12 flex items-center justify-center gap-1.5 px-4 bg-white text-gray-700 border border-line rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+                                    onClick={() => {
+                                        if (!containersLoading && filteredContainers.length > 0) {
+                                            setShowBranchDropdown(!showBranchDropdown);
+                                        }
+                                    }}
+                                    disabled={containersLoading || filteredContainers.length === 0}
+                                    className={`h-9 px-4 rounded-full text-[13px] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed max-[490px]:w-full ${
+                                        primaryContainer
+                                            ? "bg-white text-primary"
+                                            : "text-white/90 border border-white/15 hover:bg-white/10"
+                                    }`}
                                 >
-                                    <History className="w-4 h-4" />
-                                    View Alert History
+                                    {containersLoading
+                                        ? "Loading..."
+                                        : primaryContainer
+                                            ? `${deviceLabel} ${primaryContainer.canisterId}`
+                                            : `Select ${deviceLabel}`}
+                                    <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${showBranchDropdown ? "rotate-180" : ""}`} />
                                 </button>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div className="flex flex-col xl1:flex-row gap-6 flex-1 min-h-0">
-                        {/* Overlay backdrop — mobile only */}
-                        {showKpiPanel && (
-                            <div
-                                className="xl1:hidden fixed inset-0 bg-black/40 z-40"
-                                onClick={() => { setShowKpiPanel(false); setSelectedContainers([]); }}
-                            />
+                                {showBranchDropdown && filteredContainers.length > 0 && (
+                                    <div className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                        {filteredContainers.map((c) => {
+                                            const isSelected = selectedContainers.some((s) => s.tank_id === c.tank_id);
+                                            return (
+                                                <button
+                                                    key={`${c.branch_id}-${c.tank_id}-${c.canisterId}`}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedContainers([c]);
+                                                        setShowBranchDropdown(false);
+                                                    }}
+                                                    className={`w-full text-left px-3 py-2 text-xs transition-colors duration-150 border-b border-gray-100 last:border-b-0 ${
+                                                        isSelected
+                                                            ? "bg-primary/10 text-primary font-medium"
+                                                            : "text-gray-700 hover:bg-gray-50"
+                                                    }`}
+                                                >
+                                                    <div>
+                                                        <p className="font-semibold">{deviceLabel} {c.canisterId}</p>
+                                                        <p className="text-gray-400">{c.branchName}</p>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* History pill */}
+                            <button
+                                type="button"
+                                onClick={() => setShowHistory(true)}
+                                className="h-9 px-4 rounded-full text-[13px] font-semibold text-white/90 border border-white/15 hover:bg-white/10 flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors max-[490px]:w-full"
+                            >
+                                <History className="w-3.5 h-3.5" />
+                                Config History
+                            </button>
+                        </div>
+                    );
+                    return (
+                    <div className="relative flex flex-col flex-1 min-h-0">
+                        {/* xl1+: notch that blends into the KPI panel's top edge. Below xl1: normal row above the panel. */}
+                        {isXl1 ? (
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 z-30">
+                                {pillBar}
+                            </div>
+                        ) : (
+                            <div className="flex justify-center mb-3">
+                                {pillBar}
+                            </div>
                         )}
-                        <section id="onboarding-alert-kpi-panel" className={`bg-white rounded-lg border border-line p-4 min-w-0 overflow-y-auto xl1:flex xl1:flex-1 xl1:flex-col xl1:overflow-hidden xl1:relative xl1:inset-auto xl1:z-auto ${showKpiPanel ? "fixed inset-x-3 top-14 bottom-3 z-50 flex flex-col" : "hidden"}`}>
+                        {containersError && (
+                            <p className="mt-2 text-xs text-red-600">{containersError}</p>
+                        )}
+                        <section id="onboarding-alert-kpi-panel" className="bg-white rounded-2xl border border-line p-4 min-w-0 flex flex-1 flex-col min-h-0 xl1:relative">
                             <div className="flex items-center justify-between gap-3 mb-4">
                                 <h2 className="font-bold text-black text-base">
                                     Tank Monitoring
-                                    {primaryContainer ? ` — ${deviceLabel} ${primaryContainer.canisterId}` : ""}
                                 </h2>
                                 <div className="flex items-center gap-2">
                                     {(directionFilter === "cryotanks"
                                         ? !primaryContainer || (!primaryContainer.is_incubator && !primaryContainer.is_refrigerator)
                                         : primaryContainer && !primaryContainer.is_incubator && !primaryContainer.is_refrigerator) && (
-                                        <div className="relative group">
+                                        <div className="relative group hidden md:block">
                                             <button
                                                 type="button"
                                                 disabled={!primaryContainer}
@@ -420,21 +425,13 @@ export default function AlertSetting() {
                                                 <Sparkles size={14} />
                                                 Set Recommended
                                             </button>
-                                            <div className="pointer-events-none absolute right-0 top-full mt-2 w-64 rounded-xl bg-primary text-white text-[11px] font-medium px-3 py-2 shadow-lg opacity-0 translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0 z-20">
+                                            <div className="pointer-events-none absolute right-0 top-full mt-2 w-max max-w-52 rounded-xl bg-black text-white text-[11px] font-medium px-3 py-2 shadow-lg opacity-0 translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0 z-20">
                                                 {primaryContainer
                                                     ? "Fills every KPI with safe recommended thresholds and turns those alerts on. Nothing is applied until you review and press Save Changes."
                                                     : "Select a container first to apply recommended thresholds."}
                                             </div>
                                         </div>
                                     )}
-                                    <button
-                                        type="button"
-                                        onClick={() => { setShowKpiPanel(false); setSelectedContainers([]); }}
-                                        className="xl1:hidden p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                                        aria-label="Close"
-                                    >
-                                        <X size={20} />
-                                    </button>
                                 </div>
                             </div>
                             {!primaryContainer && directionFilter !== "cryotanks" ? (
@@ -466,7 +463,7 @@ export default function AlertSetting() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex-1 min-h-0 xl1:overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+                                <div className="flex-1 min-h-0 flex flex-col">
                                     <CryoBentoGrid
                                         ref={bentoGridRef}
                                         tankId={primaryContainer?.tank_id ?? null}
@@ -481,6 +478,8 @@ export default function AlertSetting() {
                             )}
                         </section>
                     </div>
+                    );
+                    })()}
                 </PageLayout>
 
                 <CryoHistoryModal
