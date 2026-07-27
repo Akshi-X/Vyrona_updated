@@ -35,7 +35,6 @@ from app.constants.enums import ActivityOutcome
 from app.dependencies.auth_dependencies import get_current_user
 from app.exceptions import InvalidTokenException
 from app.models.IVF.device_model import Device
-from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
 from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
@@ -710,28 +709,6 @@ def _require_alert_setting_role(current_user: User) -> None:
         )
 
 
-def _resolve_current_hospital_id(request: Request, db: Session) -> int:
-    """Resolve hospital_id from authenticated request context for IVF users."""
-    hospital_id = getattr(getattr(request, "state", None), "hospital_id", None)
-    if hospital_id is not None:
-        return int(hospital_id)
-
-    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
-    if branch_id is not None:
-        branch = (
-            db.query(HospitalBranch)
-            .filter(HospitalBranch.branch_id == int(branch_id))
-            .first()
-        )
-        if branch and branch.hospital_id is not None:
-            return int(branch.hospital_id)
-
-    raise HTTPException(
-        status_code=400,
-        detail="Unable to resolve hospital for current user",
-    )
-
-
 def _kpi_config_metadata(row: KpiConfig) -> dict:
     return {
         "id": row.id,
@@ -753,89 +730,9 @@ def _kpi_config_metadata(row: KpiConfig) -> dict:
         "cooldown_minutes": int(row.cooldown_minutes)
         if row.cooldown_minutes is not None
         else None,
+        "whatsapp_alert": bool(row.whatsapp_alert),
+        "email_alert": bool(row.email_alert),
         "status": bool(row.status),
-    }
-
-
-@router.get("/hospital-notification-settings")
-def get_hospital_notification_settings(
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Get hospital-level notification channel settings for Alert Configuration."""
-    _require_alert_setting_role(current_user)
-    hospital_id = _resolve_current_hospital_id(request, db)
-    hospital = db.query(Hospital).filter(Hospital.hospital_id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-
-    return {
-        "hospital_id": hospital.hospital_id,
-        "is_email_notifify": bool(hospital.is_email_notifify),
-        "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
-    }
-
-
-@router.put("/hospital-notification-settings")
-def update_hospital_notification_settings(
-    request: Request,
-    body: dict = Body(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Update hospital-level notification channel settings for Alert Configuration."""
-    _require_alert_setting_role(current_user)
-
-    if "is_email_notifify" not in body or "is_whatsapp_notify" not in body:
-        raise HTTPException(
-            status_code=400,
-            detail="is_email_notifify and is_whatsapp_notify are required",
-        )
-
-    email_enabled = bool(body.get("is_email_notifify"))
-    whatsapp_enabled = bool(body.get("is_whatsapp_notify"))
-
-    if not email_enabled and not whatsapp_enabled:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one notification channel must be enabled",
-        )
-
-    hospital_id = _resolve_current_hospital_id(request, db)
-    hospital = db.query(Hospital).filter(Hospital.hospital_id == hospital_id).first()
-    if not hospital:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-
-    before_state = {
-        "is_email_notifify": bool(hospital.is_email_notifify),
-        "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
-    }
-
-    hospital.is_email_notifify = email_enabled
-    hospital.is_whatsapp_notify = whatsapp_enabled
-    db.commit()
-
-    ActivityLogService(db).log_activity(
-        action="alert_configuration.notification_settings_updated",
-        outcome=ActivityOutcome.SUCCESS.value,
-        actor=build_actor_from_user(current_user),
-        target=build_target("hospital", str(hospital.hospital_id), hospital.hospital_name),
-        metadata={
-            "hospital_id": hospital.hospital_id,
-            "before": before_state,
-            "after": {
-                "is_email_notifify": bool(hospital.is_email_notifify),
-                "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
-            },
-        },
-        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
-    )
-
-    return {
-        "hospital_id": hospital.hospital_id,
-        "is_email_notifify": bool(hospital.is_email_notifify),
-        "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
     }
 
 
@@ -914,6 +811,8 @@ def list_kpi_config(
         "tank_code": tank.tank_code or "",
         "branch_id": tank.branch_id,
         "hospital_id": branch.hospital_id if branch else None,
+        "empty_weight_kg": float(tank.empty_weight_kg) if tank.empty_weight_kg is not None else None,
+        "full_weight_kg": float(tank.full_weight_kg) if tank.full_weight_kg is not None else None,
         "config": rows,
     }
 
@@ -965,6 +864,8 @@ def create_kpi_config(
         alert_type=body.get("alert_type"),
         cooldown_minutes=int(body["cooldown_minutes"]) if body.get("cooldown_minutes") is not None else None,
         unack_escalation_threshold=int(body["unack_escalation_threshold"]) if body.get("unack_escalation_threshold") is not None else None,
+        whatsapp_alert=bool(body.get("whatsapp_alert", False)),
+        email_alert=bool(body.get("email_alert", False)),
         status=body.get("status", True),
     )
     db.commit()
@@ -996,6 +897,8 @@ def create_kpi_config(
         if row.cooldown_minutes is not None
         else 60,
         "unack_escalation_threshold": row.unack_escalation_threshold,
+        "whatsapp_alert": bool(row.whatsapp_alert),
+        "email_alert": bool(row.email_alert),
         "status": bool(row.status),
     }
 
@@ -1202,6 +1105,8 @@ def update_kpi_config(
         unack_escalation_threshold=int(body["unack_escalation_threshold"])
         if body.get("unack_escalation_threshold") is not None
         else None,
+        whatsapp_alert=bool(body["whatsapp_alert"]) if body.get("whatsapp_alert") is not None else None,
+        email_alert=bool(body["email_alert"]) if body.get("email_alert") is not None else None,
         status=body.get("status"),
     )
     if not row:
@@ -1241,6 +1146,8 @@ def update_kpi_config(
         if row.cooldown_minutes is not None
         else 60,
         "unack_escalation_threshold": row.unack_escalation_threshold,
+        "whatsapp_alert": bool(row.whatsapp_alert),
+        "email_alert": bool(row.email_alert),
         "status": bool(row.status),
     }
 

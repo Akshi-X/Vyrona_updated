@@ -21,7 +21,7 @@ createRoot(document.getElementById("root")!).render(
                     <SidebarProvider>
                         <InstallPromptProvider>
                             <RouterProvider router={router} />
-                            <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover />
+                            <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover theme="light" />
                         </InstallPromptProvider>
                     </SidebarProvider>
                 </GoogleMapsProvider>
