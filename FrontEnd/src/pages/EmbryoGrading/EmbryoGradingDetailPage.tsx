@@ -388,7 +388,7 @@ export default function EmbryoGradingDetailPage() {
       <div className="flex flex-col min-w-0 w-full flex-1 min-h-0 overflow-y-auto">
 
             {selectedCycle ? (
-              <div className="flex flex-col gap-4 p-4">
+              <div className="flex flex-col gap-4">
                 <div className="flex gap-4 items-start">
                 <div className="flex-1 min-w-0">
                 {/* Cycle Journey */}

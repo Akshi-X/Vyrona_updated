@@ -69,6 +69,14 @@ UI labels switch based on `deviceType`:
 
 ## AlertSetting Patterns
 
+### CryoBentoGrid card min-width rule
+No bento card in `CryoBentoGrid.tsx` may render below 400px wide. The grid is `grid-cols-12` inside an unpadded `@container` wrapper; columns only split at container breakpoints where every card in the row stays ≥400px after subtracting gaps (`gap-5` = 20px):
+- 1-up (`col-span-12`) by default
+- 2-up (`col-span-6` only) from `@4xl` (896px → ~438px per card; smaller spans dip below 400)
+- From `@min-[81rem]` (1296px) rows use asymmetric bento splits — any spans ≥4 are safe (`col-span-4` in a 2-card row ≈ 425px). Current rhythm: 5/7, then two 4/4/4 rows.
+
+When adding or resizing cards, verify the math at each breakpoint rather than reusing spans; a span of 3 violates the rule at realistic widths.
+
 ### Chamber vs Common (Incubators)
 Incubators have chambers. `selectedChamberId: string | null`:
 - `null` → **Common** (incubator-level config, `chamber_id IS NULL` in DB)
