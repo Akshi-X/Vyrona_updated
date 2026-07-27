@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { toast } from "react-toastify";
 import {
@@ -40,7 +40,7 @@ interface KpiSliderMeta {
 const KPI_META: Record<string, KpiSliderMeta> = {
     [KPI.TEMP_INTERNAL]: { label: "Internal Temperature", unit: "°C", lo: -240, hi: -140, step: 0.5, dual: true },
     [KPI.TEMP_EXTERNAL]: { label: "External Temperature", unit: "°C", lo: 15, hi: 55, step: 0.5, dual: true },
-    [KPI.LN2_LEVEL]: { label: "LN2", unit: "Ln2 in kg", lo: 0, hi: 100, step: 1, dual: false },
+    [KPI.LN2_LEVEL]: { label: "LN2", unit: "Ln2 in kg", lo: 0, hi: 100, step: 0.1, dual: false },
     [KPI.LN2_EVAPORATION]: { label: "Evaporation Rate", unit: "kg/hr", lo: -0.5, hi: 1.5, step: 0.05, dual: true },
     [KPI.SHOCK]: { label: "Shock Detection", unit: "g", lo: 0, hi: 10, step: 0.1, dual: true },
     [KPI.BATTERY]: { label: "Battery Level", unit: "%", lo: 0, hi: 100, step: 1, dual: false },
@@ -89,6 +89,9 @@ const EMPTY_DRAFT: KpiDraft = {
     email_alert: false,
     unack_escalation_threshold: null,
 };
+
+/** True whenever no tank is selected — the alert controls render but must not respond to input. */
+const LockedContext = createContext(false);
 
 /** Patch applied when the master switch turns on: core KPIs get both channels by default. */
 const enablePatch = (kpiName: string, d: KpiDraft): Partial<KpiDraft> => ({
@@ -147,7 +150,7 @@ function BentoCard({
 }) {
     return (
         <div
-            className={`cryo-in relative overflow-hidden rounded-[24px] shadow-[0_10px_34px_rgba(83,63,29,0.09)] ${className}`}
+            className={`cryo-in relative md:overflow-hidden rounded-none md:rounded-[20px] border-0 md:border md:border-gray-100 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${className}`}
             style={{ animationDelay: `${delay}ms`, color: INK } as CSSProperties}
         >
             {children}
@@ -156,18 +159,67 @@ function BentoCard({
 }
 
 function CardTitle({ children }: { children: ReactNode }) {
-    return <h3 className="text-[16px] font-extrabold tracking-tight">{children}</h3>;
+    return <h3 className="text-[15px] font-extrabold tracking-tight text-gray-900">{children}</h3>;
 }
 
 function MicroLabel({ children }: { children: ReactNode }) {
     return (
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: INK_SOFT }}>
+        <span className="block leading-none text-[11px] font-bold uppercase tracking-[0.1em] text-gray-500">
             {children}
         </span>
     );
 }
 
+const LOADING_MESSAGES = [
+    "Fetching configuration...",
+    "Loading live readings...",
+    "Syncing alert thresholds...",
+];
+
+/** Typewriter loop through LOADING_MESSAGES: types, holds, deletes, moves to next. */
+function LoadingMessage() {
+    const [msgIndex, setMsgIndex] = useState(0);
+    const [text, setText] = useState("");
+    const [phase, setPhase] = useState<"typing" | "holding" | "deleting">("typing");
+
+    useEffect(() => {
+        const full = LOADING_MESSAGES[msgIndex];
+        if (phase === "typing") {
+            if (text.length < full.length) {
+                const id = setTimeout(() => setText(full.slice(0, text.length + 1)), 32);
+                return () => clearTimeout(id);
+            }
+            const id = setTimeout(() => setPhase("holding"), 900);
+            return () => clearTimeout(id);
+        }
+        if (phase === "holding") {
+            const id = setTimeout(() => setPhase("deleting"), 700);
+            return () => clearTimeout(id);
+        }
+        // deleting
+        if (text.length > 0) {
+            const id = setTimeout(() => setText(text.slice(0, -1)), 18);
+            return () => clearTimeout(id);
+        }
+        setMsgIndex((i) => (i + 1) % LOADING_MESSAGES.length);
+        setPhase("typing");
+    }, [text, phase, msgIndex]);
+
+    return (
+        <p className="text-sm font-semibold min-w-[13ch]">
+            {text}
+            <span className="inline-block w-[2px] h-[1em] align-middle ml-0.5 bg-current animate-pulse" />
+        </p>
+    );
+}
+
 // ─── Threshold editing controls ──────────────────────────────────────────────
+
+const COOLDOWN_MESSAGES = [
+    "No repeat WhatsApp alert for 1 hr.",
+    "Admins get no repeat WhatsApp alert for 2 hr.",
+];
+const COOLDOWN_ROTATE_MS = 10000;
 
 /** Bottom control bar: bell status, WhatsApp / email channel buttons, master switch. */
 function ChannelBar({
@@ -179,6 +231,7 @@ function ChannelBar({
     draft: KpiDraft;
     onDraft: (kpiName: string, patch: Partial<KpiDraft>) => void;
 }) {
+    const locked = useContext(LockedContext);
     const on = draft.enabled;
     const statusText = !on
         ? "Alerts are off — you won't be notified for this KPI."
@@ -189,97 +242,145 @@ function ChannelBar({
             : draft.email_alert
               ? "Alerts arrive in-app and by email."
               : "Alerts arrive in-app only.";
+
+    // Whenever WhatsApp is active, the status pill rotates through the base status
+    // and the two cooldown tips every 10s; the ring around the bell tracks the sweep.
+    const rotating = on && draft.whatsapp_alert;
+    const messages = rotating ? [statusText, ...COOLDOWN_MESSAGES] : [statusText];
+    const [index, setIndex] = useState(0);
+    useEffect(() => {
+        if (!rotating) {
+            setIndex(0);
+            return;
+        }
+        const id = setInterval(() => {
+            setIndex((i) => (i + 1) % messages.length);
+        }, COOLDOWN_ROTATE_MS);
+        return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rotating]);
+    const displayText = messages[index % messages.length];
+
     return (
-        <div
-            className={`relative mt-1.5 flex items-center gap-2 rounded-full px-2 py-1 transition-colors duration-200 ${
-                on ? "bg-white" : "bg-white/60"
-            }`}
-        >
+        <>
+        <div className="mt-1.5 flex flex-col items-stretch @min-[30rem]:flex-row @min-[30rem]:items-center gap-1.5">
             <div
-                className={`w-9 h-9 rounded-full grid place-items-center shrink-0 transition-colors duration-200 ${
-                    on ? "bg-primary-light" : "bg-gray-200"
+                className={`relative flex-1 min-w-0 flex items-center gap-2 rounded-full px-2 py-1 transition-colors duration-200 border ${
+                    on ? "bg-primary-ring/60 border-primary-ring" : "bg-primary-bg/80 border-primary-ring"
                 }`}
             >
-                {on ? (
-                    <Bell size={16} className="text-white" />
-                ) : (
-                    <BellOff size={16} className="text-gray-500" />
-                )}
-            </div>
-            <div className="w-px h-6 bg-gray-300 shrink-0" />
-            <p className="flex-1 min-w-0 px-1 text-[10px] leading-tight font-semibold text-black">
-                {statusText}
-            </p>
-            <button
-                type="button"
-                aria-pressed={on && draft.whatsapp_alert}
-                aria-label="WhatsApp alerts"
-                title={on ? "WhatsApp alerts" : "Turn the alert on first"}
-                disabled={!on}
-                onClick={() =>
-                    onDraft(kpiName, {
-                        whatsapp_alert: !draft.whatsapp_alert,
-                        // Escalation needs at least one channel; clear it when the last one goes off
-                        ...(draft.whatsapp_alert && !draft.email_alert && { unack_escalation_threshold: null }),
-                    })
-                }
-                className="relative w-9 h-9 rounded-xl bg-white border border-gray-200 grid place-items-center shrink-0 transition-transform duration-150 active:scale-95 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40"
-            >
-                <img
-                    src="/250px-WhatsApp.svg.webp"
-                    alt=""
-                    className={`w-5 h-5 transition-all duration-200 ${on && draft.whatsapp_alert ? "" : "grayscale opacity-40"}`}
-                />
-                {on && draft.whatsapp_alert && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-400 border-2 border-white" />
-                )}
-            </button>
-            <button
-                type="button"
-                aria-pressed={on && draft.email_alert}
-                aria-label="Email alerts"
-                title={on ? "Email alerts" : "Turn the alert on first"}
-                disabled={!on}
-                onClick={() =>
-                    onDraft(kpiName, {
-                        email_alert: !draft.email_alert,
-                        // Escalation needs at least one channel; clear it when the last one goes off
-                        ...(draft.email_alert && !draft.whatsapp_alert && { unack_escalation_threshold: null }),
-                    })
-                }
-                className="relative w-9 h-9 rounded-xl bg-white border border-gray-200 grid place-items-center shrink-0 transition-transform duration-150 active:scale-95 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40"
-            >
-                <Mail size={16} className={`transition-colors duration-200 ${on && draft.email_alert ? "text-[#6b1176]" : "text-gray-300"}`} />
-                {on && draft.email_alert && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-400 border-2 border-white" />
-                )}
-            </button>
-            <button
-                type="button"
-                role="switch"
-                aria-checked={on}
-                aria-label="Alert on/off"
-                onClick={() =>
-                    onDraft(
-                        kpiName,
-                        on
-                            ? { enabled: false, unack_escalation_threshold: null }
-                            : enablePatch(kpiName, draft),
-                    )
-                }
-                className={`relative w-[52px] h-8 rounded-full shrink-0 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40 ${
-                    on ? "bg-primary-light" : "bg-gray-300"
-                }`}
-            >
-                <span
-                    className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-200 ${
-                        on ? "translate-x-5" : "translate-x-0"
+                <div
+                    className={`relative w-9 h-9 rounded-full grid place-items-center shrink-0 transition-colors duration-200 ${
+                        on ? "bg-primary-light" : "bg-gray-200"
                     }`}
-                />
-            </button>
+                >
+                    {on ? (
+                        <Bell size={15} className="text-white" />
+                    ) : (
+                        <BellOff size={15} className="text-gray-500" />
+                    )}
+                </div>
+                <p key={index} className="flex-1 min-w-0 px-1 text-[11px] leading-tight font-semibold text-gray-800 cooldown-fade">
+                    {displayText}
+                </p>
+            </div>
+            <div
+                className={`relative shrink-0 flex items-center justify-between @min-[30rem]:justify-start gap-2 rounded-full px-2 py-1 transition-colors duration-200 border ${
+                    on ? "bg-primary-ring/60 border-primary-ring" : "bg-primary-bg/80 border-primary-ring"
+                }`}
+            >
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        aria-pressed={on && draft.whatsapp_alert}
+                        aria-label="WhatsApp alerts"
+                        title={locked ? "Select a tank first" : on ? "WhatsApp alerts" : "Turn the alert on first"}
+                        disabled={!on || locked}
+                        onClick={() =>
+                            onDraft(kpiName, {
+                                whatsapp_alert: !draft.whatsapp_alert,
+                            })
+                        }
+                        className="relative w-9 h-9 rounded-full bg-white border border-gray-200 grid place-items-center shrink-0 transition-transform duration-150 active:scale-95 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40"
+                    >
+                        <img
+                            src="/250px-WhatsApp.svg.webp"
+                            alt=""
+                            className={`w-[18px] h-[18px] transition-all duration-200 ${on && draft.whatsapp_alert ? "" : "grayscale opacity-40"}`}
+                        />
+                        {on && draft.whatsapp_alert && (
+                            <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-green-400 border-2 border-white" />
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        aria-pressed={on && draft.email_alert}
+                        aria-label="Email alerts"
+                        title={locked ? "Select a tank first" : on ? "Email alerts" : "Turn the alert on first"}
+                        disabled={!on || locked}
+                        onClick={() =>
+                            onDraft(kpiName, {
+                                email_alert: !draft.email_alert,
+                                // Escalation is email-only; clear it when email turns off
+                                ...(draft.email_alert && { unack_escalation_threshold: null }),
+                            })
+                        }
+                        className="relative w-9 h-9 rounded-full bg-white border border-gray-200 grid place-items-center shrink-0 transition-transform duration-150 active:scale-95 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40"
+                    >
+                        <Mail size={15} className={`transition-colors duration-200 ${on && draft.email_alert ? "text-[#6b1176]" : "text-gray-300"}`} />
+                        {on && draft.email_alert && (
+                            <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-green-400 border-2 border-white" />
+                        )}
+                    </button>
+                </div>
+                <div className="relative group shrink-0 flex items-center">
+                    {locked && (
+                        <div className="pointer-events-none absolute -top-1 right-0 -translate-y-full w-max max-w-[180px] rounded-lg bg-black text-white text-[10px] font-medium px-2.5 py-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-30 text-center">
+                            Select a cryotank to enable
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={on}
+                        aria-label="Alert on/off"
+                        disabled={locked}
+                        onClick={() =>
+                            onDraft(
+                                kpiName,
+                                on
+                                    ? { enabled: false, unack_escalation_threshold: null }
+                                    : enablePatch(kpiName, draft),
+                            )
+                        }
+                        className={`relative w-12 h-7 rounded-full shrink-0 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40 disabled:cursor-not-allowed disabled:opacity-60 ${
+                            on ? "bg-primary-light" : "bg-gray-300"
+                        }`}
+                    >
+                        <span
+                            className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${
+                                on ? "translate-x-5" : "translate-x-0"
+                            }`}
+                        />
+                    </button>
+                </div>
+            </div>
         </div>
+        </>
     );
 }
+
+/**
+ * Formats a value at a KPI's step precision. With `trim` (tick labels, live-reading
+ * markers) it rounds and strips trailing zeros for compact display, e.g. "2.5".
+ * Without it (Min/Max inputs) it preserves the fixed decimal padding the user is
+ * editing against, e.g. "50.0", so the field doesn't reformat mid-typing.
+ */
+const formatStep = (v: number, step: number, trim = false): string => {
+    if (Number.isInteger(step)) return trim ? String(Math.round(v)) : String(v);
+    const fixed = v.toFixed(step < 0.1 ? 2 : 1);
+    return trim ? String(Number(fixed)) : fixed;
+};
 
 /** Number input that commits on blur/Enter so partial typing isn't clamped mid-edit. */
 function ThresholdField({
@@ -299,9 +400,11 @@ function ThresholdField({
     step: number;
     onCommit: (v: number | null) => void;
 }) {
-    const [text, setText] = useState(value != null ? String(value) : "");
+    const fmt = (v: number) => formatStep(v, step);
+    const [text, setText] = useState(value != null ? fmt(value) : "");
     useEffect(() => {
-        setText(value != null ? String(value) : "");
+        setText(value != null ? fmt(value) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [value]);
     const commit = () => {
         if (text.trim() === "") {
@@ -310,14 +413,14 @@ function ThresholdField({
         }
         const n = Number(text);
         if (!Number.isFinite(n)) {
-            setText(value != null ? String(value) : "");
+            setText(value != null ? fmt(value) : "");
             return;
         }
         onCommit(Math.min(hi, Math.max(lo, n)));
     };
     return (
         <label className="flex items-center gap-1">
-            <span className="text-[10px] font-bold" style={{ color: INK_SOFT }}>{label}</span>
+            <span className="text-[12px] font-bold text-gray-700">{label}</span>
             <input
                 type="number"
                 min={lo}
@@ -331,9 +434,9 @@ function ThresholdField({
                     if (e.key === "Enter") e.currentTarget.blur();
                 }}
                 aria-label={label}
-                className="w-16 rounded-lg bg-white/80 px-1 py-0.5 text-[11px] font-bold text-center outline-none focus:ring-2 focus:ring-black/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-16 rounded-md bg-white border border-gray-200 px-1.5 py-1 text-[13px] font-bold text-center outline-none focus:ring-2 focus:ring-black/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
-            {unit && <span className="text-[10px] font-bold" style={{ color: INK_SOFT }}>{unit}</span>}
+            {unit && <span className="text-[12px] font-bold text-gray-700">{unit}</span>}
         </label>
     );
 }
@@ -344,47 +447,61 @@ function KpiSlider({
     ink,
     onChange,
     currentReading,
+    markerUnit,
 }: {
     meta: KpiSliderMeta;
     draft: KpiDraft;
     ink: string;
     onChange: (min: number | null, max: number | null) => void;
     currentReading?: number | null;
+    markerUnit?: string;
 }) {
+    const locked = useContext(LockedContext);
+    const unit = markerUnit ?? meta.unit;
     const a = draft.min ?? meta.lo;
     const b = draft.max ?? meta.hi;
     const pct = (v: number) => ((v - meta.lo) / (meta.hi - meta.lo)) * 100;
-    const fmt = (v: number) =>
-        Number.isInteger(meta.step) ? String(Math.round(v)) : String(Number(v.toFixed(meta.step < 0.1 ? 2 : 1)));
+    const fmt = (v: number) => formatStep(v, meta.step, true);
     const scaleTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => meta.lo + t * (meta.hi - meta.lo));
+
+    // Near either edge the centered label would overflow the track; anchor it
+    // to that corner instead of centering on the (clipped) reading position.
+    const readingPct = pct(currentReading ?? meta.lo);
+    const edge = readingPct >= 88 ? "right" : readingPct <= 12 ? "left" : "center";
+    const markerStyle: CSSProperties =
+        edge === "right"
+            ? { right: 0, alignItems: "flex-end" }
+            : edge === "left"
+              ? { left: 0, alignItems: "flex-start" }
+              : { left: `${readingPct}%`, transform: "translateX(-50%)", alignItems: "center" };
+
     return (
         <div style={{ "--thumb": ink } as CSSProperties}>
             <div className="relative select-none">
-                <div className="relative h-8">
-                    {currentReading != null && (
-                        <div
-                            className="absolute left-0 right-0 top-0 flex justify-center pointer-events-none"
-                            style={{
-                                left: `${pct(currentReading)}%`,
-                                transform: "translateX(-50%)",
-                                width: "fit-content",
-                            }}
-                        >
-                            <div className="flex flex-col items-center gap-0.25">
-                                <span className="text-[8px] font-bold text-green-600 whitespace-nowrap">Latest</span>
-                                <div className="w-0.5 h-3 bg-green-500 rounded-full opacity-80" />
-                            </div>
+                <div className="relative h-6">
+                    <div
+                        className={`absolute top-0 flex flex-col pointer-events-none ${currentReading == null ? "invisible" : ""}`}
+                        style={{ ...markerStyle, width: "fit-content" }}
+                    >
+                        <span className="text-[10px] font-bold text-green-600 whitespace-nowrap">
+                            Latest {currentReading != null ? fmt(currentReading) : ""}{unit ? ` ${unit}` : ""}
+                        </span>
+                        <div className="w-0.5 h-2 bg-green-500 rounded-full opacity-80" />
+                    </div>
+                </div>
+                <div className="relative h-6 group">
+                    {locked && (
+                        <div className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full w-max max-w-[180px] rounded-lg bg-black text-white text-[10px] font-medium px-2.5 py-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-30 text-center">
+                            Select a cryotank to enable
                         </div>
                     )}
-                </div>
-                <div className="relative h-7">
-                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 rounded-full bg-white/70" />
+                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 rounded-full bg-white" />
                     <div
                         className="absolute top-1/2 -translate-y-1/2 h-2 rounded-full transition-all duration-150"
                         style={{
                             left: `${meta.dual ? pct(Math.min(a, b)) : 0}%`,
                             right: `${100 - pct(meta.dual ? Math.max(a, b) : a)}%`,
-                            backgroundColor: ink,
+                            backgroundColor: locked ? "#9CA3AF" : ink,
                             opacity: 0.8,
                         }}
                     />
@@ -397,6 +514,7 @@ function KpiSlider({
                                 max={meta.hi}
                                 step={meta.step}
                                 value={a}
+                                disabled={locked}
                                 onChange={(e) => onChange(Math.min(Number(e.target.value), b), b)}
                                 aria-label={`${meta.label} minimum`}
                             />
@@ -407,6 +525,7 @@ function KpiSlider({
                                 max={meta.hi}
                                 step={meta.step}
                                 value={b}
+                                disabled={locked}
                                 onChange={(e) => onChange(a, Math.max(Number(e.target.value), a))}
                                 aria-label={`${meta.label} maximum`}
                             />
@@ -419,6 +538,7 @@ function KpiSlider({
                             max={meta.hi}
                             step={meta.step}
                             value={a}
+                            disabled={locked}
                             onChange={(e) => onChange(Number(e.target.value), null)}
                             aria-label={`${meta.label} minimum`}
                         />
@@ -429,10 +549,9 @@ function KpiSlider({
                 {scaleTicks.map((v, i) => (
                     <span
                         key={i}
-                        className={`flex flex-col text-[9px] font-semibold leading-tight ${
+                        className={`flex flex-col text-[11px] font-semibold leading-tight text-gray-600 ${
                             i === 0 ? "items-start" : i === scaleTicks.length - 1 ? "items-end" : "items-center"
                         }`}
-                        style={{ color: INK_SOFT }}
                     >
                         <span className="w-px h-1 bg-current opacity-70" />
                         {fmt(v)}
@@ -480,8 +599,8 @@ function EscalationInput({
 }) {
     const v = draft.unack_escalation_threshold ?? null;
     return (
-        <div className="relative h-10 flex items-center justify-between gap-2 mt-1.5 px-3 rounded-2xl bg-orange-100/70 border border-orange-200">
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-800">Escalation</span>
+        <div className="relative h-9 flex items-center justify-between gap-2 mt-1.5 px-3 rounded-xl bg-orange-50 border border-orange-100">
+            <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-orange-800">Mail Escalation</span>
             <div className="flex items-center gap-1.5">
                 <input
                     type="number"
@@ -496,21 +615,31 @@ function EscalationInput({
                         });
                     }}
                     title="Send escalation email to admins/managers after N consecutive unacknowledged alerts. Leave empty to disable."
-                    className="w-10 rounded-lg bg-white/80 px-1 py-0.5 text-[12px] font-bold text-orange-900 text-center outline-none focus:ring-2 focus:ring-orange-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-12 rounded-md bg-white border border-orange-200 px-1.5 py-1 text-[13px] font-bold text-orange-900 text-center outline-none focus:ring-2 focus:ring-orange-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
-                <span className="text-[10px] font-semibold text-orange-700 whitespace-nowrap">
-                    {v === null ? "disabled" : v === 0 ? "immediate" : `after ${v} unack`}
+                <span className="text-[11px] font-semibold text-orange-700 whitespace-nowrap">
+                    {v === null ? "no escalation set" : v === 0 ? "immediate" : `after ${v} unack`}
                 </span>
             </div>
         </div>
     );
 }
 
-function EscalationHint({ message }: { message: string }) {
+function EscalationHint({ message, dim = false }: { message: string; dim?: boolean }) {
     return (
-        <div className="relative h-10 mt-1.5 px-3 rounded-2xl bg-white/35 border border-dashed border-gray-400/50 flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: INK_SOFT }}>Escalation</span>
-            <p className="text-[10px] font-semibold flex-1 text-right" style={{ color: INK_SOFT }}>
+        <div
+            className={`relative mt-1.5 px-3 py-2 @min-[25.625rem]:h-9 @min-[25.625rem]:py-0 rounded-xl border border-dashed flex items-center gap-2 ${
+                dim ? "bg-gray-100 border-gray-200" : "bg-primary-bg/60 border-primary-ring"
+            }`}
+        >
+            <span
+                className={`text-[11px] font-bold uppercase tracking-[0.1em] leading-tight max-w-[38px] @min-[25.625rem]:max-w-none ${
+                    dim ? "text-gray-400" : "text-gray-500"
+                }`}
+            >
+                Mail Escalation
+            </span>
+            <p className={`text-[11px] font-semibold flex-1 text-right ${dim ? "text-gray-400" : "text-gray-500"}`}>
                 {message}
             </p>
         </div>
@@ -527,15 +656,16 @@ function EscalationRow({
     draft: KpiDraft;
     onDraft: (kpiName: string, patch: Partial<KpiDraft>) => void;
 }) {
-    if (draft.enabled && (draft.whatsapp_alert || draft.email_alert)) {
+    if (draft.enabled && draft.email_alert) {
         return <EscalationInput kpiName={kpiName} draft={draft} onDraft={onDraft} />;
     }
     return (
         <EscalationHint
+            dim={!draft.enabled}
             message={
                 draft.enabled
-                    ? "Turn on WhatsApp or email alerts to enable escalation"
-                    : "Turn on the alert with WhatsApp or email to enable"
+                    ? "Turn on email alerts to enable escalation"
+                    : "Turn on the alert with email to enable"
             }
         />
     );
@@ -548,6 +678,7 @@ function ThresholdBox({
     onDraft,
     metaOverride,
     currentReading,
+    markerUnit,
 }: {
     kpiName: string;
     draft: KpiDraft;
@@ -555,18 +686,20 @@ function ThresholdBox({
     onDraft: (kpiName: string, patch: Partial<KpiDraft>) => void;
     metaOverride?: Partial<KpiSliderMeta>;
     currentReading?: number | null;
+    markerUnit?: string;
 }) {
     const meta = { ...KPI_META[kpiName], ...metaOverride };
+    const dim = !draft.enabled;
     return (
         <>
-            <div className="relative rounded-2xl bg-white/45 px-3 pt-2 pb-1.5">
+            <div className={`relative rounded-xl border px-2.5 py-2.5 ${dim ? "bg-gray-100 border-gray-200" : "bg-primary-bg/60 border-primary-ring"}`}>
                 <div className="mb-1">
                     <MicroLabel>Alert threshold</MicroLabel>
                 </div>
                 <KpiSlider
                     meta={meta}
                     draft={draft}
-                    ink={ink}
+                    ink={dim ? "#9CA3AF" : ink}
                     onChange={(min, max) =>
                         onDraft(kpiName, {
                             min,
@@ -576,6 +709,7 @@ function ThresholdBox({
                         })
                     }
                     currentReading={currentReading}
+                    markerUnit={markerUnit}
                 />
             </div>
             <EscalationRow kpiName={kpiName} draft={draft} onDraft={onDraft} />
@@ -600,26 +734,14 @@ function InternalTemperatureCard({
     onDraft: (kpiName: string, patch: Partial<KpiDraft>) => void;
 }) {
     return (
-        <BentoCard delay={0} className="col-span-12 @min-[81rem]:col-span-5 min-h-[440px] bg-gradient-to-br from-[#ECDCF8] to-[#DFC7F1] p-4 flex flex-col">
-            <Thermometer strokeWidth={1.25} className="absolute top-4 right-4 w-28 h-28 text-[#A879D6] opacity-25" />
+        <BentoCard delay={0} className="col-span-12 @min-[70rem]:col-span-5 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
+            <Thermometer strokeWidth={1.25} className="absolute top-4 right-4 w-24 h-24 text-[#6B3A7E] opacity-[0.12]" />
             <div className="relative">
                 <CardTitle>Internal temperature:</CardTitle>
                 <p className="text-[12px] mt-0.5 text-gray-500">Cryogenic temperature inside {tankCode ? `tank ${tankCode}` : "the tank"}, where samples are stored</p>
             </div>
-            <div className="relative flex-1 flex items-center justify-center">
-                <div className="rounded-xl px-6 py-4 bg-white/60 backdrop-blur-sm border border-white/40 text-center">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Latest</span>
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    </div>
-                    <div className="cryo-display font-extrabold leading-none text-slate-900 text-[34px]">
-                        {live.tempCurrent != null ? live.tempCurrent.toFixed(1) : "—"}
-                        <span className="text-[16px] font-bold text-slate-500"> °C</span>
-                    </div>
-                </div>
-            </div>
             {editable && (
-                <div className="relative mt-auto">
+                <div className="relative md:mt-auto">
                     <ThresholdBox kpiName={KPI.TEMP_INTERNAL} draft={draft} ink="#6B3A7E" onDraft={onDraft} currentReading={live.tempCurrent} />
                 </div>
             )}
@@ -643,13 +765,32 @@ function Ln2LevelCard({
     l2Pct: number | null;
 }) {
     return (
-        <BentoCard delay={60} className="col-span-12 @min-[81rem]:col-span-7 min-h-[440px] bg-gradient-to-br from-[#FADFEC] to-[#F4C8DF] p-4 flex flex-row gap-4">
-            {/* ln2.svg is white-only art; mask + backgroundColor tints it like the other decos */}
+        <BentoCard delay={60} className="col-span-12 @min-[70rem]:col-span-7 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-row gap-4">
+            <div className="relative flex-1 min-w-0 flex flex-col items-start gap-2">
+                <div className="relative">
+                    <CardTitle>LN2 level:</CardTitle>
+                    <p className="text-[12px] mt-0.5 text-gray-500">Liquid nitrogen left in the tank to keep samples frozen</p>
+                </div>
+                {editable && (
+                    <div className="relative md:mt-auto self-stretch min-[500px]:min-w-[320px]">
+                        <ThresholdBox
+                            kpiName={KPI.LN2_LEVEL}
+                            draft={draft}
+                            ink="#6B3A7E"
+                            onDraft={onDraft}
+                            metaOverride={usableKg != null ? { hi: usableKg } : undefined}
+                            currentReading={usableKg != null && live.ln2Pct != null ? (live.ln2Pct / 100) * usableKg : null}
+                            markerUnit="kg"
+                        />
+                    </div>
+                )}
+            </div>
+            {/* Below 1030px there's no room for the 3D dewar — show a watermark icon instead, positioned like the other cards' decos */}
             <span
                 aria-hidden
-                className="absolute top-4 right-4 w-28 h-28 opacity-20"
+                className="@min-[1030px]:hidden absolute top-4 right-4 w-24 h-24 opacity-[0.12]"
                 style={{
-                    backgroundColor: "#D4649E",
+                    backgroundColor: "#6B3A7E",
                     WebkitMaskImage: "url(/ln2.svg)",
                     maskImage: "url(/ln2.svg)",
                     WebkitMaskRepeat: "no-repeat",
@@ -660,37 +801,7 @@ function Ln2LevelCard({
                     maskPosition: "center",
                 }}
             />
-            <div className="relative flex flex-col items-start gap-2">
-                <div className="relative">
-                    <CardTitle>LN2 level:</CardTitle>
-                    <p className="text-[12px] mt-0.5 text-gray-500">Liquid nitrogen left in the tank to keep samples frozen</p>
-                </div>
-                <div className="flex items-center justify-center py-3 self-center">
-                    <div className="rounded-xl px-6 py-3 bg-white/60 backdrop-blur-sm border border-white/40 text-center">
-                        <div className="flex items-center justify-center gap-2 mb-1.5">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Latest</span>
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        </div>
-                        <p className="cryo-display text-[34px] font-extrabold leading-none text-slate-900">
-                            {live.ln2Pct != null && usableKg != null ? ((live.ln2Pct / 100) * usableKg).toFixed(1) : "—"}
-                            <span className="text-[16px] font-bold text-slate-500"> kg</span>
-                        </p>
-                    </div>
-                </div>
-                {editable && (
-                    <div className="relative">
-                        <ThresholdBox
-                            kpiName={KPI.LN2_LEVEL}
-                            draft={draft}
-                            ink="#7C1B4E"
-                            onDraft={onDraft}
-                            metaOverride={usableKg != null ? { hi: usableKg } : undefined}
-                            currentReading={usableKg != null && live.ln2Pct != null ? (live.ln2Pct / 100) * usableKg : null}
-                        />
-                    </div>
-                )}
-            </div>
-            <div className="relative flex-1 min-h-0 flex flex-col">
+            <div className="relative w-[260px] shrink-0 min-h-0 hidden @min-[1030px]:flex flex-col pt-10">
                 {/* Mini 3D dewar — callout indicators on tank for liquid level + L2 threshold */}
                 <div className="flex-1 min-h-0">
                     <MiniTank3D
@@ -719,11 +830,11 @@ function LidStateCard({
     const known = live.lidOpen != null;
     const open = live.lidOpen === true;
     return (
-        <BentoCard delay={120} className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 min-h-[350px] bg-gradient-to-br from-[#E5EDFE] to-[#CFDDFA] p-4 flex flex-col">
+        <BentoCard delay={120} className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
             {/* lid_state.svg is white-only art; mask + backgroundColor tints it like the other decos */}
             <span
                 aria-hidden
-                className="absolute top-4 right-4 w-28 h-28 opacity-20"
+                className="absolute top-4 right-4 w-20 h-20 opacity-[0.12]"
                 style={{
                     backgroundColor: "#5A83BC",
                     WebkitMaskImage: "url(/lid_state.svg)",
@@ -740,24 +851,43 @@ function LidStateCard({
                 <CardTitle>Lid state:</CardTitle>
                 <p className="text-[12px] mt-0.5 text-gray-500">Live open / closed status of the tank lid</p>
             </div>
-            <div className="relative flex items-center justify-center py-3">
-                <div className="rounded-xl px-6 py-3 bg-white/60 backdrop-blur-sm border border-white/40 text-center">
-                    <div className="flex items-center justify-center gap-2 mb-1.5">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Latest</span>
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    </div>
-                    <p className={`text-[28px] font-bold leading-tight ${known ? (open ? "text-amber-600" : "text-green-600") : "text-slate-400"}`}>
-                        {known ? (open ? "OPEN" : "CLOSED") : "—"}
-                    </p>
-                </div>
-            </div>
             {editable && (
-                <div className="relative mt-auto">
-                    <div className="rounded-2xl bg-white/45 px-3 pt-2 pb-0 space-y-0.5">
-                        <MicroLabel>Alert threshold</MicroLabel>
-                        <p className="text-[11px] font-semibold" style={{ color: INK_SOFT }}>
-                            Alerts when the lid is opened.
-                        </p>
+                <div className="relative md:mt-auto">
+                    <div className="rounded-xl bg-primary-bg/60 border border-primary-ring px-3 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-2.5">
+                                <span className="block leading-none text-[11px] font-bold uppercase tracking-[0.1em] text-gray-900">
+                                    Alert threshold
+                                </span>
+                                <p className="text-[12px] leading-none font-semibold text-gray-700">
+                                    Alerts when the lid is opened.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 rounded-lg bg-white border border-gray-200 px-3 py-2">
+                                <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-green-600 whitespace-nowrap">
+                                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                                    Latest
+                                </span>
+                                <span className={`text-[15px] font-bold leading-none whitespace-nowrap ${known ? (open ? "text-amber-600" : "text-green-600") : "text-slate-400"}`}>
+                                    {known ? (open ? "OPEN" : "CLOSED") : "—"}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="mt-3 pt-2.5 border-t border-primary-ring/70">
+                            <span className="block leading-none text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500 mb-1.5">
+                                Guidelines
+                            </span>
+                            <ul className="space-y-1">
+                                <li className="flex items-start gap-1.5 text-[11px] font-medium text-gray-600">
+                                    <span className="mt-1 w-1 h-1 rounded-full bg-gray-400 shrink-0" />
+                                    Do not overfill the tank to the brim.
+                                </li>
+                                <li className="flex items-start gap-1.5 text-[11px] font-medium text-gray-600">
+                                    <span className="mt-1 w-1 h-1 rounded-full bg-gray-400 shrink-0" />
+                                    Once filled, check the lid status before closing.
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                     <EscalationRow kpiName={KPI.LID_STATE} draft={draft} onDraft={onDraft} />
                     <ChannelBar kpiName={KPI.LID_STATE} draft={draft} onDraft={onDraft} />
@@ -772,10 +902,7 @@ function LidStateCard({
 function EditableKpiCard({
     kpiName,
     title,
-    reading,
-    readingUnit,
     sub,
-    gradient,
     ink,
     deco,
     delay,
@@ -787,10 +914,7 @@ function EditableKpiCard({
 }: {
     kpiName: string;
     title: string;
-    reading: string;
-    readingUnit: string;
     sub: string;
-    gradient: string;
     ink: string;
     deco: ReactNode;
     delay: number;
@@ -801,26 +925,14 @@ function EditableKpiCard({
     currentReading?: number | null;
 }) {
     return (
-        <BentoCard delay={delay} className={`${className} ${gradient} p-3 flex flex-col gap-2`}>
+        <BentoCard delay={delay} className={`${className} pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2`}>
             {deco}
             <div className="relative">
                 <CardTitle>{title}</CardTitle>
                 <p className="text-[12px] mt-0.5 text-gray-500">{sub}</p>
             </div>
-            <div className="relative flex items-center justify-center py-3">
-                <div className="rounded-xl px-6 py-3 bg-white/60 backdrop-blur-sm border border-white/40 text-center">
-                    <div className="flex items-center justify-center gap-2 mb-1.5">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Latest</span>
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    </div>
-                    <p className="cryo-display text-[34px] font-extrabold leading-none text-slate-900">
-                        {reading}
-                        <span className="text-[16px] font-bold text-slate-500"> {readingUnit}</span>
-                    </p>
-                </div>
-            </div>
             {editable && (
-                <div className="relative mt-auto">
+                <div className="relative md:mt-auto">
                     <ThresholdBox kpiName={kpiName} draft={draft} ink={ink} onDraft={onDraft} currentReading={currentReading} />
                 </div>
             )}
@@ -1109,13 +1221,18 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
             : null;
 
     return (
-        <>
+        <LockedContext.Provider value={tankId == null}>
             <style>{`
                 @keyframes cryo-in {
                     from { opacity: 0; transform: translateY(14px) scale(0.985); }
                     to   { opacity: 1; transform: none; }
                 }
                 .cryo-in { opacity: 0; animation: cryo-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+                @keyframes cooldown-fade {
+                    from { opacity: 0; transform: translateY(2px); }
+                    to   { opacity: 1; transform: none; }
+                }
+                .cooldown-fade { animation: cooldown-fade 0.3s ease forwards; }
                 .cryo-display { font-family: 'Work Sans', sans-serif; }
                 .cryo-range {
                     position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
@@ -1125,39 +1242,45 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                 .cryo-range-solo { pointer-events: auto; }
                 .cryo-range::-webkit-slider-thumb {
                     -webkit-appearance: none; appearance: none; pointer-events: auto;
-                    width: 18px; height: 18px; border-radius: 9999px;
+                    width: 16px; height: 16px; border-radius: 9999px;
                     background: #fff; border: 3px solid var(--thumb, #2E2A24);
                     box-shadow: 0 2px 6px rgba(0,0,0,0.25); cursor: grab;
                     transition: transform 0.15s ease;
                 }
                 .cryo-range::-webkit-slider-thumb:hover { transform: scale(1.12); }
                 .cryo-range::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.2); }
+                .cryo-range:disabled::-webkit-slider-thumb {
+                    cursor: not-allowed; border-color: #9CA3AF; transform: none;
+                }
                 .cryo-range::-moz-range-thumb {
                     pointer-events: auto;
-                    width: 18px; height: 18px; border-radius: 9999px;
+                    width: 16px; height: 16px; border-radius: 9999px;
                     background: #fff; border: 3px solid var(--thumb, #2E2A24);
                     box-shadow: 0 2px 6px rgba(0,0,0,0.25); cursor: grab;
                 }
+                .cryo-range:disabled::-moz-range-thumb { cursor: not-allowed; border-color: #9CA3AF; }
                 @media (prefers-reduced-motion: reduce) {
                     .cryo-in { animation-duration: 0.01s; }
                 }
             `}</style>
 
             {/* @container is required by the @2xl/@4xl/@min-[81rem] classes on the cards */}
-            <div className="@container relative">
+            <div className="@container relative flex-1 min-h-0 flex flex-col md:rounded-[24px] md:p-3 @2xl:p-4 md:bg-gradient-to-b md:from-primary-bg md:to-[#FAFAFA] md:overflow-hidden">
                 {loading && (
                     <div className="absolute inset-0 z-20 flex items-center justify-center">
                         <div className="flex items-center gap-3 rounded-2xl bg-white/85 px-6 py-4 shadow-xl" style={{ color: INK_SOFT }}>
                             <Loader2 className="animate-spin w-6 h-6" />
-                            <p className="text-sm font-semibold">Loading live readings...</p>
+                            <LoadingMessage />
                         </div>
                     </div>
                 )}
+                {/* Scrollable card area — the save bar below stays outside this scroll region, always visible */}
+                <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
                 <div className={loading ? "blur-sm pointer-events-none select-none" : ""}>
                     {/* Card min-width rule: no bento card may render below 400px. Columns only
                         split when every card in the row stays >=400px (container padding + gap
                         included): 1-up by default, 2-up from @4xl, 3-up from @min-[81rem]. */}
-                    <div className="grid grid-cols-12 gap-4 @2xl:gap-5">
+                    <div className="grid grid-cols-12 gap-3 @2xl:gap-4 max-md:[&>*:not(:first-child)]:border-t max-md:[&>*:not(:first-child)]:border-gray-200">
                         {/* Heroes — live reading + threshold editing */}
                         <InternalTemperatureCard
                             tankCode={tankCode}
@@ -1185,14 +1308,11 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                         <EditableKpiCard
                             kpiName={KPI.TEMP_EXTERNAL}
                             title="External temperature:"
-                            reading={live.extTempCurrent != null ? live.extTempCurrent.toFixed(1) : "—"}
-                            readingUnit="°C"
                             sub="Room temperature around the tank"
-                            gradient="bg-gradient-to-br from-[#DFF3DF] to-[#C6E7C6]"
-                            ink="#2F6B4C"
-                            deco={<ThermometerSun strokeWidth={1.25} className="absolute top-3 right-3 w-28 h-28 text-[#4E9A72] opacity-25" />}
+                            ink="#6B3A7E"
+                            deco={<ThermometerSun strokeWidth={1.25} className="absolute top-3 right-3 w-20 h-20 text-[#2F6B4C] opacity-[0.12]" />}
                             delay={180}
-                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 min-h-[350px]"
+                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]"
                             draft={getDraft(KPI.TEMP_EXTERNAL)}
                             editable={editable}
                             onDraft={onDraft}
@@ -1201,18 +1321,15 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                         <EditableKpiCard
                             kpiName={KPI.LN2_EVAPORATION}
                             title="Evaporation rate:"
-                            reading={live.evapCurrent != null ? live.evapCurrent.toFixed(2) : "—"}
-                            readingUnit="kg/hr"
                             sub="How fast liquid nitrogen is being used up"
-                            gradient="bg-gradient-to-br from-[#D5F0F1] to-[#BCE3E5]"
-                            ink="#1E6B70"
+                            ink="#6B3A7E"
                             deco={
                                 // evap.svg is white-only art; mask + backgroundColor tints it like the other decos
                                 <span
                                     aria-hidden
-                                    className="absolute top-3 right-3 w-28 h-28 opacity-20"
+                                    className="absolute top-3 right-3 w-20 h-20 opacity-[0.12]"
                                     style={{
-                                        backgroundColor: "#3E9AA0",
+                                        backgroundColor: "#1E6B70",
                                         WebkitMaskImage: "url(/evap.svg)",
                                         maskImage: "url(/evap.svg)",
                                         WebkitMaskRepeat: "no-repeat",
@@ -1225,7 +1342,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                                 />
                             }
                             delay={220}
-                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 min-h-[350px]"
+                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]"
                             draft={getDraft(KPI.LN2_EVAPORATION)}
                             editable={editable}
                             onDraft={onDraft}
@@ -1234,14 +1351,11 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                         <EditableKpiCard
                             kpiName={KPI.HUMIDITY}
                             title="Humidity:"
-                            reading="—"
-                            readingUnit="%"
                             sub="Moisture level in the air around the tank"
-                            gradient="bg-gradient-to-br from-[#E1DEFA] to-[#CCC7F2]"
-                            ink="#5B3E97"
-                            deco={<CloudRain strokeWidth={1.25} className="absolute top-3 right-3 w-28 h-28 text-[#8B67C9] opacity-20" />}
+                            ink="#6B3A7E"
+                            deco={<CloudRain strokeWidth={1.25} className="absolute top-3 right-3 w-20 h-20 text-[#5B3E97] opacity-[0.12]" />}
                             delay={260}
-                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 min-h-[350px]"
+                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]"
                             draft={getDraft(KPI.HUMIDITY)}
                             editable={editable}
                             onDraft={onDraft}
@@ -1249,14 +1363,11 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                         <EditableKpiCard
                             kpiName={KPI.BATTERY}
                             title="Battery:"
-                            reading={live.battery != null ? String(Math.round(live.battery)) : "—"}
-                            readingUnit="%"
                             sub="Charge left in the monitoring device battery"
-                            gradient="bg-gradient-to-br from-[#F7D4F0] to-[#EFB6E4]"
-                            ink="#8A1F72"
-                            deco={<Battery strokeWidth={1.25} className="absolute top-3 right-3 w-28 h-28 text-[#C554AC] opacity-25" />}
+                            ink="#6B3A7E"
+                            deco={<Battery strokeWidth={1.25} className="absolute top-3 right-3 w-20 h-20 text-[#8A1F72] opacity-[0.12]" />}
                             delay={300}
-                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 min-h-[350px]"
+                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]"
                             draft={getDraft(KPI.BATTERY)}
                             editable={editable}
                             onDraft={onDraft}
@@ -1265,28 +1376,29 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                         <EditableKpiCard
                             kpiName={KPI.SHOCK}
                             title="Shock detection:"
-                            reading={live.shockCurrent != null ? live.shockCurrent.toFixed(1) : "—"}
-                            readingUnit="g"
                             sub="Impacts or sudden movement of the tank"
-                            gradient="bg-gradient-to-br from-[#C9E4EE] to-[#B2D7E5]"
-                            ink="#1F6178"
-                            deco={<Zap strokeWidth={1.25} className="absolute top-3 right-3 w-28 h-28 text-[#3E8CA8] opacity-20" />}
+                            ink="#6B3A7E"
+                            deco={<Zap strokeWidth={1.25} className="absolute top-3 right-3 w-20 h-20 text-[#1F6178] opacity-[0.12]" />}
                             delay={340}
-                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 min-h-[350px]"
+                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]"
                             draft={getDraft(KPI.SHOCK)}
                             editable={editable}
                             onDraft={onDraft}
                             currentReading={live.shockCurrent}
                         />
                     </div>
+                </div>
+                </div>
 
-                    {/* Sticky save bar */}
-                    {editable && tankId != null && dirtyKpis.length > 0 && (
-                        <div className="sticky bottom-2 z-10 mt-4 flex items-center justify-between gap-3 rounded-2xl bg-[#2E2A24] text-white px-5 py-3 shadow-[0_10px_34px_rgba(0,0,0,0.35)]">
-                            <span className="text-sm font-semibold">
-                                {dirtyKpis.length} unsaved threshold change{dirtyKpis.length > 1 ? "s" : ""}
-                            </span>
-                            <div className="flex items-center gap-2">
+                {/* Save bar — a static footer outside the scroll area, so it's always visible without scrolling */}
+                {editable && tankId != null && (
+                        <div className="mt-3 flex items-center gap-2 rounded-xl bg-white border border-gray-200 px-3 py-2 shadow-[0_10px_34px_rgba(0,0,0,0.1)]">
+                            {dirtyKpis.length > 0 && (
+                                <span className="text-xs font-semibold text-gray-800">
+                                    {dirtyKpis.length} unsaved threshold change{dirtyKpis.length > 1 ? "s" : ""}
+                                </span>
+                            )}
+                            <div className="flex items-center gap-1 ml-auto">
                                 {/* Copy to Additional Tanks */}
                                 {otherTanks.length > 0 && configRows.length > 0 && (
                                     <div className="relative">
@@ -1294,7 +1406,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                                             type="button"
                                             onClick={() => setShowCopyDropdown((v) => !v)}
                                             disabled={savingCopy}
-                                            className="px-4 py-2 rounded-xl text-sm font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-150 disabled:opacity-50"
+                                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors duration-150 disabled:opacity-50"
                                         >
                                             Copy to Other Tanks
                                         </button>
@@ -1362,23 +1474,25 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                                         )}
                                     </div>
                                 )}
-                                <button
-                                    type="button"
-                                    onClick={handleDiscard}
-                                    disabled={saving}
-                                    className="px-4 py-2 rounded-xl text-sm font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-150 disabled:opacity-50"
-                                >
-                                    Discard
-                                </button>
+                                {dirtyKpis.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleDiscard}
+                                        disabled={saving}
+                                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors duration-150 disabled:opacity-50"
+                                    >
+                                        Discard
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={handleSave}
-                                    disabled={saving}
-                                    className="px-5 py-2 rounded-xl bg-white text-[#2E2A24] text-sm font-bold hover:bg-white/90 transition-colors duration-150 disabled:opacity-60 flex items-center gap-2"
+                                    disabled={saving || dirtyKpis.length === 0}
+                                    className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary-light transition-colors duration-150 disabled:opacity-60 flex items-center gap-1.5"
                                 >
                                     {saving ? (
                                         <>
-                                            <Loader2 className="animate-spin w-4 h-4" />
+                                            <Loader2 className="animate-spin w-3.5 h-3.5" />
                                             Saving...
                                         </>
                                     ) : (
@@ -1387,10 +1501,9 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                                 </button>
                             </div>
                         </div>
-                    )}
-                </div>
+                )}
             </div>
-        </>
+        </LockedContext.Provider>
     );
 });
 
