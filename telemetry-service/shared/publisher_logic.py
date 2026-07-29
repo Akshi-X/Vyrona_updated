@@ -202,7 +202,7 @@ def extract_tive_temperature_kpis(
             }
         )
 
-    humidity = None
+    humidity = payload_data.get("Humidity")
     hum_obj = payload_data.get("Humidity")
     if isinstance(hum_obj, dict):
         humidity = hum_obj.get("Percentage")
@@ -264,6 +264,33 @@ def process_tive_refrigerator(
     )
 
     kpis = extract_tive_temperature_kpis(webhook_payload, timestamp)
+    kpi_map = {kpi["name"]: kpi["value"] for kpi in kpis}
+
+    timestamp_str = timestamp
+    if isinstance(timestamp_str, str) and timestamp_str.endswith("Z"):
+        timestamp_str = timestamp_str[:-1] + "+00:00"
+    try:
+        raw_data_timestamp = (
+            datetime.fromisoformat(timestamp_str)
+            if isinstance(timestamp_str, str)
+            else datetime.now()
+        )
+    except (TypeError, ValueError):
+        raw_data_timestamp = datetime.now()
+
+    # Insert raw data (always) — archive the full Tive webhook payload so the
+    # raw audit trail exists even when KPI extraction yields nothing.
+    insert_refrigerator_raw_data(
+        db,
+        refrigerator_info["refrigerator_id"],
+        refrigerator_info["zone_id"],
+        device_id,
+        kpi_map.get(KPI_NAMES.REFRIGERATOR_TEMP),
+        kpi_map.get(KPI_NAMES.REFRIGERATOR_HUMIDITY),
+        kpi_map.get(KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE),
+        webhook_payload,
+        raw_data_timestamp,
+    )
 
     if not kpis:
         logger.warning(
@@ -1094,6 +1121,52 @@ def insert_ln2_iot_raw_data(
         return row_id
     except Exception as e:
         logger.error(f"Error inserting ln2_iot_raw_data: {e}", exc_info=True)
+        raise
+
+
+def insert_refrigerator_raw_data(
+    db_session,
+    refrigerator_id: int,
+    zone_id: str,
+    device_code: Optional[str],
+    temperature: Optional[float],
+    humidity: Optional[float],
+    battery_percentage: Optional[float],
+    payload: Dict[str, Any],
+    timestamp: datetime,
+) -> Optional[int]:
+    """Insert raw refrigerator sensor payload into refrigerator_raw_data table."""
+    try:
+        insert_query = text("""
+            INSERT INTO refrigerator_raw_data
+            (refrigerator_id, zone_id, device_code, raw_temperature, raw_humidity,
+             raw_battery_percentage, payload, created_at)
+            VALUES (:refrigerator_id, :zone_id, :device_code, :raw_temperature, :raw_humidity,
+                    :raw_battery_percentage, :payload, :created_at)
+            RETURNING id
+        """).bindparams(bindparam("payload", type_=JSONB))
+
+        result = db_session.execute(
+            insert_query,
+            {
+                "refrigerator_id": refrigerator_id,
+                "zone_id": zone_id,
+                "device_code": device_code,
+                "raw_temperature": temperature,
+                "raw_humidity": humidity,
+                "raw_battery_percentage": battery_percentage,
+                "payload": payload,
+                "created_at": timestamp,
+            },
+        )
+
+        row_id = result.scalar()
+        logger.info(
+            f"✓ Inserted refrigerator_raw_data (id={row_id}, refrigerator_id={refrigerator_id}, zone_id={zone_id})"
+        )
+        return row_id
+    except Exception as e:
+        logger.error(f"Error inserting refrigerator_raw_data: {e}", exc_info=True)
         raise
 
 
