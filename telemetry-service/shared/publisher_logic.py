@@ -202,7 +202,7 @@ def extract_tive_temperature_kpis(
             }
         )
 
-    humidity = None
+    humidity = payload_data.get("Humidity")
     hum_obj = payload_data.get("Humidity")
     if isinstance(hum_obj, dict):
         humidity = hum_obj.get("Percentage")
