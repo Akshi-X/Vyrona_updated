@@ -80,6 +80,10 @@
             "description": "Step into the Control Tower to monitor branch operations, manage pending actions, and oversee logistics lanes in real time.",
             "badge": "🗼"
         },
+        "quick_exit": {
+            "headerTitle": "Control Tower Cleared!",
+            "message": "You can now monitor live operations and respond to actions from the Control Tower like a pro."
+        },
         "interlude": {
             "headerTitle": "Tour",
             "title": "Nice work! Tour complete.",
@@ -96,6 +100,14 @@
             "title": "Control Tower Cleared!",
             "message": "You can now monitor live operations and respond to actions from the Control Tower like a pro.",
             "badge": "🏆"
+        },
+        "quick_start": {
+            "message": "Take a quick guided tour to see how to monitor branch operations, manage pending actions, and oversee logistics lanes in real time."
+        },
+        "quick_exit": {
+            "headerTitle": "Control Tower Cleared!",
+            "title": "Control Tower Cleared!",
+            "message": "You can now monitor live operations and respond to actions from the Control Tower like a pro."
         }
     },
     {
