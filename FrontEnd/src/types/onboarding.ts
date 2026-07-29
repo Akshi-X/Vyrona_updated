@@ -22,6 +22,18 @@ export interface OnboardingLevelCompletion {
     badge: string;
 }
 
+/** Shown at the start of a page-launched preview tour — a compact intro (no pass threshold). */
+export interface OnboardingLevelQuickStart {
+    message: string;
+}
+
+/** Shown at the end of a page-launched preview tour (no quiz) with an "Exit Tour" action. */
+export interface OnboardingLevelQuickExit {
+    headerTitle?: string;
+    title: string;
+    message: string;
+}
+
 export interface OnboardingLevelInterlude {
     headerTitle?: string;
     title: string;
@@ -53,6 +65,8 @@ export interface OnboardingLevelConfig {
     welcome?: OnboardingLevelWelcome;
     interlude?: OnboardingLevelInterlude;
     completion?: OnboardingLevelCompletion;
+    quick_start?: OnboardingLevelQuickStart;
+    quick_exit?: OnboardingLevelQuickExit;
     quiz?: OnboardingLevelQuiz;
 }
 

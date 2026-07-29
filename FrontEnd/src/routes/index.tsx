@@ -45,19 +45,24 @@ import { useTourNavContext } from "../contexts/TourNavContext";
 
 // Renders whichever level is currently active — works on any page.
 // Prevents two OnboardingLevel instances from fighting over the shared tour instance.
-// Prioritises pendingStartLevelId so clicking Start/Resume on any level mounts the right one.
+// A preview session (launched from a real page's TourEntryButton) always mounts its
+// level; otherwise prioritise pendingStartLevelId so Start/Resume mounts the right one.
 function ActiveOnboardingLevel() {
     const { levels, state } = useOnboarding();
     const tourNavCtx = useTourNavContext();
+
+    const previewId = tourNavCtx?.previewLevelId;
     const pendingId = tourNavCtx?.pendingStartLevelId;
 
-    const active = pendingId
-        ? (levels.find((l) => l.id === pendingId) ?? null)
-        : (
-            levels.find((l) => state.levels[l.id]?.status === "in_progress") ??
-            levels.find((l) => state.levels[l.id]?.status === "available") ??
-            null
-        );
+    const active = previewId
+        ? (levels.find((l) => l.id === previewId) ?? null)
+        : pendingId
+            ? (levels.find((l) => l.id === pendingId) ?? null)
+            : (
+                levels.find((l) => state.levels[l.id]?.status === "in_progress") ??
+                levels.find((l) => state.levels[l.id]?.status === "available") ??
+                null
+            );
 
     if (!active) return null;
     return <OnboardingLevel levelId={active.id} />;

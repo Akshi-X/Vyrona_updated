@@ -23,6 +23,7 @@ import { userService } from '../../services/userService';
 import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 import DashboardIconDark from '../../assets/DashBoardIcons/DashBoardDark.svg';
 import PageLayout from '../../components/PageLayout';
+import TourEntryButton from '../../components/TourEntryButton';
 // Dashboard Icons
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -963,6 +964,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   const dashboardActionIcons = (
     <div className="flex items-center gap-4">
+      <TourEntryButton />
       <div className="relative">
         <img className="w-[22px] h-[22px] cursor-pointer" alt="Critical Alerts" src={CriticalAlertsIcon}
           onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }} />
@@ -995,6 +997,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   const dashboardActionIconsWithId = (
     <div id="onboarding-dashboard-alerts" className="flex items-center gap-6">
+      <TourEntryButton label="Tour" />
       <div id="onboarding-dashboard-critical-alerts-icon" className="flex flex-col items-center gap-1 cursor-pointer"
         onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
         <div className="relative">
@@ -1036,7 +1039,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   return (
     <>
-      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop patternBackground>
+      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop patternBackground hideTourButton>
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>

@@ -8,6 +8,7 @@ import { TourProvider, useTour } from "@reactour/tour";
 import { OnboardingModeProvider } from "../../contexts/OnboardingModeContext";
 import { disableOnboardingMocks, enableOnboardingMocks } from "../../onboarding/mockApi";
 import OnboardingOverlay from "./OnboardingOverlay";
+import PreviewTourOverlay from "./PreviewTourOverlay";
 import { TourNavStoreProvider, useTourNavContext, type TourNavState } from "../../contexts/TourNavContext";
 import TourStepHeading from "./TourStepHeading";
 import {
@@ -68,8 +69,22 @@ function TourContent({ content }: { content: unknown }) {
     const ctx = useTourNavContext();
     const nav = ctx?.nav;
     const { setIsOpen } = useTour();
+    const navigate = useNavigate();
 
-    const handleClose = () => { setIsOpen(false); ctx?.setIsTourActive(false); ctx?.openOverlay?.(); };
+    const handleClose = () => {
+        setIsOpen(false);
+        ctx?.setIsTourActive(false);
+        // Preview session: exiting mid-tour returns to the originating real page.
+        if (ctx?.previewLevelId) {
+            const path = ctx.returnPath;
+            ctx.setReturnPath(null);
+            ctx.setPreviewLevelId(null);
+            ctx.setPreviewPhase(null);
+            if (path) navigate(path);
+            return;
+        }
+        ctx?.openOverlay?.();
+    };
 
     if (nav?.is_wide) {
         const mediaSrc = nav.gif ?? nav.genieImage;
@@ -260,6 +275,7 @@ export default function OnboardingShell() {
                             {/* Kept outside the hideSidebar conditional so React never remounts it on
                             layout changes — preserves isOpen state when navigating to no-sidebar routes. */}
                             <OnboardingOverlay />
+                            <PreviewTourOverlay />
                         </GeniePreloaderGate>
                     </TourProviderWithDynamicStyles>
                 </TourNavStoreProvider>

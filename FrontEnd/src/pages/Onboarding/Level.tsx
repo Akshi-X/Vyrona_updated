@@ -112,11 +112,26 @@ interface OnboardingLevelProps {
 }
 
 export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
-    const { getSteps, getLevelProgress, startLevel, setStepIndex } = useOnboarding();
+    const { getSteps, getLevelProgress, startLevel, setStepIndex: setStepIndexPersisted } = useOnboarding();
     const navigate = useNavigate();
     const location = useLocation();
     const { setIsOpen, setSteps, setCurrentStep } = useTour();
     const tourNavCtx = useTourNavContext();
+
+    // Tours launched from a real page's TourEntryButton (previewLevelId set) are a
+    // quick contextual walkthrough — they must never touch the persisted onboarding
+    // progress table (status, step index, score). Step position is tracked locally
+    // instead, and level-lock/start/complete calls are skipped entirely.
+    const isPreview = tourNavCtx?.previewLevelId === levelId;
+    const [previewStepIndex, setPreviewStepIndex] = useState(0);
+
+    const setStepIndex = useCallback((targetLevelId: string, index: number) => {
+        if (isPreview) {
+            setPreviewStepIndex(index);
+        } else {
+            setStepIndexPersisted(targetLevelId, index);
+        }
+    }, [isPreview, setStepIndexPersisted]);
 
     const steps = getSteps(levelId);
     const progress = getLevelProgress(levelId);
@@ -129,7 +144,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     const isTourActive = tourNavCtx?.isTourActive ?? false;
     const setIsTourActive = (v: boolean) => tourNavCtx?.setIsTourActive(v);
 
-    const stepIndex = progress?.lastStepIndex ?? 0;
+    const stepIndex = isPreview ? previewStepIndex : (progress?.lastStepIndex ?? 0);
     const stepCount = steps.length;
     const activeStep = stepIndex < stepCount ? steps[stepIndex] : null;
     const canNext = !activeStep?.requireClick || !!confirmedSteps[activeStep.id];
@@ -153,11 +168,12 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
     // ── 1. Level init ──────────────────────────────────────────────
     useEffect(() => {
+        if (isPreview) return;
         if (progress?.status === "locked") {
             navigate("/onboarding/timeline");
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [levelId, progress?.status]);
+    }, [levelId, progress?.status, isPreview]);
 
     // ── 2. Completion log ──────────────────────────────────────────
     useEffect(() => { completionLoggedRef.current = false; }, [levelId]);
@@ -166,9 +182,14 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         if (stepCount > 0 && stepIndex >= stepCount && !completionLoggedRef.current) {
             completionLoggedRef.current = true;
             setIsTourActive(false);
+            // Preview tours skip the quiz entirely — move to the exit card, which
+            // OnboardingOverlay renders (with an "Exit tour" action back to the page).
+            if (isPreview) {
+                tourNavCtx?.setPreviewPhase("done");
+            }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [stepCount, stepIndex, levelId]);
+    }, [stepCount, stepIndex, levelId, isPreview]);
 
     // ── 3. Tour steps setup & initial position ─────────────────────
     useEffect(() => {
@@ -543,7 +564,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     useEffect(() => {
         if (tourNavCtx?.pendingStartLevelId !== levelId) return;
         tourNavCtx.setPendingStartLevelId(null);
-        if (progress?.status === "available") {
+        if (!isPreview && progress?.status === "available") {
             startLevel(levelId);
         }
         setIsTourActive(true);
@@ -553,7 +574,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     // ── Register startTour ──────────────────────────────────────────
     useEffect(() => {
         const fn = () => {
-            if (progress?.status === "available") {
+            if (!isPreview && progress?.status === "available") {
                 startLevel(levelId);
             }
             setIsTourActive(true);
@@ -565,7 +586,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         tourNavCtx?.setStartTour(fn);
         return () => { tourNavCtx?.setStartTour(null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [progress?.status, levelId, stepCount, stepIndex]);
+    }, [progress?.status, levelId, stepCount, stepIndex, isPreview]);
 
     return null;
 }

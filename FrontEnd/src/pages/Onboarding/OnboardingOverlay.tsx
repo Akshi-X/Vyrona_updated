@@ -210,6 +210,14 @@ export default function OnboardingOverlay() {
         return null;
     }
 
+    // A page-launched preview tour has its own overlay (PreviewTourOverlay); the hub
+    // chrome must stay completely out of the way so the two never collide. The
+    // location.state check covers the first render before PreviewTourOverlay's handoff
+    // effect has set previewLevelId, preventing a one-frame flash of the hub.
+    if (tourNavCtx?.previewLevelId || (location.state as { previewLevelId?: string } | null)?.previewLevelId) {
+        return null;
+    }
+
     return (
         <>
             {!isTourOpen && (
