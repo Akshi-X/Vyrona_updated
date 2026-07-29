@@ -774,6 +774,7 @@ def get_hospital_notification_settings(
         "hospital_id": hospital.hospital_id,
         "is_email_notifify": bool(hospital.is_email_notifify),
         "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
+        "is_push_notify": bool(hospital.is_push_notify),
     }
 
 
@@ -795,8 +796,9 @@ def update_hospital_notification_settings(
 
     email_enabled = bool(body.get("is_email_notifify"))
     whatsapp_enabled = bool(body.get("is_whatsapp_notify"))
+    push_enabled = bool(body.get("is_push_notify"))
 
-    if not email_enabled and not whatsapp_enabled:
+    if not email_enabled and not whatsapp_enabled and not push_enabled:
         raise HTTPException(
             status_code=400,
             detail="At least one notification channel must be enabled",
@@ -810,10 +812,12 @@ def update_hospital_notification_settings(
     before_state = {
         "is_email_notifify": bool(hospital.is_email_notifify),
         "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
+        "is_push_notify": bool(hospital.is_push_notify),
     }
 
     hospital.is_email_notifify = email_enabled
     hospital.is_whatsapp_notify = whatsapp_enabled
+    hospital.is_push_notify = push_enabled
     db.commit()
 
     ActivityLogService(db).log_activity(
@@ -827,6 +831,7 @@ def update_hospital_notification_settings(
             "after": {
                 "is_email_notifify": bool(hospital.is_email_notifify),
                 "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
+                "is_push_notify": bool(hospital.is_push_notify),
             },
         },
         audit_log_disabled=is_audit_log_disabled_for_user(current_user),
@@ -836,6 +841,7 @@ def update_hospital_notification_settings(
         "hospital_id": hospital.hospital_id,
         "is_email_notifify": bool(hospital.is_email_notifify),
         "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
+        "is_push_notify": bool(hospital.is_push_notify),
     }
 
 

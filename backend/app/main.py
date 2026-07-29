@@ -28,6 +28,7 @@ from app.controller import (
     lane_risk_controller,
     onboarding_controller,
     patient_controller,
+    push_controller,
     quality_controller,
     report_actions_controller,
     shipment_controller,
@@ -236,6 +237,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Include API routes
 app.include_router(user_controller.router, prefix=API_PREFIX)
+app.include_router(push_controller.router, prefix=API_PREFIX)
 app.include_router(activity_log_controller.router, prefix=API_PREFIX)
 app.include_router(report_actions_controller.router, prefix=API_PREFIX)
 app.include_router(onboarding_controller.router, prefix=API_PREFIX)
