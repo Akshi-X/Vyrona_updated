@@ -97,12 +97,20 @@ type UseRefrigeratorKpiSnapshotOptions = {
   refrigeratorId?: string;
   zoneId?: string | null;
   enabled?: boolean;
+  /**
+   * KPI names from the zone's alert config. The live socket pushes every KPI the
+   * device reports (tive_battery_percentage among them), including ones with no
+   * kpi_config for this zone, so only these names may surface as tiles.
+   * null/undefined means the config isn't known yet — keep every KPI until it is.
+   */
+  allowedKpiNames?: string[] | null;
 };
 
 export function useRefrigeratorKpiSnapshot({
   refrigeratorId,
   zoneId,
   enabled = true,
+  allowedKpiNames,
 }: UseRefrigeratorKpiSnapshotOptions): RefrigeratorKpiSnapshot {
   const normalizedRefrigeratorId = refrigeratorId != null ? String(refrigeratorId) : undefined;
   const { token } = useAuth();
@@ -254,11 +262,20 @@ export function useRefrigeratorKpiSnapshot({
     };
   }, [normalizedRefrigeratorId, zoneId, token, enabled]);
 
+  const allowedKpiKey = allowedKpiNames == null ? null : allowedKpiNames.join('|');
+
   const sensorTiles = useMemo<RefrigeratorSensorTile[]>(() => {
-    const dynamicKeys = Object.keys(latestByName);
+    const allowed = allowedKpiKey == null
+      ? null
+      : new Set(allowedKpiKey ? allowedKpiKey.split('|') : []);
+    const dynamicKeys = Object.keys(latestByName).filter(
+      (name) => allowed == null || allowed.has(name),
+    );
     const orderedKeys = dynamicKeys.length > 0
       ? dynamicKeys
-      : Array.from(REFRIGERATOR_KPI_ORDER);
+      : allowed
+        ? Array.from(allowed)
+        : Array.from(REFRIGERATOR_KPI_ORDER);
     return orderedKeys.map((id) => {
       const latest = latestByName[id];
       const value = latest ? latest.value : null;
@@ -275,7 +292,7 @@ export function useRefrigeratorKpiSnapshot({
         withinThreshold: latest?.withinThreshold ?? true,
       };
     });
-  }, [latestByName, nowTs]);
+  }, [allowedKpiKey, latestByName, nowTs]);
 
   return {
     sensorTiles,
