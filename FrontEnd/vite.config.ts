@@ -79,6 +79,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,svg}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Adds push/notificationclick handlers to the generated SW without
+        // switching off generateSW. See public/push-sw.js.
+        importScripts: ['/push-sw.js'],
       },
       manifest: {
         name: 'mG Scale',

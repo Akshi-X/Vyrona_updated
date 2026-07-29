@@ -774,6 +774,7 @@ export default function AlertSetting() {
             hospital_id: 0,
             is_email_notifify: true,
             is_whatsapp_notify: false,
+            is_push_notify: false,
         });
 
     /** Inline edit draft for KPI table: min, max, alert_type, lid_state per config id */
@@ -1863,13 +1864,15 @@ export default function AlertSetting() {
     };
 
     const handleSelectNotificationChannel = (
-        channel: "email" | "whatsapp",
+        channel: "email" | "whatsapp" | "push",
         enabled: boolean,
     ) => {
         setNotifySettings((prev) =>
             channel === "email"
                 ? { ...prev, is_email_notifify: enabled }
-                : { ...prev, is_whatsapp_notify: enabled },
+                : channel === "whatsapp"
+                    ? { ...prev, is_whatsapp_notify: enabled }
+                    : { ...prev, is_push_notify: enabled },
         );
         setNotifySettingsError(null);
     };
@@ -1877,7 +1880,8 @@ export default function AlertSetting() {
     const handleSaveNotifySettings = async () => {
         if (
             !notifySettings.is_email_notifify &&
-            !notifySettings.is_whatsapp_notify
+            !notifySettings.is_whatsapp_notify &&
+            !notifySettings.is_push_notify
         ) {
             setNotifySettingsError("Enable at least one notification channel");
             return;
@@ -1888,6 +1892,7 @@ export default function AlertSetting() {
             await ivfService.updateHospitalNotificationSettings({
                 is_email_notifify: notifySettings.is_email_notifify,
                 is_whatsapp_notify: notifySettings.is_whatsapp_notify,
+                is_push_notify: notifySettings.is_push_notify,
             });
             const updatedSettings =
                 await ivfService.getHospitalNotificationSettings();
@@ -3937,7 +3942,7 @@ export default function AlertSetting() {
                         </div>
 
                         <p className="text-sm text-gray-600 mb-4">
-                            Enable one or both channels for alert notifications.
+                            Enable one or more channels for alert notifications.
                         </p>
 
                         {notifySettingsLoading ? (
@@ -3987,6 +3992,31 @@ export default function AlertSetting() {
                                         onCheckedChange={(checked) =>
                                             handleSelectNotificationChannel(
                                                 "whatsapp",
+                                                checked,
+                                            )
+                                        }
+                                        disabled={notifySettingsSaving}
+                                    />
+                                </div>
+
+                                <div className="border-t border-gray-100" />
+
+                                {/* Push row */}
+                                <div className="flex items-center justify-between py-2">
+                                    <label
+                                        htmlFor="notify-push"
+                                        className="text-sm font-medium text-gray-900 cursor-pointer select-none"
+                                    >
+                                        Push Notification
+                                    </label>
+                                    <Switch
+                                        id="notify-push"
+                                        checked={
+                                            notifySettings.is_push_notify
+                                        }
+                                        onCheckedChange={(checked) =>
+                                            handleSelectNotificationChannel(
+                                                "push",
                                                 checked,
                                             )
                                         }

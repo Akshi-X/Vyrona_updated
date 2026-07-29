@@ -141,6 +141,7 @@ export interface HospitalNotificationSettings {
     hospital_id: number;
     is_email_notifify: boolean;
     is_whatsapp_notify: boolean;
+    is_push_notify: boolean;
 }
 
 export interface DeviationsGraphDataItem {
@@ -715,6 +716,7 @@ export class IvfService extends BaseApiService {
     async updateHospitalNotificationSettings(payload: {
         is_email_notifify: boolean;
         is_whatsapp_notify: boolean;
+        is_push_notify: boolean;
     }): Promise<HospitalNotificationSettings> {
         return await this.request("/api/ivf/quality/hospital-notification-settings", {
             method: "PUT",

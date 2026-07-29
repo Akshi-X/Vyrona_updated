@@ -38,6 +38,7 @@ from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.incubator_model import Incubator
 from ...models.IVF.refrigerator_model import Refrigerator
+from ...models.push_subscription_model import PushSubscription
 from ...models.user_model import User
 from ...schemas.IVF.critical_alert_schema import (
     AcknowledgeAlertResponse,
@@ -50,6 +51,10 @@ from ...schemas.IVF.critical_alert_schema import (
     TankAlertsResponse,
 )
 from ...service.email_service import send_email
+from ...service.push_notification_service import (
+    push_notifications_configured,
+    send_web_push,
+)
 from ...service.redis_service import get_redis
 from ...service.activity_log_service import (
     ActivityLogService,
@@ -336,21 +341,25 @@ class CriticalAlertService:
 
     def _get_hospital_notification_config(
         self, hospital_id: Optional[int]
-    ) -> tuple[bool, bool]:
-        """Return hospital notification config as (email_enabled, whatsapp_enabled)."""
+    ) -> tuple[bool, bool, bool]:
+        """Return hospital notification config as (email_enabled, whatsapp_enabled, push_enabled)."""
         if hospital_id is None:
-            return False, False
+            return False, False, False
 
         config = (
-            self.db.query(Hospital.is_email_notifify, Hospital.is_whatsapp_notify)
+            self.db.query(
+                Hospital.is_email_notifify,
+                Hospital.is_whatsapp_notify,
+                Hospital.is_push_notify,
+            )
             .filter(Hospital.hospital_id == hospital_id)
             .first()
         )
         if not config:
-            return False, False
+            return False, False, False
 
-        email_enabled, whatsapp_enabled = config
-        return bool(email_enabled), bool(whatsapp_enabled)
+        email_enabled, whatsapp_enabled, push_enabled = config
+        return bool(email_enabled), bool(whatsapp_enabled), bool(push_enabled)
 
     def _generate_dedup_key(
         self,
@@ -758,11 +767,12 @@ class CriticalAlertService:
             # Notify only when a new alert row was actually created. When a concurrent
             # run already created this alert, _create_alert returns the existing row with
             # created=False and we must not re-send (root cause of duplicate emails).
-            # Fetch both notification flags in a single DB query.
+            # Fetch all notification flags in a single DB query.
             if created and kpi_config.alert_type == "critical":
                 (
                     is_hospital_email_configured,
                     is_hospital_whatsapp_configured,
+                    is_hospital_push_configured,
                 ) = self._get_hospital_notification_config(alert.hospital_id)
                 if is_hospital_email_configured:
                     if kpi_config.unack_escalation_threshold is not None:
@@ -784,6 +794,14 @@ class CriticalAlertService:
                 else:
                     logger.info(
                         "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
+                        alert.alert_id,
+                        alert.hospital_id,
+                    )
+                if is_hospital_push_configured:
+                    self._send_alert_push(alert)
+                else:
+                    logger.info(
+                        "Skipping push for alert_id=%s because hospital_id=%s has push notifications disabled",
                         alert.alert_id,
                         alert.hospital_id,
                     )
@@ -875,8 +893,10 @@ class CriticalAlertService:
         occurred_at: datetime,
         triggered_by: AlertTriggeredBy = AlertTriggeredBy.SYSTEM,
         extra_info: Optional[str] = None,
-    ) -> CriticalAlert:
-        """Create a new refrigerator alert if it doesn't already exist (using dedup_key)."""
+    ) -> tuple[CriticalAlert, bool]:
+        """Create a new refrigerator alert if it doesn't already exist (using dedup_key).
+        Returns (alert, created) — created=False means an existing ACTIVE row was
+        reused, so callers must not re-send notifications for it."""
         hospital_id, branch_id = self._get_refrigerator_hospital_branch(refrigerator_id)
 
         zone_part = zone_id or "all"
@@ -894,7 +914,7 @@ class CriticalAlertService:
         if existing_alert:
             existing_alert.occurred_at = occurred_at
             existing_alert.updated_at = datetime.now(timezone.utc)
-            return existing_alert
+            return existing_alert, False
 
         refrigerator = self.db.query(Refrigerator).filter(
             Refrigerator.refrigerator_id == refrigerator_id
@@ -936,7 +956,7 @@ class CriticalAlertService:
                     "branch_id": branch_id,
                 },
             )
-            return alert
+            return alert, True
         except IntegrityError as e:
             if isinstance(e.orig, UniqueViolation) and "dedup_key" in str(e.orig):
                 logger.info(
@@ -955,7 +975,7 @@ class CriticalAlertService:
                     existing_alert.occurred_at = occurred_at
                     existing_alert.updated_at = datetime.now(timezone.utc)
                     self.db.flush()
-                    return existing_alert
+                    return existing_alert, False
             raise
 
     def check_and_create_alert_for_refrigerator_kpi_deviations(
@@ -1061,7 +1081,7 @@ class CriticalAlertService:
                 + (f" zone {zone_id}" if zone_id else "")
             )
 
-            alert = self._create_refrigerator_alert(
+            alert, created = self._create_refrigerator_alert(
                 refrigerator_id=refrigerator_id,
                 zone_id=zone_id,
                 alert_type=AlertType.DEVIATION_ALERT,
@@ -1073,10 +1093,15 @@ class CriticalAlertService:
                 extra_info=str(kpi_config.id),
             )
 
-            if kpi_config.alert_type == "critical":
+            # Notify only when a new alert row was actually created — mirrors the tank
+            # path. When a concurrent run already created this alert, created=False and
+            # we must not re-send (this was previously the root cause of duplicate
+            # refrigerator emails firing on every telemetry cycle within the dedup window).
+            if created and kpi_config.alert_type == "critical":
                 (
                     is_hospital_email_configured,
                     is_hospital_whatsapp_configured,
+                    is_hospital_push_configured,
                 ) = self._get_hospital_notification_config(alert.hospital_id)
                 if is_hospital_email_configured:
                     if kpi_config.unack_escalation_threshold is not None:
@@ -1097,8 +1122,16 @@ class CriticalAlertService:
                         alert.alert_id,
                         alert.hospital_id,
                     )
+                if is_hospital_push_configured:
+                    self._send_alert_push(alert)
+                else:
+                    logger.info(
+                        "Skipping push for alert_id=%s because hospital_id=%s has push notifications disabled",
+                        alert.alert_id,
+                        alert.hospital_id,
+                    )
 
-            if kpi_config.unack_escalation_threshold is not None:
+            if created and kpi_config.unack_escalation_threshold is not None:
                 if self._check_refrigerator_escalation_needed(kpi_config, refrigerator_id, zone_id):
                     unack_alerts = (
                         self.db.query(CriticalAlert)
@@ -1420,21 +1453,17 @@ class CriticalAlertService:
 
         return alerts_created
 
-    def _send_alert_email(self, alert: CriticalAlert):
-        """Send email notification for critical (High severity) alerts only.
-        Recipients: all Managers across the hospital + Users in the tank's branch."""
-        # Only send emails for critical (High severity) alerts
-        if alert.severity != AlertSeverity.HIGH.value:
-            logger.debug(
-                f"Skipping email for non-critical alert_id={alert.alert_id} (severity={alert.severity})"
-            )
-            return
-
-        # Resolve device label and branch — supports tank and refrigerator alerts
+    def _resolve_alert_recipients(
+        self, alert: CriticalAlert
+    ) -> Optional[tuple[list[User], HospitalBranch, str]]:
+        """Resolve (recipients, branch, device_label) for a tank or refrigerator alert.
+        Recipients: all Managers/Admins across the hospital + Users in the device's branch.
+        Returns None if the device or branch can no longer be resolved. Shared by email,
+        WhatsApp, and push senders so the recipient rules stay in exactly one place."""
         if alert.tank_id:
             tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
             if not tank:
-                return
+                return None
             device_label = tank.tank_code or f"Tank-{tank.tank_id}"
             device_branch_id = tank.branch_id
         elif alert.refrigerator_id:
@@ -1442,12 +1471,12 @@ class CriticalAlertService:
                 Refrigerator.refrigerator_id == alert.refrigerator_id
             ).first()
             if not refrigerator:
-                return
+                return None
             label = refrigerator.refrigerator_code or f"Refrigerator-{refrigerator.refrigerator_id}"
             device_label = f"{label} {alert.zone_id}" if alert.zone_id else label
             device_branch_id = refrigerator.branch_id
         else:
-            return
+            return None
 
         branch = (
             self.db.query(HospitalBranch)
@@ -1455,7 +1484,7 @@ class CriticalAlertService:
             .first()
         )
         if not branch:
-            return
+            return None
 
         hospital_id = branch.hospital_id
 
@@ -1493,7 +1522,24 @@ class CriticalAlertService:
             .all()
         )
 
-        all_users = {user.user_id: user for user in managers + branch_users}.values()
+        all_users = list({user.user_id: user for user in managers + branch_users}.values())
+
+        return all_users, branch, device_label
+
+    def _send_alert_email(self, alert: CriticalAlert):
+        """Send email notification for critical (High severity) alerts only.
+        Recipients: all Managers across the hospital + Users in the tank's branch."""
+        # Only send emails for critical (High severity) alerts
+        if alert.severity != AlertSeverity.HIGH.value:
+            logger.debug(
+                f"Skipping email for non-critical alert_id={alert.alert_id} (severity={alert.severity})"
+            )
+            return
+
+        recipients = self._resolve_alert_recipients(alert)
+        if not recipients:
+            return
+        all_users, branch, device_label = recipients
 
         alerts_url = f"{settings.FRONTEND_URL}/dashboard?alert_id={alert.alert_id}"
 
@@ -1615,6 +1661,97 @@ class CriticalAlertService:
                         "error": str(e),
                     },
                 )
+                # Release the guard so a genuinely failed send can be retried before TTL.
+                try:
+                    get_redis().delete(dedup_key)
+                except Exception:
+                    pass
+
+    def _send_alert_push(self, alert: CriticalAlert):
+        """Send a web push notification for critical (High severity) alerts only.
+        Same recipient set and Redis dedup pattern as _send_alert_email, gated
+        additionally on each user's push_enabled flag and per-device enabled flag."""
+        if alert.severity != AlertSeverity.HIGH.value:
+            logger.debug(
+                f"Skipping push for non-critical alert_id={alert.alert_id} (severity={alert.severity})"
+            )
+            return
+
+        if not push_notifications_configured():
+            logger.debug("Skipping push for alert_id=%s: VAPID keys not configured", alert.alert_id)
+            return
+
+        recipients = self._resolve_alert_recipients(alert)
+        if not recipients:
+            return
+        all_users, branch, device_label = recipients
+
+        alerts_url = f"{settings.FRONTEND_URL}/dashboard?alert_id={alert.alert_id}"
+
+        for user in all_users:
+            if not user.push_enabled:
+                continue
+
+            # Same cross-process guard as email, keyed to the push channel so email and
+            # push dedup independently (a user could opt out of one and not the other).
+            dedup_key = f"alert:push:{alert.alert_id}:{user.user_id}"
+            try:
+                if not get_redis().set(dedup_key, 1, nx=True, ex=_EMAIL_DEDUP_TTL_SECONDS):
+                    logger.info(
+                        "Skipping duplicate push to %s for alert_id=%s (redis guard)",
+                        user.user_id, alert.alert_id,
+                    )
+                    continue
+            except Exception as exc:
+                logger.warning(
+                    "Redis push-dedup guard unavailable for alert_id=%s (%s); sending anyway",
+                    alert.alert_id, exc,
+                )
+
+            subscriptions = (
+                self.db.query(PushSubscription)
+                .filter(
+                    PushSubscription.user_id == user.user_id,
+                    PushSubscription.enabled == True,
+                )
+                .all()
+            )
+            if not subscriptions:
+                continue
+
+            payload = {
+                "title": f"Critical Alert: {alert.alert_type} - {device_label}",
+                "body": alert.message,
+                "alert_id": alert.alert_id,
+                "severity": alert.severity,
+                "tag": alert.dedup_key,
+                "url": alerts_url,
+                "device_label": device_label,
+                "occurred_at": alert.occurred_at.isoformat() if alert.occurred_at else None,
+            }
+
+            sent_any = False
+            for subscription in subscriptions:
+                if send_web_push(self.db, subscription, payload):
+                    sent_any = True
+
+            ActivityLogService(self.db).log_activity(
+                action="push.critical_alert_sent",
+                outcome=ActivityOutcome.SUCCESS.value if sent_any else ActivityOutcome.FAILURE.value,
+                actor=build_system_actor("critical_alert"),
+                target=build_target("user", user.user_id, user.email),
+                metadata={
+                    "recipient_user_id": user.user_id,
+                    "alert_id": alert.alert_id,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "message": alert.message,
+                    "branch_id": branch.branch_id if branch else None,
+                    "branch_name": branch.branch_name if branch else None,
+                    "subscription_count": len(subscriptions),
+                },
+            )
+            if not sent_any:
                 # Release the guard so a genuinely failed send can be retried before TTL.
                 try:
                     get_redis().delete(dedup_key)
@@ -2046,7 +2183,7 @@ class CriticalAlertService:
             return
 
         hospital_id = branch.hospital_id
-        is_email_enabled, _ = self._get_hospital_notification_config(hospital_id)
+        is_email_enabled, _, _ = self._get_hospital_notification_config(hospital_id)
         if not is_email_enabled:
             logger.info(
                 "Skipping escalation email — hospital_id=%s has email notifications disabled", hospital_id
@@ -2251,7 +2388,7 @@ class CriticalAlertService:
             return
 
         hospital_id = refrigerator.hospital_id
-        is_email_enabled, _ = self._get_hospital_notification_config(hospital_id)
+        is_email_enabled, _, _ = self._get_hospital_notification_config(hospital_id)
         if not is_email_enabled:
             logger.info(
                 "Skipping refrigerator escalation email — hospital_id=%s has email notifications disabled",
