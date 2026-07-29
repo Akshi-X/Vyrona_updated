@@ -11,6 +11,7 @@ import { tasksService, type Task } from '../../services/tasksService';
 import { userService } from '../../services/userService';
 import RefrigeratorVisualisation from './sections/RefrigeratorVisualisation';
 import { useRefrigeratorKpiSnapshot } from './sections/useRefrigeratorKpiSnapshot';
+import { useRefrigeratorAlertKpiNames } from './commonComponent/useRefrigeratorAlertConfig';
 
 type RefrigeratorZone = { zone_id: string; zone_name: string };
 
@@ -35,10 +36,16 @@ export default function RefrigeratorTrackingPage() {
   const [currentUserName, setCurrentUserName] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
 
+  const allowedKpiNames = useRefrigeratorAlertKpiNames(
+    hasRefrigeratorId ? refrigeratorIdNum : undefined,
+    selectedZoneId,
+    hasRefrigeratorId,
+  );
   const { sensorTiles, tempExternal, probeTemp } = useRefrigeratorKpiSnapshot({
     refrigeratorId: hasRefrigeratorId ? refrigeratorIdParam : undefined,
     zoneId: selectedZoneId,
     enabled: hasRefrigeratorId,
+    allowedKpiNames,
   });
 
   useEffect(() => {
