@@ -367,6 +367,22 @@ export const router = createBrowserRouter([
                     </RoleBasedRoute>
                 ),
             },
+            {
+                path: "/user-profile",
+                element: (
+                    <RoleBasedRoute>
+                        <UserProfilePage />
+                    </RoleBasedRoute>
+                ),
+            },
+            {
+                path: "/support",
+                element: (
+                    <RoleBasedRoute>
+                        <Support />
+                    </RoleBasedRoute>
+                ),
+            },
         ],
     },
 
@@ -374,22 +390,6 @@ export const router = createBrowserRouter([
     // PROTECTED ROUTES WITHOUT SHARED SIDEBAR
     // ============================================================
     { path: "/track-and-trace", element: <TrackAndTrace /> },
-    {
-        path: "/user-profile",
-        element: (
-            <RoleBasedRoute>
-                <UserProfilePage />
-            </RoleBasedRoute>
-        ),
-    },
-    {
-        path: "/support",
-        element: (
-            <RoleBasedRoute>
-                <Support />
-            </RoleBasedRoute>
-        ),
-    },
 
     // ============================================================
     // FALLBACK ROUTE

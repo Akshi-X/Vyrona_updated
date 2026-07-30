@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Lock } from "lucide-react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { useLayoutEffect } from "react";
 import { Sidebar } from "../../components/Sidebar";
 import { useAuth } from "../../contexts/AuthContext";
@@ -189,15 +189,8 @@ function TourProviderWithDynamicStyles({ children }: { children: React.ReactNode
     );
 }
 
-// Pages that have their own full-width layout — sidebar should be hidden for these.
-const NO_SIDEBAR_PATHS = ["/onboarding/user-profile", "/onboarding/support", "/onboarding/success"];
-
 export default function OnboardingShell() {
     const navigate = useNavigate();
-    const location = useLocation();
-    const hideSidebar = NO_SIDEBAR_PATHS.some(
-        (p) => location.pathname === p || location.pathname.startsWith(p + "/"),
-    );
     const { logout } = useAuth();
 
     useLayoutEffect(() => {
@@ -254,26 +247,19 @@ export default function OnboardingShell() {
     };
 
     // Providers are always at the same tree position so React never remounts them
-    // when navigating between sidebar and no-sidebar pages — tour state is preserved.
+    // while navigating between onboarding pages — tour state is preserved.
     return (
         <OnboardingModeProvider value={true}>
             <GeniePreloaderProvider>
                 <TourNavStoreProvider>
                     <TourProviderWithDynamicStyles>
                         <GeniePreloaderGate>
-                            {hideSidebar ? (
-                                // Pages with their own full-width layout — no sidebar, no offset wrapper.
-                                <Outlet />
-                            ) : (
-                                <div className="bg-surface flex w-full h-dvh overflow-hidden">
-                                    <Sidebar onLogout={handleLogout} />
-                                    <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
-                                        <Outlet />
-                                    </div>
+                            <div className="bg-surface flex w-full h-dvh overflow-hidden">
+                                <Sidebar onLogout={handleLogout} />
+                                <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
+                                    <Outlet />
                                 </div>
-                            )}
-                            {/* Kept outside the hideSidebar conditional so React never remounts it on
-                            layout changes — preserves isOpen state when navigating to no-sidebar routes. */}
+                            </div>
                             <OnboardingOverlay />
                             <PreviewTourOverlay />
                         </GeniePreloaderGate>
