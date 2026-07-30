@@ -28,7 +28,7 @@ const KPI = {
     LID_STATE: "ln2_lid_state",
 } as const;
 
-interface KpiSliderMeta {
+export interface KpiSliderMeta {
     label: string;
     unit: string;
     lo: number;
@@ -50,7 +50,7 @@ const KPI_META: Record<string, KpiSliderMeta> = {
 
 const EDITABLE_KPIS = Object.keys(KPI_META);
 
-interface KpiDraft {
+export interface KpiDraft {
     min: number | null;
     max: number | null;
     /** Master alert switch for this KPI. */
@@ -81,7 +81,7 @@ export interface CryoBentoGridHandle {
     applyRecommended: () => void;
 }
 
-const EMPTY_DRAFT: KpiDraft = {
+export const EMPTY_DRAFT: KpiDraft = {
     min: null,
     max: null,
     enabled: false,
@@ -90,19 +90,47 @@ const EMPTY_DRAFT: KpiDraft = {
     unack_escalation_threshold: null,
 };
 
-/** True whenever no tank is selected — the alert controls render but must not respond to input. */
-const LockedContext = createContext(false);
+/**
+ * Locks the alert controls while no device is selected (they still render, but
+ * must not respond to input). `noun` is the device phrase used in the "Select …"
+ * tooltip, e.g. "a cryotank" / "an incubator" / "a refrigerator".
+ */
+export interface LockState {
+    locked: boolean;
+    noun: string;
+}
+export const LockedContext = createContext<LockState>({ locked: false, noun: "a device" });
 
-/** Patch applied when the master switch turns on: core KPIs get both channels by default. */
-const enablePatch = (kpiName: string, d: KpiDraft): Partial<KpiDraft> => ({
-    enabled: true,
-    ...(DEFAULT_CHANNELS_ON.has(kpiName) && !d.whatsapp_alert && !d.email_alert
-        ? { whatsapp_alert: true, email_alert: true }
-        : {}),
-    ...(kpiName === KPI.LID_STATE ? { min: 0, max: 0 } : {}),
+/**
+ * Per-device policy consumed by the shared threshold controls. Defaults to the
+ * cryotank values so CryoBentoGrid needs no provider; other device grids
+ * (incubator/refrigerator) wrap their tree in a KpiPolicyContext.Provider.
+ */
+export interface KpiPolicy {
+    /** kpiName → slider metadata (bounds, step, unit, dual). */
+    metaMap: Record<string, KpiSliderMeta>;
+    /** KPIs whose channels default ON the first time the master switch is enabled. */
+    defaultChannelsOn: Set<string>;
+    /** Lid-state KPI whose min/max lock to 0,0 on enable (binary alert). */
+    lidStateKpi: string | null;
+}
+
+export const KpiPolicyContext = createContext<KpiPolicy>({
+    metaMap: KPI_META,
+    defaultChannelsOn: DEFAULT_CHANNELS_ON,
+    lidStateKpi: KPI.LID_STATE,
 });
 
-const sameDraft = (a?: KpiDraft, b?: KpiDraft) =>
+/** Patch applied when the master switch turns on: core KPIs get both channels by default. */
+const enablePatch = (policy: KpiPolicy, kpiName: string, d: KpiDraft): Partial<KpiDraft> => ({
+    enabled: true,
+    ...(policy.defaultChannelsOn.has(kpiName) && !d.whatsapp_alert && !d.email_alert
+        ? { whatsapp_alert: true, email_alert: true }
+        : {}),
+    ...(kpiName === policy.lidStateKpi ? { min: 0, max: 0 } : {}),
+});
+
+export const sameDraft = (a?: KpiDraft, b?: KpiDraft) =>
     (a?.min ?? null) === (b?.min ?? null) &&
     (a?.max ?? null) === (b?.max ?? null) &&
     (a?.enabled ?? false) === (b?.enabled ?? false) &&
@@ -139,17 +167,68 @@ const EMPTY_LIVE: LiveData = {
 const INK = "#2E2A24";
 const INK_SOFT = "#000000";
 
-function BentoCard({
+/** Shared keyframes + range-input styling for all bento grids. Global, injected once per grid. */
+export function BentoStyles() {
+    return (
+        <style>{`
+            @keyframes cryo-in {
+                from { opacity: 0; transform: translateY(14px) scale(0.985); }
+                to   { opacity: 1; transform: none; }
+            }
+            .cryo-in { opacity: 0; animation: cryo-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+            @keyframes cooldown-fade {
+                from { opacity: 0; transform: translateY(2px); }
+                to   { opacity: 1; transform: none; }
+            }
+            .cooldown-fade { animation: cooldown-fade 0.3s ease forwards; }
+            .cryo-display { font-family: 'Work Sans', sans-serif; }
+            .cryo-range {
+                position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+                -webkit-appearance: none; appearance: none; background: transparent;
+                pointer-events: none;
+            }
+            .cryo-range-solo { pointer-events: auto; }
+            .cryo-range::-webkit-slider-thumb {
+                -webkit-appearance: none; appearance: none; pointer-events: auto;
+                width: 16px; height: 16px; border-radius: 9999px;
+                background: #fff; border: 3px solid var(--thumb, #2E2A24);
+                box-shadow: 0 2px 6px rgba(0,0,0,0.25); cursor: grab;
+                transition: transform 0.15s ease;
+            }
+            .cryo-range::-webkit-slider-thumb:hover { transform: scale(1.12); }
+            .cryo-range::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.2); }
+            .cryo-range:disabled::-webkit-slider-thumb {
+                cursor: not-allowed; border-color: #9CA3AF; transform: none;
+            }
+            .cryo-range::-moz-range-thumb {
+                pointer-events: auto;
+                width: 16px; height: 16px; border-radius: 9999px;
+                background: #fff; border: 3px solid var(--thumb, #2E2A24);
+                box-shadow: 0 2px 6px rgba(0,0,0,0.25); cursor: grab;
+            }
+            .cryo-range:disabled::-moz-range-thumb { cursor: not-allowed; border-color: #9CA3AF; }
+            @media (prefers-reduced-motion: reduce) {
+                .cryo-in { animation-duration: 0.01s; }
+            }
+        `}</style>
+    );
+}
+
+export function BentoCard({
     className = "",
     children,
     delay = 0,
+    id,
 }: {
     className?: string;
     children: ReactNode;
     delay?: number;
+    /** Onboarding tour anchor, e.g. "onboarding-alert-kpi-temp_internal". */
+    id?: string;
 }) {
     return (
         <div
+            id={id}
             className={`cryo-in relative md:overflow-hidden rounded-none md:rounded-[20px] border-0 md:border md:border-gray-100 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${className}`}
             style={{ animationDelay: `${delay}ms`, color: INK } as CSSProperties}
         >
@@ -158,11 +237,11 @@ function BentoCard({
     );
 }
 
-function CardTitle({ children }: { children: ReactNode }) {
+export function CardTitle({ children }: { children: ReactNode }) {
     return <h3 className="text-[15px] font-extrabold tracking-tight text-gray-900">{children}</h3>;
 }
 
-function MicroLabel({ children }: { children: ReactNode }) {
+export function MicroLabel({ children }: { children: ReactNode }) {
     return (
         <span className="block leading-none text-[11px] font-bold uppercase tracking-[0.1em] text-gray-500">
             {children}
@@ -177,7 +256,7 @@ const LOADING_MESSAGES = [
 ];
 
 /** Typewriter loop through LOADING_MESSAGES: types, holds, deletes, moves to next. */
-function LoadingMessage() {
+export function LoadingMessage() {
     const [msgIndex, setMsgIndex] = useState(0);
     const [text, setText] = useState("");
     const [phase, setPhase] = useState<"typing" | "holding" | "deleting">("typing");
@@ -222,7 +301,7 @@ const COOLDOWN_MESSAGES = [
 const COOLDOWN_ROTATE_MS = 10000;
 
 /** Bottom control bar: bell status, WhatsApp / email channel buttons, master switch. */
-function ChannelBar({
+export function ChannelBar({
     kpiName,
     draft,
     onDraft,
@@ -231,7 +310,8 @@ function ChannelBar({
     draft: KpiDraft;
     onDraft: (kpiName: string, patch: Partial<KpiDraft>) => void;
 }) {
-    const locked = useContext(LockedContext);
+    const { locked, noun: lockNoun } = useContext(LockedContext);
+    const policy = useContext(KpiPolicyContext);
     const on = draft.enabled;
     const statusText = !on
         ? "Alerts are off — you won't be notified for this KPI."
@@ -293,8 +373,9 @@ function ChannelBar({
                     <button
                         type="button"
                         aria-pressed={on && draft.whatsapp_alert}
+                        id={`onboarding-alert-whatsapp-${kpiName}`}
                         aria-label="WhatsApp alerts"
-                        title={locked ? "Select a tank first" : on ? "WhatsApp alerts" : "Turn the alert on first"}
+                        title={locked ? `Select ${lockNoun} first` : on ? "WhatsApp alerts" : "Turn the alert on first"}
                         disabled={!on || locked}
                         onClick={() =>
                             onDraft(kpiName, {
@@ -315,8 +396,9 @@ function ChannelBar({
                     <button
                         type="button"
                         aria-pressed={on && draft.email_alert}
+                        id={`onboarding-alert-email-${kpiName}`}
                         aria-label="Email alerts"
-                        title={locked ? "Select a tank first" : on ? "Email alerts" : "Turn the alert on first"}
+                        title={locked ? `Select ${lockNoun} first` : on ? "Email alerts" : "Turn the alert on first"}
                         disabled={!on || locked}
                         onClick={() =>
                             onDraft(kpiName, {
@@ -336,13 +418,14 @@ function ChannelBar({
                 <div className="relative group shrink-0 flex items-center">
                     {locked && (
                         <div className="pointer-events-none absolute -top-1 right-0 -translate-y-full w-max max-w-[180px] rounded-lg bg-black text-white text-[10px] font-medium px-2.5 py-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-30 text-center">
-                            Select a cryotank to enable
+                            Select {lockNoun} to enable
                         </div>
                     )}
                     <button
                         type="button"
                         role="switch"
                         aria-checked={on}
+                        id={`onboarding-alert-toggle-${kpiName}`}
                         aria-label="Alert on/off"
                         disabled={locked}
                         onClick={() =>
@@ -350,7 +433,7 @@ function ChannelBar({
                                 kpiName,
                                 on
                                     ? { enabled: false, unack_escalation_threshold: null }
-                                    : enablePatch(kpiName, draft),
+                                    : enablePatch(policy, kpiName, draft),
                             )
                         }
                         className={`relative w-12 h-7 rounded-full shrink-0 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40 disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -376,7 +459,7 @@ function ChannelBar({
  * Without it (Min/Max inputs) it preserves the fixed decimal padding the user is
  * editing against, e.g. "50.0", so the field doesn't reformat mid-typing.
  */
-const formatStep = (v: number, step: number, trim = false): string => {
+export const formatStep = (v: number, step: number, trim = false): string => {
     if (Number.isInteger(step)) return trim ? String(Math.round(v)) : String(v);
     const fixed = v.toFixed(step < 0.1 ? 2 : 1);
     return trim ? String(Number(fixed)) : fixed;
@@ -456,7 +539,7 @@ function KpiSlider({
     currentReading?: number | null;
     markerUnit?: string;
 }) {
-    const locked = useContext(LockedContext);
+    const { locked, noun: lockNoun } = useContext(LockedContext);
     const unit = markerUnit ?? meta.unit;
     const a = draft.min ?? meta.lo;
     const b = draft.max ?? meta.hi;
@@ -464,35 +547,34 @@ function KpiSlider({
     const fmt = (v: number) => formatStep(v, meta.step, true);
     const scaleTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => meta.lo + t * (meta.hi - meta.lo));
 
-    // Near either edge the centered label would overflow the track; anchor it
-    // to that corner instead of centering on the (clipped) reading position.
-    const readingPct = pct(currentReading ?? meta.lo);
-    const edge = readingPct >= 88 ? "right" : readingPct <= 12 ? "left" : "center";
-    const markerStyle: CSSProperties =
-        edge === "right"
-            ? { right: 0, alignItems: "flex-end" }
-            : edge === "left"
-              ? { left: 0, alignItems: "flex-start" }
-              : { left: `${readingPct}%`, transform: "translateX(-50%)", alignItems: "center" };
+    // The pointer tick tracks the reading, clamped to the scale so an out-of-range
+    // value pins to the edge instead of sliding off the track; the label shifts
+    // toward the interior near the edges so it never overflows the card.
+    const readingPct = Math.min(100, Math.max(0, pct(currentReading ?? meta.lo)));
+    const labelTransform =
+        readingPct >= 88 ? "translateX(-100%)" : readingPct <= 12 ? "translateX(0)" : "translateX(-50%)";
 
     return (
         <div style={{ "--thumb": ink } as CSSProperties}>
             <div className="relative select-none">
                 <div className="relative h-6">
                     <div
-                        className={`absolute top-0 flex flex-col pointer-events-none ${currentReading == null ? "invisible" : ""}`}
-                        style={{ ...markerStyle, width: "fit-content" }}
+                        className={`absolute inset-y-0 pointer-events-none ${currentReading == null ? "invisible" : ""}`}
+                        style={{ left: `${readingPct}%` }}
                     >
-                        <span className="text-[10px] font-bold text-green-600 whitespace-nowrap">
+                        <span
+                            className="absolute top-0 text-[10px] font-bold text-green-600 whitespace-nowrap leading-none"
+                            style={{ transform: labelTransform }}
+                        >
                             Latest {currentReading != null ? fmt(currentReading) : ""}{unit ? ` ${unit}` : ""}
                         </span>
-                        <div className="w-0.5 h-2 bg-green-500 rounded-full opacity-80" />
+                        <div className="absolute bottom-0 -translate-x-1/2 w-0.5 h-2 bg-green-500 rounded-full opacity-80" />
                     </div>
                 </div>
                 <div className="relative h-6 group">
                     {locked && (
                         <div className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full w-max max-w-[180px] rounded-lg bg-black text-white text-[10px] font-medium px-2.5 py-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-30 text-center">
-                            Select a cryotank to enable
+                            Select {lockNoun} to enable
                         </div>
                     )}
                     <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 rounded-full bg-white" />
@@ -599,7 +681,7 @@ function EscalationInput({
 }) {
     const v = draft.unack_escalation_threshold ?? null;
     return (
-        <div className="relative h-9 flex items-center justify-between gap-2 mt-1.5 px-3 rounded-xl bg-orange-50 border border-orange-100">
+        <div id={`onboarding-alert-escalation-${kpiName}`} className="relative h-9 flex items-center justify-between gap-2 mt-1.5 px-3 rounded-xl bg-orange-50 border border-orange-100">
             <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-orange-800">Mail Escalation</span>
             <div className="flex items-center gap-1.5">
                 <input
@@ -625,9 +707,10 @@ function EscalationInput({
     );
 }
 
-function EscalationHint({ message, dim = false }: { message: string; dim?: boolean }) {
+function EscalationHint({ message, dim = false, id }: { message: string; dim?: boolean; id?: string }) {
     return (
         <div
+            id={id}
             className={`relative mt-1.5 px-3 py-2 @min-[25.625rem]:h-9 @min-[25.625rem]:py-0 rounded-xl border border-dashed flex items-center gap-2 ${
                 dim ? "bg-gray-100 border-gray-200" : "bg-primary-bg/60 border-primary-ring"
             }`}
@@ -647,7 +730,7 @@ function EscalationHint({ message, dim = false }: { message: string; dim?: boole
 }
 
 /** Escalation row is always visible: input when usable, otherwise a hint on how to unlock it. */
-function EscalationRow({
+export function EscalationRow({
     kpiName,
     draft,
     onDraft,
@@ -661,6 +744,7 @@ function EscalationRow({
     }
     return (
         <EscalationHint
+            id={`onboarding-alert-escalation-${kpiName}`}
             dim={!draft.enabled}
             message={
                 draft.enabled
@@ -671,7 +755,7 @@ function EscalationRow({
     );
 }
 
-function ThresholdBox({
+export function ThresholdBox({
     kpiName,
     draft,
     ink,
@@ -688,7 +772,8 @@ function ThresholdBox({
     currentReading?: number | null;
     markerUnit?: string;
 }) {
-    const meta = { ...KPI_META[kpiName], ...metaOverride };
+    const policy = useContext(KpiPolicyContext);
+    const meta = { ...policy.metaMap[kpiName], ...metaOverride };
     const dim = !draft.enabled;
     return (
         <>
@@ -705,7 +790,7 @@ function ThresholdBox({
                             min,
                             max,
                             // Dragging a slider implies the alert should be live
-                            ...(draft.enabled ? {} : enablePatch(kpiName, draft)),
+                            ...(draft.enabled ? {} : enablePatch(policy, kpiName, draft)),
                         })
                     }
                     currentReading={currentReading}
@@ -734,7 +819,7 @@ function InternalTemperatureCard({
     onDraft: (kpiName: string, patch: Partial<KpiDraft>) => void;
 }) {
     return (
-        <BentoCard delay={0} className="col-span-12 @min-[70rem]:col-span-5 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
+        <BentoCard delay={0} id={`onboarding-alert-kpi-${KPI.TEMP_INTERNAL}`} className="col-span-12 @min-[70rem]:col-span-5 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
             <Thermometer strokeWidth={1.25} className="absolute top-4 right-4 w-24 h-24 text-[#6B3A7E] opacity-[0.12]" />
             <div className="relative">
                 <CardTitle>Internal temperature:</CardTitle>
@@ -765,7 +850,7 @@ function Ln2LevelCard({
     l2Pct: number | null;
 }) {
     return (
-        <BentoCard delay={60} className="col-span-12 @min-[70rem]:col-span-7 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-row gap-4">
+        <BentoCard delay={60} id={`onboarding-alert-kpi-${KPI.LN2_LEVEL}`} className="col-span-12 @min-[70rem]:col-span-7 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-row gap-4">
             <div className="relative flex-1 min-w-0 flex flex-col items-start gap-2">
                 <div className="relative">
                     <CardTitle>LN2 level:</CardTitle>
@@ -830,7 +915,7 @@ function LidStateCard({
     const known = live.lidOpen != null;
     const open = live.lidOpen === true;
     return (
-        <BentoCard delay={120} className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
+        <BentoCard delay={120} id={`onboarding-alert-kpi-${KPI.LID_STATE}`} className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
             {/* lid_state.svg is white-only art; mask + backgroundColor tints it like the other decos */}
             <span
                 aria-hidden
@@ -899,7 +984,7 @@ function LidStateCard({
 
 // ─── Editable secondary cards ────────────────────────────────────────────────
 
-function EditableKpiCard({
+export function EditableKpiCard({
     kpiName,
     title,
     sub,
@@ -925,7 +1010,7 @@ function EditableKpiCard({
     currentReading?: number | null;
 }) {
     return (
-        <BentoCard delay={delay} className={`${className} pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2`}>
+        <BentoCard delay={delay} id={`onboarding-alert-kpi-${kpiName}`} className={`${className} pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2`}>
             {deco}
             <div className="relative">
                 <CardTitle>{title}</CardTitle>
@@ -1221,48 +1306,8 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
             : null;
 
     return (
-        <LockedContext.Provider value={tankId == null}>
-            <style>{`
-                @keyframes cryo-in {
-                    from { opacity: 0; transform: translateY(14px) scale(0.985); }
-                    to   { opacity: 1; transform: none; }
-                }
-                .cryo-in { opacity: 0; animation: cryo-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
-                @keyframes cooldown-fade {
-                    from { opacity: 0; transform: translateY(2px); }
-                    to   { opacity: 1; transform: none; }
-                }
-                .cooldown-fade { animation: cooldown-fade 0.3s ease forwards; }
-                .cryo-display { font-family: 'Work Sans', sans-serif; }
-                .cryo-range {
-                    position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
-                    -webkit-appearance: none; appearance: none; background: transparent;
-                    pointer-events: none;
-                }
-                .cryo-range-solo { pointer-events: auto; }
-                .cryo-range::-webkit-slider-thumb {
-                    -webkit-appearance: none; appearance: none; pointer-events: auto;
-                    width: 16px; height: 16px; border-radius: 9999px;
-                    background: #fff; border: 3px solid var(--thumb, #2E2A24);
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.25); cursor: grab;
-                    transition: transform 0.15s ease;
-                }
-                .cryo-range::-webkit-slider-thumb:hover { transform: scale(1.12); }
-                .cryo-range::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.2); }
-                .cryo-range:disabled::-webkit-slider-thumb {
-                    cursor: not-allowed; border-color: #9CA3AF; transform: none;
-                }
-                .cryo-range::-moz-range-thumb {
-                    pointer-events: auto;
-                    width: 16px; height: 16px; border-radius: 9999px;
-                    background: #fff; border: 3px solid var(--thumb, #2E2A24);
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.25); cursor: grab;
-                }
-                .cryo-range:disabled::-moz-range-thumb { cursor: not-allowed; border-color: #9CA3AF; }
-                @media (prefers-reduced-motion: reduce) {
-                    .cryo-in { animation-duration: 0.01s; }
-                }
-            `}</style>
+        <LockedContext.Provider value={{ locked: tankId == null, noun: "a cryotank" }}>
+            <BentoStyles />
 
             {/* @container is required by the @2xl/@4xl/@min-[81rem] classes on the cards */}
             <div className="@container relative flex-1 min-h-0 flex flex-col md:rounded-[24px] md:p-3 @2xl:p-4 md:bg-gradient-to-b md:from-primary-bg md:to-[#FAFAFA] md:overflow-hidden">
@@ -1403,6 +1448,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                                 {otherTanks.length > 0 && configRows.length > 0 && (
                                     <div className="relative">
                                         <button
+                                            id="onboarding-alert-copy-tanks"
                                             type="button"
                                             onClick={() => setShowCopyDropdown((v) => !v)}
                                             disabled={savingCopy}
@@ -1485,6 +1531,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                                     </button>
                                 )}
                                 <button
+                                    id="onboarding-alert-save-btn"
                                     type="button"
                                     onClick={handleSave}
                                     disabled={saving || dirtyKpis.length === 0}

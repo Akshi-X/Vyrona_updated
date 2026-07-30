@@ -235,19 +235,26 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                             const isOpen = isDashboard ? dashboardOpen : isAlertConfig ? alertConfigOpen : false;
                             const setOpen = isDashboard ? setDashboardOpen : isAlertConfig ? setAlertConfigOpen : () => {};
 
+                            // Match on parsed params, not the raw search string, so extra
+                            // params (?direction=refrigerators&branch_id=21) still resolve.
+                            const currentParams = new URLSearchParams(location.search);
+                            const queryMatches = (query: string) =>
+                                [...new URLSearchParams(query)].every(
+                                    ([k, v]) => currentParams.get(k) === v,
+                                );
+
                             const getChildActive = (child: NavChild) => {
-                                if (child.path.includes("?")) {
-                                    const [p, q] = child.path.split("?");
-                                    return location.pathname === resolvePath(p) && location.search === `?${q}`;
-                                }
-                                const resolved = resolvePath(child.path);
+                                const [rawPath, rawQuery] = child.path.split("?");
+                                const resolved = resolvePath(rawPath);
+                                const pathActive =
+                                    location.pathname === resolved ||
+                                    location.pathname.startsWith(resolved + "/");
+                                if (!pathActive) return false;
+                                if (rawQuery) return queryMatches(rawQuery);
                                 const siblingQueryActive = item.children
                                     .filter((s) => s.path !== child.path && s.path.includes("?"))
-                                    .some((s) => location.search === `?${s.path.split("?")[1]}`);
-                                return (
-                                    (location.pathname === resolved || location.pathname.startsWith(resolved + "/")) &&
-                                    !siblingQueryActive
-                                );
+                                    .some((s) => queryMatches(s.path.split("?")[1]));
+                                return !siblingQueryActive;
                             };
 
                             return (
@@ -291,6 +298,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                 return (
                                                     <button
                                                         key={ci}
+                                                        id={isAlertConfig ? `onboarding-sidebar-alert-${child.label.toLowerCase()}` : undefined}
                                                         onClick={() => {
                                                             setOpen(true);
                                                             handleNavigation(child.path);

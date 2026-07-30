@@ -599,6 +599,22 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
             return { updated: configs.filter((c) => configList.some((e) => e.kpi_name === c.kpi_name)).length, created: 0 };
         }
 
+        // Alert Setting — update a single KPI config row (PUT). The bento grid saves
+        // existing rows this way, so it must be mocked or the tour would write to the
+        // real backend. Merges into in-memory state like the bulk handler above.
+        if (endpoint.match(/^\/api\/ivf\/quality\/kpi-config\/\d+$/) && options?.method === "PUT") {
+            const configId = Number(endpoint.split("/").pop());
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            type KpiConfigEntry = Record<string, unknown> & { kpi_name: string; id?: number };
+            const configList = dashboardData.alertSettingKpiConfigList.config as KpiConfigEntry[];
+            const existing = configList.find((c) => Number(c.id) === configId);
+            if (existing) {
+                Object.assign(existing, body);
+                return existing;
+            }
+            return { id: configId, ...body };
+        }
+
         // Alert Setting — KPI config list for a specific tank.
         if (endpoint.startsWith("/api/ivf/quality/kpi-config/list")) {
             return dashboardData.alertSettingKpiConfigList;
@@ -645,6 +661,32 @@ export const enableOnboardingMocks = (department: string = "IVF") => {
             if (endpoint.includes("duration_minutes=10080")) return shiftKpiHistoryToNow(dashboardData.ivfKpiHistory7D);
             if (endpoint.includes("duration_minutes=1440")) return shiftKpiHistoryToNow(dashboardData.ivfKpiHistory24H);
             return buildMockKpiHistory(); // LIVE and 1H
+        }
+
+        // Alert Setting — LN2 level history (drives the LN2 card's live reading and
+        // the 3D dewar fill). Mocked so the tour never calls the real backend.
+        if (endpoint.startsWith("/api/ivf/quality/tanks/") && endpoint.includes("/ln2-history")) {
+            const now = Date.now();
+            const history = Array.from({ length: 8 }, (_, i) => ({
+                timestamp: new Date(now - (7 - i) * 70_000).toISOString(),
+                ln2_level_pct: 67,
+                ln2_mass_kg: 33.53,
+                evaporation_rate_kg_per_h: 0.02,
+            }));
+            return { tank_id: 161, tank_code: "T-161", history };
+        }
+
+        // Alert Setting — tank quality history (internal/external temp, battery, shock).
+        if (endpoint.startsWith("/api/ivf/quality/tanks/") && endpoint.includes("/history")) {
+            const now = Date.now();
+            const history = Array.from({ length: 8 }, (_, i) => ({
+                timestamp: new Date(now - (7 - i) * 70_000).toISOString(),
+                temp_internal: -195.5,
+                temp_external: 27.9,
+                battery_percentage: 100,
+                shock: 1.0,
+            }));
+            return { tank_code: "T-161", history };
         }
 
         // IVF track shipment — canister tracking details (cryolocks list).
