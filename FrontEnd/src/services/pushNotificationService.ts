@@ -13,7 +13,6 @@ export interface PushSubscriptionKeys {
 export interface SubscribePushRequest {
   endpoint: string;
   keys: PushSubscriptionKeys;
-  user_agent?: string;
   device_label?: string;
 }
 

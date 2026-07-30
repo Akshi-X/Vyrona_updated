@@ -69,7 +69,6 @@ export const PushNotificationProvider: React.FC<{ children: React.ReactNode }> =
                 p256dh: raw.keys?.p256dh || "",
                 auth: raw.keys?.auth || "",
             },
-            user_agent: navigator.userAgent,
         });
 
         await refresh();
