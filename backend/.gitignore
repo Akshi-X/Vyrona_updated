@@ -31,6 +31,9 @@ venv/
 .env.local
 .env.*.local
 
+# VAPID keys (web push)
+*.pem
+
 # IDE
 .vscode/
 .idea/

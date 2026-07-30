@@ -95,6 +95,7 @@ def init_db():
     from ..models import kpi_config_model, readings_model
 
     from ..models import onboarding_state_model, onboarding_event_model
+    from ..models import push_subscription_model
 
     # Note: IVF schema separation has been removed
     # All tables (including IVF tables) are now in public schema
