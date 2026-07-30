@@ -497,8 +497,8 @@ export class IvfService extends BaseApiService {
         tank_code: string;
         branch_id?: number | null;
         branch_name?: string | null;
-        tank_max_capacity_reading?: number | null;
-        tank_min_capacity_reading?: number | null;
+        full_weight_kg?: number | null;
+        empty_weight_kg?: number | null;
         kpi_limits: Record<
             string,
             {
