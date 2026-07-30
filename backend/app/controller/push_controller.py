@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -33,7 +33,6 @@ class SubscribeKeys(BaseModel):
 class SubscribeRequest(BaseModel):
     endpoint: str
     keys: SubscribeKeys
-    user_agent: Optional[str] = None
     device_label: Optional[str] = None
 
 
@@ -101,10 +100,16 @@ def get_vapid_public_key():
 @router.post("/subscribe")
 def subscribe(
     request_data: SubscribeRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Create or update a push subscription for the current user's browser."""
+    # user_agent is read from the request header, not the JSON body — Windows
+    # UA strings ("...; Win64; x64...") trip SanitizationMiddleware's command
+    # injection regex (`;\s*\w+`) when sent as a body field.
+    user_agent = request.headers.get("user-agent")
+
     subscription = (
         db.query(PushSubscription)
         .filter(PushSubscription.endpoint == request_data.endpoint)
@@ -112,7 +117,7 @@ def subscribe(
     )
 
     device_label = request_data.device_label or _device_label_from_user_agent(
-        request_data.user_agent
+        user_agent
     )
 
     if subscription:
@@ -121,7 +126,7 @@ def subscribe(
         subscription.user_id = current_user.user_id
         subscription.p256dh = request_data.keys.p256dh
         subscription.auth = request_data.keys.auth
-        subscription.user_agent = request_data.user_agent
+        subscription.user_agent = user_agent
         subscription.device_label = device_label
         subscription.enabled = True
         subscription.failure_count = 0
@@ -132,7 +137,7 @@ def subscribe(
             endpoint=request_data.endpoint,
             p256dh=request_data.keys.p256dh,
             auth=request_data.keys.auth,
-            user_agent=request_data.user_agent,
+            user_agent=user_agent,
             device_label=device_label,
             enabled=True,
         )

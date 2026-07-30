@@ -1,8 +1,11 @@
 import json
 import logging
+import os
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Optional
 
+from py_vapid import Vapid02
 from pywebpush import WebPushException, webpush
 from sqlalchemy.orm import Session
 
@@ -18,6 +21,22 @@ def push_notifications_configured() -> bool:
     return bool(
         settings.VAPID_PUBLIC_KEY and settings.VAPID_PRIVATE_KEY and settings.VAPID_SUBJECT
     )
+
+
+@lru_cache(maxsize=1)
+def _vapid_key() -> Vapid02:
+    """Load the VAPID private key regardless of how it was supplied:
+    a local .pem file path (dev), or the raw PEM/base64 text of an Azure Key
+    Vault secret (staging/prod, resolved by config.py's Key Vault reference
+    handling before this ever runs). pywebpush's own string parsing only
+    handles bare base64 keys, not `-----BEGIN...` PEM text, hence the extra
+    branch here."""
+    raw = settings.VAPID_PRIVATE_KEY
+    if os.path.isfile(raw):
+        return Vapid02.from_file(raw)
+    if raw.strip().startswith("-----BEGIN"):
+        return Vapid02.from_pem(raw.encode())
+    return Vapid02.from_string(raw)
 
 
 def send_web_push(db: Session, subscription: PushSubscription, payload: dict) -> bool:
@@ -41,7 +60,7 @@ def send_web_push(db: Session, subscription: PushSubscription, payload: dict) ->
                 },
             },
             data=json.dumps(payload),
-            vapid_private_key=settings.VAPID_PRIVATE_KEY,
+            vapid_private_key=_vapid_key(),
             vapid_claims={"sub": settings.VAPID_SUBJECT},
         )
         subscription.last_used_at = datetime.now(timezone.utc)
