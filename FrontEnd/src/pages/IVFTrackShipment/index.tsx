@@ -38,8 +38,8 @@ export default function IVFTrackShipmentPage() {
     const [headerTankCode, setHeaderTankCode] = useState<string>("-");
     const [headerBranchName, setHeaderBranchName] = useState<string>("-");
     const [headerTankId, setHeaderTankId] = useState<number | undefined>(undefined);
-    const [tankMaxCapacity, setTankMaxCapacity] = useState<number | null>(null);
-    const [tankMinCapacity, setTankMinCapacity] = useState<number | null>(null);
+    const [tankFullWeightKg, setTankFullWeightKg] = useState<number | null>(null);
+    const [tankEmptyWeightKg, setTankEmptyWeightKg] = useState<number | null>(null);
     const [ln2L2Threshold, setLn2L2Threshold] = useState<number | null>(null);
     const [accessDenied, setAccessDenied] = useState(false);
     const [countdown, setCountdown] = useState(3);
@@ -257,8 +257,8 @@ export default function IVFTrackShipmentPage() {
             setHeaderTankCode(kpiConfigResponse?.tank_code || "-");
             setHeaderBranchName(kpiConfigResponse?.branch_name || "-");
             setHeaderTankId(kpiConfigResponse?.tank_id ?? undefined);
-            setTankMaxCapacity(kpiConfigResponse?.tank_max_capacity_reading ?? null);
-            setTankMinCapacity(kpiConfigResponse?.tank_min_capacity_reading ?? null);
+            setTankFullWeightKg(kpiConfigResponse?.full_weight_kg ?? null);
+            setTankEmptyWeightKg(kpiConfigResponse?.empty_weight_kg ?? null);
             setLn2L2Threshold(thresholds.l2);
         } catch (e: unknown) {
             const msg = (e as Error)?.message || "";
@@ -598,8 +598,8 @@ export default function IVFTrackShipmentPage() {
                                         internalTemp={internalTemp ?? undefined}
                                         externalTemp={externalTemp ?? undefined}
                                         lidStatus={lidStatus ?? undefined}
-                                        tankMaxCapacity={tankMaxCapacity}
-                                        tankMinCapacity={tankMinCapacity}
+                                        tankMaxCapacity={tankFullWeightKg}
+                                        tankMinCapacity={tankEmptyWeightKg}
                                         ln2L2Threshold={ln2L2Threshold}
                                         sensorTiles={sensorTiles}
                                         canisters={cryocanCanisters}
