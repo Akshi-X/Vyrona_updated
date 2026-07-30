@@ -91,7 +91,9 @@ const POSITION_FNS: Record<NonNullable<OnboardingStep["placement"]>, (p: Positio
 };
 
 function resolvePosition(placement: OnboardingStep["placement"]) {
-    const fn = POSITION_FNS[placement ?? "bottom"];
+    // Placements come from hand-edited step JSON, so an unknown value is possible.
+    // Fall back to "bottom" instead of crashing the whole tour on a typo.
+    const fn = POSITION_FNS[placement ?? "bottom"] ?? POSITION_FNS.bottom;
     return (p: PositionProps) => {
         if (p.right === undefined) return "right" as const;
         // @reactour passes p.height=0 on first render before it measures the popover.

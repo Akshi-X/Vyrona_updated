@@ -5,10 +5,10 @@ import { ivfService, type IvfBranch } from "../../services/ivfService";
 import { shipmentService } from "../../services/shipmentService";
 import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
 import PageLayout from "../../components/PageLayout";
-import FilterPanel, { FilterSelect } from "../../components/FilterPanel";
 import { ChevronDown, History, Sparkles } from "lucide-react";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import CryoBentoGrid, { type CryoBentoGridHandle } from "./CryoBentoGrid";
+import DeviceKpiGrid, { type DeviceKpiGridHandle } from "./DeviceKpiGrid";
 import CryoHistoryModal from "./CryoHistoryModal";
 
 interface ContainerRow {
@@ -24,6 +24,7 @@ interface ContainerRow {
     chamber_c?: number | null;
     is_refrigerator?: boolean;
     refrigerator_id?: number | null;
+    zones?: Array<{ zone_id: string; zone_name: string }>;
 }
 
 export default function AlertSetting() {
@@ -77,6 +78,22 @@ export default function AlertSetting() {
     const [showBranchDropdown, setShowBranchDropdown] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const bentoGridRef = useRef<CryoBentoGridHandle>(null);
+    const deviceGridRef = useRef<DeviceKpiGridHandle>(null);
+
+    // Incubator chamber (null = Common / incubator-level) and refrigerator zone.
+    const [selectedChamberId, setSelectedChamberId] = useState<string | null>(null);
+    const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+    const [showScopeDropdown, setShowScopeDropdown] = useState(false);
+    const scopeDropdownRef = useRef<HTMLDivElement>(null);
+
+    // Reset scope when the selected device changes: incubators start at Common,
+    // refrigerators default to their first zone.
+    useEffect(() => {
+        setSelectedChamberId(null);
+        setSelectedZoneId(primaryContainer?.zones?.[0]?.zone_id ?? null);
+        setShowScopeDropdown(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [primaryContainer?.tank_id]);
 
     // Below xl1 (1200px) the selector pill bar moves inside the panel, under the
     // "Tank Monitoring" header row; at xl1+ it's the notch overlapping the panel's top edge.
@@ -124,6 +141,7 @@ export default function AlertSetting() {
                         chamber_c: null,
                         is_refrigerator: true,
                         refrigerator_id: ref.refrigerator_id,
+                        zones: ref.zones ?? [],
                     }))
                 );
             })
@@ -198,10 +216,6 @@ export default function AlertSetting() {
             return matchBranch && matchDevice;
         });
     }, [containers, branchFilter, directionFilter]);
-    const activeFilterCount = useMemo(
-        () => (branchFilter !== "All" ? 1 : 0),
-        [branchFilter],
-    );
 
     const otherTanks = useMemo(() => {
         if (!primaryContainer || primaryContainer.is_incubator || primaryContainer.is_refrigerator) {
@@ -233,6 +247,12 @@ export default function AlertSetting() {
             ) {
                 setShowBranchDropdown(false);
             }
+            if (
+                scopeDropdownRef.current &&
+                !scopeDropdownRef.current.contains(event.target as Node)
+            ) {
+                setShowScopeDropdown(false);
+            }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () =>
@@ -257,153 +277,7 @@ export default function AlertSetting() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const closeForm = () => {
-        setShowForm(false);
-        setEditingId(null);
-        setFormPayload({});
-        setFormError(null);
-    };
-
-    const validateForm = (): boolean => {
-        const name = (formPayload.kpi_name ?? "").trim();
-        if (!name) {
-            setFormError("KPI name is required");
-            return false;
-        }
-        setFormError(null);
-        return true;
-    };
-
-    const handleCreate = async () => {
-        if (
-            !primaryContainer ||
-            tankContext.hospital_id == null ||
-            tankContext.branch_id == null
-        ) {
-            setFormError("Missing tank context");
-            return;
-        }
-        if (!validateForm()) return;
-        setSubmitLoading(true);
-        try {
-            const payload: KpiConfigPayload = {
-                hospital_id: tankContext.hospital_id,
-                branch_id: tankContext.branch_id,
-                tank_id: primaryContainer.is_incubator || primaryContainer.is_refrigerator
-                    ? null
-                    : primaryContainer.tank_id,
-                incubator_id: primaryContainer.is_incubator
-                    ? (primaryContainer.incubator_id ?? null)
-                    : null,
-                chamber_id: primaryContainer.is_incubator ? (selectedChamberId ?? null) : null,
-                refrigerator_id: primaryContainer.is_refrigerator
-                    ? (primaryContainer.refrigerator_id ?? null)
-                    : null,
-                kpi_name: (formPayload.kpi_name ?? "").trim(),
-                alert_name: formPayload.alert_name ?? null,
-                min: formPayload.min ?? null,
-                max: formPayload.max ?? null,
-                unit: formPayload.unit ?? null,
-                alert_type: formPayload.alert_type ?? null,
-                cooldown_minutes: formPayload.cooldown_minutes ?? 60,
-                status: isActiveAlertType(formPayload.alert_type ?? null),
-            };
-            await ivfService.createKpiConfig(payload);
-            closeForm();
-            await refetchForPrimary(primaryContainer, {
-                showLoading: true,
-                chamberId: selectedChamberId,
-                zoneId: selectedZoneId,
-            });
-        } catch (e: any) {
-            setFormError(e?.message || "Create failed");
-        } finally {
-            setSubmitLoading(false);
-        }
-    };
-
-    const handleUpdate = async () => {
-        if (editingId == null || !validateForm()) return;
-        setSubmitLoading(true);
-        try {
-            await ivfService.updateKpiConfig(editingId, {
-                kpi_name: (formPayload.kpi_name ?? "").trim(),
-                alert_name: formPayload.alert_name ?? null,
-                min: formPayload.min ?? null,
-                max: formPayload.max ?? null,
-                unit: formPayload.unit ?? null,
-                alert_type: formPayload.alert_type ?? null,
-                cooldown_minutes: formPayload.cooldown_minutes ?? undefined,
-                status: isActiveAlertType(formPayload.alert_type ?? null),
-            });
-            closeForm();
-            if (primaryContainer) {
-                await refetchForPrimary(primaryContainer, {
-                    showLoading: true,
-                    chamberId: selectedChamberId,
-                    zoneId: selectedZoneId,
-                });
-            }
-        } catch (e: any) {
-            setFormError(e?.message || "Update failed");
-        } finally {
-            setSubmitLoading(false);
-        }
-    };
-
-    const closeDeleteConfirm = () => {
-        if (!deleteLoading) {
-            setShowDeleteConfirm(false);
-            setConfigToDeleteId(null);
-        }
-    };
-
-    const alertTypeOptions = [
-        { value: null as string | null, label: "Alert Disabled" },
-        { value: "no_alert", label: "No Alert" },
-        { value: "soft", label: "Soft Alert" },
-        { value: "critical", label: "Critical Alert" },
-    ];
-
-    const getDraft = (id: number) => draftConfig[id] ?? {};
-    const setDraft = (
-        id: number,
-        patch: {
-            min?: number | null;
-            max?: number | null;
-            alert_type?: string | null;
-            lid_state?: string;
-            cooldown_minutes?: number;
-            unack_escalation_threshold?: number | null;
-        },
-    ) => {
-        setDraftConfig((prev) => {
-            const next = { ...prev };
-            const current = next[id] ?? {};
-            const merged = { ...current, ...patch };
-            if (Object.keys(merged).length === 0) delete next[id];
-            else next[id] = merged;
-            return next;
-        });
-    };
-
-    // Clear draft for single container mode
-    const clearDraft = (id: number) => {
-        setDraftConfig((prev) => {
-            const next = { ...prev };
-            next[id] = {
-                min: null,
-                max: null,
-                alert_type: null,
-                lid_state: "",
-                cooldown_minutes: 60,
-            };
-            return next;
-        });
-    };
-
     // Multi-container draft helpers (keyed by kpi_name)
-    const getMultiDraft = (kpiName: string) => multiDraftConfig[kpiName] ?? {};
     const setMultiDraft = (
         kpiName: string,
         patch: {
@@ -425,503 +299,32 @@ export default function AlertSetting() {
         });
     };
 
-    // Clear multi-draft for a KPI
-    const clearMultiDraft = (kpiName: string) => {
-        setMultiDraftConfig((prev) => {
-            const next = { ...prev };
-            next[kpiName] = {
-                min: null,
-                max: null,
-                alert_type: null,
-                lid_state: "",
-                cooldown_minutes: 60,
-            };
-            return next;
-        });
-    };
-
-    const handleSaveAll = async () => {
-        const useMultiFlow =
-            selectedContainers.length > 1 || configList.length === 0;
-        if (useMultiFlow) {
-            // For multi-container OR single container with no existing config: use multiDraftConfig to build configs for all KPIs that have values
-            const configsToApply: Array<{
-                kpi_name: string;
-                alert_name: string | null;
-                min: number | null;
-                max: number | null;
-                unit: string | null;
-                alert_type: string | null;
-                cooldown_minutes?: number;
-                unack_escalation_threshold?: number | null;
-                status?: boolean;
-            }> = [];
-            for (const kpiName of effectiveKpiNames) {
-                const d = getMultiDraft(kpiName);
-                const metadata = getKpiMetadata(kpiName);
-                const cfg = getKpiFormConfig(kpiName);
-
-                let minVal = d.min ?? null;
-                let maxVal = d.max ?? null;
-
-                if (cfg.max_bound !== null && minVal !== null) {
-                    maxVal = cfg.max_bound;  // battery: max is always the hard ceiling
-                }
-                if (!cfg.max_available && cfg.max_bound === null) {
-                    maxVal = null;  // ln2_level: no max
-                }
-                if (cfg.custom_dropdown && d.lid_state) {
-                    const values = lidStateToValues(d.lid_state);
-                    minVal = values.min;
-                    maxVal = values.max;
-                }
-
-                if (
-                    minVal !== null ||
-                    maxVal !== null ||
-                    d.alert_type !== undefined
-                ) {
-                    configsToApply.push({
-                        kpi_name: kpiName,
-                        alert_name:
-                            kpiName === KPI_NAMES.IVF_LN2_LEVEL
-                                ? "LN2"
-                                : metadata.label,
-                        min: minVal,
-                        max: maxVal,
-                        unit: metadata.unit ?? null,
-                        alert_type: d.alert_type ?? null,
-                        cooldown_minutes: d.cooldown_minutes,
-                        unack_escalation_threshold: d.alert_type === "critical" ? (d.unack_escalation_threshold ?? null) : null,
-                        status: isActiveAlertType(d.alert_type ?? null),
-                    });
-                }
-            }
-
-            // Renaming a zone that has no KPI config rows yet: zone names are stored
-            // on those rows, so scaffold the refrigerator's KPIs (disabled, no
-            // thresholds) to give the new zone name somewhere to persist.
-            if (
-                zoneNameDirty &&
-                primaryContainer?.is_refrigerator &&
-                configsToApply.length === 0
-            ) {
-                for (const kpiName of effectiveKpiNames) {
-                    const metadata = getKpiMetadata(kpiName);
-                    configsToApply.push({
-                        kpi_name: kpiName,
-                        alert_name: metadata.label,
-                        min: null,
-                        max: null,
-                        unit: metadata.unit ?? null,
-                        alert_type: null,
-                        status: false,
-                    });
-                }
-            }
-
-            if (configsToApply.length === 0) return;
-
-            setSaveAllLoading(true);
-            try {
-                if (primaryContainer?.is_refrigerator) {
-                    await ivfService.bulkUpsertKpiConfigForRefrigerator(
-                        primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
-                        selectedZoneId,
-                        configsToApply,
-                        effectiveZoneName,
-                    );
-                } else if (primaryContainer?.is_incubator) {
-                    await ivfService.bulkUpsertKpiConfigForIncubator(
-                        primaryContainer.incubator_id ?? primaryContainer.tank_id,
-                        selectedChamberId,
-                        configsToApply,
-                    );
-                } else {
-                    const tankIds = selectedContainers.map((c) => c.tank_id);
-                    await ivfService.bulkUpsertKpiConfig(tankIds, configsToApply);
-                }
-                setMultiDraftConfig({});
-                // Re-sync zone names after a refrigerator save (zone_name label may have changed).
-                if (primaryContainer?.is_refrigerator) {
-                    const refId = primaryContainer.refrigerator_id ?? primaryContainer.tank_id;
-                    const freshZones = await ivfService.getRefrigeratorZones(refId).catch(() => refrigeratorZones);
-                    setRefrigeratorZones(freshZones);
-                }
-                // For multi-container, deselect all. For single container, reload config.
-                if (selectedContainers.length > 1) {
-                    await refetchForPrimary(selectedContainers[0], {
-                        showLoading: true,
-                        chamberId: selectedChamberId,
-                        zoneId: selectedZoneId,
-                    });
-                    setSelectedContainers([]);
-                } else if (primaryContainer) {
-                    await refetchForPrimary(primaryContainer, {
-                        showLoading: true,
-                        chamberId: selectedChamberId,
-                        zoneId: selectedZoneId,
-                    });
-                }
-                toast.success("Changes saved successfully");
-            } catch (e: any) {
-                setConfigError(e?.message || "Save failed");
-            } finally {
-                setSaveAllLoading(false);
-            }
-            return;
+    // Scope pill (chamber for incubators, zone for refrigerators). Shown only once
+    // a device is selected and the direction is incubator/refrigerator.
+    const scopeOptions: Array<{ id: string | null; label: string }> = (() => {
+        if (!primaryContainer) return [];
+        if (primaryContainer.is_incubator) {
+            const total = (primaryContainer.chamber_r ?? 0) * (primaryContainer.chamber_c ?? 0);
+            return [
+                { id: null, label: "Common" },
+                ...Array.from({ length: total }, (_, i) => ({ id: String(i + 1), label: `Chamber ${i + 1}` })),
+            ];
         }
-        const ids = Object.keys(draftConfig).map(Number);
-        const hasTemplateDrafts = Object.keys(multiDraftConfig).length > 0;
-        if (ids.length === 0 && !hasTemplateDrafts && !zoneNameDirty) return;
-        setSaveAllLoading(true);
-        try {
-            // Persist a zone rename: re-upsert the zone's existing configs (unchanged
-            // values) carrying the new zone_name. Runs before the per-id updates below,
-            // which don't touch zone_name, so threshold edits aren't clobbered.
-            if (zoneNameDirty && primaryContainer?.is_refrigerator) {
-                await ivfService.bulkUpsertKpiConfigForRefrigerator(
-                    primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
-                    selectedZoneId,
-                    configList.map((c) => ({
-                        kpi_name: c.kpi_name,
-                        alert_name: c.alert_name,
-                        min: c.min,
-                        max: c.max,
-                        unit: c.unit,
-                        alert_type: c.alert_type,
-                        cooldown_minutes: c.cooldown_minutes,
-                        unack_escalation_threshold: c.unack_escalation_threshold,
-                        status: c.status,
-                    })),
-                    effectiveZoneName,
-                );
-            }
-            for (const id of ids) {
-                const d = draftConfig[id];
-                if (!d) continue;
-
-                // Find the KPI name for this config id to apply special logic
-                const config = configList.find((c) => c.id === id);
-                const kpiName = config?.kpi_name || "";
-                const cfg = getKpiFormConfig(kpiName);
-
-                let minVal = d.min !== undefined ? d.min : undefined;
-                let maxVal = d.max !== undefined ? d.max : undefined;
-
-                if (cfg.max_bound !== null && minVal !== undefined && minVal !== null) {
-                    maxVal = cfg.max_bound;  // battery: max is always the hard ceiling
-                }
-                if (!cfg.max_available && cfg.max_bound === null) {
-                    maxVal = null;  // ln2_level: no max
-                }
-                if (cfg.custom_dropdown && d.lid_state !== undefined) {
-                    const values = lidStateToValues(d.lid_state || null);
-                    minVal = values.min;
-                    maxVal = values.max;
-                }
-
-                const nextAlertType =
-                    d.alert_type !== undefined
-                        ? d.alert_type
-                        : config?.alert_type ?? null;
-
-                await ivfService.updateKpiConfig(id, {
-                    min: minVal,
-                    max: maxVal,
-                    alert_type: nextAlertType,
-                    cooldown_minutes:
-                        d.cooldown_minutes !== undefined
-                            ? d.cooldown_minutes
-                            : undefined,
-                    unack_escalation_threshold: nextAlertType === "critical" ? (d.unack_escalation_threshold ?? null) : null,
-                    status: isActiveAlertType(nextAlertType),
-                });
-            }
-            if (primaryContainer && hasTemplateDrafts) {
-                const configsToApply: Array<{
-                    kpi_name: string;
-                    alert_name: string | null;
-                    min: number | null;
-                    max: number | null;
-                    unit: string | null;
-                    alert_type: string | null;
-                    cooldown_minutes?: number;
-                    unack_escalation_threshold?: number | null;
-                    status?: boolean;
-                }> = [];
-
-                for (const kpiName of missingKpiNames) {
-                    const d = getMultiDraft(kpiName);
-                    const metadata = getKpiMetadata(kpiName);
-                    const cfg = getKpiFormConfig(kpiName);
-
-                    let minVal = d.min ?? null;
-                    let maxVal = d.max ?? null;
-
-                    if (cfg.max_bound !== null && minVal !== null) {
-                        maxVal = cfg.max_bound;
-                    }
-                    if (!cfg.max_available && cfg.max_bound === null) {
-                        maxVal = null;
-                    }
-                    if (cfg.custom_dropdown && d.lid_state) {
-                        const values = lidStateToValues(d.lid_state);
-                        minVal = values.min;
-                        maxVal = values.max;
-                    }
-
-                    if (
-                        minVal !== null ||
-                        maxVal !== null ||
-                        d.alert_type !== undefined
-                    ) {
-                        configsToApply.push({
-                            kpi_name: kpiName,
-                            alert_name:
-                                kpiName === KPI_NAMES.IVF_LN2_LEVEL
-                                    ? "LN2"
-                                    : metadata.label,
-                            min: minVal,
-                            max: maxVal,
-                            unit: metadata.unit ?? null,
-                            alert_type: d.alert_type ?? null,
-                            cooldown_minutes: d.cooldown_minutes,
-                            unack_escalation_threshold: d.alert_type === "critical" ? (d.unack_escalation_threshold ?? null) : null,
-                            status: isActiveAlertType(d.alert_type ?? null),
-                        });
-                    }
-                }
-
-                if (configsToApply.length > 0) {
-                    if (primaryContainer.is_refrigerator) {
-                        await ivfService.bulkUpsertKpiConfigForRefrigerator(
-                            primaryContainer.refrigerator_id ?? primaryContainer.tank_id,
-                            selectedZoneId,
-                            configsToApply,
-                            effectiveZoneName,
-                        );
-                    } else if (primaryContainer.is_incubator) {
-                        await ivfService.bulkUpsertKpiConfigForIncubator(
-                            primaryContainer.incubator_id ?? primaryContainer.tank_id,
-                            selectedChamberId,
-                            configsToApply,
-                        );
-                    } else {
-                        await ivfService.bulkUpsertKpiConfig([primaryContainer.tank_id], configsToApply);
-                    }
-                }
-            }
-            setDraftConfig({});
-            setMultiDraftConfig({});
-            // Re-sync zone names after refrigerator save (zone_name label may have changed).
-            if (primaryContainer?.is_refrigerator) {
-                const refId = primaryContainer.refrigerator_id ?? primaryContainer.tank_id;
-                const freshZones = await ivfService.getRefrigeratorZones(refId).catch(() => refrigeratorZones);
-                setRefrigeratorZones(freshZones);
-            }
-            if (primaryContainer) {
-                await refetchForPrimary(primaryContainer, {
-                    showLoading: true,
-                    chamberId: selectedChamberId,
-                    zoneId: selectedZoneId,
-                });
-            }
-            toast.success("Changes saved successfully");
-        } catch (e: any) {
-            setConfigError(e?.message || "Save failed");
-        } finally {
-            setSaveAllLoading(false);
+        if (primaryContainer.is_refrigerator) {
+            return (primaryContainer.zones ?? []).map((z) => ({ id: z.zone_id, label: z.zone_name }));
         }
+        return [];
+    })();
+    const showScopePill = !!primaryContainer && (primaryContainer.is_incubator || primaryContainer.is_refrigerator) && scopeOptions.length > 0;
+    const scopeValue: string | null = primaryContainer?.is_refrigerator ? selectedZoneId : selectedChamberId;
+    const scopeLabel =
+        scopeOptions.find((o) => o.id === scopeValue)?.label ??
+        (primaryContainer?.is_incubator ? "Common" : "Select Zone");
+    const setScope = (id: string | null) => {
+        if (primaryContainer?.is_refrigerator) setSelectedZoneId(id);
+        else setSelectedChamberId(id);
+        setShowScopeDropdown(false);
     };
-
-    const handleDeleteConfirm = async () => {
-        if (configToDeleteId == null) return;
-        setDeleteLoading(true);
-        try {
-            await ivfService.deleteKpiConfig(configToDeleteId);
-            closeDeleteConfirm();
-            if (primaryContainer) {
-                await refetchForPrimary(primaryContainer, {
-                    showLoading: true,
-                    chamberId: selectedChamberId,
-                    zoneId: selectedZoneId,
-                });
-            }
-        } catch (e: any) {
-            setConfigError(e?.message || "Delete failed");
-        } finally {
-            setDeleteLoading(false);
-        }
-    };
-
-    const openNotifySettings = async () => {
-        setShowNotifySettings(true);
-        setNotifySettingsError(null);
-        setNotifySettingsLoading(true);
-        try {
-            const res = await ivfService.getHospitalNotificationSettings();
-            setNotifySettings(res);
-        } catch (e: any) {
-            setNotifySettingsError(
-                e?.message || "Failed to load notification settings",
-            );
-        } finally {
-            setNotifySettingsLoading(false);
-        }
-    };
-
-    const handleSelectNotificationChannel = (
-        channel: "email" | "whatsapp",
-        enabled: boolean,
-    ) => {
-        setNotifySettings((prev) =>
-            channel === "email"
-                ? { ...prev, is_email_notifify: enabled }
-                : { ...prev, is_whatsapp_notify: enabled },
-        );
-        setNotifySettingsError(null);
-    };
-
-    const handleSaveNotifySettings = async () => {
-        if (
-            !notifySettings.is_email_notifify &&
-            !notifySettings.is_whatsapp_notify
-        ) {
-            setNotifySettingsError("Enable at least one notification channel");
-            return;
-        }
-        setNotifySettingsSaving(true);
-        setNotifySettingsError(null);
-        try {
-            await ivfService.updateHospitalNotificationSettings({
-                is_email_notifify: notifySettings.is_email_notifify,
-                is_whatsapp_notify: notifySettings.is_whatsapp_notify,
-            });
-            const updatedSettings =
-                await ivfService.getHospitalNotificationSettings();
-            setNotifySettings(updatedSettings);
-            setShowNotifySettings(false);
-        } catch (e: any) {
-            setNotifySettingsError(
-                e?.message || "Failed to save notification settings",
-            );
-        } finally {
-            setNotifySettingsSaving(false);
-        }
-    };
-
-    const isMultiMode =
-        selectedContainers.length > 1 || configList.length === 0;
-    const hasPendingChanges =
-        (isMultiMode
-            ? Object.keys(multiDraftConfig).length > 0
-            : Object.keys(draftConfig).length > 0 ||
-              Object.keys(multiDraftConfig).length > 0) || zoneNameDirty;
-
-    // ─── Shared input renderer driven by KPI_FORM_CONFIG ─────────────────────
-    const renderKpiInputs = (
-        kpiName: string,
-        minVal: number | null,
-        maxVal: number | null,
-        lidStateVal: string,
-        kpiKey: string,
-        refs: { min?: HTMLInputElement | HTMLSelectElement | null; max?: HTMLInputElement | null },
-        onMin: (v: number | null) => void,
-        onMax: (v: number | null) => void,
-        onLid: (v: string) => void,
-    ) => {
-        const cfg = getKpiFormConfig(kpiName);
-        const dropdownKey = `lid-${kpiKey}`;
-
-        if (cfg.custom_dropdown) {
-            return (
-                <div className="flex items-center gap-2">
-                    <div className="relative w-64">
-                        <button
-                            type="button"
-                            className="dropdown-button w-full px-3 h-10 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary-muted focus:border-transparent bg-white text-gray-900"
-                            onClick={() => setOpenDropdowns((prev) => ({ ...prev, [dropdownKey]: !prev[dropdownKey] }))}
-                        >
-                            <span>{cfg.custom_dropdown.find((o) => o.value === lidStateVal)?.label || "Select"}</span>
-                            <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns[dropdownKey] ? "rotate-180" : ""}`} />
-                        </button>
-                        {openDropdowns[dropdownKey] && (
-                            <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                                {cfg.custom_dropdown.map((opt) => (
-                                    <button
-                                        key={opt.value}
-                                        type="button"
-                                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${opt.value === lidStateVal ? "bg-gray-200 text-gray-900" : "text-gray-700 hover:bg-gray-100"}`}
-                                        onClick={() => {
-                                            onLid(opt.value);
-                                            setOpenDropdowns((prev) => ({ ...prev, [dropdownKey]: false }));
-                                        }}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        }
-
-        return (
-            <>
-                {cfg.min_available && (
-                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent">
-                        <span className="text-xs text-black block">{cfg.min_label ?? "Min"}</span>
-                        <div className="flex items-center gap-1">
-                            <input
-                                ref={(el) => { refs.min = el; }}
-                                type="number"
-                                step="any"
-                                min={cfg.min_bound ?? undefined}
-                                max={cfg.max_bound ?? undefined}
-                                value={minVal != null ? minVal : ""}
-                                onChange={(e) => {
-                                    let v = e.target.value === "" ? null : Number(e.target.value);
-                                    if (v !== null && cfg.min_bound !== null && v < cfg.min_bound) v = cfg.min_bound;
-                                    if (v !== null && cfg.max_bound !== null && v > cfg.max_bound) v = cfg.max_bound;
-                                    onMin(v);
-                                }}
-                                onKeyDown={(e) => handleKeyDown(e, kpiKey, "min")}
-                                placeholder={cfg.min_label ?? "Min"}
-                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                            />
-                            {cfg.unit && <span className="text-sm text-gray-500 shrink-0">{cfg.unit}</span>}
-                        </div>
-                    </label>
-                )}
-                {cfg.max_available && (
-                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent">
-                        <span className="text-xs text-black block">{cfg.max_label ?? "Max"}</span>
-                        <div className="flex items-center gap-1">
-                            <input
-                                ref={(el) => { refs.max = el as HTMLInputElement; }}
-                                type="number"
-                                step="any"
-                                min={cfg.min_bound ?? undefined}
-                                value={maxVal != null ? maxVal : ""}
-                                onChange={(e) => {
-                                    let v = e.target.value === "" ? null : Number(e.target.value);
-                                    if (v !== null && cfg.min_bound !== null && v < cfg.min_bound) v = cfg.min_bound;
-                                    onMax(v);
-                                }}
-                                onKeyDown={(e) => handleKeyDown(e, kpiKey, "max")}
-                                placeholder={cfg.max_label ?? "Max"}
-                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
-                            />
-                            {cfg.unit && <span className="text-sm text-gray-500 shrink-0">{cfg.unit}</span>}
-                        </div>
-                    </label>
-                )}
-            </>
-        );
-    };
-    // ─────────────────────────────────────────────────────────────────────────
 
     return (
         <>
@@ -931,17 +334,15 @@ export default function AlertSetting() {
                     icon={CriticalAlertsIcon}
                     patternBackground
                     actions={
-                        <div className="md:hidden">
-                            <FilterPanel activeCount={activeFilterCount}>
-                                <FilterSelect
-                                    label="Branch"
-                                    value={branchFilter}
-                                    options={branchOptions}
-                                    allLabel="All Branches"
-                                    onChange={(v) => setBranchFilter(v)}
-                                />
-                            </FilterPanel>
-                        </div>
+                        <button
+                            id="onboarding-alert-config-history"
+                            type="button"
+                            onClick={() => setShowHistory(true)}
+                            className="h-9 px-3 md:px-4 rounded-lg bg-white text-gray-700 border border-line hover:bg-gray-50 text-[13px] font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors"
+                        >
+                            <History className="w-4 h-4" />
+                            <span className="hidden sm:inline">Config History</span>
+                        </button>
                     }
                 >
                     {(() => {
@@ -1007,6 +408,7 @@ export default function AlertSetting() {
                             {/* Tank / Incubator pill */}
                             <div className="relative max-[490px]:flex-1 max-[490px]:basis-[calc(50%-0.1875rem)] max-[490px]:min-w-0" ref={tankDropdownRef}>
                                 <button
+                                    id="onboarding-alert-tank-dropdown"
                                     type="button"
                                     onClick={() => {
                                         if (!containersLoading && filteredContainers.length > 0) {
@@ -1029,12 +431,13 @@ export default function AlertSetting() {
                                 </button>
 
                                 {showBranchDropdown && filteredContainers.length > 0 && (
-                                    <div className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                    <div id="onboarding-alert-tank-dropdown-list" className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                                         {filteredContainers.map((c) => {
                                             const isSelected = selectedContainers.some((s) => s.tank_id === c.tank_id);
                                             return (
                                                 <button
                                                     key={`${c.branch_id}-${c.tank_id}-${c.canisterId}`}
+                                                    id={`onboarding-alert-container-${c.canisterId}`}
                                                     type="button"
                                                     onClick={() => {
                                                         setSelectedContainers([c]);
@@ -1057,15 +460,84 @@ export default function AlertSetting() {
                                 )}
                             </div>
 
-                            {/* History pill */}
-                            <button
-                                type="button"
-                                onClick={() => setShowHistory(true)}
-                                className="h-9 px-4 rounded-full text-[13px] font-semibold text-white/90 border border-white/15 hover:bg-white/10 flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors max-[490px]:w-full"
-                            >
-                                <History className="w-3.5 h-3.5" />
-                                Config History
-                            </button>
+                            {/* Chamber / Zone pill (incubators + refrigerators) */}
+                            {showScopePill && (
+                                <div className="relative max-[490px]:flex-1 max-[490px]:basis-[calc(50%-0.1875rem)] max-[490px]:min-w-0" ref={scopeDropdownRef}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowScopeDropdown((v) => !v)}
+                                        className={`h-9 px-4 rounded-full text-[13px] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors focus:outline-none max-[490px]:w-full ${
+                                            scopeValue !== null
+                                                ? "bg-white text-primary"
+                                                : "text-white/90 border border-white/15 hover:bg-white/10"
+                                        }`}
+                                    >
+                                        {scopeLabel}
+                                        <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${showScopeDropdown ? "rotate-180" : ""}`} />
+                                    </button>
+                                    {showScopeDropdown && (
+                                        primaryContainer?.is_incubator ? (
+                                            /* Chamber grid — mirrors the incubator's physical rows × cols layout */
+                                            <div className="absolute top-full mt-2 left-0 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg p-2.5 w-max max-w-[80vw]">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setScope(null)}
+                                                    className={`w-full h-8 mb-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                                                        selectedChamberId === null
+                                                            ? "bg-primary text-white"
+                                                            : "bg-white text-gray-500 border border-gray-200 hover:border-primary hover:text-primary"
+                                                    }`}
+                                                >
+                                                    Common
+                                                </button>
+                                                <div
+                                                    className="grid gap-1.5"
+                                                    style={{ gridTemplateColumns: `repeat(${primaryContainer.chamber_c ?? 1}, minmax(28px, 1fr))` }}
+                                                >
+                                                    {Array.from({ length: primaryContainer.chamber_r ?? 0 }).map((_, r) =>
+                                                        Array.from({ length: primaryContainer.chamber_c ?? 0 }).map((_, c) => {
+                                                            const num = r * (primaryContainer.chamber_c ?? 0) + c + 1;
+                                                            const id = String(num);
+                                                            const active = selectedChamberId === id;
+                                                            return (
+                                                                <button
+                                                                    key={id}
+                                                                    type="button"
+                                                                    onClick={() => setScope(active ? null : id)}
+                                                                    className={`h-8 min-w-[28px] rounded-lg text-xs font-semibold transition-all duration-150 ${
+                                                                        active
+                                                                            ? "bg-primary text-white"
+                                                                            : "bg-white text-gray-500 border border-gray-200 hover:border-primary hover:text-primary"
+                                                                    }`}
+                                                                >
+                                                                    {num}
+                                                                </button>
+                                                            );
+                                                        }),
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                                {scopeOptions.map((opt) => (
+                                                    <button
+                                                        key={opt.id ?? "__common__"}
+                                                        type="button"
+                                                        onClick={() => setScope(opt.id)}
+                                                        className={`w-full text-left px-3 py-2 text-xs transition-colors duration-150 ${
+                                                            opt.id === scopeValue
+                                                                ? "bg-primary/10 text-primary font-medium"
+                                                                : "text-gray-700 hover:bg-gray-50"
+                                                        }`}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )
+                                    )}
+                                </div>
+                            )}
                         </div>
                     );
                     return (
@@ -1086,17 +558,22 @@ export default function AlertSetting() {
                         <section id="onboarding-alert-kpi-panel" className="bg-white rounded-2xl border border-line p-4 min-w-0 flex flex-1 flex-col min-h-0 xl1:relative">
                             <div className="flex items-center justify-between gap-3 mb-4">
                                 <h2 className="font-bold text-black text-base">
-                                    Tank Monitoring
+                                    {deviceLabel} Configuration
                                 </h2>
                                 <div className="flex items-center gap-2">
-                                    {(directionFilter === "cryotanks"
-                                        ? !primaryContainer || (!primaryContainer.is_incubator && !primaryContainer.is_refrigerator)
-                                        : primaryContainer && !primaryContainer.is_incubator && !primaryContainer.is_refrigerator) && (
+                                    {(primaryContainer || directionFilter === "cryotanks") && (
                                         <div className="relative group hidden md:block">
                                             <button
+                                                id="onboarding-alert-set-recommended"
                                                 type="button"
                                                 disabled={!primaryContainer}
-                                                onClick={() => bentoGridRef.current?.applyRecommended()}
+                                                onClick={() => {
+                                                    if (primaryContainer?.is_incubator || primaryContainer?.is_refrigerator) {
+                                                        deviceGridRef.current?.applyRecommended();
+                                                    } else {
+                                                        bentoGridRef.current?.applyRecommended();
+                                                    }
+                                                }}
                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-light active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
                                             >
                                                 <Sparkles size={14} />
@@ -1111,33 +588,35 @@ export default function AlertSetting() {
                                     )}
                                 </div>
                             </div>
-                            {!primaryContainer && directionFilter !== "cryotanks" ? (
-                                <div className="flex-1 flex items-center justify-center">
-                                    <div className="text-center text-gray-400">
-                                        <svg
-                                            className="w-16 h-16 mx-auto mb-3 opacity-50"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.5"
-                                        >
-                                            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-                                            <rect
-                                                x="9"
-                                                y="3"
-                                                width="6"
-                                                height="4"
-                                                rx="1"
-                                            />
-                                            <path
-                                                d="M9 12h6M9 16h6"
-                                                strokeLinecap="round"
-                                            />
-                                        </svg>
-                                        <p className="text-md">
-                                            Select a container to view live monitoring
-                                        </p>
-                                    </div>
+                            {directionFilter === "incubators" || directionFilter === "refrigerators" ? (
+                                <div className="flex-1 min-h-0 flex flex-col">
+                                    <DeviceKpiGrid
+                                        ref={deviceGridRef}
+                                        deviceType={directionFilter === "refrigerators" ? "refrigerator" : "incubator"}
+                                        deviceId={
+                                            !primaryContainer
+                                                ? null
+                                                : primaryContainer.is_refrigerator
+                                                    ? (primaryContainer.refrigerator_id ?? primaryContainer.tank_id)
+                                                    : (primaryContainer.incubator_id ?? primaryContainer.tank_id)
+                                        }
+                                        scopeId={
+                                            !primaryContainer
+                                                ? null
+                                                : primaryContainer.is_refrigerator
+                                                    ? selectedZoneId
+                                                    : selectedChamberId
+                                        }
+                                        scopeNoun={directionFilter === "refrigerators" ? "Zone" : "Chamber"}
+                                        scopeName={
+                                            directionFilter === "refrigerators" && scopeValue != null
+                                                ? scopeOptions.find((o) => o.id === scopeValue)?.label ?? null
+                                                : null
+                                        }
+                                        otherScopes={scopeOptions
+                                            .filter((o) => o.id !== null && o.id !== scopeValue)
+                                            .map((o) => ({ id: o.id as string, label: o.label }))}
+                                    />
                                 </div>
                             ) : (
                                 <div className="flex-1 min-h-0 flex flex-col">
