@@ -90,6 +90,16 @@ _ADVISORY_LOCK_NS_KPI = 4711
 # Cross-process guard so a given alert is emailed to a given recipient only once.
 _EMAIL_DEDUP_TTL_SECONDS = 21600  # 6 hours
 
+# WhatsApp throttle, independent of kpi_config.cooldown_minutes and email.
+# Redis holds, per kpi_config + role group ("user" = role User, "admin" =
+# Manager/Admin), the reading timestamp of the last WhatsApp actually delivered to
+# that group. Windows compare reading (device) timestamps, not wall clock. A newer
+# deviation=False reading means the KPI recovered — fresh episode, that group is
+# notified again regardless of its window. Fail-open when Redis is unreachable.
+_WA_USER_COOLDOWN_SECONDS = 60 * 60
+_WA_ADMIN_COOLDOWN_SECONDS = 2 * 60 * 60
+_wa_last_sent_key = lambda kpi_config_id, group: f"alert:whatsapp:last_sent:{kpi_config_id}:{group}"
+
 # WhatsApp Content Template SIDs
 _WA_TEMPLATE_DEVIATION = "HX890c0696439223c8f7b952d35360ea25"   # "{{1}} is deviated to {{2}} in {{3}} branch for {{4}} tank"
 _WA_TEMPLATE_LID_STATE = "HXb0f2ec1db58e9f6ac5be31473a6a6cf7"   # "{{1}} is {{2}} in {{3}} branch for {{4}} tank"
@@ -339,27 +349,31 @@ class CriticalAlertService:
 
         return branch.hospital_id, branch.branch_id
 
-    def _get_hospital_notification_config(
-        self, hospital_id: Optional[int]
-    ) -> tuple[bool, bool, bool]:
-        """Return hospital notification config as (email_enabled, whatsapp_enabled, push_enabled)."""
-        if hospital_id is None:
-            return False, False, False
-
-        config = (
-            self.db.query(
-                Hospital.is_email_notifify,
-                Hospital.is_whatsapp_notify,
-                Hospital.is_push_notify,
+    def _tank_has_email_alert_enabled(self, tank_id: int) -> bool:
+        """True when any active KPI config for the tank has per-KPI email alerts on."""
+        return (
+            self.db.query(KpiConfig.id)
+            .filter(
+                KpiConfig.tank_id == tank_id,
+                KpiConfig.status == True,
+                KpiConfig.email_alert == True,
             )
-            .filter(Hospital.hospital_id == hospital_id)
             .first()
+            is not None
         )
-        if not config:
-            return False, False, False
 
-        email_enabled, whatsapp_enabled, push_enabled = config
-        return bool(email_enabled), bool(whatsapp_enabled), bool(push_enabled)
+    def _hospital_push_configured(self, hospital_id: Optional[int]) -> bool:
+        """Push stays a hospital-wide toggle (unlike email/whatsapp, which are
+        per-KPI-config) — see Hospital.is_push_notify."""
+        if hospital_id is None:
+            return False
+
+        push_enabled = (
+            self.db.query(Hospital.is_push_notify)
+            .filter(Hospital.hospital_id == hospital_id)
+            .scalar()
+        )
+        return bool(push_enabled)
 
     def _generate_dedup_key(
         self,
@@ -764,40 +778,35 @@ class CriticalAlertService:
             )  # Set branch_id on alert for better filtering and notification targeting
             alert.tank_id = tank_id  # Set tank_id on alert for better filtering and notification targeting
 
-            # Notify only when a new alert row was actually created. When a concurrent
-            # run already created this alert, _create_alert returns the existing row with
-            # created=False and we must not re-send (root cause of duplicate emails).
-            # Fetch all notification flags in a single DB query.
-            if created and kpi_config.alert_type == "critical":
-                (
-                    is_hospital_email_configured,
-                    is_hospital_whatsapp_configured,
-                    is_hospital_push_configured,
-                ) = self._get_hospital_notification_config(alert.hospital_id)
-                if is_hospital_email_configured:
-                    if kpi_config.unack_escalation_threshold is not None:
-                        # Escalation mode: initial alert goes to branch users only.
-                        # Admins/Managers are notified when unack_escalation_threshold is reached.
-                        self._send_alert_email_to_users_only(alert)
-                    else:
-                        # Original behavior: Managers + Admins + branch Users all notified.
-                        self._send_alert_email(alert)
+            # Per-KPI notification channels (kpi_config.email_alert / whatsapp_alert).
+            if kpi_config.email_alert:
+                if kpi_config.unack_escalation_threshold is not None:
+                    # Escalation mode: initial alert goes to branch users only.
+                    # Admins/Managers are notified when unack_escalation_threshold is reached.
+                    self._send_alert_email_to_users_only(alert)
                 else:
-                    logger.info(
-                        "Skipping email for alert_id=%s because hospital_id=%s has email notifications disabled",
-                        alert.alert_id,
-                        alert.hospital_id,
-                    )
-                logger.info(f"WHATSAPPAlert created for {is_hospital_whatsapp_configured} tank_id={tank_id} kpi_config_id={kpi_config.id}")
-                if is_hospital_whatsapp_configured:
-                    self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
-                else:
-                    logger.info(
-                        "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
-                        alert.alert_id,
-                        alert.hospital_id,
-                    )
-                if is_hospital_push_configured:
+                    # Original behavior: Managers + Admins + branch Users all notified.
+                    self._send_alert_email(alert)
+            else:
+                logger.info(
+                    "Skipping email for alert_id=%s because kpi_config_id=%s has email_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+            if kpi_config.whatsapp_alert:
+                self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+            else:
+                logger.info(
+                    "Skipping WhatsApp for alert_id=%s because kpi_config_id=%s has whatsapp_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+
+            # Push stays hospital-wide (Hospital.is_push_notify) and gated on `created` —
+            # unlike email/whatsapp above it has no cooldown-driven re-notify design of its
+            # own, only a per-alert-id Redis dedup guard for concurrent-worker safety.
+            if created:
+                if self._hospital_push_configured(alert.hospital_id):
                     self._send_alert_push(alert)
                 else:
                     logger.info(
@@ -1093,36 +1102,31 @@ class CriticalAlertService:
                 extra_info=str(kpi_config.id),
             )
 
-            # Notify only when a new alert row was actually created — mirrors the tank
-            # path. When a concurrent run already created this alert, created=False and
-            # we must not re-send (this was previously the root cause of duplicate
-            # refrigerator emails firing on every telemetry cycle within the dedup window).
-            if created and kpi_config.alert_type == "critical":
-                (
-                    is_hospital_email_configured,
-                    is_hospital_whatsapp_configured,
-                    is_hospital_push_configured,
-                ) = self._get_hospital_notification_config(alert.hospital_id)
-                if is_hospital_email_configured:
-                    if kpi_config.unack_escalation_threshold is not None:
-                        self._send_alert_email_to_users_only(alert)
-                    else:
-                        self._send_alert_email(alert)
+            if kpi_config.email_alert:
+                if kpi_config.unack_escalation_threshold is not None:
+                    self._send_alert_email_to_users_only(alert)
                 else:
-                    logger.info(
-                        "Skipping email for alert_id=%s because hospital_id=%s has email notifications disabled",
-                        alert.alert_id,
-                        alert.hospital_id,
-                    )
-                if is_hospital_whatsapp_configured:
-                    self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
-                else:
-                    logger.info(
-                        "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
-                        alert.alert_id,
-                        alert.hospital_id,
-                    )
-                if is_hospital_push_configured:
+                    self._send_alert_email(alert)
+            else:
+                logger.info(
+                    "Skipping email for alert_id=%s because kpi_config_id=%s has email_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+            if kpi_config.whatsapp_alert:
+                self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+            else:
+                logger.info(
+                    "Skipping WhatsApp for alert_id=%s because kpi_config_id=%s has whatsapp_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+
+            # Push stays hospital-wide (Hospital.is_push_notify) and gated on `created` —
+            # mirrors the tank path; unlike email/whatsapp it has no cooldown-driven
+            # re-notify design of its own, only a per-alert-id Redis dedup guard.
+            if created:
+                if self._hospital_push_configured(alert.hospital_id):
                     self._send_alert_push(alert)
                 else:
                     logger.info(
@@ -1424,6 +1428,7 @@ class CriticalAlertService:
                 # Create new database session for background thread
                 bg_db = SessionLocal()
                 try:
+                    bg_service = CriticalAlertService(bg_db)
                     for alert in alerts_to_email:
                         try:
                             # Refresh alert from database for background thread
@@ -1435,6 +1440,8 @@ class CriticalAlertService:
                             if (
                                 alert_refreshed
                                 and alert_refreshed.severity == AlertSeverity.HIGH.value
+                                and alert_refreshed.tank_id is not None
+                                and bg_service._tank_has_email_alert_enabled(alert_refreshed.tank_id)
                             ):
                                 self._send_alert_email(alert_refreshed)
                         except Exception as e:
@@ -2049,6 +2056,65 @@ class CriticalAlertService:
             )
             return
 
+        role_group = lambda u: "user" if u.role == "User" else "admin"
+        sent_groups: set = set()
+        if kpi_config is not None and alert.occurred_at is not None:
+            _aware = lambda ts: ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+            current_ts = _aware(alert.occurred_at)
+            latest_clear_reading = (
+                self.db.query(Readings)
+                .filter(
+                    Readings.tank_id == alert.tank_id,
+                    Readings.kpi_config_id == kpi_config.id,
+                    Readings.deviation == False,
+                )
+                .order_by(Readings.timestamp.desc())
+                .first()
+            )
+            clear_ts = _aware(latest_clear_reading.timestamp) if latest_clear_reading else None
+
+            # Baseline per group = reading timestamp of the group's last delivered
+            # WhatsApp (not the last alert — alerts whose WhatsApp was suppressed or
+            # disabled must not slide the window forward). Missing/unreadable key
+            # counts as never sent, so Redis outages can only over-notify.
+            def _last_sent_from_redis(group: str):
+                try:
+                    v = get_redis().get(_wa_last_sent_key(kpi_config.id, group))
+                    return datetime.fromisoformat(v) if v else None
+                except Exception as exc:
+                    logger.warning(
+                        "Redis WhatsApp last-sent lookup failed for kpi_config_id=%s %s (%s); treating as fresh",
+                        kpi_config.id, group, exc,
+                    )
+                    return None
+
+            group_last_sent = {
+                "user": _last_sent_from_redis("user"),
+                "admin": _last_sent_from_redis("admin"),
+            }
+            group_cooldowns = {
+                "user": _WA_USER_COOLDOWN_SECONDS,
+                "admin": _WA_ADMIN_COOLDOWN_SECONDS,
+            }
+            skipped_groups: set = set()
+            for group, last_sent in group_last_sent.items():
+                if last_sent is None:
+                    continue  # never messaged this group for this KPI — fresh
+                last_sent = _aware(last_sent)
+                if clear_ts is not None and clear_ts > last_sent:
+                    continue  # KPI recovered since this group's last message — fresh
+                elapsed = (current_ts - last_sent).total_seconds()
+                if elapsed < group_cooldowns[group]:
+                    skipped_groups.add(group)
+                    logger.info(
+                        "Skipping WhatsApp %s recipients for alert_id=%s kpi_config_id=%s: "
+                        "last delivered %.0fs before this reading (cooldown=%ss)",
+                        group, alert.alert_id, kpi_config.id, elapsed, group_cooldowns[group],
+                    )
+            recipients = [u for u in recipients if role_group(u) not in skipped_groups]
+            if not recipients:
+                return
+
         for user in recipients:
             try:
                 to_number = _to_whatsapp_number(user.phone_number)
@@ -2062,6 +2128,7 @@ class CriticalAlertService:
                     "Sent WhatsApp alert to %s for alert_id=%s (template=%s twilio_sid=%s)",
                     to_number, alert.alert_id, template_sid, msg.sid,
                 )
+                sent_groups.add(role_group(user))
                 ActivityLogService(self.db).log_activity(
                     action="whatsapp.critical_alert_sent",
                     outcome=ActivityOutcome.SUCCESS.value,
@@ -2108,6 +2175,24 @@ class CriticalAlertService:
                         "error": str(e),
                     },
                 )
+
+        # Stamp the delivered groups with this reading's timestamp.
+        if kpi_config is not None and alert.occurred_at is not None and sent_groups:
+            occurred = alert.occurred_at if alert.occurred_at.tzinfo else alert.occurred_at.replace(tzinfo=timezone.utc)
+            for group in sent_groups:
+                try:
+                    get_redis().set(
+                        _wa_last_sent_key(kpi_config.id, group),
+                        occurred.isoformat(),
+                        # Key lives exactly as long as the group's window; once it
+                        # expires the next alert is fresh by definition.
+                        ex=_WA_USER_COOLDOWN_SECONDS if group == "user" else _WA_ADMIN_COOLDOWN_SECONDS,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to store WhatsApp last-sent in Redis for kpi_config_id=%s %s: %s",
+                        kpi_config.id, group, exc,
+                    )
 
     def _check_escalation_needed(self, kpi_config, tank_id: int) -> bool:
         """Return True when N consecutive unacknowledged alerts exist for a KPI and the
@@ -2183,10 +2268,9 @@ class CriticalAlertService:
             return
 
         hospital_id = branch.hospital_id
-        is_email_enabled, _, _ = self._get_hospital_notification_config(hospital_id)
-        if not is_email_enabled:
+        if not (kpi_config.email_alert or kpi_config.whatsapp_alert):
             logger.info(
-                "Skipping escalation email — hospital_id=%s has email notifications disabled", hospital_id
+                "Skipping escalation email — kpi_config_id=%s has no notification channel enabled", kpi_config.id
             )
             return
 
@@ -2388,11 +2472,10 @@ class CriticalAlertService:
             return
 
         hospital_id = refrigerator.hospital_id
-        is_email_enabled, _, _ = self._get_hospital_notification_config(hospital_id)
-        if not is_email_enabled:
+        if not (kpi_config.email_alert or kpi_config.whatsapp_alert):
             logger.info(
-                "Skipping refrigerator escalation email — hospital_id=%s has email notifications disabled",
-                hospital_id,
+                "Skipping refrigerator escalation email — kpi_config_id=%s has no notification channel enabled",
+                kpi_config.id,
             )
             return
 
