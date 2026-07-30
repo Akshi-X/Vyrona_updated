@@ -1,9 +1,10 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { DatabaseTable } from '../../components/DatabaseTable';
-import Header from '../../components/Header';
+import PageLayout from '../../components/PageLayout';
 import { useEffect, useState } from 'react';
 import { userService } from '../../services/userService';
+import DatabaseIcon from '../../assets/DashBoardIcons/DatabaseDark.svg';
 
 export default function Database() {
   const { isAuthenticated } = useAuth();
@@ -35,27 +36,24 @@ export default function Database() {
     );
   }
 
-  return (
-    <div className="bg-surface flex w-full" style={{ height: '100vh' }}>
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <Header
-          title=""
-          showBackButton={false}
-          className=""
-          rightContent={(
-            <div 
-              className="w-[30px] h-[30px] bg-primary-muted rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
-              onClick={() => navigate('/user-profile')}
-              title="Go to User Profile"
-            >
-              <span className="text-white text-xs font-semibold">{userInitials}</span>
-            </div>
-          )}
-        />
+  const avatarButton = (
+    <div
+      className="w-[30px] h-[30px] bg-primary-muted rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
+      onClick={() => navigate('/user-profile')}
+      title="Go to User Profile"
+    >
+      <span className="text-white text-xs font-semibold">{userInitials}</span>
+    </div>
+  );
 
-        {/* Database Content */}
-        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0" style={{ paddingTop: 'calc(63px + 1rem)' }}>
+  return (
+    <PageLayout
+      title="Database"
+      icon={DatabaseIcon}
+      description="Browse and manage your patient and canister database."
+      actions={avatarButton}
+    >
+      <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
           <div className="flex items-center justify-between">
             <h1 className="font-semibold text-black text-2xl">
               Patient Records
@@ -75,8 +73,7 @@ export default function Database() {
           <div className="flex-1">
             <DatabaseTable pharmaId="1" />
           </div>
-        </div>
-      </main>
-    </div>
+      </div>
+    </PageLayout>
   );
 }
