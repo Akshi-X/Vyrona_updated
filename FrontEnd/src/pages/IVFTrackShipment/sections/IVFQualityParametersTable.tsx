@@ -176,8 +176,8 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const [shockTs, setShockTs] = useState<number | null>(null);
   const [l1, setL1] = useState<number | null>(null);
   const [l2, setL2] = useState<number | null>(null);
-  const [tankMaxCapacity, setTankMaxCapacity] = useState<number | null>(null);
-  const [tankMinCapacity, setTankMinCapacity] = useState<number | null>(null);
+  const [tankFullWeightKg, setTankFullWeightKg] = useState<number | null>(null);
+  const [tankEmptyWeightKg, setTankEmptyWeightKg] = useState<number | null>(null);
   const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
   const [nowTs, setNowTs] = useState<number>(Date.now());
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
@@ -442,8 +442,8 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         const thresholds = extractLn2Thresholds(res?.kpi_limits);
         setL1(thresholds.l1);
         setL2(thresholds.l2);
-        setTankMaxCapacity(res?.tank_max_capacity_reading ?? null);
-        setTankMinCapacity(res?.tank_min_capacity_reading ?? null);
+        setTankFullWeightKg(res?.full_weight_kg ?? null);
+        setTankEmptyWeightKg(res?.empty_weight_kg ?? null);
         console.log("Tank details:",res);
         setKpiLimits((res?.kpi_limits ?? {}) as Record<string, Record<string, { alert_type?: string | null }>>);
       })
@@ -600,8 +600,8 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const isEvaporationMissing = evaporationRate == null;
 
   const ln2_100per =
-    tankMaxCapacity != null && tankMinCapacity != null
-      ? tankMaxCapacity - tankMinCapacity
+    tankFullWeightKg != null && tankEmptyWeightKg != null
+      ? tankFullWeightKg - tankEmptyWeightKg
       : null;
 
   const levelActualPercent =
