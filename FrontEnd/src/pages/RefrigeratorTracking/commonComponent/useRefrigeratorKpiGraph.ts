@@ -83,6 +83,7 @@ export type RefrigeratorKpiGraphController = {
   series: RefrigeratorGraphPoint[];
   setRange: Dispatch<SetStateAction<RefrigeratorGraphRangeId>>;
   stats: { min: number | null; max: number | null; avg: number | null };
+  threshold: { min: number | null; max: number | null };
   unit: string;
   variant: 'modal' | 'inline';
 };
@@ -449,41 +450,84 @@ export function useRefrigeratorKpiGraph({
     };
   }, [series]);
 
+  // The backend already scopes configs when a zone is requested, but the no-zone
+  // call returns every zone's config — match on zone first so the band drawn is
+  // never a sibling zone's.
+  const activeConfig =
+    kpiConfigs.find((config) => config.kpi_name === kpiKey && config.zone_id === (zoneId ?? null))
+    ?? kpiConfigs.find((config) => config.kpi_name === kpiKey);
+  const thresholdMin = activeConfig?.min ?? null;
+  const thresholdMax = activeConfig?.max ?? null;
+  const threshold = useMemo(
+    () => ({ min: thresholdMin, max: thresholdMax }),
+    [thresholdMax, thresholdMin],
+  );
+
   const yAxisRange = useMemo(() => {
     if (variant !== 'modal' || stats.min == null || stats.max == null) {
       return { min: undefined, max: undefined };
     }
-    if (stats.min === stats.max) {
-      return { min: stats.min - 1, max: stats.max + 1 };
+    // The threshold lines are only useful if they stay on screen, so the axis has
+    // to cover them even when every reading sits far outside the configured band.
+    const lows = [stats.min, thresholdMin].filter((v): v is number => v != null);
+    const highs = [stats.max, thresholdMax].filter((v): v is number => v != null);
+    const low = Math.min(...lows);
+    const high = Math.max(...highs);
+    if (low === high) {
+      return { min: low - 1, max: high + 1 };
     }
-    const padding = (stats.max - stats.min) * 0.1;
-    return { min: stats.min - padding, max: stats.max + padding };
-  }, [stats.max, stats.min, variant]);
+    const padding = (high - low) * 0.1;
+    return { min: low - padding, max: high + padding };
+  }, [stats.max, stats.min, thresholdMax, thresholdMin, variant]);
 
   // The KPI config is the source of truth for the unit, but it only arrives with
   // the history response — the caller's unit covers the render before that. Every
   // consumer of the unit reads it back off the controller so the axis, tooltip
   // and footer stats can never disagree.
-  const resolvedUnit = kpiConfigs.find((config) => config.kpi_name === kpiKey)?.unit || unit;
+  const resolvedUnit = activeConfig?.unit || unit;
 
-  const chartData = useMemo(() => ({
-    labels,
-    datasets: [{
-      label: label ?? kpiKey,
-      data: values,
-      borderColor: accent,
-      backgroundColor: `${accent}18`,
-      borderWidth: 2,
-      pointRadius: range === 'LIVE'
-        ? (variant === 'modal' ? 2 : 0)
-        : (values.length > 82 ? 0 : 2),
-      // Only the modal widened the hover/hit targets; inline keeps chart.js defaults.
-      ...(variant === 'modal' ? { pointHoverRadius: 4, pointHitRadius: 8 } : {}),
-      fill: variant === 'modal' ? range === 'LIVE' : true,
-      tension: 0.3,
-      spanGaps: false,
-    }],
-  }), [accent, kpiKey, label, range, values, variant, labels]);
+  const chartData = useMemo(() => {
+    // Chart.js has no annotation plugin here, so the KPI's configured band is drawn
+    // as two flat dashed datasets. They are inert: no points, no hit area, and the
+    // tooltip filters them out so hovering only ever reports the reading itself.
+    const thresholdLine = (value: number, color: string, name: string) => ({
+      label: name,
+      data: labels.map(() => value),
+      borderColor: color,
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderDash: [5, 4],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      pointHitRadius: 0,
+      fill: false,
+      tension: 0,
+      spanGaps: true,
+    });
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: label ?? kpiKey,
+          data: values,
+          borderColor: accent,
+          backgroundColor: `${accent}18`,
+          borderWidth: 2,
+          pointRadius: range === 'LIVE'
+            ? (variant === 'modal' ? 2 : 0)
+            : (values.length > 82 ? 0 : 2),
+          // Only the modal widened the hover/hit targets; inline keeps chart.js defaults.
+          ...(variant === 'modal' ? { pointHoverRadius: 4, pointHitRadius: 8 } : {}),
+          fill: variant === 'modal' ? range === 'LIVE' : true,
+          tension: 0.3,
+          spanGaps: false,
+        },
+        ...(thresholdMax != null ? [thresholdLine(thresholdMax, '#e11d48', `Max ${thresholdMax}`)] : []),
+        ...(thresholdMin != null ? [thresholdLine(thresholdMin, '#2563eb', `Min ${thresholdMin}`)] : []),
+      ],
+    };
+  }, [accent, kpiKey, label, labels, range, thresholdMax, thresholdMin, values, variant]);
 
   const chartOptions = useMemo(() => ({
     responsive: true,
@@ -496,6 +540,7 @@ export function useRefrigeratorKpiGraph({
         titleColor: '#d4b8e0',
         bodyColor: '#ffffff',
         padding: 10,
+        filter: (item: { datasetIndex: number }) => item.datasetIndex === 0,
         callbacks: {
           // The inline variant keeps chart.js's default title (the bucket label);
           // only the modal swaps in the full date-time of the hovered point.
@@ -560,6 +605,7 @@ export function useRefrigeratorKpiGraph({
     series,
     setRange,
     stats,
+    threshold,
     unit: resolvedUnit,
     variant,
   };
