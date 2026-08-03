@@ -1,16 +1,15 @@
 import { useState } from "react";
 import { HelpCircle } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import levels from "../onboarding/data/levels.json";
+import { pageTours } from "../onboarding/data";
 import ConfirmDialog from "./ConfirmDialog";
 
-const ROUTE_TO_LEVEL_ID: Record<string, string> = {};
-const LEVEL_TITLE: Record<string, string> = {};
-for (const level of levels) {
-    if (!level.tourStepsFile) continue; // level-0 has no tour, just a welcome screen
-    const realRoute = level.route.replace(/^\/onboarding/, "");
-    if (!(realRoute in ROUTE_TO_LEVEL_ID)) ROUTE_TO_LEVEL_ID[realRoute] = level.id;
-    LEVEL_TITLE[level.id] = level.title;
+// Real page route → its page tour. Decoupled from the gamified Timeline levels, so
+// every page can offer its own contextual walkthrough.
+const ROUTE_TO_TOUR: Record<string, { id: string; title: string }> = {};
+for (const tour of pageTours) {
+    const realRoute = tour.route.replace(/^\/onboarding/, "");
+    if (!(realRoute in ROUTE_TO_TOUR)) ROUTE_TO_TOUR[realRoute] = { id: tour.id, title: tour.title };
 }
 
 const TourEntryButton = ({ label }: { label?: string }) => {
@@ -18,17 +17,17 @@ const TourEntryButton = ({ label }: { label?: string }) => {
     const navigate = useNavigate();
     const [confirmOpen, setConfirmOpen] = useState(false);
 
-    const levelId = ROUTE_TO_LEVEL_ID[location.pathname];
-    if (!levelId) return null;
+    const tour = ROUTE_TO_TOUR[location.pathname];
+    if (!tour) return null;
 
     const openConfirm = () => setConfirmOpen(true);
 
     const startTour = () => {
         setConfirmOpen(false);
         // Land on the replica route; PreviewTourOverlay reads this state and opens the
-        // level's welcome card. "Begin Tour" there starts the walkthrough.
+        // tour's welcome card. "Begin Tour" there starts the walkthrough.
         navigate(`/onboarding${location.pathname}`, {
-            state: { previewLevelId: levelId, returnTo: location.pathname },
+            state: { previewLevelId: tour.id, returnTo: location.pathname },
         });
     };
 
@@ -63,7 +62,7 @@ const TourEntryButton = ({ label }: { label?: string }) => {
             {confirmOpen && (
                 <ConfirmDialog
                     title="Start the guided tour?"
-                    message={`We'll walk you through ${LEVEL_TITLE[levelId] ?? "this page"} step by step. You can exit anytime.`}
+                    message={`We'll walk you through ${tour.title ?? "this page"} step by step. You can exit anytime.`}
                     confirmLabel="Start Tour"
                     onConfirm={startTour}
                     onCancel={() => setConfirmOpen(false)}

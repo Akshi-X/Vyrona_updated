@@ -28,7 +28,7 @@ function GeniePreloaderGate({ children }: { children: React.ReactNode }) {
 // ── Shared nav buttons used by both default and wide layouts ──────────────────
 function TourNavButtons({ nav }: { nav: TourNavState }) {
     return (
-        <div className="space-y-2 border-t border-slate-100 pt-3 mt-3">
+        <div className="shrink-0 space-y-2 border-t border-slate-100 pt-3 mt-3 bg-white">
             {nav.requiresClick && (
                 <p className="text-[11px] font-medium text-amber-600">
                     Click the highlighted area to continue
@@ -113,22 +113,24 @@ function TourContent({ content }: { content: unknown }) {
     }
 
     return (
-        <div className="space-y-2">
+        <div className="flex min-h-0 flex-1 flex-col">
             <TourStepHeading
                 title={nav?.title ?? ""}
                 icon={nav?.icon}
                 onClose={handleClose}
             />
-            {nav?.genieImage && (
-                <img
-                    src={nav.genieImage}
-                    alt=""
-                    className="w-full h-72 object-contain object-center"
-                />
-            )}
-            <p className="text-sm leading-relaxed text-slate-700">
-                {(nav?.content ?? content) as React.ReactNode}
-            </p>
+            <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto">
+                {nav?.genieImage && (
+                    <img
+                        src={nav.genieImage}
+                        alt=""
+                        className="w-full h-48 shrink-0 object-contain object-center"
+                    />
+                )}
+                <p className="text-sm leading-relaxed text-slate-700">
+                    {(nav?.content ?? content) as React.ReactNode}
+                </p>
+            </div>
         </div>
     );
 }
@@ -179,8 +181,14 @@ function TourProviderWithDynamicStyles({ children }: { children: React.ReactNode
                     borderRadius: 16,
                     padding: isWide ? 0 : 20,
                     maxWidth: isWide ? 640 : 320,
-                    maxHeight: "calc(100vh - 32px)",
-                    overflow: "auto",
+                    // Cap well below viewport height so the card keeps a comfortable
+                    // margin from top/bottom edges. The body scrolls, so it never needs
+                    // to grow tall — the pinned nav always stays on screen.
+                    maxHeight: isWide ? "calc(100vh - 32px)" : "min(520px, calc(100vh - 96px))",
+                    // Non-wide: flex column so the body scrolls and the nav stays pinned/visible.
+                    ...(isWide
+                        ? { overflow: "auto" }
+                        : { display: "flex", flexDirection: "column", overflow: "hidden" }),
                 }),
             }}
         >

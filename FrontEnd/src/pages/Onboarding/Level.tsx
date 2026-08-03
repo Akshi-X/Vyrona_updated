@@ -97,14 +97,16 @@ function resolvePosition(placement: OnboardingStep["placement"]) {
     return (p: PositionProps) => {
         if (p.right === undefined) return "right" as const;
         // @reactour passes p.height=0 on first render before it measures the popover.
-        // Use a conservative fallback so the clamp keeps the tooltip on screen.
+        // Use a tall conservative fallback (≈ a genie-image popover) so the clamp keeps
+        // the whole card — including the Prev/Next nav — on screen even before measuring.
         // @reactour's own ResizeObserver updates sizes and re-calls this function
         // with the real height, so the position corrects itself automatically.
+        const windowHeight = window.innerHeight;
         return fn({
             ...p,
-            height: p.height || 320,
+            height: p.height || Math.min(520, windowHeight - 96),
             windowWidth: window.innerWidth,
-            windowHeight: window.innerHeight,
+            windowHeight,
         });
     };
 }

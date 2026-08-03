@@ -54,15 +54,17 @@ function ActiveOnboardingLevel() {
     const previewId = tourNavCtx?.previewLevelId;
     const pendingId = tourNavCtx?.pendingStartLevelId;
 
-    const active = previewId
-        ? (levels.find((l) => l.id === previewId) ?? null)
-        : pendingId
-            ? (levels.find((l) => l.id === pendingId) ?? null)
-            : (
-                levels.find((l) => state.levels[l.id]?.status === "in_progress") ??
-                levels.find((l) => state.levels[l.id]?.status === "available") ??
-                null
-            );
+    // A preview session mounts its tour directly by id — page tours are not in the
+    // gamified `levels` list, so mount previewId as-is rather than looking it up.
+    if (previewId) return <OnboardingLevel levelId={previewId} />;
+
+    const active = pendingId
+        ? (levels.find((l) => l.id === pendingId) ?? null)
+        : (
+            levels.find((l) => state.levels[l.id]?.status === "in_progress") ??
+            levels.find((l) => state.levels[l.id]?.status === "available") ??
+            null
+        );
 
     if (!active) return null;
     return <OnboardingLevel levelId={active.id} />;

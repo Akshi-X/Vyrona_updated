@@ -273,7 +273,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                             return (
                                 <div key={index} className="flex flex-col gap-0.5">
                                     <button
-                                        id={isAlertConfig ? "onboarding-sidebar-alert-setting" : undefined}
+                                        id={isAlertConfig ? "onboarding-sidebar-alert-setting" : isDashboard ? "onboarding-sidebar-dashboard" : undefined}
                                         onClick={() => setOpen((o: boolean) => !o)}
                                         className={`h-auto w-full justify-between gap-4 px-3 py-[7px] rounded-[10px] flex items-center transition-colors ${
                                             active
@@ -311,7 +311,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                 return (
                                                     <button
                                                         key={ci}
-                                                        id={isAlertConfig ? `onboarding-sidebar-alert-${child.label.toLowerCase()}` : undefined}
+                                                        id={isAlertConfig ? `onboarding-sidebar-alert-${child.label.toLowerCase()}` : child.path === "/ivf-track-shipment" ? "onboarding-sidebar-cryocan-tracking" : undefined}
                                                         onClick={() => {
                                                             setOpen(true);
                                                             handleNavigation(child.path);
