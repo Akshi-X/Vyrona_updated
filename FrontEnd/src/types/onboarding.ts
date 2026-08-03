@@ -70,6 +70,16 @@ export interface OnboardingLevelConfig {
     quiz?: OnboardingLevelQuiz;
 }
 
+/** A per-page guided tour (the "Take a tour" icon), decoupled from the gamified levels. */
+export interface PageTour {
+    id: string;
+    /** The /onboarding replica route this tour runs on (real page = route minus /onboarding). */
+    route: string;
+    title: string;
+    quick_start?: OnboardingLevelQuickStart;
+    quick_exit?: OnboardingLevelQuickExit;
+}
+
 export interface OnboardingStep {
     id: string;
     target: string;

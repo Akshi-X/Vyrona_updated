@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Info } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useOnboarding } from "../../contexts/OnboardingContext";
+import { getPageTour } from "../../onboarding/data";
 import { useTourNavContext } from "../../contexts/TourNavContext";
 
 // Dedicated overlay for page-launched preview tours (the header "Take a tour" icon).
@@ -10,7 +10,6 @@ import { useTourNavContext } from "../../contexts/TourNavContext";
 export default function PreviewTourOverlay() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { levels } = useOnboarding();
     const tourNavCtx = useTourNavContext();
 
     const previewLevelId = tourNavCtx?.previewLevelId ?? null;
@@ -28,7 +27,7 @@ export default function PreviewTourOverlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.state]);
 
-    const config = previewLevelId ? levels.find((l) => l.id === previewLevelId) : null;
+    const config = previewLevelId ? getPageTour(previewLevelId) : null;
 
     const exit = () => {
         const path = tourNavCtx?.returnPath;
@@ -50,15 +49,12 @@ export default function PreviewTourOverlay() {
     const isDone = previewPhase === "done";
 
     const headerLabel = isDone
-        ? config.quick_exit?.headerTitle ?? config.completion?.title ?? "Tour complete"
-        : config.welcome?.headerTitle ?? "Tour";
+        ? config.quick_exit?.headerTitle ?? "Tour complete"
+        : "Tour";
 
-    const exitContent = config.quick_exit ??
-        (config.completion
-            ? { title: config.completion.title, message: config.completion.message }
-            : { title: "Tour complete", message: "You've finished this tour." });
+    const exitContent = config.quick_exit ?? { title: "Tour complete", message: "You've finished this tour." };
 
-    const startMessage = config.quick_start?.message ?? config.welcome?.description ?? "";
+    const startMessage = config.quick_start?.message ?? "";
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-6">
