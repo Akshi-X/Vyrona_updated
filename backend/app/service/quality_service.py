@@ -1828,21 +1828,27 @@ class QualityService:
         config_ids = [r.id for r in config_q.all()]
         if not config_ids:
             return None
-        row_number = (
-            func.row_number()
-            .over(partition_by=Readings.kpi_config_id, order_by=Readings.timestamp.desc())
-            .label("rn")
-        )
-        base_q = db.query(Readings.id, row_number).filter(Readings.kpi_config_id.in_(config_ids))
-        subquery = base_q.subquery()
-        valid_ids = db.query(subquery.c.id).filter(subquery.c.rn <= n).subquery()
-        results = (
-            db.query(Readings.kpi_config_id, Readings.kpi_value, Readings.timestamp, KpiConfig.kpi_name, KpiConfig.unit)
-            .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
-            .filter(Readings.id.in_(valid_ids))
-            .order_by(Readings.kpi_config_id, Readings.timestamp.desc())
-            .all()
-        )
+        # A row_number() window over every reading for these configs, fed into an
+        # `id IN (...)` filter, made Postgres hash-join the id list against a full
+        # scan of all 62M+ rows in the readings hypertable (~37s). A LATERAL join
+        # walks idx_readings_kpi_config_timestamp backwards and stops after n rows
+        # per config instead — two 50-row index scans, sub-millisecond.
+        results = db.execute(
+            text("""
+                SELECT r.kpi_config_id, r.kpi_value, r.timestamp, k.kpi_name, k.unit
+                FROM kpi_config k
+                JOIN LATERAL (
+                    SELECT r2.kpi_config_id, r2.kpi_value, r2.timestamp
+                    FROM readings r2
+                    WHERE r2.kpi_config_id = k.id
+                    ORDER BY r2.timestamp DESC
+                    LIMIT :n
+                ) r ON TRUE
+                WHERE k.id = ANY(:config_ids)
+                ORDER BY r.kpi_config_id, r.timestamp DESC
+            """),
+            {"config_ids": config_ids, "n": n},
+        ).fetchall()
         if not results:
             return None
         kpis = defaultdict(list)
