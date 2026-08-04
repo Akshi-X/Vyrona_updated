@@ -110,6 +110,22 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
+        screenshots: [
+          {
+            src: '/screenshots/login-wide.png',
+            sizes: '1280x800',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Sign in to mG Scale',
+          },
+          {
+            src: '/screenshots/login-narrow.png',
+            sizes: '390x844',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Sign in to mG Scale',
+          },
+        ],
       },
     }),
   ],

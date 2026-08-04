@@ -9,8 +9,11 @@ interface BeforeInstallPromptEvent extends Event {
 
 interface InstallPromptContextValue {
     canInstall: boolean;
+    isIOS: boolean;
+    showIOSGuide: boolean;
     promptInstall: () => Promise<void>;
     dismiss: () => void;
+    closeIOSGuide: () => void;
 }
 
 const InstallPromptContext = createContext<InstallPromptContextValue | undefined>(undefined);
@@ -19,12 +22,24 @@ const isStandalone = () =>
     window.matchMedia("(display-mode: standalone)").matches ||
     (window.navigator as unknown as { standalone?: boolean }).standalone === true;
 
+// iOS Safari never fires beforeinstallprompt — no native install flow exists there.
+// iPadOS reports as "MacIntel" in the UA, so touch support disambiguates it from a real Mac.
+const isIOS = () => {
+    const ua = window.navigator.userAgent;
+    return (
+        /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+    );
+};
+
 export const InstallPromptProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [deferredEvent, setDeferredEvent] = useState<BeforeInstallPromptEvent | null>(null);
     const [installed, setInstalled] = useState(isStandalone);
     const [dismissed, setDismissed] = useState(
         () => localStorage.getItem(DISMISSED_STORAGE_KEY) === "true",
     );
+    const [showIOSGuide, setShowIOSGuide] = useState(false);
+    const ios = useMemo(isIOS, []);
 
     useEffect(() => {
         const onBeforeInstallPrompt = (event: Event) => {
@@ -45,22 +60,32 @@ export const InstallPromptProvider: React.FC<{ children: React.ReactNode }> = ({
     }, []);
 
     const promptInstall = useCallback(async () => {
+        if (ios) {
+            setShowIOSGuide(true);
+            return;
+        }
         if (!deferredEvent) return;
         await deferredEvent.prompt();
         await deferredEvent.userChoice;
         setDeferredEvent(null);
-    }, [deferredEvent]);
+    }, [ios, deferredEvent]);
 
     const dismiss = useCallback(() => {
         localStorage.setItem(DISMISSED_STORAGE_KEY, "true");
         setDismissed(true);
+        setShowIOSGuide(false);
     }, []);
 
-    const canInstall = Boolean(deferredEvent) && !installed && !dismissed;
+    const closeIOSGuide = useCallback(() => {
+        setShowIOSGuide(false);
+    }, []);
+
+    // iOS has no beforeinstallprompt event, so canInstall can't wait on deferredEvent there.
+    const canInstall = (ios || Boolean(deferredEvent)) && !installed && !dismissed;
 
     const value = useMemo<InstallPromptContextValue>(
-        () => ({ canInstall, promptInstall, dismiss }),
-        [canInstall, promptInstall, dismiss],
+        () => ({ canInstall, isIOS: ios, showIOSGuide, promptInstall, dismiss, closeIOSGuide }),
+        [canInstall, ios, showIOSGuide, promptInstall, dismiss, closeIOSGuide],
     );
 
     return <InstallPromptContext.Provider value={value}>{children}</InstallPromptContext.Provider>;
