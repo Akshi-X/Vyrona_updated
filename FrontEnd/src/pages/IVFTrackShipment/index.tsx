@@ -244,8 +244,8 @@ export default function IVFTrackShipmentPage() {
             setHeaderTankCode("-");
             setHeaderBranchName("-");
             setHeaderTankId(undefined);
-            setTankMaxCapacity(null);
-            setTankMinCapacity(null);
+            setTankFullWeightKg(null);
+            setTankEmptyWeightKg(null);
             setLn2L2Threshold(null);
             return;
         }
@@ -268,8 +268,8 @@ export default function IVFTrackShipmentPage() {
             } else {
                 setHeaderTankCode("-");
                 setHeaderBranchName("-");
-                setTankMaxCapacity(null);
-                setTankMinCapacity(null);
+                setTankFullWeightKg(null);
+                setTankEmptyWeightKg(null);
                 setLn2L2Threshold(null);
             }
         }
