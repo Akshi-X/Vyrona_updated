@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { Share, SquarePlus, X } from "lucide-react";
 import { useInstallPrompt } from "../contexts/InstallPromptContext";
 
@@ -7,7 +8,7 @@ export const IOSInstallGuideDialog: React.FC = () => {
 
     if (!showIOSGuide) return null;
 
-    return (
+    return createPortal(
         <div
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
             onClick={closeIOSGuide}
@@ -74,6 +75,7 @@ export const IOSInstallGuideDialog: React.FC = () => {
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 };
