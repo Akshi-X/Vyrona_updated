@@ -12,6 +12,7 @@ import { GoogleMapsProvider } from "./contexts/GoogleMapsProvider";
 import { UIVariantProvider } from "./contexts/UIVariantContext";
 import { SidebarProvider } from "./contexts/SidebarContext";
 import { InstallPromptProvider } from "./contexts/InstallPromptContext";
+import { PushNotificationProvider } from "./contexts/PushNotificationContext";
 
 createRoot(document.getElementById("root")!).render(
     <StrictMode>
@@ -20,8 +21,10 @@ createRoot(document.getElementById("root")!).render(
                 <GoogleMapsProvider>
                     <SidebarProvider>
                         <InstallPromptProvider>
-                            <RouterProvider router={router} />
-                            <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover theme="light" />
+                            <PushNotificationProvider>
+                                <RouterProvider router={router} />
+                                <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover theme="light" />
+                            </PushNotificationProvider>
                         </InstallPromptProvider>
                     </SidebarProvider>
                 </GoogleMapsProvider>

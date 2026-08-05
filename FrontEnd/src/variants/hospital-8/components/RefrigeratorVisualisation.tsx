@@ -29,26 +29,15 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Tooltip,
-  Filler,
-} from 'chart.js';
-import { Line } from 'react-chartjs-2';
 import { AlertTriangle, Droplets, Thermometer, TrendingUp } from 'lucide-react';
 import type { Task } from '../../../services/tasksService';
-import { ivfService } from '../../../services/ivfService';
 import { useRefrigeratorKpiSnapshot } from '../../../pages/RefrigeratorTracking/sections/useRefrigeratorKpiSnapshot';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useRefrigeratorAlertKpiNames } from '../../../pages/RefrigeratorTracking/commonComponent/useRefrigeratorAlertConfig';
+import RefrigeratorKpiGraph from '../../../pages/RefrigeratorTracking/commonComponent/RefrigeratorKpiGraph';
+import { useRefrigeratorKpiGraph } from '../../../pages/RefrigeratorTracking/commonComponent/useRefrigeratorKpiGraph';
 
 import { ivfAlertsService, type IVFAlert } from '../../../services/ivfAlertsService';
 import ColdStorageRoom from './ColdStorageRoom';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
 /**
  * Procedural 3D refrigerator. Two stacked glass-door compartments: top =
@@ -423,279 +412,6 @@ function buildCompartment(
   return { group, doorHit, doorGroup, highlightRing, interiorLight, interiorBack: back, mistMeshes };
 }
 
-
-const INLINE_TIME_RANGES = [
-  { id: 'LIVE' as const, label: 'LATEST', minutes: undefined },
-  { id: '1H'  as const, label: '1H',  minutes: 60    },
-  { id: '24H' as const, label: '24H', minutes: 1440  },
-  { id: '7D'  as const, label: '7D',  minutes: 10080 },
-] as const;
-type InlineRangeId = (typeof INLINE_TIME_RANGES)[number]['id'];
-
-type InlineDataPoint = { timestamp: string; value: number };
-type InlineBucketedChart = { labels: string[]; values: (number | null)[] };
-
-function parseInlineTimestamp(ts: string): Date | null {
-  try {
-    const norm = ts.trim().replace(' ', 'T');
-    const withZ = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(norm) ? norm : `${norm}Z`;
-    const d = new Date(withZ);
-    return isNaN(d.getTime()) ? null : d;
-  } catch { return null; }
-}
-
-function buildInlineBucketedChart(
-  series: InlineDataPoint[],
-  range: InlineRangeId,
-  rangeStartMs: number,
-  nowMs: number,
-): InlineBucketedChart {
-  const slotMs =
-    range === '1H'  ? 2  * 60_000 :
-    range === '24H' ? 30 * 60_000 :
-                      6  * 60 * 60_000;
-
-  const labels: string[] = [];
-  const values: (number | null)[] = [];
-
-  const slotMap = new Map<number, number>();
-  for (const p of series) {
-    const d = parseInlineTimestamp(p.timestamp);
-    if (!d) continue;
-    const offsetMs = d.getTime() - rangeStartMs;
-    if (offsetMs < 0 || offsetMs > nowMs - rangeStartMs) continue;
-    const slotIdx = Math.floor(offsetMs / slotMs);
-    if (!slotMap.has(slotIdx)) slotMap.set(slotIdx, p.value);
-  }
-
-  const totalMs = nowMs - rangeStartMs;
-  const totalSlots = Math.ceil(totalMs / slotMs);
-
-  for (let i = 0; i <= totalSlots; i++) {
-    const slotTimeMs = rangeStartMs + i * slotMs;
-    const d = new Date(slotTimeMs);
-    const label =
-      range === '7D'
-        ? d.toLocaleDateString([], { month: 'short', day: 'numeric' })
-        : `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-    labels.push(label);
-    values.push(slotMap.get(i) ?? null);
-  }
-
-  return { labels, values };
-}
-
-function InlineKpiChart({
-  refrigeratorId,
-  kpiKey,
-  zoneId,
-  accent,
-  unit,
-}: {
-  refrigeratorId: number;
-  kpiKey: string;
-  zoneId: string;
-  accent: string;
-  unit: string;
-}) {
-  const { token } = useAuth();
-  const [range, setRange] = useState<InlineRangeId>('LIVE');
-  const [series, setSeries] = useState<{ timestamp: string; value: number }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const wsRef = useRef<WebSocket | null>(null);
-  const latestKpiTimestampRef = useRef<Record<string, string>>({});
-  const chartRef = useRef<any>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    const minutes = INLINE_TIME_RANGES.find((r) => r.id === range)?.minutes;
-    ivfService
-      .getRefrigeratorKpiHistory(refrigeratorId, minutes, zoneId)
-      .then((res) => {
-        const raw = res.kpi_series?.[kpiKey] ?? [];
-        setSeries(raw.map((p: any) => ({ timestamp: p.timestamp, value: p.value })));
-      })
-      .catch(() => setSeries([]))
-      .finally(() => setLoading(false));
-  }, [refrigeratorId, kpiKey, zoneId, range]);
-
-  useEffect(() => {
-    if (range !== 'LIVE') {
-      wsRef.current?.close();
-      wsRef.current = null;
-      return;
-    }
-
-    if (wsRef.current) return;
-
-    try {
-      const wsBase = import.meta.env.VITE_API_BASE_URL?.replace(/^http/, 'ws') || 'ws://localhost:8001';
-      const wsUrl = `${wsBase}/api/ivf/quality/refrigerator-kpi-ws?token=${token}`;
-      const ws = new WebSocket(wsUrl);
-
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ refrigerator_id: refrigeratorId, zone_id: zoneId }));
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          if (!parsed.kpis || !Array.isArray(parsed.kpis)) return;
-
-          const relevantKpis = parsed.kpis.filter((k: any) => k.name === kpiKey);
-
-          setSeries((prev) => {
-            let updated = [...prev];
-            for (const kpi of relevantKpis) {
-              const ts = kpi.timestamp || '';
-              const lastTs = latestKpiTimestampRef.current[kpiKey];
-              if (lastTs && ts <= lastTs) continue;
-
-              latestKpiTimestampRef.current[kpiKey] = ts;
-              updated.push({
-                timestamp: ts,
-                value: kpi.value,
-              });
-            }
-            return updated;
-          });
-        } catch (err) {
-          console.error('WS parse error:', err);
-        }
-      };
-
-      ws.onclose = () => {
-        wsRef.current = null;
-      };
-
-      wsRef.current = ws;
-    } catch (err) {
-      console.error('WS error:', err);
-    }
-
-    return () => {
-      wsRef.current?.close();
-      wsRef.current = null;
-    };
-  }, [range, refrigeratorId, zoneId, token, kpiKey]);
-
-  useEffect(() => {
-    chartRef.current?.update();
-  }, [series]);
-
-  const rangeMinutes = INLINE_TIME_RANGES.find((r) => r.id === range)?.minutes;
-  const nowMs = Date.now();
-  const rangeStartMs = rangeMinutes != null ? nowMs - rangeMinutes * 60_000 : null;
-
-  const { labels, values } = useMemo(() => {
-    if (range === 'LIVE' || rangeStartMs == null) {
-      return {
-        labels: series.map((p) => {
-          try {
-            const norm = p.timestamp.trim().replace(' ', 'T');
-            const withZ = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(norm) ? norm : `${norm}Z`;
-            const d = new Date(withZ);
-            if (isNaN(d.getTime())) return '';
-            if (range === '7D') return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-          } catch { return ''; }
-        }),
-        values: series.map((p) => p.value),
-      };
-    }
-    return buildInlineBucketedChart(series, range, rangeStartMs, nowMs);
-  }, [series, range, rangeStartMs, nowMs]);
-
-  const stats = useMemo(() => {
-    const nonNullValues = values.filter((v): v is number => v !== null);
-    if (nonNullValues.length === 0) return { min: null, max: null, avg: null };
-    return {
-      min: Math.min(...nonNullValues),
-      max: Math.max(...nonNullValues),
-      avg: nonNullValues.reduce((a, b) => a + b, 0) / nonNullValues.length,
-    };
-  }, [values]);
-
-  const chartData = useMemo(() => ({
-    labels,
-    datasets: [{
-      label: kpiKey,
-      data: values,
-      borderColor: accent,
-      backgroundColor: `${accent}18`,
-      borderWidth: 2,
-      pointRadius: range === 'LIVE' ? 0 : (values.length > 82 ? 0 : 2),
-      fill: true,
-      tension: 0.3,
-      spanGaps: false,
-    }],
-  }), [labels, values, accent, kpiKey, range]);
-
-  const chartOptions = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false as const,
-    plugins: { legend: { display: false }, tooltip: {
-      backgroundColor: '#1a0a1f', titleColor: '#d4b8e0', bodyColor: '#ffffff', padding: 10,
-      callbacks: { label: (ctx: { parsed: { y: number } }) => `${ctx.parsed.y?.toFixed(2)} ${unit}` },
-    }},
-    scales: {
-      x: { ticks: { maxTicksLimit: range === '7D' ? 8 : 6, font: { size: 9 }, color: '#9ca3af' }, grid: { color: '#f0ecf6' } },
-      y: { ticks: { font: { size: 9 }, color: '#9ca3af', callback: (v: number | string) => `${v}` }, grid: { color: '#f0ecf6' } },
-    },
-  }), [unit, range]);
-
-  return (
-    <div>
-      <div style={{ padding: '10px 12px 0', minHeight: 120 }}>
-        <div style={{ height: 120, position: 'relative' }}>
-          {loading && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg className="animate-spin" style={{ width: 20, height: 20, color: accent }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-            </div>
-          )}
-          {!loading && series.length === 0 && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#9ca3af' }}>No data</div>
-          )}
-          {!loading && series.length > 0 && (
-            <Line ref={chartRef} data={chartData} options={chartOptions as any} />
-          )}
-        </div>
-      </div>
-      <div style={{ padding: '8px 12px 10px', borderTop: '1px solid #f0e8f4', marginTop: 6 }}>
-        <div style={{ display: 'flex', gap: 0, marginBottom: 8 }}>
-          {(['min', 'max', 'avg'] as const).map((key, i) => (
-            <div key={key} style={{ flex: 1, textAlign: 'center', borderRight: i < 2 ? '1px solid #f0e8f4' : undefined, paddingRight: i < 2 ? 8 : 0, paddingLeft: i > 0 ? 8 : 0 }}>
-              <div style={{ fontSize: 8, fontWeight: 600, color: '#a07ab8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{key}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: accent, marginTop: 1 }}>
-                {stats[key] !== null ? `${stats[key]!.toFixed(1)}` : '—'}<span style={{ fontSize: 9, color: '#9ca3af', marginLeft: 1 }}>{unit}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 500 }}>Range:</span>
-          <div style={{ display: 'flex', borderRadius: 6, border: '1px solid #e6d6ee', overflow: 'hidden', background: '#fdfbfe' }}>
-            {INLINE_TIME_RANGES.map((r) => (
-              <button key={r.id} type="button" onClick={() => setRange(r.id)} style={{
-                padding: '3px 10px', fontSize: 9, fontWeight: 600,
-                background: range === r.id ? accent : 'transparent',
-                color: range === r.id ? '#fff' : '#6b5a70',
-                border: 'none', cursor: 'pointer',
-              }}>
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function getDateLabel(ts: string): string {
   const d = new Date(ts);
   if (isNaN(d.getTime())) return 'Unknown';
@@ -759,13 +475,20 @@ function EmbeddedAlerts({ refrigeratorId }: { refrigeratorId?: number }) {
     try {
       await ivfAlertsService.acknowledgeAlert(alertId);
       fetchAlerts();
-    } catch {} finally {
+    } catch {
+      return;
+    } finally {
       setAckingIds((p) => { const n = new Set(p); n.delete(alertId); return n; });
     }
   };
 
   const toggleExpand = (key: string) => {
-    setExpandedKeys((p) => { const n = new Set(p); n.has(key) ? n.delete(key) : n.add(key); return n; });
+    setExpandedKeys((p) => {
+      const next = new Set(p);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
 
   const grouped = useMemo(() => {
@@ -809,7 +532,7 @@ function EmbeddedAlerts({ refrigeratorId }: { refrigeratorId?: number }) {
                 const hiddenCount = older.length;
                 const isExpanded = expandedKeys.has(group.key);
                 const isAcked = !!latest.acknowledged_at;
-                const sevBadge = latest.severity === 'High' || (latest.severity as any) === 'Critical'
+                const sevBadge = latest.severity === 'High' || (latest.severity as string) === 'Critical'
                   ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700';
 
                 return (
@@ -834,57 +557,57 @@ function EmbeddedAlerts({ refrigeratorId }: { refrigeratorId?: number }) {
                           </span>
                         </div>
                         <div className="mt-1 text-[11px] text-[#333]">{latest.message}</div>
-                        <div className="mt-1 text-[10px] text-gray-500">{formatAlertTime(latest.created_at)}</div>
                         {isAcked && latest.acknowledgment_reason && (
                           <div className="mt-1 flex flex-wrap items-start gap-x-1 text-[10px] text-gray-500">
                             <span className="font-semibold text-gray-600">Reason:</span>
                             <span>{latest.acknowledgment_reason}</span>
                           </div>
                         )}
+                        <div className="mt-1.5 flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-gray-500">{formatAlertTime(latest.created_at)}</span>
+                          {!isAcked && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleAcknowledge(latest.alert_id); }}
+                              disabled={ackingIds.has(latest.alert_id)}
+                              className="shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-primary text-white hover:bg-[#5a0f66] transition-colors disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {ackingIds.has(latest.alert_id) ? '...' : 'Acknowledge'}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {hiddenCount > 0 && (
-                          <svg className={`w-3.5 h-3.5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        )}
-                        {!isAcked && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleAcknowledge(latest.alert_id); }}
-                            disabled={ackingIds.has(latest.alert_id)}
-                            className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-primary text-white hover:bg-[#5a0f66] transition-colors disabled:opacity-50 whitespace-nowrap"
-                          >
-                            {ackingIds.has(latest.alert_id) ? '...' : 'Acknowledge'}
-                          </button>
-                        )}
-                      </div>
+                      {hiddenCount > 0 && (
+                        <svg className={`mt-0.5 w-3.5 h-3.5 shrink-0 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      )}
                     </div>
 
                     {isExpanded && hiddenCount > 0 && (
                       <div className="mt-2 border-t border-gray-200/70 pt-2 space-y-2">
                         {older.map((a) => (
-                          <div key={a.alert_id} className="flex items-center justify-between gap-2 pl-10">
-                            <div className="min-w-0">
-                              <div className="text-[11px] text-[#333]">{a.message}</div>
-                              <div className="mt-0.5 text-[10px] text-gray-500">{formatAlertTime(a.created_at)}</div>
-                              {a.acknowledged_at && a.acknowledgment_reason && (
-                                <div className="mt-0.5 flex flex-wrap items-start gap-x-1 text-[10px] text-gray-500">
-                                  <span className="font-semibold text-gray-600">Reason:</span>
-                                  <span>{a.acknowledgment_reason}</span>
-                                </div>
+                          <div key={a.alert_id} className="min-w-0 pl-10">
+                            <div className="text-[11px] text-[#333]">{a.message}</div>
+                            {a.acknowledged_at && a.acknowledgment_reason && (
+                              <div className="mt-0.5 flex flex-wrap items-start gap-x-1 text-[10px] text-gray-500">
+                                <span className="font-semibold text-gray-600">Reason:</span>
+                                <span>{a.acknowledgment_reason}</span>
+                              </div>
+                            )}
+                            <div className="mt-1 flex items-center justify-between gap-2">
+                              <span className="text-[10px] text-gray-500">{formatAlertTime(a.created_at)}</span>
+                              {!a.acknowledged_at && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleAcknowledge(a.alert_id); }}
+                                  disabled={ackingIds.has(a.alert_id)}
+                                  className="shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-primary text-white hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
+                                >
+                                  {ackingIds.has(a.alert_id) ? '...' : 'Acknowledge'}
+                                </button>
                               )}
                             </div>
-                            {!a.acknowledged_at && (
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleAcknowledge(a.alert_id); }}
-                                disabled={ackingIds.has(a.alert_id)}
-                                className="shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-primary text-white hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
-                              >
-                                {ackingIds.has(a.alert_id) ? '...' : 'Acknowledge'}
-                              </button>
-                            )}
                           </div>
                         ))}
                       </div>
@@ -900,6 +623,12 @@ function EmbeddedAlerts({ refrigeratorId }: { refrigeratorId?: number }) {
   );
 }
 
+// Tile ids come straight from the KPI names the API pushes (refrigerator_temp,
+// refrigerator_humidity, ...), so match on the name rather than a fixed id.
+function isTempKpi(kpiName: string): boolean {
+  return kpiName.includes('temp');
+}
+
 function ZoneKpiSection({
   zone,
   refrigeratorId,
@@ -907,73 +636,136 @@ function ZoneKpiSection({
   zone: RefrigeratorZone;
   refrigeratorId?: number;
 }) {
-  const { sensorTiles } = useRefrigeratorKpiSnapshot({
+  const allowedKpiNames = useRefrigeratorAlertKpiNames(refrigeratorId, zone.zone_id, !!refrigeratorId);
+  const { sensorTiles, isInitialLoading } = useRefrigeratorKpiSnapshot({
     refrigeratorId: refrigeratorId ? String(refrigeratorId) : undefined,
     zoneId: zone.zone_id,
     enabled: !!refrigeratorId,
+    allowedKpiNames,
   });
 
   return (
     <div className="flex flex-col gap-2">
-      {sensorTiles.length === 0 ? (
+      {isInitialLoading || allowedKpiNames == null ? (
+        <div className="flex flex-col gap-2">
+          {[0, 1].map((i) => (
+            <div key={i} className="animate-pulse h-16 rounded-xl bg-[#f2eaf7]" />
+          ))}
+        </div>
+      ) : sensorTiles.length === 0 ? (
         <div className="text-xs text-gray-400 italic">No data</div>
       ) : (
         [...sensorTiles].sort((a, b) => {
-          const aIsTemp = (a.id as any) === 'refrigerator_temp' ? 0 : 1;
-          const bIsTemp = (b.id as any) === 'refrigerator_temp' ? 0 : 1;
+          const aIsTemp = isTempKpi(a.id) ? 0 : 1;
+          const bIsTemp = isTempKpi(b.id) ? 0 : 1;
           return aIsTemp - bIsTemp;
-        }).map((tile) => {
-          const isTemp = (tile.id as any) === 'refrigerator_temp';
-          const accent = isTemp ? '#1a7abb' : '#7a22c8';
-          const ring = isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)';
-          return (
-            <div
-              key={tile.id}
-              style={{
-                borderRadius: 16,
-                border: `1px solid #e6d6ee`,
-                background: '#fdfbfe',
-                boxShadow: '0 4px 12px rgba(64,17,83,0.06)',
-                overflow: 'hidden',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: '#8b6c97', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                      {tile.label}
-                    </span>
-                    <span className="inline-flex px-1.5 py-0.5 text-[9px] font-semibold rounded-full bg-primary/10 text-primary border border-primary/20">
-                      {zone.zone_name}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: accent, marginTop: 4 }}>
-                    {tile.value}
-                  </div>
-                  <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
-                    {tile.timestamp ?? '—'}
-                  </div>
-                </div>
-                <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', border: '1px solid #e6d6ee', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `inset 0 0 0 6px ${ring}`, color: accent, flexShrink: 0 }}>
-                  {isTemp ? <Thermometer size={18} /> : <Droplets size={18} />}
-                </div>
-              </div>
-              {refrigeratorId != null && (
-                <InlineKpiChart
-                  refrigeratorId={refrigeratorId}
-                  kpiKey={tile.id}
-                  zoneId={zone.zone_id}
-                  accent={accent}
-                  unit={tile.unit ?? '°C'}
-                />
-              )}
-            </div>
-          );
-        })
+        }).map((tile) => (
+          <ZoneKpiTileCard
+            key={`${zone.zone_id}-${tile.id}`}
+            refrigeratorId={refrigeratorId}
+            tile={tile}
+            zoneId={zone.zone_id}
+            zoneName={zone.zone_name}
+          />
+        ))
       )}
     </div>
   );
+}
+
+function ZoneKpiTileCard({
+  refrigeratorId,
+  tile,
+  zoneId,
+  zoneName,
+}: {
+  refrigeratorId?: number;
+  tile: {
+    id: string;
+    label: string;
+    value: string;
+    timestamp?: string | null;
+    unit?: string;
+  };
+  zoneId: string;
+  zoneName: string;
+}) {
+  const isTemp = isTempKpi(tile.id);
+  const accent = isTemp ? '#1a7abb' : '#7a22c8';
+  const ring = isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)';
+
+  return (
+    <div
+      style={{
+        borderRadius: 16,
+        border: '1px solid #e6d6ee',
+        background: '#fdfbfe',
+        boxShadow: '0 4px 12px rgba(64,17,83,0.06)',
+        overflow: 'hidden',
+        flexShrink: 0,
+      }}
+    >
+      <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: '#8b6c97', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              {tile.label}
+            </span>
+            <span className="inline-flex px-1.5 py-0.5 text-[9px] font-semibold rounded-full bg-primary/10 text-primary border border-primary/20">
+              {zoneName}
+            </span>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: accent, marginTop: 4 }}>
+            {tile.value}
+          </div>
+          <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
+            {tile.timestamp ?? '—'}
+          </div>
+        </div>
+        <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', border: '1px solid #e6d6ee', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `inset 0 0 0 6px ${ring}`, color: accent, flexShrink: 0 }}>
+          {isTemp ? <Thermometer size={18} /> : <Droplets size={18} />}
+        </div>
+      </div>
+      {refrigeratorId != null && (
+        <ZoneKpiInlineGraph
+          accent={accent}
+          kpiKey={tile.id}
+          label={tile.label}
+          refrigeratorId={refrigeratorId}
+          unit={tile.unit ?? '°C'}
+          zoneId={zoneId}
+        />
+      )}
+    </div>
+  );
+}
+
+function ZoneKpiInlineGraph({
+  accent,
+  kpiKey,
+  label,
+  refrigeratorId,
+  unit,
+  zoneId,
+}: {
+  accent: string;
+  kpiKey: string;
+  label: string;
+  refrigeratorId: number;
+  unit: string;
+  zoneId: string;
+}) {
+  const graphController = useRefrigeratorKpiGraph({
+    refrigeratorId,
+    kpiKey,
+    zoneId,
+    variant: 'inline',
+    accent,
+    unit,
+    label,
+  });
+
+  return <RefrigeratorKpiGraph controller={graphController} />;
 }
 
 export default function RefrigeratorVisualisation({
@@ -981,9 +773,6 @@ export default function RefrigeratorVisualisation({
   selectedSensorId,
   onSensorSelect,
   hasAlert,
-  onTaskCreated: _onTaskCreated,
-  currentUserName: _currentUserName = '',
-  currentUserId: _currentUserId = '',
   refrigeratorId,
   refrigeratorCode,
   branchName,
@@ -1446,10 +1235,10 @@ export default function RefrigeratorVisualisation({
   }, [hasAlert]);
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 h-full min-h-0">
+    <div className="grid grid-cols-1 auto-rows-min overflow-y-auto min-[900px]:auto-rows-auto min-[900px]:overflow-visible min-[900px]:grid-cols-[minmax(280px,32%)_1fr] xl:grid-cols-[minmax(340px,40%)_1fr] 2xl:grid-cols-2 gap-4 h-full min-h-0">
 
       {/* Left: Live Conditions (top) + Messages (bottom) */}
-      <aside className="flex flex-col gap-3 min-h-0">
+      <aside className="flex flex-col gap-3 min-h-[520px] min-[900px]:min-h-0">
 
         {/* Live Conditions card — 60% */}
         <div className="@container min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ flex: '3 1 0%' }}>
@@ -1504,7 +1293,7 @@ export default function RefrigeratorVisualisation({
       {/* Center 3D viewer / Room visualization */}
       <section
         data-refrigerator-3d-mount
-        className="relative min-h-0 overflow-hidden"
+        className="relative min-h-[420px] min-[900px]:min-h-0 overflow-hidden"
         style={{ borderRadius: 20, border: '1px solid #d8c6e8', background: 'linear-gradient(160deg, #f3eaf9 0%, #ede0f5 40%, #e4d4f0 100%)', boxShadow: '0 8px 20px -12px #4011531f, 0 2px 6px #4011530a' }}
         aria-label="Refrigerator 3D visualisation"
       >

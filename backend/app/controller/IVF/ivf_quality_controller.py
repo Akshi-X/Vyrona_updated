@@ -35,6 +35,7 @@ from app.constants.enums import ActivityOutcome
 from app.dependencies.auth_dependencies import get_current_user
 from app.exceptions import InvalidTokenException
 from app.models.IVF.device_model import Device
+from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
 from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
@@ -709,6 +710,28 @@ def _require_alert_setting_role(current_user: User) -> None:
         )
 
 
+def _resolve_current_hospital_id(request: Request, db: Session) -> int:
+    """Resolve hospital_id from authenticated request context for IVF users."""
+    hospital_id = getattr(getattr(request, "state", None), "hospital_id", None)
+    if hospital_id is not None:
+        return int(hospital_id)
+
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    if branch_id is not None:
+        branch = (
+            db.query(HospitalBranch)
+            .filter(HospitalBranch.branch_id == int(branch_id))
+            .first()
+        )
+        if branch and branch.hospital_id is not None:
+            return int(branch.hospital_id)
+
+    raise HTTPException(
+        status_code=400,
+        detail="Unable to resolve hospital for current user",
+    )
+
+
 def _kpi_config_metadata(row: KpiConfig) -> dict:
     return {
         "id": row.id,
@@ -733,6 +756,73 @@ def _kpi_config_metadata(row: KpiConfig) -> dict:
         "whatsapp_alert": bool(row.whatsapp_alert),
         "email_alert": bool(row.email_alert),
         "status": bool(row.status),
+    }
+
+
+@router.get("/hospital-notification-settings")
+def get_hospital_notification_settings(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get hospital-level push notification setting. Email/WhatsApp are configured
+    per-KPI-config (see kpi-config endpoints below) — push remains hospital-wide."""
+    _require_alert_setting_role(current_user)
+    hospital_id = _resolve_current_hospital_id(request, db)
+    hospital = db.query(Hospital).filter(Hospital.hospital_id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    return {
+        "hospital_id": hospital.hospital_id,
+        "is_push_notify": bool(hospital.is_push_notify),
+    }
+
+
+@router.put("/hospital-notification-settings")
+def update_hospital_notification_settings(
+    request: Request,
+    body: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update the hospital-level push notification setting."""
+    _require_alert_setting_role(current_user)
+
+    if "is_push_notify" not in body:
+        raise HTTPException(
+            status_code=400,
+            detail="is_push_notify is required",
+        )
+
+    push_enabled = bool(body.get("is_push_notify"))
+
+    hospital_id = _resolve_current_hospital_id(request, db)
+    hospital = db.query(Hospital).filter(Hospital.hospital_id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    before_state = {"is_push_notify": bool(hospital.is_push_notify)}
+
+    hospital.is_push_notify = push_enabled
+    db.commit()
+
+    ActivityLogService(db).log_activity(
+        action="alert_configuration.notification_settings_updated",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("hospital", str(hospital.hospital_id), hospital.hospital_name),
+        metadata={
+            "hospital_id": hospital.hospital_id,
+            "before": before_state,
+            "after": {"is_push_notify": bool(hospital.is_push_notify)},
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
+
+    return {
+        "hospital_id": hospital.hospital_id,
+        "is_push_notify": bool(hospital.is_push_notify),
     }
 
 

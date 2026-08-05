@@ -79,6 +79,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,svg}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Adds push/notificationclick handlers to the generated SW without
+        // switching off generateSW. See public/push-sw.js.
+        importScripts: ['/push-sw.js'],
       },
       manifest: {
         name: 'mG Scale',
@@ -105,6 +108,22 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
+          },
+        ],
+        screenshots: [
+          {
+            src: '/screenshots/login-wide.png',
+            sizes: '1280x800',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Sign in to mG Scale',
+          },
+          {
+            src: '/screenshots/login-narrow.png',
+            sizes: '390x844',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Sign in to mG Scale',
           },
         ],
       },
