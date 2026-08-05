@@ -354,15 +354,30 @@ export default function AlertSetting() {
                     icon={CriticalAlertsIcon}
                     patternBackground
                     actions={
-                        <button
-                            id="onboarding-alert-config-history"
-                            type="button"
-                            onClick={() => setShowHistory(true)}
-                            className="h-9 px-3 md:px-4 rounded-lg bg-white text-gray-700 border border-line hover:bg-gray-50 text-[13px] font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors"
-                        >
-                            <History className="w-4 h-4" />
-                            <span className="hidden sm:inline">Config History</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                id="onboarding-alert-config-history"
+                                type="button"
+                                onClick={() => setShowHistory(true)}
+                                title="Config History"
+                                aria-label="Config History"
+                                className="h-9 w-9 min-[900px]:w-auto min-[900px]:px-4 rounded-lg bg-white text-gray-700 border border-line hover:bg-gray-50 text-[13px] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
+                            >
+                                <History className="w-4 h-4 shrink-0" />
+                                <span className="hidden min-[900px]:inline">Config History</span>
+                            </button>
+                            <button
+                                id="onboarding-alert-notify-open"
+                                type="button"
+                                onClick={openNotifySettings}
+                                title="Notifications"
+                                aria-label="Notifications"
+                                className="h-9 w-9 min-[900px]:w-auto min-[900px]:px-4 rounded-lg bg-white text-gray-700 border border-line hover:bg-gray-50 text-[13px] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
+                            >
+                                <Bell className="w-4 h-4 shrink-0" />
+                                <span className="hidden min-[900px]:inline">Notifications</span>
+                            </button>
+                        </div>
                     }
                 >
                     {(() => {
@@ -552,17 +567,6 @@ export default function AlertSetting() {
                                                     >
                                                         {opt.label}
                                                     </button>
-
-                            {/* Notifications pill */}
-                            <button
-                                id="onboarding-alert-notify-open"
-                                type="button"
-                                onClick={openNotifySettings}
-                                className="h-9 px-4 rounded-full text-[13px] font-semibold text-white/90 border border-white/15 hover:bg-white/10 flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors max-[490px]:w-full"
-                            >
-                                <Bell className="w-3.5 h-3.5" />
-                                Notifications
-                            </button>
                                                 ))}
                                             </div>
                                         )
