@@ -109,9 +109,9 @@ _WA_TEMPLATE_LN2_LEVEL = "HXcb6b9aeb47949e7b1c45efbfe7900eed"   # "{{1}} crossed
 # Alert-email artwork. Embedded as inline CID attachments rather than linked, so the
 # images render without a publicly reachable host and without the recipient having to
 # allow external images. Paths resolve against the frontend's public/ directory.
-_EMAIL_ASSET_DIR = (
-    Path(__file__).resolve().parents[4] / "FrontEnd" / "public"
-)
+# Inside the backend tree so the assets ship with the backend image; the frontend's
+# public/ directory is not present in a backend-only deployment.
+_EMAIL_ASSET_DIR = Path(__file__).resolve().parents[2] / "assets" / "email"
 _EMAIL_BANNER_PATH = "/banner-hex.png"
 
 _EMAIL_INLINE_ASSETS = {
