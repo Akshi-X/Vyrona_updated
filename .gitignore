@@ -7,3 +7,4 @@ FrontEnd/.env
 .devcontainer/.env
 logs/
 n-task.csv
+docs/

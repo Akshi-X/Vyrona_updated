@@ -436,11 +436,55 @@ def sync_ivf_schema():
                 "ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS is_whatsapp_notify BOOLEAN NOT NULL DEFAULT false"
             )
         )
+        db.execute(
+            text(
+                "ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS is_push_notify BOOLEAN NOT NULL DEFAULT false"
+            )
+        )
 
         # users: optional phone number
         db.execute(
             text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20)"
+            )
+        )
+
+        # users: web push account-wide opt-out
+        db.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS push_enabled BOOLEAN NOT NULL DEFAULT true"
+            )
+        )
+
+        # push_subscriptions: per-browser Web Push subscriptions
+        db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS push_subscriptions (
+                    id SERIAL PRIMARY KEY,
+                    user_id VARCHAR NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                    endpoint TEXT NOT NULL UNIQUE,
+                    p256dh VARCHAR(255) NOT NULL,
+                    auth VARCHAR(255) NOT NULL,
+                    user_agent VARCHAR(255),
+                    device_label VARCHAR(120),
+                    enabled BOOLEAN NOT NULL DEFAULT true,
+                    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    last_used_at TIMESTAMP,
+                    last_failure_at TIMESTAMP,
+                    failure_count INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+        )
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_push_subscriptions_user_id ON push_subscriptions(user_id)"
+            )
+        )
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_push_subscriptions_endpoint ON push_subscriptions(endpoint)"
             )
         )
 

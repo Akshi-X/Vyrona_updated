@@ -36,91 +36,7 @@
         "startPage": "/onboarding/user-profile",
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
-    {
-        "id": "pf7-first-name",
-        "target": "#onboarding-profile-first-name",
-        "title": "First Name",
-        "icon": "User",
-        "content": "Your first name as it appears across the platform — in alert logs, audit records, and team communications.",
-        "placement": "bottom",
-        "requireClick": false,
-        "genieImage": "/genie/explaining.webp"
-    },
-    {
-        "id": "pf7-last-name",
-        "target": "#onboarding-profile-last-name",
-        "title": "Last Name",
-        "icon": "User",
-        "content": "Your last name. Combined with your first name, this forms the identity shown to other team members throughout the system.",
-        "placement": "bottom",
-        "requireClick": false,
-        "genieImage": "/genie/explaining.webp"
-    },
-    {
-        "id": "pf7-email",
-        "target": "#onboarding-profile-email",
-        "title": "Email Address",
-        "icon": "Mail",
-        "content": "Your registered work email — read-only because it is tied to your account credentials and can only be changed by your administrator.",
-        "placement": "bottom",
-        "requireClick": false,
-        "genieImage": "/genie/explaining_with_phone.webp"
-    },
-    {
-        "id": "pf7-role",
-        "target": "#onboarding-profile-role",
-        "title": "Role",
-        "icon": "ShieldCheck",
-        "content": "Your role controls what you can see and do across the platform — User, Manager, or Admin. Roles are assigned by your hospital administrator and cannot be changed here.",
-        "placement": "bottom",
-        "requireClick": false,
-        "genieImage": "/genie/explaining_settings.webp"
-    },
-    {
-        "id": "pf7-phone",
-        "target": "#onboarding-profile-phone",
-        "title": "Phone Number",
-        "icon": "Phone",
-        "content": "Your contact number — optional, but worth adding so your team can reach you directly for urgent escalations outside the platform.",
-        "placement": "bottom",
-        "requireClick": false,
-        "genieImage": "/genie/explaining_with_phone.webp"
-    },
-    {
-        "id": "pf7-edit-btn",
-        "target": "#onboarding-profile-edit-btn",
-        "title": "Edit Profile",
-        "icon": "Pencil",
-        "content": "Click Edit Profile to unlock your name and phone fields. Email and role stay read-only — those are managed by your administrator.",
-        "placement": "bottom",
-        "requireClick": true,
-        "clickOnlyId": ["#onboarding-profile-edit-btn"],
-        "prevDisable": true,
-        "genieImage": "/genie/explaining_settings.webp"
-    },
-    {
-        "id": "pf7-edit-mode",
-        "target": "#onboarding-profile-basic-info",
-        "title": "Edit Your Details",
-        "icon": "Pencil",
-        "content": "Your name and phone number fields are now editable. Email and role remain locked — those are managed at the account level by your administrator.",
-        "placement": "bottom",
-        "requireClick": false,
-        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
-    },
-    {
-        "id": "pf7-save-btn",
-        "target": "#onboarding-profile-save-btn",
-        "title": "Save Changes",
-        "icon": "Check",
-        "content": "Click Save to commit your changes. The form validates inputs before saving — names must contain letters only, and phone numbers must be a valid format.",
-        "placement": "bottom",
-        "requireClick": true,
-        "clickOnlyId": ["#onboarding-profile-save-btn"],
-        "prevDisable": true,
-        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
-    },
-
+    
     {
         "id": "pf7-support-activity",
         "target": "#onboarding-profile-support-activity",
@@ -329,35 +245,5 @@
         "placement": "top",
         "requireClick": false,
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
-    },
-    {
-        "id": "pf7-notifications",
-        "target": "#onboarding-profile-notifications",
-        "title": "Notifications",
-        "icon": "Bell",
-        "content": "Control how the platform communicates with you. Changes here only affect your account — other users' preferences remain unchanged.",
-        "placement": "top",
-        "requireClick": false,
-        "genieImage": "/genie/explaining_with_phone.webp"
-    },
-    {
-        "id": "pf7-notif-ticket",
-        "target": "#onboarding-profile-notif-ticket",
-        "title": "Ticket Update Emails",
-        "icon": "Mail",
-        "content": "Turn this on to receive an email whenever one of your support ticket statuses changes — useful if you want updates without checking the platform manually.",
-        "placement": "top",
-        "requireClick": false,
-        "genieImage": "/genie/explaining_with_phone.webp"
-    },
-    {
-        "id": "pf7-notif-updates",
-        "target": "#onboarding-profile-notif-updates",
-        "title": "Feature Update Emails",
-        "icon": "Sparkles",
-        "content": "Stay informed about new myGrape features and product improvements. This option is coming soon — once live, you'll receive periodic feature update newsletters.",
-        "placement": "top",
-        "requireClick": false,
-        "genieImage": "/genie/explaining_casual.webp"
     }
 ]

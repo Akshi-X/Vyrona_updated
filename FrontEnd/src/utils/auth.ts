@@ -1,6 +1,6 @@
-import Cookies from 'js-cookie';
+import Cookies from "js-cookie";
 
-export const AUTH_TOKEN_KEY = 'auth_token';
+export const AUTH_TOKEN_KEY = "auth_token";
 
 export const authUtils = {
   // Save auth token to cookies with secure settings
@@ -10,12 +10,14 @@ export const authUtils = {
     const expirationHours = rememberMe ? 9 : 1;
     // Calculate expiration date from now
     const expirationDate = new Date();
-    expirationDate.setTime(expirationDate.getTime() + (expirationHours * 60 * 60 * 1000));
-    
+    expirationDate.setTime(
+      expirationDate.getTime() + expirationHours * 60 * 60 * 1000,
+    );
+
     Cookies.set(AUTH_TOKEN_KEY, token, {
       expires: expirationDate,
-      secure: true, // Only send over HTTPS
-      sameSite: 'strict' // CSRF protection
+      secure: import.meta.env.VITE_API_BASE_URL.includes("https"), // Only send over HTTPS
+      sameSite: "strict", // CSRF protection
     });
   },
 
@@ -46,7 +48,7 @@ export const authUtils = {
     if (!token) {
       return false; // No token to check
     }
-    
+
     // The js-cookie library automatically handles expiration
     // If the cookie is still present, it's not expired
     // If it's expired, js-cookie will return undefined
@@ -56,5 +58,5 @@ export const authUtils = {
   // Force clear token (for logout)
   clearToken: (): void => {
     Cookies.remove(AUTH_TOKEN_KEY);
-  }
+  },
 };

@@ -118,7 +118,7 @@ to fix-conflict
 
 npm run dev --  --port 5174
 
-poetry run uvicorn main:app --port 8001 --reload
+poetry run uvicorn app.main:app --port 8001 --reload
 
 
 

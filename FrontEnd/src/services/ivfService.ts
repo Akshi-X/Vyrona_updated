@@ -115,6 +115,8 @@ export interface KpiConfigRow {
     alert_type: string | null;
     cooldown_minutes: number;
     unack_escalation_threshold: number | null;
+    whatsapp_alert: boolean;
+    email_alert: boolean;
     status: boolean;
 }
 
@@ -134,13 +136,14 @@ export interface KpiConfigPayload {
     alert_type?: string | null;
     cooldown_minutes?: number;
     unack_escalation_threshold?: number | null;
+    whatsapp_alert?: boolean;
+    email_alert?: boolean;
     status?: boolean;
 }
 
 export interface HospitalNotificationSettings {
     hospital_id: number;
-    is_email_notifify: boolean;
-    is_whatsapp_notify: boolean;
+    is_push_notify: boolean;
 }
 
 export interface DeviationsGraphDataItem {
@@ -497,8 +500,8 @@ export class IvfService extends BaseApiService {
         tank_code: string;
         branch_id?: number | null;
         branch_name?: string | null;
-        tank_max_capacity_reading?: number | null;
-        tank_min_capacity_reading?: number | null;
+        full_weight_kg?: number | null;
+        empty_weight_kg?: number | null;
         kpi_limits: Record<
             string,
             {
@@ -680,6 +683,8 @@ export class IvfService extends BaseApiService {
         refrigerator_code?: string;
         branch_id: number;
         hospital_id: number | null;
+        empty_weight_kg?: number | null;
+        full_weight_kg?: number | null;
         config: Array<KpiConfigRow>;
     }> {
         let param: string;
@@ -713,8 +718,7 @@ export class IvfService extends BaseApiService {
     }
 
     async updateHospitalNotificationSettings(payload: {
-        is_email_notifify: boolean;
-        is_whatsapp_notify: boolean;
+        is_push_notify: boolean;
     }): Promise<HospitalNotificationSettings> {
         return await this.request("/api/ivf/quality/hospital-notification-settings", {
             method: "PUT",
@@ -762,6 +766,8 @@ export class IvfService extends BaseApiService {
             alert_type?: string | null;
             cooldown_minutes?: number;
             unack_escalation_threshold?: number | null;
+            whatsapp_alert?: boolean;
+            email_alert?: boolean;
             status?: boolean;
         }>,
     ): Promise<{ updated: number; created: number }> {
@@ -784,6 +790,8 @@ export class IvfService extends BaseApiService {
             alert_type?: string | null;
             cooldown_minutes?: number;
             unack_escalation_threshold?: number | null;
+            whatsapp_alert?: boolean;
+            email_alert?: boolean;
             status?: boolean;
         }>,
     ): Promise<{ updated: number; created: number }> {
@@ -806,6 +814,8 @@ export class IvfService extends BaseApiService {
             alert_type?: string | null;
             cooldown_minutes?: number;
             unack_escalation_threshold?: number | null;
+            whatsapp_alert?: boolean;
+            email_alert?: boolean;
             status?: boolean;
         }>,
         zoneName?: string | null,

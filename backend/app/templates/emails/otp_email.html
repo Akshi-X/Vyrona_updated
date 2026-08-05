@@ -3,143 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
     <title>{{ subject }}</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #F8F9FA;
-            margin: 0;
-            padding: 0;
-            line-height: 1.6;
-        }
-        .email-container {
-            max-width: 600px;
-            margin: 20px auto;
-            background-color: #FFFFFF;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-        .header {
-            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
-            color: #FFFFFF;
-            padding: 25px 30px;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 22px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        .content {
-            padding: 30px;
-            color: #374151;
-        }
-        .otp-box {
-            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
-            color: #FFFFFF;
-            padding: 25px;
-            margin: 25px 0;
-            text-align: center;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(107, 17, 118, 0.3);
-        }
-        .otp-code {
-            font-size: 36px;
-            font-weight: bold;
-            letter-spacing: 10px;
-            margin: 12px 0;
-            font-family: 'Courier New', monospace;
-        }
-        .otp-label {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 8px;
-        }
-        .warning-box {
-            background-color: #FEF3C7;
-            border-left: 4px solid #F59E0B;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 8px;
-        }
-        .warning-box p {
-            margin: 6px 0;
-            font-size: 14px;
-            color: #92400E;
-        }
-        .info-box {
-            background-color: #EFF6FF;
-            border-left: 4px solid #2563EB;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 8px;
-        }
-        .info-box p {
-            margin: 6px 0;
-            font-size: 14px;
-            color: #1E40AF;
-        }
-        .footer {
-            background-color: #F8F9FA;
-            padding: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #6B7280;
-            border-top: 1px solid #E5E7EB;
-        }
-        .footer p {
-            margin: 5px 0;
-        }
-        .divider {
-            height: 1px;
-            background-color: #E5E7EB;
-            margin: 20px 0;
-        }
-        .icon {
-            font-size: 32px;
-            margin-bottom: 10px;
+    <!--[if mso]>
+    <style type="text/css">
+        body, table, td, th, p, a, div {font-family: Arial, Helvetica, sans-serif !important;}
+    </style>
+    <![endif]-->
+    <style type="text/css">
+        @media only screen and (min-width: 621px) {
+            .mg-pad  {padding-left: 34px !important; padding-right: 34px !important;}
+            .mg-code {font-size: 42px !important; letter-spacing: 12px !important;}
+            .mg-h1   {font-size: 28px !important;}
+            .mg-logo {width: 150px !important; max-width: 150px !important;}
+            .mg-tag  {font-size: 12px !important; letter-spacing: 2px !important;}
         }
     </style>
 </head>
-<body>
-    <div class="email-container">
-        <div class="header">
-            <div class="icon">🔐</div>
-            <h1>{{ subject }}</h1>
-        </div>
-        
-        <div class="content">
-            <h2 style="color: #6B1176; font-size: 18px; margin-top: 0;">Hello,</h2>
-            <p>You've requested to log in to your myGrape account. Please use the OTP below to complete your login:</p>
-            
-            <div class="otp-box">
-                <div class="otp-label">Your OTP Code</div>
-                <div class="otp-code">{{ otp_code }}</div>
-                <div style="font-size: 12px; opacity: 0.9;">Valid for {{ expiry_minutes }} minutes</div>
-            </div>
-            
-            <div class="info-box">
-                <p><strong>⏱️ Important:</strong> This OTP is valid for <strong>{{ expiry_minutes }} minutes</strong> only.</p>
-                <p>Please enter it in your login screen to continue.</p>
-            </div>
-            
-            <div class="divider"></div>
-            
-            <div class="warning-box">
-                <p><strong>⚠️ Security Notice:</strong></p>
-                <p>• Never share this OTP with anyone</p>
-                <p>• myGrape will never ask for your OTP via email or phone</p>
-                <p>• If you didn't request this OTP, please ignore this email</p>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p><strong>myGrape</strong></p>
-            <p>This is an automated message. Please do not reply to this email.</p>
-            <p style="margin-top: 10px;">© 2025 myGrape. All rights reserved.</p>
-        </div>
+{% set brand = '#6b1176' %}
+<body style="margin:0; padding:0; background-color:#EFEFF3; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased;">
+
+    <!-- Preheader: inbox preview text -->
+    <div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#EFEFF3; opacity:0;">
+        Your myGrape verification code is {{ otp_code }} &mdash; valid for {{ expiry_minutes }} minutes.
     </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; background-color:#EFEFF3;">
+        <tr>
+            <td align="center" style="text-align:center; padding:26px 10px;">
+
+                <!--[if mso]><table role="presentation" width="640" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="mg-card" style="border-spacing:0; width:100%; max-width:640px; margin:0 auto; text-align:left; background-color:#FFFFFF; border-radius:10px; overflow:hidden;">
+
+                    <!-- Header -->
+                    <tr>
+                        <td background="{{ banner_url }}" style="background-color:{{ brand }};{% if banner_url %} background-image:url('{{ banner_url }}'); background-position:top right; background-repeat:no-repeat; background-size:200px 132px;{% endif %} padding:0;">
+                            <!--[if gte mso 9]>
+                            <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:640px;height:132px;">
+                                <v:fill type="frame" src="{{ banner_url }}" color="{{ brand }}" position="1,0"/>
+                                <v:textbox inset="0,0,0,0"><![endif]-->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
+                                <tr>
+                                    <td align="left" valign="middle" style="text-align:left; vertical-align:middle; padding:22px 0 22px 20px;">
+                                        {% if logo_url %}
+                                        <img src="{{ logo_url }}" alt="mG SCALE" width="120" height="64" class="mg-logo" style="display:block; border:0; outline:none; text-decoration:none; width:120px; height:auto; max-width:120px; font-size:19px; font-weight:700; color:#FFFFFF;">
+                                        {% else %}
+                                        <span style="font-size:19px; font-weight:700; color:#FFFFFF; letter-spacing:0.3px;">mG SCALE</span>
+                                        {% endif %}
+                                    </td>
+                                    <td align="right" valign="middle" class="mg-tag" style="width:100%; text-align:right; vertical-align:middle; padding:22px 20px 22px 6px; font-size:10px; font-weight:700; color:#FFFFFF; letter-spacing:1.2px; text-transform:uppercase;">Verification</td>
+                                </tr>
+                            </table>
+                            <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
+                        </td>
+                    </tr>
+                    <tr><td style="height:4px; line-height:4px; font-size:0; background-color:#8b2a96;">&nbsp;</td></tr>
+
+                    <!-- Intro -->
+                    <tr>
+                        <td class="mg-pad" style="padding:30px 20px 0 20px;">
+                            <h1 class="mg-h1" style="margin:0 0 8px 0; font-size:23px; line-height:1.25; font-weight:800; color:#16171D; letter-spacing:-0.5px;">
+                                Your verification code
+                            </h1>
+                            <p style="margin:0; font-size:15px; line-height:1.6; color:#6E7180;">
+                                Enter this code to finish signing in.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Code -->
+                    <tr>
+                        <td class="mg-pad" style="padding:22px 20px 0 20px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; background-color:#F7ECFF; border:1px solid #E6D6EE; border-radius:12px;">
+                                <tr>
+                                    <td align="center" style="text-align:center; padding:28px 16px 24px 16px;">
+                                        <div style="font-size:11px; font-weight:700; color:{{ brand }}; letter-spacing:1.6px; text-transform:uppercase; opacity:0.8;">One-time code</div>
+                                        <div class="mg-code" style="margin-top:10px; font-family:'SF Mono',Consolas,Menlo,monospace; font-size:30px; font-weight:800; color:{{ brand }}; letter-spacing:7px; text-indent:7px;">{{ otp_code }}</div>
+                                        <div style="margin-top:12px; font-size:13px; color:#8A8D9B;">Valid for {{ expiry_minutes }} minutes</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Security note -->
+                    <tr>
+                        <td class="mg-pad" style="padding:20px 20px 0 20px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; background-color:#FFF6E5; border-radius:8px;">
+                                <tr>
+                                    <td style="padding:16px 18px; font-size:14px; line-height:1.6; color:#7A4A08;">
+                                        <strong>Keep this code private.</strong> myGrape will never ask you for it. If you did not request this code, you can safely ignore this email.
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr><td style="height:34px; line-height:34px; font-size:0;">&nbsp;</td></tr>
+
+                    <!-- Footer -->
+                    <tr><td style="height:2px; line-height:2px; font-size:0; background-color:#8b2a96;">&nbsp;</td></tr>
+                    <tr>
+                        <td style="background-color:#F5F4F8; padding:22px 20px; text-align:center;">
+                            <p style="margin:0 0 6px 0; font-size:15px; font-weight:700; color:{{ brand }};">myGrape</p>
+                            <p style="margin:0; font-size:13px; line-height:1.7; color:#8A8D9B;">
+                                Automated message &mdash; please do not reply.<br>
+                                &copy; 2025 myGrape. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]></td></tr></table><![endif]-->
+
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

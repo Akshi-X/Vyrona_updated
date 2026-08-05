@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Lock } from "lucide-react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { useLayoutEffect } from "react";
 import { Sidebar } from "../../components/Sidebar";
 import { useAuth } from "../../contexts/AuthContext";
@@ -8,6 +8,7 @@ import { TourProvider, useTour } from "@reactour/tour";
 import { OnboardingModeProvider } from "../../contexts/OnboardingModeContext";
 import { disableOnboardingMocks, enableOnboardingMocks } from "../../onboarding/mockApi";
 import OnboardingOverlay from "./OnboardingOverlay";
+import PreviewTourOverlay from "./PreviewTourOverlay";
 import { TourNavStoreProvider, useTourNavContext, type TourNavState } from "../../contexts/TourNavContext";
 import TourStepHeading from "./TourStepHeading";
 import {
@@ -27,7 +28,7 @@ function GeniePreloaderGate({ children }: { children: React.ReactNode }) {
 // ── Shared nav buttons used by both default and wide layouts ──────────────────
 function TourNavButtons({ nav }: { nav: TourNavState }) {
     return (
-        <div className="space-y-2 border-t border-slate-100 pt-3 mt-3">
+        <div className="shrink-0 space-y-2 border-t border-slate-100 pt-3 mt-3 bg-white">
             {nav.requiresClick && (
                 <p className="text-[11px] font-medium text-amber-600">
                     Click the highlighted area to continue
@@ -68,8 +69,22 @@ function TourContent({ content }: { content: unknown }) {
     const ctx = useTourNavContext();
     const nav = ctx?.nav;
     const { setIsOpen } = useTour();
+    const navigate = useNavigate();
 
-    const handleClose = () => { setIsOpen(false); ctx?.setIsTourActive(false); ctx?.openOverlay?.(); };
+    const handleClose = () => {
+        setIsOpen(false);
+        ctx?.setIsTourActive(false);
+        // Preview session: exiting mid-tour returns to the originating real page.
+        if (ctx?.previewLevelId) {
+            const path = ctx.returnPath;
+            ctx.setReturnPath(null);
+            ctx.setPreviewLevelId(null);
+            ctx.setPreviewPhase(null);
+            if (path) navigate(path);
+            return;
+        }
+        ctx?.openOverlay?.();
+    };
 
     if (nav?.is_wide) {
         const mediaSrc = nav.gif ?? nav.genieImage;
@@ -98,22 +113,24 @@ function TourContent({ content }: { content: unknown }) {
     }
 
     return (
-        <div className="space-y-2">
+        <div className="flex min-h-0 flex-1 flex-col">
             <TourStepHeading
                 title={nav?.title ?? ""}
                 icon={nav?.icon}
                 onClose={handleClose}
             />
-            {nav?.genieImage && (
-                <img
-                    src={nav.genieImage}
-                    alt=""
-                    className="w-full h-72 object-contain object-center"
-                />
-            )}
-            <p className="text-sm leading-relaxed text-slate-700">
-                {(nav?.content ?? content) as React.ReactNode}
-            </p>
+            <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto">
+                {nav?.genieImage && (
+                    <img
+                        src={nav.genieImage}
+                        alt=""
+                        className="w-full h-48 shrink-0 object-contain object-center"
+                    />
+                )}
+                <p className="text-sm leading-relaxed text-slate-700">
+                    {(nav?.content ?? content) as React.ReactNode}
+                </p>
+            </div>
         </div>
     );
 }
@@ -164,8 +181,14 @@ function TourProviderWithDynamicStyles({ children }: { children: React.ReactNode
                     borderRadius: 16,
                     padding: isWide ? 0 : 20,
                     maxWidth: isWide ? 640 : 320,
-                    maxHeight: "calc(100vh - 32px)",
-                    overflow: "auto",
+                    // Cap well below viewport height so the card keeps a comfortable
+                    // margin from top/bottom edges. The body scrolls, so it never needs
+                    // to grow tall — the pinned nav always stays on screen.
+                    maxHeight: isWide ? "calc(100vh - 32px)" : "min(520px, calc(100vh - 96px))",
+                    // Non-wide: flex column so the body scrolls and the nav stays pinned/visible.
+                    ...(isWide
+                        ? { overflow: "auto" }
+                        : { display: "flex", flexDirection: "column", overflow: "hidden" }),
                 }),
             }}
         >
@@ -174,15 +197,8 @@ function TourProviderWithDynamicStyles({ children }: { children: React.ReactNode
     );
 }
 
-// Pages that have their own full-width layout — sidebar should be hidden for these.
-const NO_SIDEBAR_PATHS = ["/onboarding/user-profile", "/onboarding/support", "/onboarding/success"];
-
 export default function OnboardingShell() {
     const navigate = useNavigate();
-    const location = useLocation();
-    const hideSidebar = NO_SIDEBAR_PATHS.some(
-        (p) => location.pathname === p || location.pathname.startsWith(p + "/"),
-    );
     const { logout } = useAuth();
 
     useLayoutEffect(() => {
@@ -239,27 +255,21 @@ export default function OnboardingShell() {
     };
 
     // Providers are always at the same tree position so React never remounts them
-    // when navigating between sidebar and no-sidebar pages — tour state is preserved.
+    // while navigating between onboarding pages — tour state is preserved.
     return (
         <OnboardingModeProvider value={true}>
             <GeniePreloaderProvider>
                 <TourNavStoreProvider>
                     <TourProviderWithDynamicStyles>
                         <GeniePreloaderGate>
-                            {hideSidebar ? (
-                                // Pages with their own full-width layout — no sidebar, no offset wrapper.
-                                <Outlet />
-                            ) : (
-                                <div className="bg-surface flex w-full h-dvh overflow-hidden">
-                                    <Sidebar onLogout={handleLogout} />
-                                    <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
-                                        <Outlet />
-                                    </div>
+                            <div className="bg-surface flex w-full h-dvh overflow-hidden">
+                                <Sidebar onLogout={handleLogout} />
+                                <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
+                                    <Outlet />
                                 </div>
-                            )}
-                            {/* Kept outside the hideSidebar conditional so React never remounts it on
-                            layout changes — preserves isOpen state when navigating to no-sidebar routes. */}
+                            </div>
                             <OnboardingOverlay />
+                            <PreviewTourOverlay />
                         </GeniePreloaderGate>
                     </TourProviderWithDynamicStyles>
                 </TourNavStoreProvider>

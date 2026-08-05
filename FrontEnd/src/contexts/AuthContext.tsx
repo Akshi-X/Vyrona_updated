@@ -10,6 +10,7 @@ import { authUtils } from "../utils/auth";
 import { authService } from "../services/authService";
 import { userService } from "../services/userService";
 import { runAuthenticatedHealthCheck } from "../utils/variantHealthCheck";
+import { unsubscribeFromPushOnLogout } from "../utils/push";
 
 interface AuthContextType {
     isAuthenticated: boolean;
@@ -345,6 +346,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const logout = () => {
+        // Best-effort push cleanup — must run before authService.logout() clears
+        // the auth cookie, since it needs a valid token for the DELETE call.
+        unsubscribeFromPushOnLogout(token);
+
         // Clear session timeout
         clearSessionTimeout();
 

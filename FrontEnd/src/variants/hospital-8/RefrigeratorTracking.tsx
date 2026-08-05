@@ -11,8 +11,58 @@ import { userService } from '../../services/userService';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatBox from '../../components/StakeholderChatBox';
 import RefrigeratorVisualisation from './components/RefrigeratorVisualisation';
+import brandLogo from '../../assets/mGScale.svg';
 
 type RefrigeratorZone = { zone_id: string; zone_name: string };
+
+const THROBBER_STYLES = `
+  @keyframes throb-pulse {
+    0%, 100% { transform: scale(0.92); opacity: 0.9; }
+    50%      { transform: scale(1.05); opacity: 1; }
+  }
+  @keyframes throb-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  @keyframes throb-spin-rev {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(-360deg); }
+  }
+  @keyframes throb-dots {
+    0%, 80%, 100% { opacity: 0.25; }
+    40%           { opacity: 1; }
+  }
+  @keyframes loading-word {
+    0%   { opacity: 0; transform: translateY(5px); }
+    16%  { opacity: 1; transform: translateY(0); }
+    84%  { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-5px); }
+  }
+`;
+
+const THROBBER_WORDS = [
+  'Fetching Refrigerator Status',
+  'Loading Zone Sensors',
+  'Syncing Alerts & Tasks',
+];
+
+// Cycles through the loading phrases, fading each in and out.
+const ThrobberWords: React.FC = () => {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setIdx((i) => (i + 1) % THROBBER_WORDS.length), 1900);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span
+      key={idx}
+      className="text-xs font-semibold text-gray-500"
+      style={{ animation: 'loading-word 1.9s ease-in-out' }}
+    >
+      {THROBBER_WORDS[idx]}
+    </span>
+  );
+};
 
 export default function RefrigeratorTrackingPageHospital8() {
   const { refrigeratorId: refrigeratorIdParam } = useParams<{ refrigeratorId: string }>();
@@ -32,6 +82,26 @@ export default function RefrigeratorTrackingPageHospital8() {
   const [currentUserId, setCurrentUserId] = useState('');
   const [showMessages, setShowMessages] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
+
+  // Throbber orchestration — mirrors hospital-8 Dashboard's loader fade-out
+  const [loaderRevealed, setLoaderRevealed] = useState(false);
+  const [hideLoader, setHideLoader] = useState(false);
+
+  useEffect(() => {
+    if (isLoadingType) {
+      setLoaderRevealed(false);
+      setHideLoader(false);
+      return;
+    }
+    const t = setTimeout(() => setLoaderRevealed(true), 120);
+    return () => clearTimeout(t);
+  }, [isLoadingType]);
+
+  useEffect(() => {
+    if (!loaderRevealed) return;
+    const t = setTimeout(() => setHideLoader(true), 650);
+    return () => clearTimeout(t);
+  }, [loaderRevealed]);
 
   useEffect(() => {
     if (!hasRefrigeratorId) {
@@ -123,6 +193,8 @@ export default function RefrigeratorTrackingPageHospital8() {
 
   return (
     <>
+    <div className="relative">
+    <style>{THROBBER_STYLES}</style>
     <PageLayout title="Refrigerator Tracking" description="Monitor temperature, alerts and tasks for cold storage units" lucideIcon={Snowflake} actions={pageActions}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
         <div className="flex items-center gap-1 text-sm">
@@ -169,6 +241,72 @@ export default function RefrigeratorTrackingPageHospital8() {
       </div>
     </PageLayout>
 
+    {!hideLoader && (
+      <div
+        className="absolute inset-0 z-[70] flex flex-col items-center justify-center"
+        style={{
+          background: 'radial-gradient(ellipse at center, #FBF8FF 0%, #F2E9FA 55%, #EADbF7 100%)',
+          opacity: loaderRevealed ? 0 : 1,
+          transition: 'opacity 0.6s ease',
+          pointerEvents: loaderRevealed ? 'none' : 'auto',
+        }}
+      >
+        <div className="relative flex items-center justify-center w-36 h-36">
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: 'conic-gradient(from 0deg, transparent 0deg, rgba(107,17,118,0.05) 120deg, #6b1176 340deg, transparent 360deg)',
+              WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))',
+              mask: 'radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))',
+              animation: 'throb-spin 1.1s linear infinite',
+            }}
+          />
+          <div
+            className="absolute rounded-full"
+            style={{
+              inset: 16,
+              background: 'conic-gradient(from 180deg, transparent 0deg, rgba(192,132,252,0.08) 140deg, #c084fc 330deg, transparent 360deg)',
+              WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px))',
+              mask: 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px))',
+              animation: 'throb-spin-rev 1.6s linear infinite',
+            }}
+          />
+          <div
+            aria-label="mgSCALE"
+            className="relative w-16 h-16"
+            style={{
+              backgroundColor: '#6b1176',
+              WebkitMask: `url(${brandLogo}) center / contain no-repeat`,
+              mask: `url(${brandLogo}) center / contain no-repeat`,
+              animation: 'throb-pulse 1.5s ease-in-out infinite',
+            }}
+          />
+        </div>
+        <div className="mt-7 flex flex-col items-center gap-2">
+          <p className="text-sm font-black tracking-tight text-gray-800">
+            mgSCALE <span className="text-gray-300 font-thin">|</span>{' '}
+            <span style={{ color: '#6b1176' }}>ColdSense</span>
+          </p>
+          <div className="h-4 flex items-center justify-center">
+            <ThrobberWords />
+          </div>
+          <div className="flex items-center gap-1.5">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="w-1.5 h-1.5 rounded-full"
+                style={{
+                  background: '#6b1176',
+                  animation: 'throb-dots 1.2s ease-in-out infinite',
+                  animationDelay: `${i * 0.16}s`,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+    </div>
 
     <StakeholderChatBox
       isOpen={showMessages}

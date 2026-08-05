@@ -1679,8 +1679,8 @@
     "tank_code": "T1",
     "branch_id": 16,
     "branch_name": "Bangalore",
-    "tank_max_capacity_reading": 56.36,
-    "tank_min_capacity_reading": 22.156,
+    "full_weight_kg": 56.36,
+    "empty_weight_kg": 22.156,
     "kpi_limits": {
       "temp_internal": {
         "Internal Temperature": {
@@ -10012,6 +10012,9 @@
         "tank_id": 161,
         "kpi_name": "temp_internal",
         "alert_name": "Internal Temperature",
+        "whatsapp_alert": true,
+        "email_alert": true,
+        "unack_escalation_threshold": 2,
         "min": -200.0,
         "max": -180.0,
         "unit": "\u00b0C",
@@ -10075,7 +10078,9 @@
         "cooldown_minutes": 30,
         "status": true
       }
-    ]
+    ],
+    "empty_weight_kg": 120.0,
+    "full_weight_kg": 170.0
   },
   "refillPendingDetections": {
     "detections": [

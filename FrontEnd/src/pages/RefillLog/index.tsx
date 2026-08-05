@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import PageLayout from "../../components/PageLayout";
 import Modal from "../../components/Modal";
-import ContainersIcon from "../../assets/DashBoardIcons/Containers.svg";
+import RefillIcon from "../../components/RefillIcon";
 import { useAuth } from "../../contexts/AuthContext";
 import { ivfService, type IvfBranch, type RefillLogItem } from "../../services/ivfService";
 import { userService, type UserListItem } from "../../services/userService";
@@ -499,7 +499,7 @@ const RefillLog = () => {
         <PageLayout
                 title="Refill Logs"
                 description="Track LN2 refill activities and reservoir inventory."
-                icon={ContainersIcon}
+                lucideIcon={RefillIcon}
                 actions={
                     <button
                         type="button"
