@@ -20,9 +20,29 @@ export default function RefrigeratorKpiGraph({ controller }: RefrigeratorKpiGrap
     series,
     setRange,
     stats,
+    threshold,
     unit,
     variant,
   } = controller;
+
+  const thresholdLegend = (scale: 'sm' | 'md') => {
+    if (threshold.min == null && threshold.max == null) return null;
+    const fontSize = scale === 'sm' ? 8 : 10;
+    const entries: Array<{ key: string; label: string; color: string }> = [];
+    if (threshold.max != null) entries.push({ key: 'max', label: `Max ${threshold.max}${unit}`, color: '#e11d48' });
+    if (threshold.min != null) entries.push({ key: 'min', label: `Min ${threshold.min}${unit}`, color: '#2563eb' });
+
+    return (
+      <div style={{ display: 'flex', gap: scale === 'sm' ? 8 : 12, justifyContent: 'center', marginTop: 4 }}>
+        {entries.map((entry) => (
+          <span key={entry.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize, color: '#9ca3af', fontWeight: 500 }}>
+            <span style={{ width: 12, height: 0, borderTop: `1.5px dashed ${entry.color}` }} />
+            {entry.label}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
   if (variant === 'inline') {
     return (
@@ -51,6 +71,7 @@ export default function RefrigeratorKpiGraph({ controller }: RefrigeratorKpiGrap
               <Line ref={chartRef} data={chartData} options={chartOptions} />
             )}
           </div>
+          {!loading && !error && series.length > 0 && thresholdLegend('sm')}
         </div>
         <div style={{ padding: '8px 12px 10px', borderTop: '1px solid #f0e8f4', marginTop: 6 }}>
           <div style={{ display: 'flex', gap: 0, marginBottom: 8 }}>
@@ -129,6 +150,7 @@ export default function RefrigeratorKpiGraph({ controller }: RefrigeratorKpiGrap
             <Line ref={chartRef} data={chartData} options={chartOptions} />
           )}
         </div>
+        {!loading && !error && series.length > 0 && thresholdLegend('md')}
       </div>
 
       <div style={{ padding: '12px 18px 16px', borderTop: '1px solid #f0e8f4', marginTop: 12 }}>
