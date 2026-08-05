@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="color-scheme" content="light">
-    <meta name="supported-color-schemes" content="light">
+    <meta name="color-scheme" content="light only">
+    <meta name="supported-color-schemes" content="light only">
     <title>{{ subject }}</title>
     <!--[if mso]>
     <style type="text/css">
@@ -13,6 +13,7 @@
     </style>
     <![endif]-->
     <style type="text/css">
+        :root {color-scheme: light only; supported-color-schemes: light only;}
         @media only screen and (max-width: 620px) {
             .mg-card     {width: 100% !important;}
             .mg-pad      {padding-left: 22px !important; padding-right: 22px !important;}
@@ -20,9 +21,15 @@
             .mg-stat     {font-size: 30px !important;}
             .mg-hero-txt {display: block !important; width: 100% !important;}
             .mg-hero-img {display: block !important; width: 100% !important; padding: 18px 0 0 0 !important; text-align: center !important;}
-            .mg-col      {display: block !important; width: 100% !important; border-left: 0 !important; border-right: 0 !important;}
+            .mg-col      {display: block !important; width: 100% !important; border-left: 0 !important; border-right: 0 !important; padding-left: 14px !important; padding-right: 14px !important;}
             .mg-col-div  {border-top: 1px solid #ECEDF2 !important;}
             .mg-btn a    {display: block !important;}
+            .mg-kv-l     {display: block !important; width: auto !important;}
+            .mg-kv-v     {display: block !important; width: auto !important; text-align: left !important; margin-top: 3px !important;}
+            .mg-stat     {font-size: 26px !important;}
+            .mg-pad      {padding-left: 16px !important; padding-right: 16px !important;}
+            .mg-logo     {width: 104px !important; max-width: 104px !important;}
+            .mg-tag      {font-size: 9px !important; letter-spacing: 0.8px !important; padding-right: 14px !important;}
         }
     </style>
 </head>
@@ -40,7 +47,8 @@
         <tr>
             <td align="center" style="text-align:center; padding:26px 10px;">
 
-                <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" class="mg-card" style="border-spacing:0; width:640px; max-width:640px; margin:0 auto; text-align:left; background-color:#FFFFFF; border-radius:10px; overflow:hidden;">
+                <!--[if mso]><table role="presentation" width="640" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="mg-card" style="border-spacing:0; width:100%; max-width:640px; margin:0 auto; text-align:left; background-color:#FFFFFF; border-radius:10px; overflow:hidden;">
 
                     <!-- Header -->
                     <tr>
@@ -53,12 +61,12 @@
                                 <tr>
                                     <td align="left" valign="middle" style="text-align:left; vertical-align:middle; padding:26px 0 26px 34px;">
                                         {% if logo_url %}
-                                        <img src="{{ logo_url }}" alt="mG SCALE" width="150" height="80" style="display:block; border:0; outline:none; text-decoration:none; width:150px; height:auto; max-width:150px; font-size:19px; font-weight:700; color:#FFFFFF;">
+                                        <img src="{{ logo_url }}" alt="mG SCALE" width="150" height="80" class="mg-logo" style="display:block; border:0; outline:none; text-decoration:none; width:150px; height:auto; max-width:150px; font-size:19px; font-weight:700; color:#FFFFFF;">
                                         {% else %}
                                         <span style="font-size:19px; font-weight:700; color:#FFFFFF; letter-spacing:0.3px;">mG SCALE</span>
                                         {% endif %}
                                     </td>
-                                    <td align="right" valign="middle" style="width:100%; text-align:right; vertical-align:middle; padding:26px 34px 26px 0; font-size:12px; font-weight:700; color:#FFFFFF; letter-spacing:2px; text-transform:uppercase; white-space:nowrap;">Alert Notification</td>
+                                    <td class="mg-tag" align="right" valign="middle" style="width:100%; text-align:right; vertical-align:middle; padding:26px 20px 26px 8px; font-size:12px; font-weight:700; color:#FFFFFF; letter-spacing:2px; text-transform:uppercase;">Alert Notification</td>
                                 </tr>
                             </table>
                             <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
@@ -155,8 +163,8 @@
                                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
                                             <tr>
                                                 <td width="34" valign="middle" style="width:34px; vertical-align:middle; font-size:0;"><img src="cid:mg_bars" alt="" width="18" height="18" style="display:inline-block; border:0; outline:none; width:18px; height:18px;"></td>
-                                                <td valign="middle" style="vertical-align:middle; font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.2px; text-transform:uppercase;">Severity</td>
-                                                <td align="right" valign="middle" style="text-align:right; vertical-align:middle; font-size:14px; font-weight:800; color:{{ accent }};">{{ severity }}</td>
+                                                <td class="mg-kv-l" valign="middle" style="vertical-align:middle; font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.2px; text-transform:uppercase;">Severity</td>
+                                                <td class="mg-kv-v" align="right" valign="middle" style="text-align:right; vertical-align:middle; font-size:14px; font-weight:800; color:{{ accent }};">{{ severity }}</td>
                                             </tr>
                                         </table>
                                     </td>
@@ -164,8 +172,8 @@
                                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
                                             <tr>
                                                 <td width="34" valign="middle" style="width:34px; vertical-align:middle; font-size:0;"><img src="cid:mg_pin" alt="" width="18" height="18" style="display:inline-block; border:0; outline:none; width:18px; height:18px;"></td>
-                                                <td valign="middle" style="vertical-align:middle; font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.2px; text-transform:uppercase;">Branch</td>
-                                                <td align="right" valign="middle" style="text-align:right; vertical-align:middle; font-size:14px; font-weight:700; color:#16171D;">{{ branch_name }}</td>
+                                                <td class="mg-kv-l" valign="middle" style="vertical-align:middle; font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.2px; text-transform:uppercase;">Branch</td>
+                                                <td class="mg-kv-v" align="right" valign="middle" style="text-align:right; vertical-align:middle; font-size:14px; font-weight:700; color:#16171D;">{{ branch_name }}</td>
                                             </tr>
                                         </table>
                                     </td>
@@ -177,7 +185,7 @@
                                                 <td width="34" valign="top" style="width:34px; vertical-align:top; font-size:0; padding-top:3px;"><img src="cid:mg_tankicon" alt="" width="18" height="18" style="display:inline-block; border:0; outline:none; width:18px; height:18px;"></td>
                                                 <td valign="top" style="vertical-align:top;">
                                                     <div style="font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.2px; text-transform:uppercase;">Device</div>
-                                                    <div style="margin-top:5px; font-size:14px; font-weight:700; color:#16171D; text-align:right;">{% if device_code %}{{ device_code }}{% else %}{{ tank_code }}{% endif %}{% if zone_name %} &middot; {{ zone_name }}{% endif %}</div>
+                                                    <div class="mg-kv-v" style="margin-top:5px; font-size:14px; font-weight:700; color:#16171D; text-align:right;">{% if device_code %}{{ device_code }}{% else %}{{ tank_code }}{% endif %}{% if zone_name %} &middot; {{ zone_name }}{% endif %}</div>
                                                 </td>
                                             </tr>
                                         </table>
@@ -188,7 +196,7 @@
                                                 <td width="34" valign="top" style="width:34px; vertical-align:top; font-size:0; padding-top:3px;"><img src="cid:mg_clockg" alt="" width="18" height="18" style="display:inline-block; border:0; outline:none; width:18px; height:18px;"></td>
                                                 <td valign="top" style="vertical-align:top;">
                                                     <div style="font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.2px; text-transform:uppercase;">Detected At</div>
-                                                    <div style="margin-top:5px; font-size:14px; font-weight:700; color:#16171D; text-align:right;">{{ occurred_at }}</div>
+                                                    <div class="mg-kv-v" style="margin-top:5px; font-size:14px; font-weight:700; color:#16171D; text-align:right;">{{ occurred_at }}</div>
                                                 </td>
                                             </tr>
                                         </table>
@@ -240,6 +248,7 @@
                         </td>
                     </tr>
                 </table>
+                <!--[if mso]></td></tr></table><![endif]-->
 
             </td>
         </tr>

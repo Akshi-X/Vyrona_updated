@@ -36,7 +36,7 @@ jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
 # Brand artwork shared by the transactional templates. The logo is embedded inline so
 # it renders without a reachable host; the header texture stays a URL because cid:
 # does not resolve inside a CSS background-image.
-BRAND_ASSET_DIR = Path(__file__).resolve().parents[3] / "FrontEnd" / "public"
+BRAND_ASSET_DIR = Path(__file__).resolve().parents[1] / "assets" / "email"
 BRAND_LOGO_CID = "mg_logo"
 
 
