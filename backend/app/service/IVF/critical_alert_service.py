@@ -116,7 +116,7 @@ _EMAIL_BANNER_PATH = "/banner-hex.png"
 
 _EMAIL_INLINE_ASSETS = {
     "mg_logo": "mygrape-logo.png",
-    "mg_tank": "cryocan.png",
+    "mg_tank": "cryocan_alert.png",
     "mg_pin": "email-icons/pin.png",
     "mg_tankicon": "email-icons/tank.png",
     "mg_clock": "email-icons/clock.png",
