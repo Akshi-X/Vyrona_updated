@@ -1679,8 +1679,8 @@
     "tank_code": "T1",
     "branch_id": 16,
     "branch_name": "Bangalore",
-    "tank_max_capacity_reading": 56.36,
-    "tank_min_capacity_reading": 22.156,
+    "full_weight_kg": 56.36,
+    "empty_weight_kg": 22.156,
     "kpi_limits": {
       "temp_internal": {
         "Internal Temperature": {
