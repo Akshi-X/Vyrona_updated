@@ -8,6 +8,7 @@ import { useOnboardingMode } from "../contexts/OnboardingModeContext";
 import { useAuth } from "../contexts/AuthContext";
 import { userService } from "../services/userService";
 import { InstallPromptCard } from "./InstallPromptCard";
+import { IOSInstallGuideDialog } from "./IOSInstallGuideDialog";
 
 import MyGrapeLogo from "../assets/mGScale.svg";
 import IsolationModeBanner from "../assets/Isolation_Mode.svg";
@@ -381,6 +382,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 </nav>
 
                 <InstallPromptCard />
+                <IOSInstallGuideDialog />
 
                 {/* Profile */}
                 <button

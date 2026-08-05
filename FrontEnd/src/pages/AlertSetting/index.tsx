@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { ivfService, type IvfBranch } from "../../services/ivfService";
+import { ivfService, type IvfBranch, type HospitalNotificationSettings } from "../../services/ivfService";
 import { shipmentService } from "../../services/shipmentService";
 import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
 import PageLayout from "../../components/PageLayout";
-import { ChevronDown, History, Sparkles } from "lucide-react";
+import { Bell, ChevronDown, History, Sparkles, X } from "lucide-react";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import CryoBentoGrid, { type CryoBentoGridHandle } from "./CryoBentoGrid";
 import DeviceKpiGrid, { type DeviceKpiGridHandle } from "./DeviceKpiGrid";
 import CryoHistoryModal from "./CryoHistoryModal";
+import { Switch } from "../../components/ui/switch";
 
 interface ContainerRow {
     tank_id: number;
@@ -106,6 +107,18 @@ export default function AlertSetting() {
         mql.addEventListener("change", onChange);
         return () => mql.removeEventListener("change", onChange);
     }, []);
+
+    const [showNotifySettings, setShowNotifySettings] = useState(false);
+    const [notifySettingsLoading, setNotifySettingsLoading] = useState(false);
+    const [notifySettingsSaving, setNotifySettingsSaving] = useState(false);
+    const [notifySettingsError, setNotifySettingsError] = useState<
+        string | null
+    >(null);
+    const [notifySettings, setNotifySettings] =
+        useState<HospitalNotificationSettings>({
+            hospital_id: 0,
+            is_push_notify: false,
+        });
 
     useEffect(() => {
         const loadBranches = async () => {
@@ -258,6 +271,47 @@ export default function AlertSetting() {
         return () =>
             document.removeEventListener("mousedown", handleClickOutside);
     }, [isOnboarding]);
+
+    const openNotifySettings = async () => {
+        setShowNotifySettings(true);
+        setNotifySettingsError(null);
+        setNotifySettingsLoading(true);
+        try {
+            const res = await ivfService.getHospitalNotificationSettings();
+            setNotifySettings(res);
+        } catch (e: any) {
+            setNotifySettingsError(
+                e?.message || "Failed to load notification settings",
+            );
+        } finally {
+            setNotifySettingsLoading(false);
+        }
+    };
+
+    const handleTogglePushNotify = (enabled: boolean) => {
+        setNotifySettings((prev) => ({ ...prev, is_push_notify: enabled }));
+        setNotifySettingsError(null);
+    };
+
+    const handleSaveNotifySettings = async () => {
+        setNotifySettingsSaving(true);
+        setNotifySettingsError(null);
+        try {
+            await ivfService.updateHospitalNotificationSettings({
+                is_push_notify: notifySettings.is_push_notify,
+            });
+            const updatedSettings =
+                await ivfService.getHospitalNotificationSettings();
+            setNotifySettings(updatedSettings);
+            setShowNotifySettings(false);
+        } catch (e: any) {
+            setNotifySettingsError(
+                e?.message || "Failed to save notification settings",
+            );
+        } finally {
+            setNotifySettingsSaving(false);
+        }
+    };
 
     const deviceLabel =
         directionFilter === "incubators"
@@ -498,6 +552,17 @@ export default function AlertSetting() {
                                                     >
                                                         {opt.label}
                                                     </button>
+
+                            {/* Notifications pill */}
+                            <button
+                                id="onboarding-alert-notify-open"
+                                type="button"
+                                onClick={openNotifySettings}
+                                className="h-9 px-4 rounded-full text-[13px] font-semibold text-white/90 border border-white/15 hover:bg-white/10 flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors max-[490px]:w-full"
+                            >
+                                <Bell className="w-3.5 h-3.5" />
+                                Notifications
+                            </button>
                                                 ))}
                                             </div>
                                         )
@@ -618,6 +683,111 @@ export default function AlertSetting() {
                             : null
                     }
                 />
+
+                {/* Push notification settings modal — hospital-wide toggle. Email/WhatsApp
+                    are configured per-KPI inside CryoBentoGrid. */}
+                {showNotifySettings && (
+                    <div
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                        onClick={() => {
+                            if (!notifySettingsSaving && !isOnboarding) {
+                                setShowNotifySettings(false);
+                                setNotifySettingsError(null);
+                            }
+                        }}
+                    >
+                        <div
+                            id="onboarding-alert-notify-modal"
+                            className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="font-semibold text-lg text-black">
+                                    Push Notifications
+                                </h3>
+                                <button
+                                    id="onboarding-alert-notify-close"
+                                    type="button"
+                                    onClick={() => {
+                                        if (!notifySettingsSaving) {
+                                            setShowNotifySettings(false);
+                                            setNotifySettingsError(null);
+                                        }
+                                    }}
+                                    className="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-500"
+                                    aria-label="Close notification settings"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            <p className="text-sm text-gray-600 mb-4">
+                                Send a browser push notification to concerned users when a
+                                critical alert fires for this hospital.
+                            </p>
+
+                            {notifySettingsLoading ? (
+                                <div className="py-8 flex items-center justify-center text-gray-500 text-sm">
+                                    Loading settings...
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between py-2">
+                                        <label
+                                            htmlFor="notify-push"
+                                            className="text-sm font-medium text-gray-900 cursor-pointer select-none"
+                                        >
+                                            Push Notification
+                                        </label>
+                                        <Switch
+                                            id="notify-push"
+                                            checked={notifySettings.is_push_notify}
+                                            onCheckedChange={handleTogglePushNotify}
+                                            disabled={notifySettingsSaving}
+                                        />
+                                    </div>
+
+                                    {notifySettingsError && (
+                                        <p className="text-sm text-red-600">
+                                            {notifySettingsError}
+                                        </p>
+                                    )}
+
+                                    <div className="flex justify-end gap-2 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (!notifySettingsSaving) {
+                                                    setShowNotifySettings(false);
+                                                    setNotifySettingsError(null);
+                                                }
+                                            }}
+                                            disabled={notifySettingsSaving}
+                                            className="px-4 py-2 border border-line rounded text-sm"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveNotifySettings}
+                                            disabled={notifySettingsSaving}
+                                            className="px-4 py-2 bg-primary text-white rounded text-sm hover:bg-[#8a2a95] disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            {notifySettingsSaving ? (
+                                                <>
+                                                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                    Saving...
+                                                </>
+                                            ) : (
+                                                "Save"
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
         </>
     );
 }

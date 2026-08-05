@@ -564,7 +564,135 @@ def test_check_and_create_alerts_no_alerts(alert_service, db_session, mock_canis
         return MagicMock()
     
     db_session.query.side_effect = query_side_effect
-    
+
     result = alert_service.check_and_create_alerts()
-    
+
     assert isinstance(result, list)
+
+
+# ==========================================
+# Tests for push notification wiring
+# ==========================================
+
+def test_get_hospital_notification_config_returns_three_tuple(alert_service, db_session):
+    """_get_hospital_notification_config must return (email, whatsapp, push)."""
+    query = MagicMock()
+    query.filter.return_value = query
+    query.first.return_value = (True, False, True)
+    db_session.query.return_value = query
+
+    result = alert_service._get_hospital_notification_config(hospital_id=1)
+
+    assert result == (True, False, True)
+
+
+def test_get_hospital_notification_config_none_hospital_id_short_circuits(alert_service, db_session):
+    """A None hospital_id must not touch the DB and disable every channel."""
+    result = alert_service._get_hospital_notification_config(hospital_id=None)
+
+    assert result == (False, False, False)
+    db_session.query.assert_not_called()
+
+
+def test_get_hospital_notification_config_hospital_not_found(alert_service, db_session):
+    """A hospital_id with no matching row disables every channel."""
+    query = MagicMock()
+    query.filter.return_value = query
+    query.first.return_value = None
+    db_session.query.return_value = query
+
+    result = alert_service._get_hospital_notification_config(hospital_id=999)
+
+    assert result == (False, False, False)
+
+
+def test_create_refrigerator_alert_new_row_returns_created_true(alert_service, db_session):
+    """A brand-new refrigerator alert must report created=True so callers send
+    notifications exactly once (mirrors _create_alert's tank behavior)."""
+    from app.constants.enums import AlertSource
+    from app.models.IVF.critical_alert_model import AlertSeverity, AlertType
+
+    refrigerator = Mock()
+    refrigerator.hospital_id = 10
+    refrigerator.branch_id = 20
+    refrigerator.refrigerator_code = "RF-1"
+
+    refrigerator_query = MagicMock()
+    refrigerator_query.filter.return_value = refrigerator_query
+    refrigerator_query.first.return_value = refrigerator
+
+    alert_query = MagicMock()
+    alert_query.filter.return_value = alert_query
+    alert_query.first.return_value = None  # no existing ACTIVE alert with this dedup_key
+
+    def query_side_effect(model):
+        name = getattr(model, "__name__", None)
+        if name == "Refrigerator":
+            return refrigerator_query
+        if name == "CriticalAlert":
+            return alert_query
+        return MagicMock()
+
+    db_session.query.side_effect = query_side_effect
+
+    alert, created = alert_service._create_refrigerator_alert(
+        refrigerator_id=5,
+        zone_id=None,
+        alert_type=AlertType.DEVIATION_ALERT,
+        source=AlertSource.KPI,
+        severity=AlertSeverity.HIGH,
+        message="Temperature deviated",
+        occurred_at=datetime.now(timezone.utc),
+    )
+
+    assert created is True
+    assert alert.refrigerator_id == 5
+    assert alert.hospital_id == 10
+    db_session.add.assert_called_once()
+    db_session.flush.assert_called_once()
+
+
+def test_create_refrigerator_alert_existing_row_returns_created_false(alert_service, db_session):
+    """A dedup_key hit on an existing ACTIVE alert must report created=False so
+    callers do not re-send notifications for it."""
+    from app.constants.enums import AlertSource
+    from app.models.IVF.critical_alert_model import AlertSeverity, AlertType
+
+    refrigerator = Mock()
+    refrigerator.hospital_id = 10
+    refrigerator.branch_id = 20
+    refrigerator.refrigerator_code = "RF-1"
+
+    refrigerator_query = MagicMock()
+    refrigerator_query.filter.return_value = refrigerator_query
+    refrigerator_query.first.return_value = refrigerator
+
+    existing_alert = Mock()
+
+    alert_query = MagicMock()
+    alert_query.filter.return_value = alert_query
+    alert_query.first.return_value = existing_alert
+
+    def query_side_effect(model):
+        name = getattr(model, "__name__", None)
+        if name == "Refrigerator":
+            return refrigerator_query
+        if name == "CriticalAlert":
+            return alert_query
+        return MagicMock()
+
+    db_session.query.side_effect = query_side_effect
+
+    alert, created = alert_service._create_refrigerator_alert(
+        refrigerator_id=5,
+        zone_id=None,
+        alert_type=AlertType.DEVIATION_ALERT,
+        source=AlertSource.KPI,
+        severity=AlertSeverity.HIGH,
+        message="Temperature deviated",
+        occurred_at=datetime.now(timezone.utc),
+    )
+
+    assert created is False
+    assert alert is existing_alert
+    db_session.add.assert_not_called()

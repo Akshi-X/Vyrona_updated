@@ -65,6 +65,7 @@ from app.models.shipment_leg_model import ShipmentLeg
 from app.models.task_model import Tasks
 from app.models.chat_model import ChatMessage
 from app.models.chat_read_status import ChatReadStatus
+from app.models.push_subscription_model import PushSubscription
 
 # Import IVF model modules
 from app.models.IVF import (
