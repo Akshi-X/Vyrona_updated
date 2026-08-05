@@ -265,40 +265,6 @@ export default function AlertSetting() {
             : directionFilter === "refrigerators"
                 ? "Refrigerator"
                 : "Cryotank";
-    // Onboarding: pre-fill draft values for Evaporation Rate and Lid State so the
-    // Save Changes button becomes active for the final tour step.
-    useEffect(() => {
-        const handler = () => {
-            setMultiDraft("ln2_evaporation_rate", { min: 0.5, max: 2.0, alert_type: "soft", cooldown_minutes: 60 });
-            setMultiDraft("ln2_lid_state", { lid_state: "closed", alert_type: "soft", cooldown_minutes: 30 });
-        };
-        document.addEventListener("onboarding:prefill-alert-evap-lid", handler);
-        return () => document.removeEventListener("onboarding:prefill-alert-evap-lid", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // Multi-container draft helpers (keyed by kpi_name)
-    const setMultiDraft = (
-        kpiName: string,
-        patch: {
-            min?: number | null;
-            max?: number | null;
-            alert_type?: string | null;
-            lid_state?: string;
-            cooldown_minutes?: number;
-            unack_escalation_threshold?: number | null;
-        },
-    ) => {
-        setMultiDraftConfig((prev) => {
-            const next = { ...prev };
-            const current = next[kpiName] ?? {};
-            const merged = { ...current, ...patch };
-            if (Object.keys(merged).length === 0) delete next[kpiName];
-            else next[kpiName] = merged;
-            return next;
-        });
-    };
-
     // Scope pill (chamber for incubators, zone for refrigerators). Shown only once
     // a device is selected and the direction is incubator/refrigerator.
     const scopeOptions: Array<{ id: string | null; label: string }> = (() => {
