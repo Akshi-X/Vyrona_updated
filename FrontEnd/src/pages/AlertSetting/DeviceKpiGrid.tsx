@@ -137,7 +137,7 @@ const KPI_CARD: Record<string, KpiCardSpec> = {
     },
 };
 
-const CARD_CLASS = "col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]";
+const CARD_CLASS = "col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[402px]";
 
 const DEVICE_POLICY: KpiPolicy = {
     metaMap: DEVICE_META,
@@ -286,6 +286,7 @@ const DeviceKpiGrid = forwardRef<DeviceKpiGridHandle, {
                 whatsapp_alert: row?.whatsapp_alert ?? false,
                 email_alert: row?.email_alert ?? false,
                 unack_escalation_threshold: row?.unack_escalation_threshold ?? null,
+                cooldown_minutes: row?.cooldown_minutes ?? 60,
             };
         }
         return next;
@@ -362,6 +363,7 @@ const DeviceKpiGrid = forwardRef<DeviceKpiGridHandle, {
                             whatsapp_alert: r.whatsapp_alert,
                             email_alert: r.email_alert,
                             unack_escalation_threshold: prev[k]?.unack_escalation_threshold ?? null,
+                            cooldown_minutes: prev[k]?.cooldown_minutes ?? 60,
                         };
                     }
                 }
@@ -381,7 +383,7 @@ const DeviceKpiGrid = forwardRef<DeviceKpiGridHandle, {
             max: d.max,
             unit: DEVICE_META[k].unit || null,
             alert_type: alertType,
-            cooldown_minutes: 60,
+            cooldown_minutes: d.cooldown_minutes ?? 60,
             unack_escalation_threshold: anyChannelOn ? (d.unack_escalation_threshold ?? null) : null,
             whatsapp_alert: d.enabled && d.whatsapp_alert,
             email_alert: d.enabled && d.email_alert,

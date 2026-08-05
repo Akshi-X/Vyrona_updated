@@ -59,6 +59,8 @@ export interface KpiDraft {
     email_alert: boolean;
     /** Needs an active channel: escalate to admins after N consecutive unacknowledged alerts (0 = immediate, null = disabled). */
     unack_escalation_threshold?: number | null;
+    /** Minimum minutes between repeated alerts for this KPI. Defaults to 60. */
+    cooldown_minutes?: number | null;
 }
 
 /** KPIs whose channels default ON the first time the master switch is enabled. */
@@ -88,6 +90,7 @@ export const EMPTY_DRAFT: KpiDraft = {
     whatsapp_alert: false,
     email_alert: false,
     unack_escalation_threshold: null,
+    cooldown_minutes: 60,
 };
 
 /**
@@ -136,7 +139,8 @@ export const sameDraft = (a?: KpiDraft, b?: KpiDraft) =>
     (a?.enabled ?? false) === (b?.enabled ?? false) &&
     (a?.whatsapp_alert ?? false) === (b?.whatsapp_alert ?? false) &&
     (a?.email_alert ?? false) === (b?.email_alert ?? false) &&
-    (a?.unack_escalation_threshold ?? null) === (b?.unack_escalation_threshold ?? null);
+    (a?.unack_escalation_threshold ?? null) === (b?.unack_escalation_threshold ?? null) &&
+    (a?.cooldown_minutes ?? 60) === (b?.cooldown_minutes ?? 60);
 
 // ─── Live data model ─────────────────────────────────────────────────────────
 
@@ -729,7 +733,52 @@ function EscalationHint({ message, dim = false, id }: { message: string; dim?: b
     );
 }
 
-/** Escalation row is always visible: input when usable, otherwise a hint on how to unlock it. */
+/** Cooldown between repeated alerts. Always visible; editable only when the alert is enabled. */
+function CooldownRow({
+    kpiName,
+    draft,
+    onDraft,
+}: {
+    kpiName: string;
+    draft: KpiDraft;
+    onDraft: (kpiName: string, patch: Partial<KpiDraft>) => void;
+}) {
+    const dim = !draft.enabled;
+    const v = draft.cooldown_minutes ?? 60;
+    return (
+        <div
+            className={`relative h-9 flex items-center justify-between gap-2 mt-1.5 px-3 rounded-xl border ${
+                dim ? "bg-gray-100 border-gray-200" : "bg-slate-50 border-slate-200"
+            }`}
+        >
+            <span className={`text-[11px] font-bold uppercase tracking-[0.1em] ${dim ? "text-gray-400" : "text-slate-700"}`}>
+                Mail Cooldown
+            </span>
+            <div className="flex items-center gap-1.5">
+                <input
+                    type="number"
+                    min={0}
+                    step={5}
+                    disabled={dim}
+                    value={v}
+                    onChange={(e) => {
+                        const raw = e.target.value;
+                        onDraft(kpiName, {
+                            cooldown_minutes: raw === "" ? 60 : Math.max(0, Math.round(Number(raw))),
+                        });
+                    }}
+                    title="Minimum minutes between repeated alerts for this KPI."
+                    className="w-12 rounded-md bg-white border border-slate-200 px-1.5 py-1 text-[13px] font-bold text-slate-800 text-center outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-60 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className={`text-[11px] font-semibold whitespace-nowrap ${dim ? "text-gray-400" : "text-slate-500"}`}>
+                    min between alerts
+                </span>
+            </div>
+        </div>
+    );
+}
+
+/** Escalation row is always visible: input when usable, otherwise a hint on how to unlock it. Cooldown always follows it. */
 export function EscalationRow({
     kpiName,
     draft,
@@ -739,19 +788,23 @@ export function EscalationRow({
     draft: KpiDraft;
     onDraft: (kpiName: string, patch: Partial<KpiDraft>) => void;
 }) {
-    if (draft.enabled && draft.email_alert) {
-        return <EscalationInput kpiName={kpiName} draft={draft} onDraft={onDraft} />;
-    }
     return (
-        <EscalationHint
-            id={`onboarding-alert-escalation-${kpiName}`}
-            dim={!draft.enabled}
-            message={
-                draft.enabled
-                    ? "Turn on email alerts to enable escalation"
-                    : "Turn on the alert with email to enable"
-            }
-        />
+        <>
+            {draft.enabled && draft.email_alert ? (
+                <EscalationInput kpiName={kpiName} draft={draft} onDraft={onDraft} />
+            ) : (
+                <EscalationHint
+                    id={`onboarding-alert-escalation-${kpiName}`}
+                    dim={!draft.enabled}
+                    message={
+                        draft.enabled
+                            ? "Turn on email alerts to enable escalation"
+                            : "Turn on the alert with email to enable"
+                    }
+                />
+            )}
+            <CooldownRow kpiName={kpiName} draft={draft} onDraft={onDraft} />
+        </>
     );
 }
 
@@ -819,7 +872,7 @@ function InternalTemperatureCard({
     onDraft: (kpiName: string, patch: Partial<KpiDraft>) => void;
 }) {
     return (
-        <BentoCard delay={0} id={`onboarding-alert-kpi-${KPI.TEMP_INTERNAL}`} className="col-span-12 @min-[70rem]:col-span-5 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
+        <BentoCard delay={0} id={`onboarding-alert-kpi-${KPI.TEMP_INTERNAL}`} className="col-span-12 @min-[70rem]:col-span-5 md:min-h-[402px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
             <Thermometer strokeWidth={1.25} className="absolute top-4 right-4 w-24 h-24 text-[#6B3A7E] opacity-[0.12]" />
             <div className="relative">
                 <CardTitle>Internal temperature:</CardTitle>
@@ -850,7 +903,7 @@ function Ln2LevelCard({
     l2Pct: number | null;
 }) {
     return (
-        <BentoCard delay={60} id={`onboarding-alert-kpi-${KPI.LN2_LEVEL}`} className="col-span-12 @min-[70rem]:col-span-7 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-row gap-4">
+        <BentoCard delay={60} id={`onboarding-alert-kpi-${KPI.LN2_LEVEL}`} className="col-span-12 @min-[70rem]:col-span-7 md:min-h-[402px] pt-4 px-0 pb-4 md:p-4 flex flex-row gap-4">
             <div className="relative flex-1 min-w-0 flex flex-col items-start gap-2">
                 <div className="relative">
                     <CardTitle>LN2 level:</CardTitle>
@@ -915,7 +968,7 @@ function LidStateCard({
     const known = live.lidOpen != null;
     const open = live.lidOpen === true;
     return (
-        <BentoCard delay={120} id={`onboarding-alert-kpi-${KPI.LID_STATE}`} className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
+        <BentoCard delay={120} id={`onboarding-alert-kpi-${KPI.LID_STATE}`} className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[402px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
             {/* lid_state.svg is white-only art; mask + backgroundColor tints it like the other decos */}
             <span
                 aria-hidden
@@ -1057,6 +1110,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                 whatsapp_alert: row?.whatsapp_alert ?? false,
                 email_alert: row?.email_alert ?? false,
                 unack_escalation_threshold: row?.unack_escalation_threshold ?? null,
+                cooldown_minutes: row?.cooldown_minutes ?? 60,
             };
         }
         return next;
@@ -1240,6 +1294,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                     min: d.min,
                     max: d.max,
                     alert_type: alertType,
+                    cooldown_minutes: d.cooldown_minutes ?? 60,
                     unack_escalation_threshold: anyChannelOn ? (d.unack_escalation_threshold ?? null) : null,
                     whatsapp_alert: d.enabled && d.whatsapp_alert,
                     email_alert: d.enabled && d.email_alert,
@@ -1252,7 +1307,6 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                         kpi_name: k,
                         alert_name: KPI_META[k].label,
                         unit: KPI_META[k].unit || null,
-                        cooldown_minutes: 60,
                         ...common,
                     });
                 }
@@ -1357,7 +1411,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                             ink="#6B3A7E"
                             deco={<ThermometerSun strokeWidth={1.25} className="absolute top-3 right-3 w-20 h-20 text-[#2F6B4C] opacity-[0.12]" />}
                             delay={180}
-                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]"
+                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[402px]"
                             draft={getDraft(KPI.TEMP_EXTERNAL)}
                             editable={editable}
                             onDraft={onDraft}
@@ -1387,7 +1441,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                                 />
                             }
                             delay={220}
-                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]"
+                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[402px]"
                             draft={getDraft(KPI.LN2_EVAPORATION)}
                             editable={editable}
                             onDraft={onDraft}
@@ -1400,7 +1454,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                             ink="#6B3A7E"
                             deco={<CloudRain strokeWidth={1.25} className="absolute top-3 right-3 w-20 h-20 text-[#5B3E97] opacity-[0.12]" />}
                             delay={260}
-                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]"
+                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[402px]"
                             draft={getDraft(KPI.HUMIDITY)}
                             editable={editable}
                             onDraft={onDraft}
@@ -1412,7 +1466,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                             ink="#6B3A7E"
                             deco={<Battery strokeWidth={1.25} className="absolute top-3 right-3 w-20 h-20 text-[#8A1F72] opacity-[0.12]" />}
                             delay={300}
-                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]"
+                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[402px]"
                             draft={getDraft(KPI.BATTERY)}
                             editable={editable}
                             onDraft={onDraft}
@@ -1425,7 +1479,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                             ink="#6B3A7E"
                             deco={<Zap strokeWidth={1.25} className="absolute top-3 right-3 w-20 h-20 text-[#1F6178] opacity-[0.12]" />}
                             delay={340}
-                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[360px]"
+                            className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[402px]"
                             draft={getDraft(KPI.SHOCK)}
                             editable={editable}
                             onDraft={onDraft}

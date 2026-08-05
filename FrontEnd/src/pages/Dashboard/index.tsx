@@ -1,5 +1,5 @@
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { OngoingTreatments } from '../../components/OngoingTreatments';
 import { IVFOngoingTreatments } from '../../components/IVFOngoingTreatments';
@@ -74,6 +74,8 @@ export default function Dashboard({ }: DashboardProps) {
   const { isAuthenticated, userRole } = useAuth();
   const isOnboarding = useOnboardingMode();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusAlertId = searchParams.get('alert_id');
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
@@ -292,6 +294,11 @@ export default function Dashboard({ }: DashboardProps) {
   useEffect(() => {
     fetchCriticalAlerts();
   }, [userDepartment]);
+
+  // Deep-link: /dashboard?alert_id=... opens the critical alerts dialog focused on that alert
+  useEffect(() => {
+    if (focusAlertId) setShowCriticalAlerts(true);
+  }, [focusAlertId]);
 
   // Fetch my tasks from API
   const fetchMyTasks = async () => {
@@ -1973,10 +1980,17 @@ export default function Dashboard({ }: DashboardProps) {
       {/* Critical Alerts Modal */}
       <CriticalAlertsModal
         isOpen={showCriticalAlerts}
-        onClose={() => setShowCriticalAlerts(false)}
+        onClose={() => {
+          setShowCriticalAlerts(false);
+          if (focusAlertId) {
+            searchParams.delete('alert_id');
+            setSearchParams(searchParams, { replace: true });
+          }
+        }}
         id="onboarding-dashboard-critical-alerts-modal"
         alerts={transformedAlerts}
         loading={loadingAlerts}
+        focusAlertId={focusAlertId}
         patientIdLabel={isIVF ? 'Tank Code' : 'Patient ID'}
       />
 
