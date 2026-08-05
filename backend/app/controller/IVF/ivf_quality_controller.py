@@ -753,6 +753,8 @@ def _kpi_config_metadata(row: KpiConfig) -> dict:
         "cooldown_minutes": int(row.cooldown_minutes)
         if row.cooldown_minutes is not None
         else None,
+        "whatsapp_alert": bool(row.whatsapp_alert),
+        "email_alert": bool(row.email_alert),
         "status": bool(row.status),
     }
 
@@ -763,7 +765,8 @@ def get_hospital_notification_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get hospital-level notification channel settings for Alert Configuration."""
+    """Get hospital-level push notification setting. Email/WhatsApp are configured
+    per-KPI-config (see kpi-config endpoints below) — push remains hospital-wide."""
     _require_alert_setting_role(current_user)
     hospital_id = _resolve_current_hospital_id(request, db)
     hospital = db.query(Hospital).filter(Hospital.hospital_id == hospital_id).first()
@@ -772,8 +775,7 @@ def get_hospital_notification_settings(
 
     return {
         "hospital_id": hospital.hospital_id,
-        "is_email_notifify": bool(hospital.is_email_notifify),
-        "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
+        "is_push_notify": bool(hospital.is_push_notify),
     }
 
 
@@ -784,36 +786,25 @@ def update_hospital_notification_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update hospital-level notification channel settings for Alert Configuration."""
+    """Update the hospital-level push notification setting."""
     _require_alert_setting_role(current_user)
 
-    if "is_email_notifify" not in body or "is_whatsapp_notify" not in body:
+    if "is_push_notify" not in body:
         raise HTTPException(
             status_code=400,
-            detail="is_email_notifify and is_whatsapp_notify are required",
+            detail="is_push_notify is required",
         )
 
-    email_enabled = bool(body.get("is_email_notifify"))
-    whatsapp_enabled = bool(body.get("is_whatsapp_notify"))
-
-    if not email_enabled and not whatsapp_enabled:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one notification channel must be enabled",
-        )
+    push_enabled = bool(body.get("is_push_notify"))
 
     hospital_id = _resolve_current_hospital_id(request, db)
     hospital = db.query(Hospital).filter(Hospital.hospital_id == hospital_id).first()
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
 
-    before_state = {
-        "is_email_notifify": bool(hospital.is_email_notifify),
-        "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
-    }
+    before_state = {"is_push_notify": bool(hospital.is_push_notify)}
 
-    hospital.is_email_notifify = email_enabled
-    hospital.is_whatsapp_notify = whatsapp_enabled
+    hospital.is_push_notify = push_enabled
     db.commit()
 
     ActivityLogService(db).log_activity(
@@ -824,18 +815,14 @@ def update_hospital_notification_settings(
         metadata={
             "hospital_id": hospital.hospital_id,
             "before": before_state,
-            "after": {
-                "is_email_notifify": bool(hospital.is_email_notifify),
-                "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
-            },
+            "after": {"is_push_notify": bool(hospital.is_push_notify)},
         },
         audit_log_disabled=is_audit_log_disabled_for_user(current_user),
     )
 
     return {
         "hospital_id": hospital.hospital_id,
-        "is_email_notifify": bool(hospital.is_email_notifify),
-        "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
+        "is_push_notify": bool(hospital.is_push_notify),
     }
 
 
@@ -914,6 +901,8 @@ def list_kpi_config(
         "tank_code": tank.tank_code or "",
         "branch_id": tank.branch_id,
         "hospital_id": branch.hospital_id if branch else None,
+        "empty_weight_kg": float(tank.empty_weight_kg) if tank.empty_weight_kg is not None else None,
+        "full_weight_kg": float(tank.full_weight_kg) if tank.full_weight_kg is not None else None,
         "config": rows,
     }
 
@@ -965,6 +954,8 @@ def create_kpi_config(
         alert_type=body.get("alert_type"),
         cooldown_minutes=int(body["cooldown_minutes"]) if body.get("cooldown_minutes") is not None else None,
         unack_escalation_threshold=int(body["unack_escalation_threshold"]) if body.get("unack_escalation_threshold") is not None else None,
+        whatsapp_alert=bool(body.get("whatsapp_alert", False)),
+        email_alert=bool(body.get("email_alert", False)),
         status=body.get("status", True),
     )
     db.commit()
@@ -996,6 +987,8 @@ def create_kpi_config(
         if row.cooldown_minutes is not None
         else 60,
         "unack_escalation_threshold": row.unack_escalation_threshold,
+        "whatsapp_alert": bool(row.whatsapp_alert),
+        "email_alert": bool(row.email_alert),
         "status": bool(row.status),
     }
 
@@ -1202,6 +1195,8 @@ def update_kpi_config(
         unack_escalation_threshold=int(body["unack_escalation_threshold"])
         if body.get("unack_escalation_threshold") is not None
         else None,
+        whatsapp_alert=bool(body["whatsapp_alert"]) if body.get("whatsapp_alert") is not None else None,
+        email_alert=bool(body["email_alert"]) if body.get("email_alert") is not None else None,
         status=body.get("status"),
     )
     if not row:
@@ -1241,6 +1236,8 @@ def update_kpi_config(
         if row.cooldown_minutes is not None
         else 60,
         "unack_escalation_threshold": row.unack_escalation_threshold,
+        "whatsapp_alert": bool(row.whatsapp_alert),
+        "email_alert": bool(row.email_alert),
         "status": bool(row.status),
     }
 

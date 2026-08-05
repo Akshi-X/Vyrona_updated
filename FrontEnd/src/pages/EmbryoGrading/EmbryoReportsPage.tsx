@@ -319,7 +319,9 @@ export default function EmbryoReportsPage() {
           <p className="text-[11px] text-gray-400 mt-0.5">See how your report will look</p>
         </div>
 
-        {/* Cover — separate from report so print can offset report to page 2 */}
+        {/* Print root — cover then report; cover forces a page break so the report starts on page 2 */}
+        <div id="report-print-root" className="contents">
+
         <div
           id="report-cover-page"
           className="relative w-full overflow-hidden mb-4 shrink-0"
@@ -466,7 +468,7 @@ export default function EmbryoReportsPage() {
 
               {/* Embryo Development Log */}
               {included.has('log') && logs.length > 0 && (
-                <div className="mb-5 mt-10" style={{ breakInside: 'avoid' }}>
+                <div className="mb-5 mt-10">
                   <p className="text-[9px] font-bold text-primary uppercase tracking-widest mb-2">Embryo Development Log (Summary)</p>
                   <div className="border border-gray-200 rounded-xl overflow-hidden">
                     <div className="overflow-x-auto">
@@ -700,6 +702,8 @@ export default function EmbryoReportsPage() {
           )}
           </div>
         </div>
+
+        </div>
       </div>
 
       {/* ── Right: Quick Actions & Info ── */}
@@ -864,14 +868,24 @@ export default function EmbryoReportsPage() {
         @media print {
           html, body { margin: 0 !important; padding: 0 !important; overflow: visible !important; height: auto !important; }
           * { overflow: visible !important; visibility: hidden; }
-          #report-cover-page, #report-cover-page * { visibility: visible !important; }
-          #embryo-report-print, #embryo-report-print * { visibility: visible !important; }
-          #report-cover-page {
+          /* Backgrounds, tints and chip colours are dropped by default in print */
+          *, *::before, *::after {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          #report-print-root, #report-print-root * { visibility: visible !important; }
+          #report-print-root button { display: none !important; }
+          #report-print-root {
+            display: block !important;
             position: absolute;
             top: 0; left: 0;
+            width: 210mm;
+            margin: 0 !important;
+          }
+          #report-cover-page {
             width: 210mm; height: 297mm;
-            margin: 0 ;
-            padding: 0 
+            margin: 0 !important;
+            padding: 0 !important;
             border-radius: 0 !important;
             aspect-ratio: unset !important;
             overflow: hidden !important;
@@ -885,15 +899,18 @@ export default function EmbryoReportsPage() {
             object-fit: cover;
           }
           #embryo-report-print {
-            position: absolute;
-            top: 297mm; left: 0;
             width: 210mm;
-            padding: 0mm;
             box-sizing: border-box;
             border: none !important;
             box-shadow: none !important;
             border-radius: 0 !important;
           }
+          /* Horizontal page margins; vertical breathing room comes from section spacing */
+          #embryo-report-print > div { padding: 10mm 12mm !important; }
+          #embryo-report-print table { break-inside: auto; }
+          #embryo-report-print thead { display: table-header-group; }
+          #embryo-report-print tr { break-inside: avoid; }
+          #embryo-report-print .uppercase { break-after: avoid; }
         }
       `}</style>
     </div>

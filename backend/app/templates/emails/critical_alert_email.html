@@ -4,128 +4,243 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
     <title>{{ subject }}</title>
     <!--[if mso]>
     <style type="text/css">
-        body, table, td {font-family: Arial, sans-serif !important;}
+        body, table, td, th, p, a, div {font-family: Arial, Helvetica, sans-serif !important;}
     </style>
     <![endif]-->
+    <style type="text/css">
+        @media only screen and (max-width: 620px) {
+            .mg-card     {width: 100% !important;}
+            .mg-pad      {padding-left: 22px !important; padding-right: 22px !important;}
+            .mg-h1       {font-size: 27px !important; line-height: 1.22 !important;}
+            .mg-stat     {font-size: 30px !important;}
+            .mg-hero-txt {display: block !important; width: 100% !important;}
+            .mg-hero-img {display: block !important; width: 100% !important; padding: 18px 0 0 0 !important; text-align: center !important;}
+            .mg-col      {display: block !important; width: 100% !important; border-left: 0 !important; border-right: 0 !important;}
+            .mg-col-div  {border-top: 1px solid #ECEDF2 !important;}
+            .mg-btn a    {display: block !important;}
+        }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #F8F9FA; font-family: Arial, sans-serif;">
-    <!-- Wrapper Table -->
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F8F9FA;">
+{% set accent    = '#DC2626' if severity == 'High' else ('#D97706' if severity == 'Medium' else '#2563EB') %}
+{% set accent_bg = '#FEECEC' if severity == 'High' else ('#FFF6E5' if severity == 'Medium' else '#EAF2FE') %}
+{% set brand     = '#6b1176' %}
+<body style="margin:0; padding:0; background-color:#EFEFF3; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased;">
+
+    <!-- Preheader: inbox preview text -->
+    <div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#EFEFF3; opacity:0;">
+        {{ severity }} severity &middot; {{ tank_code }}{% if branch_name %} &middot; {{ branch_name }}{% endif %} &mdash; {{ message }}
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; background-color:#EFEFF3;">
         <tr>
-            <td align="center" style="padding: 20px 0;">
-                <!-- Main Container Table -->
-                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #FFFFFF; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 600px;">
-                    
+            <td align="center" style="text-align:center; padding:26px 10px;">
+
+                <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" class="mg-card" style="border-spacing:0; width:640px; max-width:640px; margin:0 auto; text-align:left; background-color:#FFFFFF; border-radius:10px; overflow:hidden;">
+
                     <!-- Header -->
                     <tr>
-                        <td style="background-color: #6B1176; color: #FFFFFF; padding: 25px 30px; text-align: center;">
-                            <div style="font-size: 32px; margin-bottom: 10px;">⚠️</div>
-                            <h1 style="margin: 0; font-size: 22px; font-weight: 600; color: #FFFFFF;">{{ subject }}</h1>
-                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #E5D4F0;">myGrape - Critical Alert Notification</p>
+                        <td background="{{ banner_url }}" style="background-color:{{ brand }};{% if banner_url %} background-image:url('{{ banner_url }}'); background-position:top right; background-repeat:no-repeat; background-size:200px 132px;{% endif %} padding:0;">
+                            <!--[if gte mso 9]>
+                            <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:640px;height:132px;">
+                                <v:fill type="frame" src="{{ banner_url }}" color="{{ brand }}" position="1,0"/>
+                                <v:textbox inset="0,0,0,0"><![endif]-->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
+                                <tr>
+                                    <td align="left" valign="middle" style="text-align:left; vertical-align:middle; padding:26px 0 26px 34px;">
+                                        {% if logo_url %}
+                                        <img src="{{ logo_url }}" alt="mG SCALE" width="150" height="80" style="display:block; border:0; outline:none; text-decoration:none; width:150px; height:auto; max-width:150px; font-size:19px; font-weight:700; color:#FFFFFF;">
+                                        {% else %}
+                                        <span style="font-size:19px; font-weight:700; color:#FFFFFF; letter-spacing:0.3px;">mG SCALE</span>
+                                        {% endif %}
+                                    </td>
+                                    <td align="right" valign="middle" style="width:100%; text-align:right; vertical-align:middle; padding:26px 34px 26px 0; font-size:12px; font-weight:700; color:#FFFFFF; letter-spacing:2px; text-transform:uppercase; white-space:nowrap;">Alert Notification</td>
+                                </tr>
+                            </table>
+                            <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
                         </td>
                     </tr>
-                    
-                    <!-- Content -->
+                    <tr><td style="height:4px; line-height:4px; font-size:0; background-color:#8b2a96;">&nbsp;</td></tr>
+
+                    <!-- Hero -->
                     <tr>
-                        <td style="padding: 30px;">
-                            <h2 style="margin: 0 0 15px 0; font-size: 18px; color: #6B1176; font-weight: 600;">Critical Alert Detected</h2>
-                            <p style="margin: 0 0 20px 0; font-size: 14px; color: #374151; line-height: 1.6;">A critical alert has been triggered. Please review the details below:</p>
-                            
-                            <!-- Alert Details Card -->
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {% if severity == 'High' %}#FEF2F2{% elif severity == 'Medium' %}#FFFBEB{% else %}#EFF6FF{% endif %}; border-left: 4px solid {% if severity == 'High' %}#DC2626{% elif severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %}; margin: 20px 0;">
+                        <td class="mg-pad" style="padding:34px 34px 0 34px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
                                 <tr>
-                                    <td style="padding: 20px;">
-                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                    <td class="mg-hero-txt" width="{% if device_image_url %}62%{% else %}100%{% endif %}" valign="top" style="width:{% if device_image_url %}62%{% else %}100%{% endif %}; vertical-align:top;">
+
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; margin-bottom:18px;">
                                             <tr>
-                                                <td style="padding: 8px 0; font-size: 14px; color: #374151;">
-                                                    <strong style="color: {% if severity == 'High' %}#DC2626{% elif severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %};">🔔 Alert Type:</strong> {{ alert_type }}
+                                                <td valign="middle" style="vertical-align:middle; background-color:{{ accent_bg }}; border-radius:7px; padding:8px 13px; font-size:14px; font-weight:800; color:{{ accent }}; letter-spacing:0.4px; white-space:nowrap; text-transform:uppercase;">
+                                                    &#9888;&nbsp; {% if alert_stage %}{{ alert_stage }}{% else %}Alert Created{% endif %}
                                                 </td>
                                             </tr>
+                                        </table>
+
+                                        <h1 class="mg-h1" style="margin:0 0 20px 0; font-size:33px; line-height:1.2; font-weight:800; color:#16171D; letter-spacing:-0.7px;">
+                                            {% if alert_name and current_value %}{{ alert_name }} Deviated to <span style="color:{{ accent }};">{{ current_value }}</span>{% else %}{{ message }}{% endif %}
+                                        </h1>
+
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; margin-bottom:22px;">
                                             <tr>
-                                                <td style="padding: 8px 0; font-size: 14px; color: #374151;">
-                                                    <strong style="color: {% if severity == 'High' %}#DC2626{% elif severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %};">⚡ Severity:</strong> {{ severity }}
+                                                <td valign="middle" style="vertical-align:middle; font-size:15px; font-weight:600; color:#2B2D36;">
+                                                    <img src="cid:mg_pin" alt="" width="17" height="17" style="display:inline-block; border:0; outline:none; width:17px; height:17px; vertical-align:-3px;">&nbsp; {{ branch_name }} Branch
+                                                </td>
+                                                <td valign="middle" style="vertical-align:middle; padding:0 14px; color:#D6D8E0; font-size:15px;">|</td>
+                                                <td valign="middle" style="vertical-align:middle; font-size:15px; font-weight:600; color:#2B2D36;">
+                                                    <img src="cid:mg_tankicon" alt="" width="17" height="17" style="display:inline-block; border:0; outline:none; width:17px; height:17px; vertical-align:-3px;">&nbsp; {% if device_noun %}{{ device_noun }}{% else %}Tank{% endif %} {% if device_code %}{{ device_code }}{% else %}{{ tank_code }}{% endif %}
+                                                </td>
+                                                {% if zone_name %}
+                                                <td valign="middle" style="vertical-align:middle; padding:0 14px; color:#D6D8E0; font-size:15px;">|</td>
+                                                <td valign="middle" style="vertical-align:middle; font-size:15px; font-weight:600; color:#2B2D36; white-space:nowrap;">
+                                                    <img src="cid:mg_bars" alt="" width="17" height="17" style="display:inline-block; border:0; outline:none; width:17px; height:17px; vertical-align:-3px;">&nbsp; Zone {{ zone_name }}
+                                                </td>
+                                                {% endif %}
+                                            </tr>
+                                        </table>
+
+                                        <p style="margin:0; font-size:15px; line-height:1.6; color:#6E7180;">
+                                            Please review this alert and acknowledge it once the issue has been addressed.
+                                        </p>
+                                    </td>
+
+                                    {% if device_image_url %}
+                                    <td class="mg-hero-img" width="38%" align="center" valign="middle" style="width:38%; text-align:center; vertical-align:middle;">
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="border-spacing:0; margin:0 auto; text-align:center;">
+                                            <tr>
+                                                <td align="center" valign="middle" width="200" height="200" style="width:200px; text-align:center; vertical-align:middle; width:200px; height:200px; background-color:#F7ECFF; border-radius:100px; text-align:center;">
+                                                    <img src="{{ device_image_url }}" alt="" width="93" height="176" style="display:inline-block; border:0; outline:none; width:93px; height:auto; max-width:93px;">
                                                 </td>
                                             </tr>
+                                        </table>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    {% if current_value %}
+                    <!-- Current reading -->
+                    <tr>
+                        <td class="mg-pad" style="padding:28px 34px 0 34px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; border:1px solid #ECEDF2; border-radius:10px;">
+                                <tr>
+                                    <td align="center" valign="middle" style="text-align:center; vertical-align:middle; padding:26px 16px;">
+                                        <div style="font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.5px; text-transform:uppercase;">Current Reading</div>
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="border-spacing:0; margin:14px auto 0 auto;">
                                             <tr>
-                                                <td style="padding: 8px 0; font-size: 14px; color: #374151;">
-                                                    <strong style="color: {% if severity == 'High' %}#DC2626{% elif severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %};">🏢 Branch:</strong> {{ branch_name }}
+                                                <td valign="middle" style="vertical-align:middle; background-color:{{ accent_bg }}; border-radius:50px; width:46px; height:46px; text-align:center; line-height:46px;"><img src="cid:mg_kpi" alt="" width="24" height="24" style="display:inline-block; border:0; outline:none; width:24px; height:24px; vertical-align:middle;"></td>
+                                                <td valign="middle" class="mg-stat" style="vertical-align:middle; padding-left:14px; font-size:34px; font-weight:800; color:{{ accent }}; letter-spacing:-0.8px; white-space:nowrap;">{{ current_value }}</td>
+                                            </tr>
+                                        </table>
+                                        <div style="margin-top:14px; font-size:13px; color:#8A8D9B;">Detected {{ occurred_at }}</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Detail grid -->
+                    <tr>
+                        <td class="mg-pad" style="padding:16px 34px 0 34px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; border:1px solid #ECEDF2; border-radius:10px;">
+                                <tr>
+                                    <td class="mg-col" width="50%" valign="middle" style="width:50%; vertical-align:middle; padding:20px 22px; border-bottom:1px solid #ECEDF2;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
+                                            <tr>
+                                                <td width="34" valign="middle" style="width:34px; vertical-align:middle; font-size:0;"><img src="cid:mg_bars" alt="" width="18" height="18" style="display:inline-block; border:0; outline:none; width:18px; height:18px;"></td>
+                                                <td valign="middle" style="vertical-align:middle; font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.2px; text-transform:uppercase;">Severity</td>
+                                                <td align="right" valign="middle" style="text-align:right; vertical-align:middle; font-size:14px; font-weight:800; color:{{ accent }};">{{ severity }}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td class="mg-col mg-col-div" width="50%" valign="middle" style="width:50%; vertical-align:middle; padding:20px 22px; border-bottom:1px solid #ECEDF2; border-left:1px solid #ECEDF2;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
+                                            <tr>
+                                                <td width="34" valign="middle" style="width:34px; vertical-align:middle; font-size:0;"><img src="cid:mg_pin" alt="" width="18" height="18" style="display:inline-block; border:0; outline:none; width:18px; height:18px;"></td>
+                                                <td valign="middle" style="vertical-align:middle; font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.2px; text-transform:uppercase;">Branch</td>
+                                                <td align="right" valign="middle" style="text-align:right; vertical-align:middle; font-size:14px; font-weight:700; color:#16171D;">{{ branch_name }}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="mg-col" width="50%" valign="top" style="width:50%; vertical-align:top; padding:20px 22px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
+                                            <tr>
+                                                <td width="34" valign="top" style="width:34px; vertical-align:top; font-size:0; padding-top:3px;"><img src="cid:mg_tankicon" alt="" width="18" height="18" style="display:inline-block; border:0; outline:none; width:18px; height:18px;"></td>
+                                                <td valign="top" style="vertical-align:top;">
+                                                    <div style="font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.2px; text-transform:uppercase;">Device</div>
+                                                    <div style="margin-top:5px; font-size:14px; font-weight:700; color:#16171D; text-align:right;">{% if device_code %}{{ device_code }}{% else %}{{ tank_code }}{% endif %}{% if zone_name %} &middot; {{ zone_name }}{% endif %}</div>
                                                 </td>
                                             </tr>
+                                        </table>
+                                    </td>
+                                    <td class="mg-col mg-col-div" width="50%" valign="top" style="width:50%; vertical-align:top; padding:20px 22px; border-left:1px solid #ECEDF2;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
                                             <tr>
-                                                <td style="padding: 8px 0; font-size: 14px; color: #374151;">
-                                                    <strong style="color: {% if severity == 'High' %}#DC2626{% elif severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %};">🕐 Occurred At:</strong> {{ occurred_at }}
+                                                <td width="34" valign="top" style="width:34px; vertical-align:top; font-size:0; padding-top:3px;"><img src="cid:mg_clockg" alt="" width="18" height="18" style="display:inline-block; border:0; outline:none; width:18px; height:18px;"></td>
+                                                <td valign="top" style="vertical-align:top;">
+                                                    <div style="font-size:12px; font-weight:700; color:#8A8D9B; letter-spacing:1.2px; text-transform:uppercase;">Detected At</div>
+                                                    <div style="margin-top:5px; font-size:14px; font-weight:700; color:#16171D; text-align:right;">{{ occurred_at }}</div>
                                                 </td>
                                             </tr>
                                         </table>
                                     </td>
                                 </tr>
                             </table>
-                            
-                            <!-- Message Box -->
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F9FAFB; border: 1px solid #E5E7EB; margin: 20px 0;">
+                        </td>
+                    </tr>
+
+                    <!-- CTA -->
+                    <tr>
+                        <td class="mg-pad" align="center" style="text-align:center; padding:30px 34px 0 34px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="mg-btn" style="border-spacing:0; margin:0 auto;">
                                 <tr>
-                                    <td style="padding: 15px; font-size: 14px; color: #374151;">
-                                        <strong>Alert Message:</strong><br>
-                                        {{ message }}
-                                    </td>
-                                </tr>
-                            </table>
-                            
-                            <!-- Action Required Notice -->
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; margin: 20px 0;">
-                                <tr>
-                                    <td style="padding: 15px; font-size: 14px; color: #92400E;">
-                                        <strong>⏰ Action Required:</strong> Please review this alert in the application and acknowledge it once you have addressed the issue.
-                                    </td>
-                                </tr>
-                            </table>
-                            
-                            <!-- Button -->
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
-                                <tr>
-                                    <td align="center" style="padding: 10px 0;">
+                                    <td align="center" style="text-align:center; border-radius:9px; background-color:{{ brand }};">
                                         <!--[if mso]>
-                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ acknowledge_url }}" style="height:56px;v-text-anchor:middle;width:200px;" arcsize="8%" stroke="f" fillcolor="#6B1176">
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ acknowledge_url }}" style="height:56px;v-text-anchor:middle;width:320px;" arcsize="16%" stroke="f" fillcolor="{{ brand }}">
                                             <w:anchorlock/>
-                                            <center style="color:#FFFFFF;font-family:Arial,sans-serif;font-size:18px;font-weight:700;">VIEW ALERTS</center>
+                                            <center style="color:#FFFFFF;font-family:Arial,sans-serif;font-size:17px;font-weight:700;">View &amp; Acknowledge Alert &rarr;</center>
                                         </v:roundrect>
                                         <![endif]-->
                                         <!--[if !mso]><!-->
-                                        <a href="{{ acknowledge_url }}" style="display: inline-block; padding: 18px 45px; background-color: #6B1176; color: #FFFFFF !important; text-decoration: none !important; border-radius: 8px; font-weight: 700; font-size: 18px; letter-spacing: 0.8px; text-transform: uppercase; border: 2px solid #6B1176;">
-                                            VIEW ALERTS
-                                        </a>
+                                        <a href="{{ acknowledge_url }}" style="display:inline-block; padding:18px 46px; font-size:17px; font-weight:700; color:#FFFFFF !important; text-decoration:none !important; border-radius:9px;">View &amp; Acknowledge Alert &nbsp;&rarr;</a>
                                         <!--<![endif]-->
                                     </td>
                                 </tr>
                             </table>
-                            
-                            <!-- Divider -->
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
-                                <tr>
-                                    <td style="height: 1px; background-color: #E5E7EB;"></td>
-                                </tr>
-                            </table>
-                            
-                            <!-- Note -->
-                            <p style="margin: 0; font-size: 14px; color: #6B7280; line-height: 1.6;">
-                                <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
-                                <a href="{{ acknowledge_url }}" style="color: #2563EB; text-decoration: underline; word-wrap: break-word;">{{ acknowledge_url }}</a>
+                        </td>
+                    </tr>
+
+                    <!-- Fallback link -->
+                    <tr>
+                        <td class="mg-pad" style="padding:20px 34px 32px 34px;">
+                            <p style="margin:0; font-size:13px; line-height:1.6; color:#8A8D9B; text-align:center; word-break:break-all;">
+                                Or copy this link into your browser:<br><a href="{{ acknowledge_url }}" style="color:{{ brand }}; text-decoration:underline;">{{ acknowledge_url }}</a>
                             </p>
                         </td>
                     </tr>
-                    
+
                     <!-- Footer -->
+                    <tr><td style="height:2px; line-height:2px; font-size:0; background-color:#8b2a96;">&nbsp;</td></tr>
                     <tr>
-                        <td style="background-color: #F8F9FA; padding: 20px; text-align: center; font-size: 12px; color: #6B7280; border-top: 1px solid #E5E7EB;">
-                            <p style="margin: 5px 0;"><strong>myGrape</strong></p>
-                            <p style="margin: 5px 0;">This is an automated message. Please do not reply to this email.</p>
-                            <p style="margin: 10px 0 0 0;">© 2025 myGrape. All rights reserved.</p>
+                        <td style="background-color:#F5F4F8; padding:22px 34px; text-align:center;">
+                            <p style="margin:0 0 6px 0; font-size:15px; font-weight:700; color:{{ brand }};">myGrape</p>
+                            <p style="margin:0; font-size:13px; line-height:1.7; color:#8A8D9B;">
+                                Automated alert notification &mdash; please do not reply.<br>
+                                &copy; 2025 myGrape. All rights reserved.
+                            </p>
                         </td>
                     </tr>
                 </table>
+
             </td>
         </tr>
     </table>

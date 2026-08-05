@@ -17,8 +17,7 @@ class Hospital(Base):
     hospital_name = Column(String(255), nullable=False)
     hospital_type = Column(String(255), nullable=True)
     hospital_head_email = Column(String(255), nullable=True)
-    is_email_notifify = Column(Boolean, nullable=False, default=True)
-    is_whatsapp_notify = Column(Boolean, nullable=False, default=False)
+    is_push_notify = Column(Boolean, nullable=False, default=False)
 
     # Relationships
     branches = relationship(

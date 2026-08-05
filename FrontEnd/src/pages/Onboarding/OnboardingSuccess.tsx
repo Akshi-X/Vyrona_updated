@@ -1,6 +1,7 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import Header from "../../components/Header";
+import PageLayout from "../../components/PageLayout";
+import { CheckCircle } from "lucide-react";
 
 const OnboardingSuccess: React.FC = () => {
     const navigate = useNavigate();
@@ -9,11 +10,10 @@ const OnboardingSuccess: React.FC = () => {
     const ticketNumber = location.state?.ticketNumber;
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <Header title="" showBackButton={false} />
-
-            <div className="flex items-center justify-center min-h-screen" style={{ paddingTop: "calc(63px + 1rem)" }}>
-                <div id="onboarding-success-card" className="bg-white rounded-lg shadow-lg p-12 max-w-2xl w-full mx-4">
+        <PageLayout title="Onboarding Complete" lucideIcon={CheckCircle}>
+            <div className="flex-1 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-h-0">
+                <div className="max-w-2xl mx-auto w-full">
+                    <div id="onboarding-success-card" className="bg-white rounded-lg shadow-lg p-12">
                     {/* Success Icon */}
                     <div className="flex justify-center mb-8">
                         <div className="w-16 h-16 bg-green-500 rounded-lg flex items-center justify-center">
@@ -57,8 +57,9 @@ const OnboardingSuccess: React.FC = () => {
                     </div>
                 </div>
             </div>
+            </div>
 
-        </div>
+        </PageLayout>
     );
 };
 
