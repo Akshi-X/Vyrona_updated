@@ -747,11 +747,11 @@ function CooldownRow({
     const v = draft.cooldown_minutes ?? 60;
     return (
         <div
-            className={`relative h-9 flex items-center justify-between gap-2 mt-1.5 px-3 rounded-xl border ${
-                dim ? "bg-gray-100 border-gray-200" : "bg-slate-50 border-slate-200"
+            className={`relative h-9 flex items-center justify-between gap-2 mt-1.5 px-3 rounded-xl ${
+                dim ? "bg-gray-100" : "bg-primary-bg/60"
             }`}
         >
-            <span className={`text-[11px] font-bold uppercase tracking-[0.1em] ${dim ? "text-gray-400" : "text-slate-700"}`}>
+            <span className={`text-[11px] font-bold uppercase tracking-[0.1em] ${dim ? "text-gray-400" : "text-primary"}`}>
                 Mail Cooldown
             </span>
             <div className="flex items-center gap-1.5">
@@ -768,9 +768,9 @@ function CooldownRow({
                         });
                     }}
                     title="Minimum minutes between repeated alerts for this KPI."
-                    className="w-12 rounded-md bg-white border border-slate-200 px-1.5 py-1 text-[13px] font-bold text-slate-800 text-center outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-60 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-12 rounded-md bg-white border border-primary-ring px-1.5 py-1 text-[13px] font-bold text-primary text-center outline-none focus:ring-2 focus:ring-primary-ring disabled:opacity-60 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
-                <span className={`text-[11px] font-semibold whitespace-nowrap ${dim ? "text-gray-400" : "text-slate-500"}`}>
+                <span className={`text-[11px] font-semibold whitespace-nowrap ${dim ? "text-gray-400" : "text-gray-500"}`}>
                     min between alerts
                 </span>
             </div>
