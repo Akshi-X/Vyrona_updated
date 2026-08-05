@@ -1,5 +1,5 @@
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { OngoingTreatments } from '../../components/OngoingTreatments';
 import { IVFOngoingTreatments } from '../../components/IVFOngoingTreatments';
@@ -23,6 +23,7 @@ import { userService } from '../../services/userService';
 import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 import DashboardIconDark from '../../assets/DashBoardIcons/DashBoardDark.svg';
 import PageLayout from '../../components/PageLayout';
+import TourEntryButton from '../../components/TourEntryButton';
 // Dashboard Icons
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -73,6 +74,8 @@ export default function Dashboard({ }: DashboardProps) {
   const { isAuthenticated, userRole } = useAuth();
   const isOnboarding = useOnboardingMode();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusAlertId = searchParams.get('alert_id');
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
@@ -291,6 +294,11 @@ export default function Dashboard({ }: DashboardProps) {
   useEffect(() => {
     fetchCriticalAlerts();
   }, [userDepartment]);
+
+  // Deep-link: /dashboard?alert_id=... opens the critical alerts dialog focused on that alert
+  useEffect(() => {
+    if (focusAlertId) setShowCriticalAlerts(true);
+  }, [focusAlertId]);
 
   // Fetch my tasks from API
   const fetchMyTasks = async () => {
@@ -963,6 +971,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   const dashboardActionIcons = (
     <div className="flex items-center gap-4">
+      <TourEntryButton />
       <div className="relative">
         <img className="w-[22px] h-[22px] cursor-pointer" alt="Critical Alerts" src={CriticalAlertsIcon}
           onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }} />
@@ -995,6 +1004,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   const dashboardActionIconsWithId = (
     <div id="onboarding-dashboard-alerts" className="flex items-center gap-6">
+      <TourEntryButton label="Tour" />
       <div id="onboarding-dashboard-critical-alerts-icon" className="flex flex-col items-center gap-1 cursor-pointer"
         onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
         <div className="relative">
@@ -1036,7 +1046,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   return (
     <>
-      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop patternBackground>
+      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop patternBackground hideTourButton>
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
@@ -1970,10 +1980,17 @@ export default function Dashboard({ }: DashboardProps) {
       {/* Critical Alerts Modal */}
       <CriticalAlertsModal
         isOpen={showCriticalAlerts}
-        onClose={() => setShowCriticalAlerts(false)}
+        onClose={() => {
+          setShowCriticalAlerts(false);
+          if (focusAlertId) {
+            searchParams.delete('alert_id');
+            setSearchParams(searchParams, { replace: true });
+          }
+        }}
         id="onboarding-dashboard-critical-alerts-modal"
         alerts={transformedAlerts}
         loading={loadingAlerts}
+        focusAlertId={focusAlertId}
         patientIdLabel={isIVF ? 'Tank Code' : 'Patient ID'}
       />
 

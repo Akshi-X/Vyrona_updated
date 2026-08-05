@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import TourEntryButton from '../TourEntryButton';
  
 
 interface HeaderProps {
@@ -46,6 +47,9 @@ const Header: React.FC<HeaderProps> = ({
         {title ? (
           <span className="text-xs sm:text-sm font-medium text-gray-900">{title}</span>
         ) : null}
+        <div className="ml-3">
+          <TourEntryButton />
+        </div>
       </div>
       {rightContent && (
         <div className="flex items-center">

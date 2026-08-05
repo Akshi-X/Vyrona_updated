@@ -189,6 +189,10 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None
     TWILIO_WHATSAPP_FROM: Optional[str] = None
+    # Web Push / VAPID (Optional - for browser push notifications)
+    VAPID_PUBLIC_KEY: Optional[str] = None
+    VAPID_PRIVATE_KEY: Optional[str] = None
+    VAPID_SUBJECT: Optional[str] = None  # e.g. "mailto:alerts@mygrape.io"
     # ============================================
     # COMPUTED/DERIVED VALUES
     # ============================================

@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ChevronRight, Download, Users } from "lucide-react";
+import RefillIcon from "./RefillIcon";
 
 import { useSidebar } from "../contexts/SidebarContext";
 import { useOnboardingMode } from "../contexts/OnboardingModeContext";
 import { useAuth } from "../contexts/AuthContext";
 import { userService } from "../services/userService";
+import { InstallPromptCard } from "./InstallPromptCard";
+import { IOSInstallGuideDialog } from "./IOSInstallGuideDialog";
 
 import MyGrapeLogo from "../assets/mGScale.svg";
 import IsolationModeBanner from "../assets/Isolation_Mode.svg";
@@ -15,7 +18,6 @@ import DatabaseIconDark from "../assets/DashBoardIcons/DatabaseDark.svg";
 import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
 import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg";
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
-import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -50,9 +52,9 @@ const isDropdown = (item: NavItem): item is NavGroup =>
 const DASHBOARD_CHILD_PATHS = [
     "/dashboard",
     "/ivf-track-shipment",
-    // "/incubator-tracking",
+    "/incubator-tracking",
     "/refrigerator-tracking",
-    // "/embryo-console",
+    "/embryo-console",
 ];
 
 const isDashboardRoute = (pathname: string) =>
@@ -73,9 +75,9 @@ const ALL_NAV_ITEMS: NavItem[] = [
         children: [
             { label: "Overview",                  path: "/dashboard"          },
             { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
-            // { label: "Incubator Tracking",      path: "/incubator-tracking"    },
+            { label: "Incubator Tracking",      path: "/incubator-tracking"    },
             { label: "Refrigerator Tracking",     path: "/refrigerator-tracking" },
-            // { label: "Embryo Console",          path: "/embryo-console"        },
+            { label: "Embryo Console",          path: "/embryo-console"        },
         ],
     },
     { icon: DatabaseIconWhite,    label: "Database",            path: "/database"      },
@@ -87,13 +89,17 @@ const ALL_NAV_ITEMS: NavItem[] = [
         dropdown: true,
         children: [
             { label: "Cryotanks",  path: "/alert-setting" },
-            // { label: "Incubators",    path: "/alert-setting?direction=incubators"    },
+            { label: "Incubators",    path: "/alert-setting?direction=incubators"    },
             { label: "Refrigerators", path: "/alert-setting?direction=refrigerators" },
         ],
     },
     { icon: "", lucideIcon: Download, label: "Reports",         path: "/reports"       },
-    { icon: ContainersIcon,       label: "Refill log",          path: "/refill-log"    },
+    { icon: "", lucideIcon: RefillIcon, label: "Refill log",     path: "/refill-log"    },
 ];
+
+// Operational nav hidden from mygrape_admin. Hiding the Dashboard dropdown also
+// removes its children (Overview, Incubator Tracking, Embryo Console, …).
+const MYGRAPE_ADMIN_HIDDEN = ["Dashboard", "Database", "Control Tower", "Refill log"];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -142,8 +148,12 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
 
     const isIVF = (userDepartment ?? "").toUpperCase() === "IVF";
     const isCGT = (userDepartment ?? "").toUpperCase() === "CGT";
+    const isMygrapeAdmin = (userRole ?? "").toLowerCase() === "mygrape_admin";
 
     const navigationItems = ALL_NAV_ITEMS.filter((item) => {
+        // mygrape_admin manages tenants, not lab operations — hide the operational nav.
+        // Subtractive only: the department rules below still apply to what's left.
+        if (isMygrapeAdmin && MYGRAPE_ADMIN_HIDDEN.includes(item.label)) return false;
         if (item.label === "Pending approvals")
             return userRole === "Admin" || userRole === "Pharma_admin";
         if (item.label === "Users")
@@ -182,6 +192,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const resolvedPathname = isOnboarding
         ? location.pathname.replace("/onboarding", "")
         : location.pathname;
+
+    // Profile, and the support-ticket flow launched from it (profile → support → success).
+    const profileActive = ["/user-profile", "/support", "/success"].some(
+        (p) => resolvedPathname === p || resolvedPathname.startsWith(p + "/"),
+    );
 
     // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -234,25 +249,32 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                             const isOpen = isDashboard ? dashboardOpen : isAlertConfig ? alertConfigOpen : false;
                             const setOpen = isDashboard ? setDashboardOpen : isAlertConfig ? setAlertConfigOpen : () => {};
 
+                            // Match on parsed params, not the raw search string, so extra
+                            // params (?direction=refrigerators&branch_id=21) still resolve.
+                            const currentParams = new URLSearchParams(location.search);
+                            const queryMatches = (query: string) =>
+                                [...new URLSearchParams(query)].every(
+                                    ([k, v]) => currentParams.get(k) === v,
+                                );
+
                             const getChildActive = (child: NavChild) => {
-                                if (child.path.includes("?")) {
-                                    const [p, q] = child.path.split("?");
-                                    return location.pathname === resolvePath(p) && location.search === `?${q}`;
-                                }
-                                const resolved = resolvePath(child.path);
+                                const [rawPath, rawQuery] = child.path.split("?");
+                                const resolved = resolvePath(rawPath);
+                                const pathActive =
+                                    location.pathname === resolved ||
+                                    location.pathname.startsWith(resolved + "/");
+                                if (!pathActive) return false;
+                                if (rawQuery) return queryMatches(rawQuery);
                                 const siblingQueryActive = item.children
                                     .filter((s) => s.path !== child.path && s.path.includes("?"))
-                                    .some((s) => location.search === `?${s.path.split("?")[1]}`);
-                                return (
-                                    (location.pathname === resolved || location.pathname.startsWith(resolved + "/")) &&
-                                    !siblingQueryActive
-                                );
+                                    .some((s) => queryMatches(s.path.split("?")[1]));
+                                return !siblingQueryActive;
                             };
 
                             return (
                                 <div key={index} className="flex flex-col gap-0.5">
                                     <button
-                                        id={isAlertConfig ? "onboarding-sidebar-alert-setting" : undefined}
+                                        id={isAlertConfig ? "onboarding-sidebar-alert-setting" : isDashboard ? "onboarding-sidebar-dashboard" : undefined}
                                         onClick={() => setOpen((o: boolean) => !o)}
                                         className={`h-auto w-full justify-between gap-4 px-3 py-[7px] rounded-[10px] flex items-center transition-colors ${
                                             active
@@ -290,6 +312,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                 return (
                                                     <button
                                                         key={ci}
+                                                        id={isAlertConfig ? `onboarding-sidebar-alert-${child.label.toLowerCase()}` : child.path === "/ivf-track-shipment" ? "onboarding-sidebar-cryocan-tracking" : undefined}
                                                         onClick={() => {
                                                             setOpen(true);
                                                             handleNavigation(child.path);
@@ -329,8 +352,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
 
                         const needsInvert =
                             (label === "Pending approvals" ||
-                             label === "Alert Config" ||
-                             label === "Refill log") && !isActive;
+                             label === "Alert Config") && !isActive;
 
                         return (
                             <button
@@ -359,14 +381,21 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     })}
                 </nav>
 
+                <InstallPromptCard />
+                <IOSInstallGuideDialog />
+
                 {/* Profile */}
                 <button
                     id="onboarding-sidebar-profile"
                     type="button"
                     onClick={() => { navigate(resolvePath("/user-profile")); closeMobile(); }}
-                    className="group w-full flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 flex-shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
+                    className={`group w-full flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 flex-shrink-0 relative z-10 text-white transition-colors text-left ${
+                        profileActive ? "bg-white/10" : "hover:bg-white/10"
+                    }`}
                 >
-                    <span className="w-6 h-6 flex-shrink-0 rounded-full bg-white/20 text-white text-[10px] font-bold flex items-center justify-center uppercase">
+                    <span className={`w-6 h-6 flex-shrink-0 rounded-full text-[10px] font-bold flex items-center justify-center uppercase text-white ${
+                        profileActive ? "bg-white/30" : "bg-white/20"
+                    }`}>
                         {(profileName || "User")
                             .split(/\s+/)
                             .filter(Boolean)
@@ -382,7 +411,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                             {profileEmail || "\u00A0"}
                         </span>
                     </div>
-                    <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/90 opacity-0 transition-opacity duration-200 group-hover:opacity-100" strokeWidth={2} />
+                    <ChevronRight className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/90 transition-opacity duration-200 ${
+                        profileActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    }`} strokeWidth={2} />
                 </button>
 
                 {/* Logout */}

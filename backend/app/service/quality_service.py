@@ -698,6 +698,8 @@ class QualityService:
                     if r.cooldown_minutes is not None
                     else 60,
                     "unack_escalation_threshold": r.unack_escalation_threshold,
+                    "whatsapp_alert": bool(r.whatsapp_alert),
+                    "email_alert": bool(r.email_alert),
                     "status": bool(r.status),
                 }
                 for r in rows
@@ -724,6 +726,8 @@ class QualityService:
         alert_type: Optional[str] = None,
         cooldown_minutes: Optional[int] = None,
         unack_escalation_threshold: Optional[int] = None,
+        whatsapp_alert: bool = False,
+        email_alert: bool = False,
         status: bool = True,
     ) -> KpiConfig:
         """Create a KpiConfig row for a tank, incubator, or refrigerator."""
@@ -745,6 +749,8 @@ class QualityService:
             alert_type=alert_type.strip() if alert_type else None,
             cooldown_minutes=cooldown_minutes if cooldown_minutes is not None else 60,
             unack_escalation_threshold=unack_escalation_threshold,
+            whatsapp_alert=bool(whatsapp_alert),
+            email_alert=bool(email_alert),
             status=status,
         )
         self.db.add(row)
@@ -763,6 +769,8 @@ class QualityService:
         alert_type: Optional[str] = None,
         cooldown_minutes: Optional[int] = None,
         unack_escalation_threshold: Optional[int] = None,
+        whatsapp_alert: Optional[bool] = None,
+        email_alert: Optional[bool] = None,
         status: Optional[bool] = None,
     ) -> Optional[KpiConfig]:
         """Update a KpiConfig row. Validates config's tank belongs to branch when branch_id provided."""
@@ -792,6 +800,10 @@ class QualityService:
             if isinstance(unack_escalation_threshold, (int, float))
             else None
         )
+        if whatsapp_alert is not None:
+            row.whatsapp_alert = bool(whatsapp_alert)
+        if email_alert is not None:
+            row.email_alert = bool(email_alert)
         if status is not None:
             row.status = status
         self.db.flush()
@@ -882,6 +894,8 @@ class QualityService:
                         escalation_threshold = int(escalation_threshold)
                     except (TypeError, ValueError):
                         escalation_threshold = None
+                whatsapp_alert_val = bool(cfg.get("whatsapp_alert", False))
+                email_alert_val = bool(cfg.get("email_alert", False))
                 query = self.db.query(KpiConfig).filter(
                     KpiConfig.tank_id == tank_id,
                     KpiConfig.kpi_name == kpi_name,
@@ -901,6 +915,8 @@ class QualityService:
                     if cooldown_val is not None:
                         existing.cooldown_minutes = cooldown_val
                     existing.unack_escalation_threshold = escalation_threshold
+                    existing.whatsapp_alert = whatsapp_alert_val
+                    existing.email_alert = email_alert_val
                     self.db.flush()
                     updated += 1
                 else:
@@ -918,6 +934,8 @@ class QualityService:
                         if cooldown_val is not None
                         else 60,
                         unack_escalation_threshold=escalation_threshold,
+                        whatsapp_alert=whatsapp_alert_val,
+                        email_alert=email_alert_val,
                         status=bool(status_val),
                     )
                     self.db.add(row)
@@ -971,6 +989,8 @@ class QualityService:
                 escalation_threshold = int(escalation_threshold) if escalation_threshold is not None else None
             except (TypeError, ValueError):
                 escalation_threshold = None
+            whatsapp_alert_val = bool(cfg.get("whatsapp_alert", False))
+            email_alert_val = bool(cfg.get("email_alert", False))
 
             query = self.db.query(KpiConfig).filter(
                 KpiConfig.incubator_id == incubator_id,
@@ -996,6 +1016,8 @@ class QualityService:
                 if cooldown_val is not None:
                     existing.cooldown_minutes = cooldown_val
                 existing.unack_escalation_threshold = escalation_threshold
+                existing.whatsapp_alert = whatsapp_alert_val
+                existing.email_alert = email_alert_val
                 self.db.flush()
                 updated += 1
             else:
@@ -1013,6 +1035,8 @@ class QualityService:
                     alert_type=alert_type_val,
                     cooldown_minutes=cooldown_val if cooldown_val is not None else 60,
                     unack_escalation_threshold=escalation_threshold,
+                    whatsapp_alert=whatsapp_alert_val,
+                    email_alert=email_alert_val,
                     status=bool(status_val),
                 )
                 self.db.add(row)
@@ -1067,6 +1091,8 @@ class QualityService:
                 escalation_threshold = int(escalation_threshold) if escalation_threshold is not None else None
             except (TypeError, ValueError):
                 escalation_threshold = None
+            whatsapp_alert_val = bool(cfg.get("whatsapp_alert", False))
+            email_alert_val = bool(cfg.get("email_alert", False))
 
             query = self.db.query(KpiConfig).filter(
                 KpiConfig.refrigerator_id == refrigerator_id,
@@ -1092,6 +1118,8 @@ class QualityService:
                 if cooldown_val is not None:
                     existing.cooldown_minutes = cooldown_val
                 existing.unack_escalation_threshold = escalation_threshold
+                existing.whatsapp_alert = whatsapp_alert_val
+                existing.email_alert = email_alert_val
                 if zone_name is not None:
                     existing.zone_name = zone_name
                 self.db.flush()
@@ -1114,6 +1142,8 @@ class QualityService:
                     alert_type=alert_type_val,
                     cooldown_minutes=cooldown_val if cooldown_val is not None else 60,
                     unack_escalation_threshold=escalation_threshold,
+                    whatsapp_alert=whatsapp_alert_val,
+                    email_alert=email_alert_val,
                     status=bool(status_val),
                 )
                 self.db.add(row)

@@ -5,8 +5,9 @@ import { feedbackApi, type FeedbackSubmission } from "../../api/feedbackApi";
 import { userService } from "../../services/userService";
 import { useAuth } from "../../contexts/AuthContext";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
-import Header from "../../components/Header";
+import PageLayout from "../../components/PageLayout";
 import AttachmentThumbnail from "../../components/AttachmentThumbnail";
+import { HelpCircle } from "lucide-react";
 
 type SupportRole = "User" | "Manager" | "Admin";
 
@@ -580,11 +581,12 @@ const Support: React.FC = () => {
     useEffect(() => {}, [status]);
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <Header title="Support & Feedback" />
-
-            <div className="pt-[calc(63px+1rem)]">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <PageLayout
+            title="Support & Feedback"
+            lucideIcon={HelpCircle}
+            description="Submit feedback or raise a support ticket."
+        >
+            <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
                         <div className="mb-6">
                             <h1 className="text-2xl font-bold text-gray-900">
@@ -1230,9 +1232,8 @@ const Support: React.FC = () => {
                             )}
                         </form>
                     </div>
-                </div>
             </div>
-        </div>
+        </PageLayout>
     );
 };
 
