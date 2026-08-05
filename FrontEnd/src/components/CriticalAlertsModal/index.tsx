@@ -25,6 +25,8 @@ interface CriticalAlertsModalProps {
     onAcknowledgeAll?: (alertIds: string[], reason?: string) => Promise<void>;
     patientIdLabel?: string;
     id?: string;
+    /** When set, the dialog scrolls to and highlights the alert with this id. */
+    focusAlertId?: string | null;
 }
 
 const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
@@ -36,6 +38,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
     onAcknowledgeAll,
     patientIdLabel = "Tank Code",
     id,
+    focusAlertId,
 }) => {
     const showPatientId = Boolean(patientIdLabel?.trim());
     const [acknowledgingIds, setAcknowledgingIds] = useState<Set<string>>(
@@ -59,6 +62,10 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
     const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
     const filterPanelRef = useRef<HTMLDivElement | null>(null);
 
+    // Deep-link focus: scroll to and highlight a specific alert
+    const [highlightId, setHighlightId] = useState<string | null>(null);
+    const contentRef = useRef<HTMLDivElement | null>(null);
+
     // Reset filters when modal closes
     useEffect(() => {
         if (!isOpen) {
@@ -70,6 +77,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
             setPendingAcknowledgeAlertIds(null);
             setIsAcknowledgeAllPending(false);
             setPendingAcknowledgmentReason("");
+            setHighlightId(null);
         }
     }, [isOpen]);
 
@@ -346,6 +354,45 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
         return acc;
     }, {});
 
+    const alertIdToGroupKey = new Map<string, string>();
+    for (const groups of Object.values(groupedByDateAndKpi)) {
+        for (const group of groups) {
+            for (const alert of group.alerts) {
+                alertIdToGroupKey.set(alert.id, group.groupKey);
+            }
+        }
+    }
+
+    // Deep-link focus: when a focusAlertId is provided, expand its group, scroll
+    // it into view and flash a highlight so the user lands on the right alert.
+    useEffect(() => {
+        if (!isOpen || !focusAlertId) return;
+        const groupKey = alertIdToGroupKey.get(focusAlertId);
+        if (groupKey) {
+            setExpandedGroupKeys((prev) => {
+                if (prev.has(groupKey)) return prev;
+                const next = new Set(prev);
+                next.add(groupKey);
+                return next;
+            });
+        }
+        const scrollTimer = window.setTimeout(() => {
+            const el = contentRef.current?.querySelector(
+                `[data-alert-id="${focusAlertId}"]`,
+            );
+            if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                setHighlightId(focusAlertId);
+            }
+        }, 150);
+        const clearTimer = window.setTimeout(() => setHighlightId(null), 3000);
+        return () => {
+            window.clearTimeout(scrollTimer);
+            window.clearTimeout(clearTimer);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, focusAlertId, alerts]);
+
     const formatAlertTime = (timestamp: string): string => {
         const parsed = new Date(timestamp);
         if (Number.isNaN(parsed.getTime())) {
@@ -605,7 +652,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
             dataLength={Math.max(visibleAlerts.length, 1)}
             headerAction={filterHeaderAction}
         >
-            <div className="space-y-4">
+            <div className="space-y-4" ref={contentRef}>
                 {visibleAlerts.length === 0 && (
                     <div className="bg-white p-[15px] text-center text-gray-500 text-sm rounded-xl">
                         No alerts match the current filters
@@ -644,10 +691,15 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                         return null;
                                     }
 
+                                    const isGroupFocused = group.alerts.some(
+                                        (alert) => alert.id === highlightId,
+                                    );
+
                                     return (
                                         <div
                                             key={group.groupKey}
-                                            className={`rounded-xl border p-4 ${getSeverityCardClass(latestAlert.severity)} ${hiddenCount > 0 ? "cursor-pointer" : ""}`}
+                                            data-alert-id={latestAlert.id}
+                                            className={`rounded-xl border p-4 transition-shadow ${getSeverityCardClass(latestAlert.severity)} ${hiddenCount > 0 ? "cursor-pointer" : ""} ${isGroupFocused ? "ring-2 ring-inset ring-primary" : ""}`}
                                             onClick={
                                                 hiddenCount > 0
                                                     ? () =>
@@ -851,7 +903,8 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                         (alert) => (
                                                             <div
                                                                 key={alert.id}
-                                                                className="flex items-center justify-between gap-3 pl-12"
+                                                                data-alert-id={alert.id}
+                                                                className={`flex items-center justify-between gap-3 pl-12 rounded-lg transition-colors ${alert.id === highlightId ? "bg-primary/10 ring-1 ring-primary/40 py-1" : ""}`}
                                                             >
                                                                 <div className="min-w-0 text-left">
                                                                     <div className="text-sm text-[#333333]">

@@ -197,7 +197,7 @@
         "title": "Explore a Container",
         "icon": "Activity",
         "content": "Each row here represents an active container. In the live system, selecting a container opens a detailed view of its sensor readings and history, which we will explore in depth during the next level.",
-        "placement": "bottom_right",
+        "placement": "right",
         "requireClick": false,
         "genieImage": "/genie/explaining_casual.webp"
     }

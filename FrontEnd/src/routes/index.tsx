@@ -45,11 +45,18 @@ import { useTourNavContext } from "../contexts/TourNavContext";
 
 // Renders whichever level is currently active — works on any page.
 // Prevents two OnboardingLevel instances from fighting over the shared tour instance.
-// Prioritises pendingStartLevelId so clicking Start/Resume on any level mounts the right one.
+// A preview session (launched from a real page's TourEntryButton) always mounts its
+// level; otherwise prioritise pendingStartLevelId so Start/Resume mounts the right one.
 function ActiveOnboardingLevel() {
     const { levels, state } = useOnboarding();
     const tourNavCtx = useTourNavContext();
+
+    const previewId = tourNavCtx?.previewLevelId;
     const pendingId = tourNavCtx?.pendingStartLevelId;
+
+    // A preview session mounts its tour directly by id — page tours are not in the
+    // gamified `levels` list, so mount previewId as-is rather than looking it up.
+    if (previewId) return <OnboardingLevel levelId={previewId} />;
 
     const active = pendingId
         ? (levels.find((l) => l.id === pendingId) ?? null)
@@ -362,6 +369,22 @@ export const router = createBrowserRouter([
                     </RoleBasedRoute>
                 ),
             },
+            {
+                path: "/user-profile",
+                element: (
+                    <RoleBasedRoute>
+                        <UserProfilePage />
+                    </RoleBasedRoute>
+                ),
+            },
+            {
+                path: "/support",
+                element: (
+                    <RoleBasedRoute>
+                        <Support />
+                    </RoleBasedRoute>
+                ),
+            },
         ],
     },
 
@@ -369,22 +392,6 @@ export const router = createBrowserRouter([
     // PROTECTED ROUTES WITHOUT SHARED SIDEBAR
     // ============================================================
     { path: "/track-and-trace", element: <TrackAndTrace /> },
-    {
-        path: "/user-profile",
-        element: (
-            <RoleBasedRoute>
-                <UserProfilePage />
-            </RoleBasedRoute>
-        ),
-    },
-    {
-        path: "/support",
-        element: (
-            <RoleBasedRoute>
-                <Support />
-            </RoleBasedRoute>
-        ),
-    },
 
     // ============================================================
     // FALLBACK ROUTE

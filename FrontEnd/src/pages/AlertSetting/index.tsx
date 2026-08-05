@@ -5,10 +5,10 @@ import { ivfService, type IvfBranch, type HospitalNotificationSettings } from ".
 import { shipmentService } from "../../services/shipmentService";
 import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
 import PageLayout from "../../components/PageLayout";
-import FilterPanel, { FilterSelect } from "../../components/FilterPanel";
 import { Bell, ChevronDown, History, Sparkles, X } from "lucide-react";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import CryoBentoGrid, { type CryoBentoGridHandle } from "./CryoBentoGrid";
+import DeviceKpiGrid, { type DeviceKpiGridHandle } from "./DeviceKpiGrid";
 import CryoHistoryModal from "./CryoHistoryModal";
 import { Switch } from "../../components/ui/switch";
 
@@ -25,6 +25,7 @@ interface ContainerRow {
     chamber_c?: number | null;
     is_refrigerator?: boolean;
     refrigerator_id?: number | null;
+    zones?: Array<{ zone_id: string; zone_name: string }>;
 }
 
 export default function AlertSetting() {
@@ -78,6 +79,22 @@ export default function AlertSetting() {
     const [showBranchDropdown, setShowBranchDropdown] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const bentoGridRef = useRef<CryoBentoGridHandle>(null);
+    const deviceGridRef = useRef<DeviceKpiGridHandle>(null);
+
+    // Incubator chamber (null = Common / incubator-level) and refrigerator zone.
+    const [selectedChamberId, setSelectedChamberId] = useState<string | null>(null);
+    const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+    const [showScopeDropdown, setShowScopeDropdown] = useState(false);
+    const scopeDropdownRef = useRef<HTMLDivElement>(null);
+
+    // Reset scope when the selected device changes: incubators start at Common,
+    // refrigerators default to their first zone.
+    useEffect(() => {
+        setSelectedChamberId(null);
+        setSelectedZoneId(primaryContainer?.zones?.[0]?.zone_id ?? null);
+        setShowScopeDropdown(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [primaryContainer?.tank_id]);
 
     // Below xl1 (1200px) the selector pill bar moves inside the panel, under the
     // "Tank Monitoring" header row; at xl1+ it's the notch overlapping the panel's top edge.
@@ -137,6 +154,7 @@ export default function AlertSetting() {
                         chamber_c: null,
                         is_refrigerator: true,
                         refrigerator_id: ref.refrigerator_id,
+                        zones: ref.zones ?? [],
                     }))
                 );
             })
@@ -211,10 +229,6 @@ export default function AlertSetting() {
             return matchBranch && matchDevice;
         });
     }, [containers, branchFilter, directionFilter]);
-    const activeFilterCount = useMemo(
-        () => (branchFilter !== "All" ? 1 : 0),
-        [branchFilter],
-    );
 
     const otherTanks = useMemo(() => {
         if (!primaryContainer || primaryContainer.is_incubator || primaryContainer.is_refrigerator) {
@@ -245,6 +259,12 @@ export default function AlertSetting() {
                 !tankDropdownRef.current.contains(event.target as Node)
             ) {
                 setShowBranchDropdown(false);
+            }
+            if (
+                scopeDropdownRef.current &&
+                !scopeDropdownRef.current.contains(event.target as Node)
+            ) {
+                setShowScopeDropdown(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -299,6 +319,32 @@ export default function AlertSetting() {
             : directionFilter === "refrigerators"
                 ? "Refrigerator"
                 : "Cryotank";
+    // Scope pill (chamber for incubators, zone for refrigerators). Shown only once
+    // a device is selected and the direction is incubator/refrigerator.
+    const scopeOptions: Array<{ id: string | null; label: string }> = (() => {
+        if (!primaryContainer) return [];
+        if (primaryContainer.is_incubator) {
+            const total = (primaryContainer.chamber_r ?? 0) * (primaryContainer.chamber_c ?? 0);
+            return [
+                { id: null, label: "Common" },
+                ...Array.from({ length: total }, (_, i) => ({ id: String(i + 1), label: `Chamber ${i + 1}` })),
+            ];
+        }
+        if (primaryContainer.is_refrigerator) {
+            return (primaryContainer.zones ?? []).map((z) => ({ id: z.zone_id, label: z.zone_name }));
+        }
+        return [];
+    })();
+    const showScopePill = !!primaryContainer && (primaryContainer.is_incubator || primaryContainer.is_refrigerator) && scopeOptions.length > 0;
+    const scopeValue: string | null = primaryContainer?.is_refrigerator ? selectedZoneId : selectedChamberId;
+    const scopeLabel =
+        scopeOptions.find((o) => o.id === scopeValue)?.label ??
+        (primaryContainer?.is_incubator ? "Common" : "Select Zone");
+    const setScope = (id: string | null) => {
+        if (primaryContainer?.is_refrigerator) setSelectedZoneId(id);
+        else setSelectedChamberId(id);
+        setShowScopeDropdown(false);
+    };
 
     return (
         <>
@@ -308,16 +354,29 @@ export default function AlertSetting() {
                     icon={CriticalAlertsIcon}
                     patternBackground
                     actions={
-                        <div className="md:hidden">
-                            <FilterPanel activeCount={activeFilterCount}>
-                                <FilterSelect
-                                    label="Branch"
-                                    value={branchFilter}
-                                    options={branchOptions}
-                                    allLabel="All Branches"
-                                    onChange={(v) => setBranchFilter(v)}
-                                />
-                            </FilterPanel>
+                        <div className="flex items-center gap-2">
+                            <button
+                                id="onboarding-alert-config-history"
+                                type="button"
+                                onClick={() => setShowHistory(true)}
+                                title="Config History"
+                                aria-label="Config History"
+                                className="h-9 w-9 min-[900px]:w-auto min-[900px]:px-4 rounded-lg bg-white text-gray-700 border border-line hover:bg-gray-50 text-[13px] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
+                            >
+                                <History className="w-4 h-4 shrink-0" />
+                                <span className="hidden min-[900px]:inline">Config History</span>
+                            </button>
+                            <button
+                                id="onboarding-alert-notify-open"
+                                type="button"
+                                onClick={openNotifySettings}
+                                title="Notifications"
+                                aria-label="Notifications"
+                                className="h-9 w-9 min-[900px]:w-auto min-[900px]:px-4 rounded-lg bg-white text-gray-700 border border-line hover:bg-gray-50 text-[13px] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
+                            >
+                                <Bell className="w-4 h-4 shrink-0" />
+                                <span className="hidden min-[900px]:inline">Notifications</span>
+                            </button>
                         </div>
                     }
                 >
@@ -384,6 +443,7 @@ export default function AlertSetting() {
                             {/* Tank / Incubator pill */}
                             <div className="relative max-[490px]:flex-1 max-[490px]:basis-[calc(50%-0.1875rem)] max-[490px]:min-w-0" ref={tankDropdownRef}>
                                 <button
+                                    id="onboarding-alert-tank-dropdown"
                                     type="button"
                                     onClick={() => {
                                         if (!containersLoading && filteredContainers.length > 0) {
@@ -406,12 +466,13 @@ export default function AlertSetting() {
                                 </button>
 
                                 {showBranchDropdown && filteredContainers.length > 0 && (
-                                    <div className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                    <div id="onboarding-alert-tank-dropdown-list" className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                                         {filteredContainers.map((c) => {
                                             const isSelected = selectedContainers.some((s) => s.tank_id === c.tank_id);
                                             return (
                                                 <button
                                                     key={`${c.branch_id}-${c.tank_id}-${c.canisterId}`}
+                                                    id={`onboarding-alert-container-${c.canisterId}`}
                                                     type="button"
                                                     onClick={() => {
                                                         setSelectedContainers([c]);
@@ -434,26 +495,84 @@ export default function AlertSetting() {
                                 )}
                             </div>
 
-                            {/* History pill */}
-                            <button
-                                type="button"
-                                onClick={() => setShowHistory(true)}
-                                className="h-9 px-4 rounded-full text-[13px] font-semibold text-white/90 border border-white/15 hover:bg-white/10 flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors max-[490px]:w-full"
-                            >
-                                <History className="w-3.5 h-3.5" />
-                                Config History
-                            </button>
-
-                            {/* Notifications pill */}
-                            <button
-                                id="onboarding-alert-notify-open"
-                                type="button"
-                                onClick={openNotifySettings}
-                                className="h-9 px-4 rounded-full text-[13px] font-semibold text-white/90 border border-white/15 hover:bg-white/10 flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors max-[490px]:w-full"
-                            >
-                                <Bell className="w-3.5 h-3.5" />
-                                Notifications
-                            </button>
+                            {/* Chamber / Zone pill (incubators + refrigerators) */}
+                            {showScopePill && (
+                                <div className="relative max-[490px]:flex-1 max-[490px]:basis-[calc(50%-0.1875rem)] max-[490px]:min-w-0" ref={scopeDropdownRef}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowScopeDropdown((v) => !v)}
+                                        className={`h-9 px-4 rounded-full text-[13px] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors focus:outline-none max-[490px]:w-full ${
+                                            scopeValue !== null
+                                                ? "bg-white text-primary"
+                                                : "text-white/90 border border-white/15 hover:bg-white/10"
+                                        }`}
+                                    >
+                                        {scopeLabel}
+                                        <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${showScopeDropdown ? "rotate-180" : ""}`} />
+                                    </button>
+                                    {showScopeDropdown && (
+                                        primaryContainer?.is_incubator ? (
+                                            /* Chamber grid — mirrors the incubator's physical rows × cols layout */
+                                            <div className="absolute top-full mt-2 left-0 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg p-2.5 w-max max-w-[80vw]">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setScope(null)}
+                                                    className={`w-full h-8 mb-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                                                        selectedChamberId === null
+                                                            ? "bg-primary text-white"
+                                                            : "bg-white text-gray-500 border border-gray-200 hover:border-primary hover:text-primary"
+                                                    }`}
+                                                >
+                                                    Common
+                                                </button>
+                                                <div
+                                                    className="grid gap-1.5"
+                                                    style={{ gridTemplateColumns: `repeat(${primaryContainer.chamber_c ?? 1}, minmax(28px, 1fr))` }}
+                                                >
+                                                    {Array.from({ length: primaryContainer.chamber_r ?? 0 }).map((_, r) =>
+                                                        Array.from({ length: primaryContainer.chamber_c ?? 0 }).map((_, c) => {
+                                                            const num = r * (primaryContainer.chamber_c ?? 0) + c + 1;
+                                                            const id = String(num);
+                                                            const active = selectedChamberId === id;
+                                                            return (
+                                                                <button
+                                                                    key={id}
+                                                                    type="button"
+                                                                    onClick={() => setScope(active ? null : id)}
+                                                                    className={`h-8 min-w-[28px] rounded-lg text-xs font-semibold transition-all duration-150 ${
+                                                                        active
+                                                                            ? "bg-primary text-white"
+                                                                            : "bg-white text-gray-500 border border-gray-200 hover:border-primary hover:text-primary"
+                                                                    }`}
+                                                                >
+                                                                    {num}
+                                                                </button>
+                                                            );
+                                                        }),
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                                {scopeOptions.map((opt) => (
+                                                    <button
+                                                        key={opt.id ?? "__common__"}
+                                                        type="button"
+                                                        onClick={() => setScope(opt.id)}
+                                                        className={`w-full text-left px-3 py-2 text-xs transition-colors duration-150 ${
+                                                            opt.id === scopeValue
+                                                                ? "bg-primary/10 text-primary font-medium"
+                                                                : "text-gray-700 hover:bg-gray-50"
+                                                        }`}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )
+                                    )}
+                                </div>
+                            )}
                         </div>
                     );
                     return (
@@ -474,17 +593,22 @@ export default function AlertSetting() {
                         <section id="onboarding-alert-kpi-panel" className="bg-white rounded-2xl border border-line p-4 min-w-0 flex flex-1 flex-col min-h-0 xl1:relative">
                             <div className="flex items-center justify-between gap-3 mb-4">
                                 <h2 className="font-bold text-black text-base">
-                                    Tank Monitoring
+                                    {deviceLabel} Configuration
                                 </h2>
                                 <div className="flex items-center gap-2">
-                                    {(directionFilter === "cryotanks"
-                                        ? !primaryContainer || (!primaryContainer.is_incubator && !primaryContainer.is_refrigerator)
-                                        : primaryContainer && !primaryContainer.is_incubator && !primaryContainer.is_refrigerator) && (
+                                    {(primaryContainer || directionFilter === "cryotanks") && (
                                         <div className="relative group hidden md:block">
                                             <button
+                                                id="onboarding-alert-set-recommended"
                                                 type="button"
                                                 disabled={!primaryContainer}
-                                                onClick={() => bentoGridRef.current?.applyRecommended()}
+                                                onClick={() => {
+                                                    if (primaryContainer?.is_incubator || primaryContainer?.is_refrigerator) {
+                                                        deviceGridRef.current?.applyRecommended();
+                                                    } else {
+                                                        bentoGridRef.current?.applyRecommended();
+                                                    }
+                                                }}
                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-light active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
                                             >
                                                 <Sparkles size={14} />
@@ -499,33 +623,35 @@ export default function AlertSetting() {
                                     )}
                                 </div>
                             </div>
-                            {!primaryContainer && directionFilter !== "cryotanks" ? (
-                                <div className="flex-1 flex items-center justify-center">
-                                    <div className="text-center text-gray-400">
-                                        <svg
-                                            className="w-16 h-16 mx-auto mb-3 opacity-50"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.5"
-                                        >
-                                            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-                                            <rect
-                                                x="9"
-                                                y="3"
-                                                width="6"
-                                                height="4"
-                                                rx="1"
-                                            />
-                                            <path
-                                                d="M9 12h6M9 16h6"
-                                                strokeLinecap="round"
-                                            />
-                                        </svg>
-                                        <p className="text-md">
-                                            Select a container to view live monitoring
-                                        </p>
-                                    </div>
+                            {directionFilter === "incubators" || directionFilter === "refrigerators" ? (
+                                <div className="flex-1 min-h-0 flex flex-col">
+                                    <DeviceKpiGrid
+                                        ref={deviceGridRef}
+                                        deviceType={directionFilter === "refrigerators" ? "refrigerator" : "incubator"}
+                                        deviceId={
+                                            !primaryContainer
+                                                ? null
+                                                : primaryContainer.is_refrigerator
+                                                    ? (primaryContainer.refrigerator_id ?? primaryContainer.tank_id)
+                                                    : (primaryContainer.incubator_id ?? primaryContainer.tank_id)
+                                        }
+                                        scopeId={
+                                            !primaryContainer
+                                                ? null
+                                                : primaryContainer.is_refrigerator
+                                                    ? selectedZoneId
+                                                    : selectedChamberId
+                                        }
+                                        scopeNoun={directionFilter === "refrigerators" ? "Zone" : "Chamber"}
+                                        scopeName={
+                                            directionFilter === "refrigerators" && scopeValue != null
+                                                ? scopeOptions.find((o) => o.id === scopeValue)?.label ?? null
+                                                : null
+                                        }
+                                        otherScopes={scopeOptions
+                                            .filter((o) => o.id !== null && o.id !== scopeValue)
+                                            .map((o) => ({ id: o.id as string, label: o.label }))}
+                                    />
                                 </div>
                             ) : (
                                 <div className="flex-1 min-h-0 flex flex-col">
