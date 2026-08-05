@@ -11,8 +11,12 @@ import {
     onboardingLevels,
     onboardingQuizByLevel,
     onboardingStepsByLevel,
+    pageTourStepsById,
 } from "../onboarding/data";
 import { onboardingService } from "../services/onboardingService";
+
+// The final playable level — completing it finishes the whole onboarding.
+const LAST_LEVEL_ID = onboardingLevels[onboardingLevels.length - 1]?.id;
 
 interface OnboardingContextValue {
     state: OnboardingState;
@@ -102,21 +106,14 @@ type Action =
     | { type: "RESET_QUIZ"; levelId: string }
     | { type: "FAIL_QUIZ"; levelId: string; score: number; totalQuiz: number };
 
-// Sync locked ↔ available for every real level based on two gates:
-//   1. Date gate  — unlockedAt must exist and be in the past
-//   2. Score gate — sum of all highScores must meet level.scoreRequired
-// Both must be true to be available; failing either re-locks the level.
-// Only touches "locked" and "available" states — never demotes in_progress/completed.
-// Mutates `levels` in-place (caller spreads first).
+// Sync locked ↔ available for every real level based on the date gate alone:
+// unlockedAt must exist and be in the past. (No score gate — levels are not
+// score-locked.) Only touches "locked" and "available" states — never demotes
+// in_progress/completed. Mutates `levels` in-place (caller spreads first).
 const applyDateUnlocks = (
     levels: Record<string, OnboardingLevelProgress>,
     now: string,
 ) => {
-    const overallHighScore = Object.values(levels).reduce(
-        (sum, p) => sum + (p.highScore ?? 0),
-        0,
-    );
-
     onboardingLevels.forEach((level) => {
         const prog = levels[level.id];
         if (!prog) return;
@@ -124,9 +121,8 @@ const applyDateUnlocks = (
         if (prog.status === "in_progress" || prog.status === "completed") return;
 
         const dateOk = !!prog.unlockedAt && prog.unlockedAt <= now;
-        const scoreOk = overallHighScore >= (level.scoreRequired ?? 0);
 
-        levels[level.id] = { ...prog, status: (dateOk && scoreOk) ? "available" : "locked" };
+        levels[level.id] = { ...prog, status: dateOk ? "available" : "locked" };
     });
 };
 
@@ -306,16 +302,14 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
                 },
             };
 
-            // Stamp the full unlock schedule when welcome completes.
-            // level[i] unlocks at 00:00 IST on (today + i*2 days).
-            // level-1 (index 0) → daysFromNow=0 → today's midnight IST (already past) → immediately available.
-            // Stored as UTC: e.g. started 25 Apr → level-2 = 26 Apr 18:30 UTC (= 27 Apr 00:00 IST)
+            // When welcome completes, unlock every level immediately (no day-spacing):
+            // stamp today's midnight IST (already past) so the date gate passes at once.
             if (action.levelId === "level-0") {
-                onboardingLevels.forEach((lvl, index) => {
+                onboardingLevels.forEach((lvl) => {
                     if (updatedLevels[lvl.id] && !updatedLevels[lvl.id].unlockedAt) {
                         updatedLevels[lvl.id] = {
                             ...updatedLevels[lvl.id],
-                            unlockedAt: istMidnightUtc(index * 2),
+                            unlockedAt: istMidnightUtc(0),
                         };
                     }
                 });
@@ -470,7 +464,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         levels: onboardingLevels,
         isHydrating,
         getLevelProgress: (levelId) => state.levels[levelId],
-        getSteps: (levelId) => onboardingStepsByLevel[levelId] || [],
+        getSteps: (levelId) => onboardingStepsByLevel[levelId] || pageTourStepsById[levelId] || [],
         getQuiz: (levelId) => onboardingQuizByLevel[levelId] || [],
         startLevel: (levelId) => dispatch({ type: "START_LEVEL", levelId }),
         setStepIndex: (levelId, index) => {
@@ -494,7 +488,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         },
         completeLevel: (levelId, score) => {
             apiSyncNeededRef.current = true;
-            if (levelId === "level-8") {
+            if (levelId === LAST_LEVEL_ID) {
                 onboardingService.completeOnboarding();
                 // Keep auth state in sync so the user isn't redirected back into
                 // onboarding when they leave the flow without a reload.

@@ -421,6 +421,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
                     {/* Branch field — interactive for manager/admin, pre-filled + disabled for user */}
                     <div className="relative w-full" ref={branchDropdownRef}>
                         <div
+                            id="onboarding-track-branch-dropdown"
                             className={`relative w-full border rounded-[10px] px-3 py-2.5 text-sm ${
                                 branchesError ? "border-red-500" : "border-gray-300"
                             } ${
@@ -458,6 +459,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
                     {/* Tank dropdown */}
                     <div className="relative w-full" ref={tankDropdownRef}>
                         <div
+                            id="onboarding-track-tank-dropdown"
                             className={`relative w-full border rounded-[10px] px-3 py-2.5 text-sm ${
                                 !selectedBranchId ? "bg-gray-50 cursor-not-allowed text-gray-300 border-gray-200" :
                                 tanksLoading ? "bg-gray-100 cursor-not-allowed text-gray-400 border-gray-200" :
@@ -506,6 +508,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
                                 style={{ top: branchMenuStyle.top, left: branchMenuStyle.left, width: branchMenuStyle.width, transform: branchMenuStyle.placement === "top" ? "translateY(-100%)" : undefined }}>
                                 {branches.map((option) => (
                                     <div key={option.branch_id}
+                                        id={`onboarding-branch-option-${option.branch_name}`}
                                         className={`px-3 py-1.5 cursor-pointer hover:bg-primary-light hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${selectedBranchId === option.branch_id ? "bg-primary-light text-white" : "text-black"}`}
                                         onClick={() => {
                                             setSelectedBranchName(option.branch_name);
@@ -527,6 +530,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
                                 style={{ top: tankMenuStyle.top, left: tankMenuStyle.left, width: tankMenuStyle.width, transform: tankMenuStyle.placement === "top" ? "translateY(-100%)" : undefined }}>
                                 {tanks.map((tank) => (
                                     <div key={tank.tank_id}
+                                        id={`onboarding-tank-option-${tank.tank_code}`}
                                         className={`px-3 py-1.5 cursor-pointer hover:bg-primary-light hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${canisterId === tank.tank_code ? "bg-primary-light text-white" : "text-black"}`}
                                         onClick={() => {
                                             setCanisterId(tank.tank_code);

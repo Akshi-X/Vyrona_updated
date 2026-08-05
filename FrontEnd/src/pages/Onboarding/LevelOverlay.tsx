@@ -42,7 +42,7 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
     useEffect(() => {
         if (quizResult !== "pass") return;
 
-        const isLastLevel = levelId === "level-8";
+        const isLastLevel = levels.length > 0 && levelId === levels[levels.length - 1].id;
         const colors = ["var(--color-primary)", "#a855f7", "#ffffff", "#f9a8d4", "#fbbf24", "#34d399"];
 
         if (isLastLevel) {
@@ -78,6 +78,7 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
     const [showInterlude, setShowInterlude] = useState(() => quizIndex === 0 && !isCompleted);
 
 const levelConfig = levels.find((level) => level.id === levelId);
+    const isLastLevelId = levels.length > 0 && levelId === levels[levels.length - 1].id;
     const currentQuestion = quiz[quizIndex];
 
     // Notify parent of the current section so the overlay header can update
@@ -254,10 +255,19 @@ const levelConfig = levels.find((level) => level.id === levelId);
 
                 <button
                     type="button"
-                    onClick={() => setShowInterlude(false)}
+                    onClick={() => {
+                        // Quiz temporarily disabled: skip straight to completion. Records
+                        // pointsRequired as the level's score so the completion card reads
+                        // as a full pass (unlocks are date-only, not score-gated).
+                        if (quiz.length === 0) {
+                            completeLevel(levelId, levelConfig?.pointsRequired ?? 0);
+                        } else {
+                            setShowInterlude(false);
+                        }
+                    }}
                     className="inline-flex rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white"
                 >
-                    Start Quiz →
+                    {quiz.length === 0 ? "Finish →" : "Start Quiz →"}
                 </button>
             </div>
         );
@@ -278,7 +288,7 @@ const levelConfig = levels.find((level) => level.id === levelId);
                     )}
                     <div className="space-y-1 min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">
-                            {levelId === "level-8" ? "Onboarding Complete 🎓" : "Level complete"}
+                            {isLastLevelId ? "Onboarding Complete 🎓" : "Level complete"}
                         </p>
                         <h3 className="text-xl font-semibold text-slate-900">
                             {completion?.title ?? levelConfig?.title}
@@ -289,33 +299,35 @@ const levelConfig = levels.find((level) => level.id === levelId);
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
-                    <div className="flex items-end justify-between">
-                        <div>
-                            <p className="text-[11px] text-slate-400 uppercase tracking-[0.2em]">Quiz Score</p>
-                            <p className="mt-0.5 text-3xl font-bold text-slate-900">
-                                {latestScore}
-                                <span className="ml-1 text-base font-normal text-slate-400">/ {maxScore}</span>
-                            </p>
-                            {(progress?.highScore ?? 0) > latestScore && (
-                                <p className="text-[11px] text-slate-400 mt-1">
-                                    Best: <span className="font-semibold text-slate-600">{progress?.highScore} pts</span>
+                {maxScore > 0 && (
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+                        <div className="flex items-end justify-between">
+                            <div>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-[0.2em]">Quiz Score</p>
+                                <p className="mt-0.5 text-3xl font-bold text-slate-900">
+                                    {latestScore}
+                                    <span className="ml-1 text-base font-normal text-slate-400">/ {maxScore}</span>
                                 </p>
-                            )}
+                                {(progress?.highScore ?? 0) > latestScore && (
+                                    <p className="text-[11px] text-slate-400 mt-1">
+                                        Best: <span className="font-semibold text-slate-600">{progress?.highScore} pts</span>
+                                    </p>
+                                )}
+                            </div>
+                            <p className="text-2xl font-bold text-slate-700">{pct}%</p>
                         </div>
-                        <p className="text-2xl font-bold text-slate-700">{pct}%</p>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                            <div
+                                className="h-full rounded-full bg-slate-900 transition-all duration-700"
+                                style={{ width: `${pct}%` }}
+                            />
+                        </div>
+                        <div className="flex justify-between text-[11px] text-slate-400">
+                            <span>Pass threshold: {levelConfig?.pointsRequired} pts</span>
+                            <span className="font-semibold text-green-600">Passed ✓</span>
+                        </div>
                     </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                        <div
-                            className="h-full rounded-full bg-slate-900 transition-all duration-700"
-                            style={{ width: `${pct}%` }}
-                        />
-                    </div>
-                    <div className="flex justify-between text-[11px] text-slate-400">
-                        <span>Pass threshold: {levelConfig?.pointsRequired} pts</span>
-                        <span className="font-semibold text-green-600">Passed ✓</span>
-                    </div>
-                </div>
+                )}
 
                 <div className="flex flex-wrap gap-2">
                     <button
@@ -325,19 +337,21 @@ const levelConfig = levels.find((level) => level.id === levelId);
                     >
                         Retry tour
                     </button>
+                    {maxScore > 0 && (
+                        <button
+                            type="button"
+                            onClick={handleRetryQuiz}
+                            className="inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                        >
+                            Retry quiz
+                        </button>
+                    )}
                     <button
                         type="button"
-                        onClick={handleRetryQuiz}
-                        className="inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-                    >
-                        Retry quiz
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => levelId === "level-8" ? navigate("/dashboard") : onComplete?.()}
+                        onClick={() => isLastLevelId ? navigate("/dashboard") : onComplete?.()}
                         className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
                     >
-                        {levelId === "level-8" ? "Go to Dashboard →" : "Continue →"}
+                        {isLastLevelId ? "Go to Dashboard →" : "Continue →"}
                     </button>
                 </div>
             </div>
