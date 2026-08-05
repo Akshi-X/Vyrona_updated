@@ -172,7 +172,9 @@ def send_email_via_smpt(
                                image_path, exc)
                 continue
             part.add_header('Content-ID', f'<{content_id}>')
-            part.add_header('Content-Disposition', 'inline', filename=Path(image_path).name)
+            # No filename: a named part is what makes Gmail list an inline image in the
+            # attachment strip. These are decorative and referenced from the HTML by cid.
+            part.add_header('Content-Disposition', 'inline')
             msg.attach(part)
         
         # Connect to SMTP server and send email
