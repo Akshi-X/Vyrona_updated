@@ -39,7 +39,6 @@ from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.ivf_geolocation_model import IVFGeolocation
 from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
-from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
 from app.models.IVF.incubator_model import Incubator
 from app.models.IVF.tank_model import Tank
 from app.models.patient_model import Patient
@@ -622,19 +621,14 @@ class QualityService:
                     .first()
                 )
 
-            ln2_device = (
-                self.db.query(Ln2IotDevice)
-                .filter(Ln2IotDevice.tank_id == tank_id)
-                .first()
-            )
-            tank_max_capacity = (
-                float(ln2_device.tank_max_capacity_reading)
-                if ln2_device and ln2_device.tank_max_capacity_reading is not None
+            full_weight_kg = (
+                float(tank.full_weight_kg)
+                if tank and tank.full_weight_kg is not None
                 else None
             )
-            tank_min_capacity = (
-                float(ln2_device.tank_min_capacity_reading)
-                if ln2_device and ln2_device.tank_min_capacity_reading is not None
+            empty_weight_kg = (
+                float(tank.empty_weight_kg)
+                if tank and tank.empty_weight_kg is not None
                 else None
             )
 
@@ -659,8 +653,8 @@ class QualityService:
                 "tank_code": tank_code,
                 "branch_id": tank.branch_id if tank else None,
                 "branch_name": branch.branch_name if branch else None,
-                "tank_max_capacity_reading": tank_max_capacity,
-                "tank_min_capacity_reading": tank_min_capacity,
+                "full_weight_kg": full_weight_kg,
+                "empty_weight_kg": empty_weight_kg,
                 "kpi_limits": kpi_limits,
             }
         except Exception as e:
@@ -671,8 +665,8 @@ class QualityService:
                 "tank_code": tank_code,
                 "branch_id": None,
                 "branch_name": None,
-                "tank_max_capacity_reading": None,
-                "tank_min_capacity_reading": None,
+                "full_weight_kg": None,
+                "empty_weight_kg": None,
                 "kpi_limits": {},
             }
 
@@ -704,6 +698,8 @@ class QualityService:
                     if r.cooldown_minutes is not None
                     else 60,
                     "unack_escalation_threshold": r.unack_escalation_threshold,
+                    "whatsapp_alert": bool(r.whatsapp_alert),
+                    "email_alert": bool(r.email_alert),
                     "status": bool(r.status),
                 }
                 for r in rows
@@ -730,6 +726,8 @@ class QualityService:
         alert_type: Optional[str] = None,
         cooldown_minutes: Optional[int] = None,
         unack_escalation_threshold: Optional[int] = None,
+        whatsapp_alert: bool = False,
+        email_alert: bool = False,
         status: bool = True,
     ) -> KpiConfig:
         """Create a KpiConfig row for a tank, incubator, or refrigerator."""
@@ -751,6 +749,8 @@ class QualityService:
             alert_type=alert_type.strip() if alert_type else None,
             cooldown_minutes=cooldown_minutes if cooldown_minutes is not None else 60,
             unack_escalation_threshold=unack_escalation_threshold,
+            whatsapp_alert=bool(whatsapp_alert),
+            email_alert=bool(email_alert),
             status=status,
         )
         self.db.add(row)
@@ -769,6 +769,8 @@ class QualityService:
         alert_type: Optional[str] = None,
         cooldown_minutes: Optional[int] = None,
         unack_escalation_threshold: Optional[int] = None,
+        whatsapp_alert: Optional[bool] = None,
+        email_alert: Optional[bool] = None,
         status: Optional[bool] = None,
     ) -> Optional[KpiConfig]:
         """Update a KpiConfig row. Validates config's tank belongs to branch when branch_id provided."""
@@ -798,6 +800,10 @@ class QualityService:
             if isinstance(unack_escalation_threshold, (int, float))
             else None
         )
+        if whatsapp_alert is not None:
+            row.whatsapp_alert = bool(whatsapp_alert)
+        if email_alert is not None:
+            row.email_alert = bool(email_alert)
         if status is not None:
             row.status = status
         self.db.flush()
@@ -888,6 +894,8 @@ class QualityService:
                         escalation_threshold = int(escalation_threshold)
                     except (TypeError, ValueError):
                         escalation_threshold = None
+                whatsapp_alert_val = bool(cfg.get("whatsapp_alert", False))
+                email_alert_val = bool(cfg.get("email_alert", False))
                 query = self.db.query(KpiConfig).filter(
                     KpiConfig.tank_id == tank_id,
                     KpiConfig.kpi_name == kpi_name,
@@ -907,6 +915,8 @@ class QualityService:
                     if cooldown_val is not None:
                         existing.cooldown_minutes = cooldown_val
                     existing.unack_escalation_threshold = escalation_threshold
+                    existing.whatsapp_alert = whatsapp_alert_val
+                    existing.email_alert = email_alert_val
                     self.db.flush()
                     updated += 1
                 else:
@@ -924,6 +934,8 @@ class QualityService:
                         if cooldown_val is not None
                         else 60,
                         unack_escalation_threshold=escalation_threshold,
+                        whatsapp_alert=whatsapp_alert_val,
+                        email_alert=email_alert_val,
                         status=bool(status_val),
                     )
                     self.db.add(row)
@@ -977,6 +989,8 @@ class QualityService:
                 escalation_threshold = int(escalation_threshold) if escalation_threshold is not None else None
             except (TypeError, ValueError):
                 escalation_threshold = None
+            whatsapp_alert_val = bool(cfg.get("whatsapp_alert", False))
+            email_alert_val = bool(cfg.get("email_alert", False))
 
             query = self.db.query(KpiConfig).filter(
                 KpiConfig.incubator_id == incubator_id,
@@ -1002,6 +1016,8 @@ class QualityService:
                 if cooldown_val is not None:
                     existing.cooldown_minutes = cooldown_val
                 existing.unack_escalation_threshold = escalation_threshold
+                existing.whatsapp_alert = whatsapp_alert_val
+                existing.email_alert = email_alert_val
                 self.db.flush()
                 updated += 1
             else:
@@ -1019,6 +1035,8 @@ class QualityService:
                     alert_type=alert_type_val,
                     cooldown_minutes=cooldown_val if cooldown_val is not None else 60,
                     unack_escalation_threshold=escalation_threshold,
+                    whatsapp_alert=whatsapp_alert_val,
+                    email_alert=email_alert_val,
                     status=bool(status_val),
                 )
                 self.db.add(row)
@@ -1073,6 +1091,8 @@ class QualityService:
                 escalation_threshold = int(escalation_threshold) if escalation_threshold is not None else None
             except (TypeError, ValueError):
                 escalation_threshold = None
+            whatsapp_alert_val = bool(cfg.get("whatsapp_alert", False))
+            email_alert_val = bool(cfg.get("email_alert", False))
 
             query = self.db.query(KpiConfig).filter(
                 KpiConfig.refrigerator_id == refrigerator_id,
@@ -1098,6 +1118,8 @@ class QualityService:
                 if cooldown_val is not None:
                     existing.cooldown_minutes = cooldown_val
                 existing.unack_escalation_threshold = escalation_threshold
+                existing.whatsapp_alert = whatsapp_alert_val
+                existing.email_alert = email_alert_val
                 if zone_name is not None:
                     existing.zone_name = zone_name
                 self.db.flush()
@@ -1120,6 +1142,8 @@ class QualityService:
                     alert_type=alert_type_val,
                     cooldown_minutes=cooldown_val if cooldown_val is not None else 60,
                     unack_escalation_threshold=escalation_threshold,
+                    whatsapp_alert=whatsapp_alert_val,
+                    email_alert=email_alert_val,
                     status=bool(status_val),
                 )
                 self.db.add(row)
@@ -1828,21 +1852,27 @@ class QualityService:
         config_ids = [r.id for r in config_q.all()]
         if not config_ids:
             return None
-        row_number = (
-            func.row_number()
-            .over(partition_by=Readings.kpi_config_id, order_by=Readings.timestamp.desc())
-            .label("rn")
-        )
-        base_q = db.query(Readings.id, row_number).filter(Readings.kpi_config_id.in_(config_ids))
-        subquery = base_q.subquery()
-        valid_ids = db.query(subquery.c.id).filter(subquery.c.rn <= n).subquery()
-        results = (
-            db.query(Readings.kpi_config_id, Readings.kpi_value, Readings.timestamp, KpiConfig.kpi_name, KpiConfig.unit)
-            .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
-            .filter(Readings.id.in_(valid_ids))
-            .order_by(Readings.kpi_config_id, Readings.timestamp.desc())
-            .all()
-        )
+        # A row_number() window over every reading for these configs, fed into an
+        # `id IN (...)` filter, made Postgres hash-join the id list against a full
+        # scan of all 62M+ rows in the readings hypertable (~37s). A LATERAL join
+        # walks idx_readings_kpi_config_timestamp backwards and stops after n rows
+        # per config instead — two 50-row index scans, sub-millisecond.
+        results = db.execute(
+            text("""
+                SELECT r.kpi_config_id, r.kpi_value, r.timestamp, k.kpi_name, k.unit
+                FROM kpi_config k
+                JOIN LATERAL (
+                    SELECT r2.kpi_config_id, r2.kpi_value, r2.timestamp
+                    FROM readings r2
+                    WHERE r2.kpi_config_id = k.id
+                    ORDER BY r2.timestamp DESC
+                    LIMIT :n
+                ) r ON TRUE
+                WHERE k.id = ANY(:config_ids)
+                ORDER BY r.kpi_config_id, r.timestamp DESC
+            """),
+            {"config_ids": config_ids, "n": n},
+        ).fetchall()
         if not results:
             return None
         kpis = defaultdict(list)

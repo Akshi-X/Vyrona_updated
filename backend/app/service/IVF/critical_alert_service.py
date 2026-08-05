@@ -4,6 +4,7 @@ Handles business logic for critical alerts including detection, creation, and em
 """
 
 import logging
+import math
 import threading
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -38,6 +39,7 @@ from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.incubator_model import Incubator
 from ...models.IVF.refrigerator_model import Refrigerator
+from ...models.push_subscription_model import PushSubscription
 from ...models.user_model import User
 from ...schemas.IVF.critical_alert_schema import (
     AcknowledgeAlertResponse,
@@ -50,6 +52,10 @@ from ...schemas.IVF.critical_alert_schema import (
     TankAlertsResponse,
 )
 from ...service.email_service import send_email
+from ...service.push_notification_service import (
+    push_notifications_configured,
+    send_web_push,
+)
 from ...service.redis_service import get_redis
 from ...service.activity_log_service import (
     ActivityLogService,
@@ -85,10 +91,101 @@ _ADVISORY_LOCK_NS_KPI = 4711
 # Cross-process guard so a given alert is emailed to a given recipient only once.
 _EMAIL_DEDUP_TTL_SECONDS = 21600  # 6 hours
 
+# WhatsApp throttle, independent of kpi_config.cooldown_minutes and email.
+# Redis holds, per kpi_config + role group ("user" = role User, "admin" =
+# Manager/Admin), the reading timestamp of the last WhatsApp actually delivered to
+# that group. Windows compare reading (device) timestamps, not wall clock. A newer
+# deviation=False reading means the KPI recovered — fresh episode, that group is
+# notified again regardless of its window. Fail-open when Redis is unreachable.
+_WA_USER_COOLDOWN_SECONDS = 60 * 60
+_WA_ADMIN_COOLDOWN_SECONDS = 2 * 60 * 60
+_wa_last_sent_key = lambda kpi_config_id, group: f"alert:whatsapp:last_sent:{kpi_config_id}:{group}"
+
 # WhatsApp Content Template SIDs
 _WA_TEMPLATE_DEVIATION = "HX890c0696439223c8f7b952d35360ea25"   # "{{1}} is deviated to {{2}} in {{3}} branch for {{4}} tank"
 _WA_TEMPLATE_LID_STATE = "HXb0f2ec1db58e9f6ac5be31473a6a6cf7"   # "{{1}} is {{2}} in {{3}} branch for {{4}} tank"
 _WA_TEMPLATE_LN2_LEVEL = "HXcb6b9aeb47949e7b1c45efbfe7900eed"   # "{{1}} crossed L2 in {{2}} branch for {{3}} tank"
+
+# Alert-email artwork. Embedded as inline CID attachments rather than linked, so the
+# images render without a publicly reachable host and without the recipient having to
+# allow external images. Paths resolve against the frontend's public/ directory.
+# Inside the backend tree so the assets ship with the backend image; the frontend's
+# public/ directory is not present in a backend-only deployment.
+_EMAIL_ASSET_DIR = Path(__file__).resolve().parents[2] / "assets" / "email"
+_EMAIL_BANNER_PATH = "/banner-hex.png"
+
+_EMAIL_INLINE_ASSETS = {
+    "mg_logo": "mygrape-logo.png",
+    "mg_tank": "cryocan_alert.png",
+    "mg_pin": "email-icons/pin.png",
+    "mg_tankicon": "email-icons/tank.png",
+    "mg_clock": "email-icons/clock.png",
+    "mg_bars": "email-icons/bars.png",
+    "mg_pulse": "email-icons/pulse.png",
+    "mg_clockg": "email-icons/clock_g.png",
+}
+
+
+# Per-KPI icon for the reading callout, mirroring the icons on the AlertSetting cards
+# (CryoBentoGrid / DeviceKpiGrid). Only the matching one is attached, under a fixed
+# content-id, so the template does not need to know which KPI it is rendering.
+_KPI_ICON_FILES = {
+    "temp_internal": "kpi_thermometer.png",
+    "temp_external": "kpi_thermometer_sun.png",
+    "incubator_temp": "kpi_thermometer.png",
+    "incubator_o2": "kpi_wind.png",
+    "incubator_co2": "kpi_cloud_fog.png",
+    "incubator_humidity": "kpi_cloud_rain.png",
+    "refrigerator_temp": "kpi_thermometer.png",
+    "refrigerator_humidity": "kpi_cloud_rain.png",
+    "humidity": "kpi_cloud_rain.png",
+    "incubator_ph": "kpi_flask.png",
+    "incubator_voc": "kpi_gauge.png",
+    "tive_battery_percentage": "kpi_battery.png",
+    "shock": "kpi_zap.png",
+    "ln2_level": "kpi_droplet.png",
+    "ln2_evaporation_rate": "kpi_waves.png",
+    "ln2_lid_state": "kpi_door.png",
+    "incubator_lid_state": "kpi_door.png",
+}
+_KPI_ICON_DEFAULT = "kpi_thermometer.png"
+_KPI_ICON_CID = "mg_kpi"
+
+# send_immediate_alert_email labels violations with its own type strings; map them onto
+# the kpi_name keys _KPI_ICON_FILES understands so the callout icon matches the violation.
+_IMMEDIATE_VIOLATION_ICON_KPI = {
+    "temp_internal": "temp_internal",
+    "temp_external": "temp_external",
+    "shock": "shock",
+    "ln2_evaporation": "ln2_evaporation_rate",
+    "ln2_lid_open": "ln2_lid_state",
+}
+
+
+def _inline_alert_images(
+    kpi_name: Optional[str] = None, include_tank: bool = True
+) -> dict:
+    """{content_id: absolute path} for every asset the alert templates reference.
+
+    include_tank drops the cryotank artwork (the heaviest asset) for incubator and
+    refrigerator alerts, where a picture of a tank would be misleading."""
+    assets = dict(_EMAIL_INLINE_ASSETS)
+    if not include_tank:
+        assets.pop("mg_tank", None)
+    assets[_KPI_ICON_CID] = "email-icons/" + _KPI_ICON_FILES.get(
+        kpi_name or "", _KPI_ICON_DEFAULT
+    )
+    return {
+        cid: str(_EMAIL_ASSET_DIR / rel)
+        for cid, rel in assets.items()
+        if (_EMAIL_ASSET_DIR / rel).is_file()
+    }
+
+# Lid-state gate. A lid open for a routine retrieval must not page anyone, so the
+# first alert waits until the lid has been continuously open this long. Kept separate
+# from kpi_config.cooldown_minutes, which governs only how often the alert repeats
+# afterwards — one field cannot carry both meanings independently.
+_LID_OPEN_TOLERANCE_SECONDS = 5 * 60
 
 _LID_STATE_KPI_NAMES = {"ln2_lid_state", "incubator_lid_state"}
 _LN2_LEVEL_KPI_NAMES = {"ln2_level"}
@@ -334,23 +431,136 @@ class CriticalAlertService:
 
         return branch.hospital_id, branch.branch_id
 
-    def _get_hospital_notification_config(
-        self, hospital_id: Optional[int]
-    ) -> tuple[bool, bool]:
-        """Return hospital notification config as (email_enabled, whatsapp_enabled)."""
-        if hospital_id is None:
-            return False, False
+    def _tank_has_email_alert_enabled(self, tank_id: int) -> bool:
+        """True when any active KPI config for the tank has per-KPI email alerts on."""
+        return (
+            self.db.query(KpiConfig.id)
+            .filter(
+                KpiConfig.tank_id == tank_id,
+                KpiConfig.status == True,
+                KpiConfig.email_alert == True,
+            )
+            .first()
+            is not None
+        )
 
-        config = (
-            self.db.query(Hospital.is_email_notifify, Hospital.is_whatsapp_notify)
-            .filter(Hospital.hospital_id == hospital_id)
+    def _episode_start(self, kpi_config_id: int, *device_filters) -> Optional[datetime]:
+        """Timestamp of the first deviating reading in the current unbroken episode.
+
+        Anchored to the most recent clearing reading, so a recovery ends the episode
+        and the next deviation starts a fresh one. device_filters scope the lookup to
+        one device (tank, or refrigerator + zone). Returns None when no deviating
+        reading exists."""
+        last_clear = (
+            self.db.query(Readings)
+            .filter(
+                *device_filters,
+                Readings.kpi_config_id == kpi_config_id,
+                Readings.deviation == False,
+            )
+            .order_by(Readings.timestamp.desc())
             .first()
         )
-        if not config:
-            return False, False
 
-        email_enabled, whatsapp_enabled = config
-        return bool(email_enabled), bool(whatsapp_enabled)
+        query = self.db.query(Readings).filter(
+            *device_filters,
+            Readings.kpi_config_id == kpi_config_id,
+            Readings.deviation == True,
+        )
+        if last_clear:
+            query = query.filter(Readings.timestamp >= last_clear.timestamp)
+
+        first_deviation = query.order_by(Readings.timestamp.asc()).first()
+        if not first_deviation or not first_deviation.timestamp:
+            return None
+
+        start_time = first_deviation.timestamp
+        return start_time if start_time.tzinfo else start_time.replace(tzinfo=timezone.utc)
+
+    def _format_ist_clock(self, moment: datetime) -> str:
+        """Render a UTC moment as an IST wall-clock time, e.g. '9:00AM'."""
+        aware = moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+        ist = timezone(timedelta(hours=5, minutes=30))
+        return aware.astimezone(ist).strftime("%I:%M %p").lstrip("0")
+
+    def _format_ist_date(self, moment: datetime) -> str:
+        """Render a UTC moment as an IST calendar date, e.g. '03 Aug 2026'. Derived from
+        the IST-shifted moment so a late-evening UTC timestamp reports the next day."""
+        aware = moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+        ist = timezone(timedelta(hours=5, minutes=30))
+        return aware.astimezone(ist).strftime("%d %b %Y")
+
+    def _ln2_usable_span(self, tank_id: Optional[int]) -> Optional[float]:
+        """Usable LN2 range in kg, used to express ln2_level as a percentage.
+
+        The tank's own full/empty weights are the source of truth; the IoT device
+        thresholds are only a fallback for tanks whose weights were never recorded.
+        Note the track-shipment UI divides by the device thresholds instead, so the
+        two can differ where both are populated."""
+        if tank_id is None:
+            return None
+
+        tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        if tank and tank.full_weight_kg is not None and tank.empty_weight_kg is not None:
+            span = float(tank.full_weight_kg) - float(tank.empty_weight_kg)
+            if span > 0:
+                return span
+
+        # Raw SQL rather than the ORM model: Ln2IotDevice declares a relationship that
+        # does not resolve unless the whole model graph is imported, and importing it
+        # here would break this module at load time.
+        device = self.db.execute(
+            text("""SELECT tank_max_capacity_reading, tank_min_capacity_reading
+                    FROM ln2_iot_devices WHERE tank_id = :tank_id LIMIT 1"""),
+            {"tank_id": tank_id},
+        ).first()
+        if device and device[0] is not None and device[1] is not None:
+            span = float(device[0]) - float(device[1])
+            if span > 0:
+                return span
+        return None
+
+    def _format_kpi_value(
+        self, kpi_config, value: Optional[float], tank_id: Optional[int] = None
+    ) -> str:
+        """Render a reading for display, e.g. '-150.2°C'. Lid-state KPIs carry a boolean
+        in kpi_value, so they render as OPEN/CLOSED rather than 1/0."""
+        if value is None:
+            return ""
+        if kpi_config is not None and kpi_config.kpi_name in _LID_STATE_KPI_NAMES:
+            return "OPEN" if value == 1 else "CLOSED"
+
+        # ln2_level is stored in kg; recipients think in percent, matching the UI.
+        if kpi_config is not None and kpi_config.kpi_name in _LN2_LEVEL_KPI_NAMES:
+            span = self._ln2_usable_span(tank_id)
+            if span:
+                return f"{math.floor(float(value) / span * 100)}%"
+
+        unit = (kpi_config.unit or "") if kpi_config is not None else ""
+        return f"{round(value, 2)}{unit}"
+
+    def _format_duration(self, seconds: float) -> str:
+        """Render an elapsed span as '2HR', '45MIN' or '2HR 15MIN'."""
+        total_minutes = max(0, int(seconds // 60))
+        hours, minutes = divmod(total_minutes, 60)
+        if hours and minutes:
+            return f"{hours}h {minutes}m"
+        if hours:
+            return f"{hours}h"
+        return f"{minutes}m"
+
+    def _hospital_push_configured(self, hospital_id: Optional[int]) -> bool:
+        """Push stays a hospital-wide toggle (unlike email/whatsapp, which are
+        per-KPI-config) — see Hospital.is_push_notify."""
+        if hospital_id is None:
+            return False
+
+        push_enabled = (
+            self.db.query(Hospital.is_push_notify)
+            .filter(Hospital.hospital_id == hospital_id)
+            .scalar()
+        )
+        return bool(push_enabled)
 
     def _generate_dedup_key(
         self,
@@ -555,6 +765,10 @@ class CriticalAlertService:
                 )
                 return []
 
+        # Oldest first: only one alert is raised per kpi_config per run, so the row that
+        # arrives first sets occurred_at. Without an explicit order Postgres returns heap
+        # order, which shifts whenever a row is updated, and the alert lands on an
+        # arbitrary reading instead of the one that started the excursion.
         deviations = (
             self.db.query(Readings)
             .filter(
@@ -562,6 +776,7 @@ class CriticalAlertService:
                 Readings.deviation == True,
                 or_(Readings.checked.is_(None), Readings.checked == False),
             )
+            .order_by(Readings.timestamp.asc())
             .all()
         )
 
@@ -598,63 +813,51 @@ class CriticalAlertService:
                 if kpi_config.cooldown_minutes is not None
                 else 3600
             )
-            if kpi_config.kpi_name == "ln2_lid_state":
-                last_clear = (
-                    self.db.query(Readings)
+            episode_start = self._episode_start(kpi_config.id, Readings.tank_id == tank_id)
+
+            if kpi_config.kpi_name in _LID_STATE_KPI_NAMES and episode_start is not None:
+                # Continuity is the span of the actual deviating readings — first open
+                # reading to the latest one in this unbroken episode — not now-vs-start.
+                # A single stale reading (device went silent after one "open") spans 0s
+                # and must not page; only readings that genuinely persist open for the
+                # tolerance window do.
+                latest_deviation_ts = (
+                    self.db.query(func.max(Readings.timestamp))
                     .filter(
                         Readings.tank_id == tank_id,
                         Readings.kpi_config_id == kpi_config.id,
-                        Readings.deviation == False,
+                        Readings.deviation == True,
+                        Readings.timestamp >= episode_start,
                     )
-                    .order_by(Readings.timestamp.desc())
-                    .first()
+                    .scalar()
                 )
-                if last_clear:
-                    first_deviation = (
-                        self.db.query(Readings)
-                        .filter(
-                            Readings.tank_id == tank_id,
-                            Readings.kpi_config_id == kpi_config.id,
-                            Readings.deviation == True,
-                            Readings.timestamp >= last_clear.timestamp,
-                        )
-                        .order_by(Readings.timestamp.asc())
-                        .first()
-                    )
-                else:
-                    first_deviation = (
-                        self.db.query(Readings)
-                        .filter(
-                            Readings.tank_id == tank_id,
-                            Readings.kpi_config_id == kpi_config.id,
-                            Readings.deviation == True,
-                        )
-                        .order_by(Readings.timestamp.asc())
-                        .first()
-                    )
-                if first_deviation and first_deviation.timestamp:
-                    start_time = first_deviation.timestamp
-                    if not start_time.tzinfo:
-                        start_time = start_time.replace(tzinfo=timezone.utc)
-                    continuity_seconds = (now - start_time).total_seconds()
+                if latest_deviation_ts is not None and latest_deviation_ts.tzinfo is None:
+                    latest_deviation_ts = latest_deviation_ts.replace(tzinfo=timezone.utc)
+                continuity_seconds = (
+                    (latest_deviation_ts - episode_start).total_seconds()
+                    if latest_deviation_ts is not None
+                    else 0.0
+                )
+                logger.info(
+                    "%s continuity for kpi_config_id=%s: start_time=%s latest_reading=%s duration=%.0fs tolerance=%.0fs",
+                    kpi_config.kpi_name,
+                    kpi_config.id,
+                    episode_start,
+                    latest_deviation_ts,
+                    continuity_seconds,
+                    _LID_OPEN_TOLERANCE_SECONDS,
+                )
+                if continuity_seconds < _LID_OPEN_TOLERANCE_SECONDS:
                     logger.info(
-                        "ln2_lid_state continuity for kpi_config_id=%s: start_time=%s now=%s duration=%.0fs cooldown=%.0fs",
+                        "Skipping %s alert for kpi_config_id=%s; continuous deviation %.0fs below tolerance %.0fs",
+                        kpi_config.kpi_name,
                         kpi_config.id,
-                        start_time,
-                        now,
                         continuity_seconds,
-                        cooldown_seconds,
+                        _LID_OPEN_TOLERANCE_SECONDS,
                     )
-                    if continuity_seconds < cooldown_seconds:
-                        logger.info(
-                            "Skipping ln2_lid_state alert for kpi_config_id=%s; continuous deviation %.0fs below cooldown %.0fs",
-                            kpi_config.id,
-                            continuity_seconds,
-                            cooldown_seconds,
-                        )
-                        deviation.checked = True
-                        checked_kpi_configs.append(kpi_config.id)
-                        continue
+                    deviation.checked = True
+                    checked_kpi_configs.append(kpi_config.id)
+                    continue
 
             ## Check if last alert created for this config is not acknowledged and occurred within last 1 hour,
             # if yes skip creating new alert to avoid alert spam.
@@ -718,6 +921,45 @@ class CriticalAlertService:
                         checked_kpi_configs.append(kpi_config.id)
                         continue
 
+            # An alert already raised within the current episode means the condition never
+            # cleared, so recipients get the continuation notice citing when it started
+            # rather than a fresh "new alert". Status is deliberately not filtered — the
+            # device condition is still live even if someone acknowledged an earlier alert.
+            first_episode_alert = None
+            if episode_start is not None:
+                first_episode_alert = (
+                    self.db.query(CriticalAlert)
+                    .filter(
+                        CriticalAlert.tank_id == tank_id,
+                        CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                        or_(
+                            CriticalAlert.dedup_key.like(dedup_prefix),
+                            CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                        ),
+                        CriticalAlert.created_at >= episode_start,
+                    )
+                    .order_by(CriticalAlert.created_at.asc())
+                    .first()
+                )
+            episode_first_alert_at = (
+                first_episode_alert.created_at if first_episode_alert else None
+            )
+
+            # Readings.alert_id is stamped when an alert is raised, so this recovers the
+            # exact measurement the first alert of the episode fired on.
+            episode_first_value = None
+            if first_episode_alert is not None:
+                first_reading = (
+                    self.db.query(Readings)
+                    .filter(Readings.alert_id == first_episode_alert.alert_id)
+                    .order_by(Readings.timestamp.asc())
+                    .first()
+                )
+                if first_reading is not None:
+                    episode_first_value = self._format_kpi_value(
+                        kpi_config, first_reading.kpi_value, tank_id=tank_id
+                    )
+
             tank_code = (
                 self.db.query(Tank.tank_code).filter(Tank.tank_id == tank_id).scalar()
             )
@@ -755,35 +997,57 @@ class CriticalAlertService:
             )  # Set branch_id on alert for better filtering and notification targeting
             alert.tank_id = tank_id  # Set tank_id on alert for better filtering and notification targeting
 
-            # Notify only when a new alert row was actually created. When a concurrent
-            # run already created this alert, _create_alert returns the existing row with
-            # created=False and we must not re-send (root cause of duplicate emails).
-            # Fetch both notification flags in a single DB query.
-            if created and kpi_config.alert_type == "critical":
-                (
-                    is_hospital_email_configured,
-                    is_hospital_whatsapp_configured,
-                ) = self._get_hospital_notification_config(alert.hospital_id)
-                if is_hospital_email_configured:
-                    if kpi_config.unack_escalation_threshold is not None:
-                        # Escalation mode: initial alert goes to branch users only.
-                        # Admins/Managers are notified when unack_escalation_threshold is reached.
-                        self._send_alert_email_to_users_only(alert)
-                    else:
-                        # Original behavior: Managers + Admins + branch Users all notified.
-                        self._send_alert_email(alert)
-                else:
-                    logger.info(
-                        "Skipping email for alert_id=%s because hospital_id=%s has email notifications disabled",
-                        alert.alert_id,
-                        alert.hospital_id,
+            # Per-KPI notification channels (kpi_config.email_alert / whatsapp_alert).
+            if kpi_config.email_alert:
+                if kpi_config.unack_escalation_threshold is not None:
+                    # Escalation mode: initial alert goes to branch users only.
+                    # Admins/Managers are notified when unack_escalation_threshold is reached.
+                    self._send_alert_email_to_users_only(
+                        alert,
+                        alert_name=kpi_config.alert_name,
+                        kpi_name=kpi_config.kpi_name,
+                        first_alert_at=episode_first_alert_at,
+                        first_alert_value=episode_first_value,
+                        current_value=self._format_kpi_value(
+                            kpi_config, deviation.kpi_value, tank_id=tank_id
+                        ),
                     )
-                logger.info(f"WHATSAPPAlert created for {is_hospital_whatsapp_configured} tank_id={tank_id} kpi_config_id={kpi_config.id}")
-                if is_hospital_whatsapp_configured:
-                    self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+                else:
+                    # Original behavior: Managers + Admins + branch Users all notified.
+                    self._send_alert_email(
+                        alert,
+                        alert_name=kpi_config.alert_name,
+                        kpi_name=kpi_config.kpi_name,
+                        first_alert_at=episode_first_alert_at,
+                        first_alert_value=episode_first_value,
+                        current_value=self._format_kpi_value(
+                            kpi_config, deviation.kpi_value, tank_id=tank_id
+                        ),
+                    )
+            else:
+                logger.info(
+                    "Skipping email for alert_id=%s because kpi_config_id=%s has email_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+            if kpi_config.whatsapp_alert:
+                self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+            else:
+                logger.info(
+                    "Skipping WhatsApp for alert_id=%s because kpi_config_id=%s has whatsapp_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+
+            # Push stays hospital-wide (Hospital.is_push_notify) and gated on `created` —
+            # unlike email/whatsapp above it has no cooldown-driven re-notify design of its
+            # own, only a per-alert-id Redis dedup guard for concurrent-worker safety.
+            if created:
+                if self._hospital_push_configured(alert.hospital_id):
+                    self._send_alert_push(alert)
                 else:
                     logger.info(
-                        "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
+                        "Skipping push for alert_id=%s because hospital_id=%s has push notifications disabled",
                         alert.alert_id,
                         alert.hospital_id,
                     )
@@ -875,8 +1139,10 @@ class CriticalAlertService:
         occurred_at: datetime,
         triggered_by: AlertTriggeredBy = AlertTriggeredBy.SYSTEM,
         extra_info: Optional[str] = None,
-    ) -> CriticalAlert:
-        """Create a new refrigerator alert if it doesn't already exist (using dedup_key)."""
+    ) -> tuple[CriticalAlert, bool]:
+        """Create a new refrigerator alert if it doesn't already exist (using dedup_key).
+        Returns (alert, created) — created=False means an existing ACTIVE row was
+        reused, so callers must not re-send notifications for it."""
         hospital_id, branch_id = self._get_refrigerator_hospital_branch(refrigerator_id)
 
         zone_part = zone_id or "all"
@@ -894,7 +1160,7 @@ class CriticalAlertService:
         if existing_alert:
             existing_alert.occurred_at = occurred_at
             existing_alert.updated_at = datetime.now(timezone.utc)
-            return existing_alert
+            return existing_alert, False
 
         refrigerator = self.db.query(Refrigerator).filter(
             Refrigerator.refrigerator_id == refrigerator_id
@@ -936,7 +1202,7 @@ class CriticalAlertService:
                     "branch_id": branch_id,
                 },
             )
-            return alert
+            return alert, True
         except IntegrityError as e:
             if isinstance(e.orig, UniqueViolation) and "dedup_key" in str(e.orig):
                 logger.info(
@@ -955,7 +1221,7 @@ class CriticalAlertService:
                     existing_alert.occurred_at = occurred_at
                     existing_alert.updated_at = datetime.now(timezone.utc)
                     self.db.flush()
-                    return existing_alert
+                    return existing_alert, False
             raise
 
     def check_and_create_alert_for_refrigerator_kpi_deviations(
@@ -1045,6 +1311,46 @@ class CriticalAlertService:
                         checked_kpi_configs.append(kpi_config.id)
                         continue
 
+            # Episode tracking, mirroring the tank path: an alert already raised since
+            # the last clearing reading means the condition never recovered, so
+            # recipients get the continuation notice instead of a fresh alert.
+            device_filters = [Readings.refrigerator_id == refrigerator_id]
+            if zone_id is not None:
+                device_filters.append(Readings.zone_id == zone_id)
+            episode_start = self._episode_start(kpi_config.id, *device_filters)
+
+            first_episode_alert = None
+            if episode_start is not None:
+                first_episode_alert = (
+                    self.db.query(CriticalAlert)
+                    .filter(
+                        CriticalAlert.refrigerator_id == refrigerator_id,
+                        CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                        or_(
+                            CriticalAlert.dedup_key.like(dedup_prefix),
+                            CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                        ),
+                        CriticalAlert.created_at >= episode_start,
+                    )
+                    .order_by(CriticalAlert.created_at.asc())
+                    .first()
+                )
+            episode_first_alert_at = (
+                first_episode_alert.created_at if first_episode_alert else None
+            )
+            episode_first_value = None
+            if first_episode_alert is not None:
+                first_reading = (
+                    self.db.query(Readings)
+                    .filter(Readings.alert_id == first_episode_alert.alert_id)
+                    .order_by(Readings.timestamp.asc())
+                    .first()
+                )
+                if first_reading is not None:
+                    episode_first_value = self._format_kpi_value(
+                        kpi_config, first_reading.kpi_value
+                    )
+
             branch_name = (
                 self.db.query(HospitalBranch.branch_name)
                 .filter(HospitalBranch.branch_id == deviation.branch_id)
@@ -1061,7 +1367,7 @@ class CriticalAlertService:
                 + (f" zone {zone_id}" if zone_id else "")
             )
 
-            alert = self._create_refrigerator_alert(
+            alert, created = self._create_refrigerator_alert(
                 refrigerator_id=refrigerator_id,
                 zone_id=zone_id,
                 alert_type=AlertType.DEVIATION_ALERT,
@@ -1073,32 +1379,54 @@ class CriticalAlertService:
                 extra_info=str(kpi_config.id),
             )
 
-            if kpi_config.alert_type == "critical":
-                (
-                    is_hospital_email_configured,
-                    is_hospital_whatsapp_configured,
-                ) = self._get_hospital_notification_config(alert.hospital_id)
-                if is_hospital_email_configured:
-                    if kpi_config.unack_escalation_threshold is not None:
-                        self._send_alert_email_to_users_only(alert)
-                    else:
-                        self._send_alert_email(alert)
-                else:
-                    logger.info(
-                        "Skipping email for alert_id=%s because hospital_id=%s has email notifications disabled",
-                        alert.alert_id,
-                        alert.hospital_id,
+            if kpi_config.email_alert:
+                if kpi_config.unack_escalation_threshold is not None:
+                    self._send_alert_email_to_users_only(
+                        alert,
+                        alert_name=kpi_config.alert_name,
+                        kpi_name=kpi_config.kpi_name,
+                        first_alert_at=episode_first_alert_at,
+                        first_alert_value=episode_first_value,
+                        current_value=self._format_kpi_value(kpi_config, deviation.kpi_value),
                     )
-                if is_hospital_whatsapp_configured:
-                    self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+                else:
+                    self._send_alert_email(
+                        alert,
+                        alert_name=kpi_config.alert_name,
+                        kpi_name=kpi_config.kpi_name,
+                        first_alert_at=episode_first_alert_at,
+                        first_alert_value=episode_first_value,
+                        current_value=self._format_kpi_value(kpi_config, deviation.kpi_value),
+                    )
+            else:
+                logger.info(
+                    "Skipping email for alert_id=%s because kpi_config_id=%s has email_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+            if kpi_config.whatsapp_alert:
+                self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+            else:
+                logger.info(
+                    "Skipping WhatsApp for alert_id=%s because kpi_config_id=%s has whatsapp_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+
+            # Push stays hospital-wide (Hospital.is_push_notify) and gated on `created` —
+            # mirrors the tank path; unlike email/whatsapp it has no cooldown-driven
+            # re-notify design of its own, only a per-alert-id Redis dedup guard.
+            if created:
+                if self._hospital_push_configured(alert.hospital_id):
+                    self._send_alert_push(alert)
                 else:
                     logger.info(
-                        "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
+                        "Skipping push for alert_id=%s because hospital_id=%s has push notifications disabled",
                         alert.alert_id,
                         alert.hospital_id,
                     )
 
-            if kpi_config.unack_escalation_threshold is not None:
+            if created and kpi_config.unack_escalation_threshold is not None:
                 if self._check_refrigerator_escalation_needed(kpi_config, refrigerator_id, zone_id):
                     unack_alerts = (
                         self.db.query(CriticalAlert)
@@ -1391,6 +1719,7 @@ class CriticalAlertService:
                 # Create new database session for background thread
                 bg_db = SessionLocal()
                 try:
+                    bg_service = CriticalAlertService(bg_db)
                     for alert in alerts_to_email:
                         try:
                             # Refresh alert from database for background thread
@@ -1402,6 +1731,8 @@ class CriticalAlertService:
                             if (
                                 alert_refreshed
                                 and alert_refreshed.severity == AlertSeverity.HIGH.value
+                                and alert_refreshed.tank_id is not None
+                                and bg_service._tank_has_email_alert_enabled(alert_refreshed.tank_id)
                             ):
                                 self._send_alert_email(alert_refreshed)
                         except Exception as e:
@@ -1420,9 +1751,358 @@ class CriticalAlertService:
 
         return alerts_created
 
-    def _send_alert_email(self, alert: CriticalAlert):
+    def _resolve_alert_email_context(self, alert: CriticalAlert):
+        """Resolve the device + branch presentation fields shared by the alert-email
+        senders. Returns (branch, ctx) or (None, None) when the alert cannot be emailed
+        (unknown device, or the device/branch row is missing). ctx carries device_label,
+        device_branch_id, device_noun, device_code, zone_name and is_cryotank."""
+        if alert.tank_id:
+            tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
+            if not tank:
+                return None, None
+            device_label = tank.tank_code or f"Tank-{tank.tank_id}"
+            ctx = {
+                "device_label": device_label,
+                "device_branch_id": tank.branch_id,
+                "device_noun": "Tank",
+                "device_code": device_label,
+                "zone_name": None,
+                # Cryotank artwork belongs only on cryotank alerts; incubators and
+                # refrigerators carry their own ids and must not show a tank picture.
+                "is_cryotank": not (alert.incubator_id or alert.refrigerator_id),
+            }
+        elif alert.refrigerator_id:
+            refrigerator = self.db.query(Refrigerator).filter(
+                Refrigerator.refrigerator_id == alert.refrigerator_id
+            ).first()
+            if not refrigerator:
+                return None, None
+            label = refrigerator.refrigerator_code or f"Refrigerator-{refrigerator.refrigerator_id}"
+            ctx = {
+                "device_label": f"{label} {alert.zone_id}" if alert.zone_id else label,
+                "device_branch_id": refrigerator.branch_id,
+                "device_noun": "Refrigerator",
+                "device_code": label,
+                "zone_name": alert.zone_id,
+                "is_cryotank": False,
+            }
+        else:
+            return None, None
+
+        branch = (
+            self.db.query(HospitalBranch)
+            .filter(HospitalBranch.branch_id == ctx["device_branch_id"])
+            .first()
+        )
+        if not branch:
+            return None, None
+        return branch, ctx
+
+    def _dispatch_alert_emails(
+        self,
+        alert: CriticalAlert,
+        recipients,
+        branch,
+        ctx: dict,
+        *,
+        alert_name: Optional[str] = None,
+        kpi_name: Optional[str] = None,
+        first_alert_at: Optional[datetime] = None,
+        first_alert_value: Optional[str] = None,
+        current_value: Optional[str] = None,
+        escalation_mode: bool = False,
+    ):
+        """Render the critical/continuation alert email once and send it to each recipient.
+        Shared by _send_alert_email and _send_alert_email_to_users_only.
+
+        When first_alert_at is supplied the condition has already been alerted on in this
+        episode, so the continuation template is used instead of the new-alert one."""
+        device_label = ctx["device_label"]
+        is_cryotank = ctx["is_cryotank"]
+
+        alerts_url = f"{settings.FRONTEND_URL}/dashboard?alert_id={alert.alert_id}"
+        template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
+        jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))
+
+        is_continuation = first_alert_at is not None
+        template_name = (
+            "critical_alert_continuation_email.html"
+            if is_continuation
+            else "critical_alert_email.html"
+        )
+
+        try:
+            template = jinja_env.get_template(template_name)
+        except Exception as e:
+            logger.error(f"Failed to load {template_name}: {str(e)}")
+            template = None
+
+        first_alert_clock = ""
+        first_alert_date = ""
+        duration_text = ""
+        current_at = ""
+        alert_stage = "Alert Continuity" if is_continuation else "Alert Created"
+        if is_continuation:
+            first_alert_clock = self._format_ist_clock(first_alert_at)
+            first_alert_date = self._format_ist_date(first_alert_at)
+            started = (
+                first_alert_at
+                if first_alert_at.tzinfo
+                else first_alert_at.replace(tzinfo=timezone.utc)
+            )
+            now_utc = datetime.now(timezone.utc)
+            duration_text = self._format_duration((now_utc - started).total_seconds())
+            current_at = f"{self._format_ist_clock(now_utc)}, {self._format_ist_date(now_utc)}"
+
+        severity_class = "high-severity"
+        if alert.severity == "Medium":
+            severity_class = "medium-severity"
+        elif alert.severity == "Low":
+            severity_class = "low-severity"
+
+        # The attachment set depends only on kpi_name/is_cryotank, so build it once
+        # instead of re-scanning the asset directory for every recipient.
+        inline_images = _inline_alert_images(kpi_name, include_tank=is_cryotank)
+
+        for user in recipients:
+            # Cross-process guard: claim this (alert, recipient) atomically so concurrent
+            # runs / retries can never send the same alert to the same user twice. Fail-open
+            # if Redis is unreachable — never drop a critical alert because the cache is down.
+            dedup_key = f"alert:email:{alert.alert_id}:{user.user_id}"
+            try:
+                if not get_redis().set(dedup_key, 1, nx=True, ex=_EMAIL_DEDUP_TTL_SECONDS):
+                    logger.info(
+                        "Skipping duplicate email to %s for alert_id=%s (redis guard)",
+                        user.email, alert.alert_id,
+                    )
+                    continue
+            except Exception as exc:
+                logger.warning(
+                    "Redis email-dedup guard unavailable for alert_id=%s (%s); sending anyway",
+                    alert.alert_id, exc,
+                )
+            try:
+                if is_continuation:
+                    subject = f"Alert Continuation: {alert.alert_type} ongoing for {duration_text} - {device_label}"
+                else:
+                    subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {device_label}"
+                ist = timezone(timedelta(hours=5, minutes=30))
+                utc_time = alert.occurred_at.replace(tzinfo=timezone.utc)  # mark as UTC
+                timestamp_string = utc_time.astimezone(ist).strftime(
+                    "%Y-%m-%d %H:%M:%S IST"
+                )
+                if template:
+                    html_body = template.render(
+                        subject=subject,
+                        logo_url="cid:mg_logo",
+                        device_image_url="cid:mg_tank" if is_cryotank else "",
+                        device_noun=ctx["device_noun"],
+                        device_code=ctx["device_code"],
+                        zone_name=ctx["zone_name"],
+                        banner_url=f"{settings.FRONTEND_URL}{_EMAIL_BANNER_PATH}",
+                        alert_type=alert.alert_type,
+                        alert_name=alert_name or alert.alert_type,
+                        severity=alert.severity,
+                        tank_id=alert.tank_id,
+                        tank_code=device_label,
+                        branch_name=branch.branch_name or "N/A",
+                        message=alert.message,
+                        occurred_at=timestamp_string,
+                        first_alert_at=first_alert_clock,
+                        first_alert_date=first_alert_date,
+                        current_at=current_at,
+                        alert_stage=alert_stage,
+                        first_alert_value=first_alert_value or "",
+                        current_value=current_value or "",
+                        duration_text=duration_text,
+                        acknowledge_url=alerts_url,
+                        severity_class=severity_class,
+                    )
+                else:
+                    # Fallback to simple HTML if template fails
+                    html_body = f"""
+                    <html>
+                    <body>
+                        <h2>{"Alert Continuation" if is_continuation else "Critical Alert Notification"}</h2>
+                        {f"<p>First {alert_name or alert.alert_type} alert is noted at {first_alert_clock} on {first_alert_date}{f' at {first_alert_value}' if first_alert_value else ''}, alert continued for {duration_text}{f', currently {current_value}' if current_value else ''}, kindly pay attention.</p>" if is_continuation else ""}
+                        <p><strong>Alert Type:</strong> {alert.alert_type}</p>
+                        <p><strong>Severity:</strong> {alert.severity}</p>
+                        <p><strong>Device:</strong> {device_label}</p>
+                        <p><strong>Branch:</strong> {branch.branch_name or "N/A"}</p>
+                        <p><strong>Message:</strong> {alert.message}</p>
+                        <p><strong>Occurred At:</strong> {timestamp_string}</p>
+                        <br/>
+                        <a href="{alerts_url}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                            View Alerts
+                        </a>
+                    </body>
+                    </html>
+                    """
+
+                send_email(user.email, subject, html_body, inline_images=inline_images)
+                logger.info(
+                    f"Sent alert email to {user.email} for alert_id={alert.alert_id}"
+                )
+                success_metadata = {
+                    "recipient_email": user.email,
+                    "recipient_user_id": user.user_id,
+                    "email_subject": subject,
+                    "email_message": alert.message,
+                    "alert_id": alert.alert_id,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "message": alert.message,
+                    "occurred_at": timestamp_string,
+                    "tank_id": alert.tank_id,
+                    "tank_code": device_label,
+                    "branch_id": branch.branch_id if branch else None,
+                    "branch_name": branch.branch_name if branch else None,
+                }
+                if escalation_mode:
+                    success_metadata["escalation_mode"] = True
+                ActivityLogService(self.db).log_activity(
+                    action="email.critical_alert_sent",
+                    outcome=ActivityOutcome.SUCCESS.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.email),
+                    metadata=success_metadata,
+                )
+            except Exception as e:
+                logger.error(f"Failed to send alert email to {user.email}: {str(e)}")
+                failure_metadata = {
+                    "recipient_email": user.email,
+                    "recipient_user_id": user.user_id,
+                    "alert_id": alert.alert_id,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "message": alert.message,
+                    "tank_id": alert.tank_id,
+                    "tank_code": device_label,
+                    "branch_id": branch.branch_id if branch else None,
+                    "branch_name": branch.branch_name if branch else None,
+                    "error": str(e),
+                }
+                if escalation_mode:
+                    failure_metadata["escalation_mode"] = True
+                ActivityLogService(self.db).log_activity(
+                    action="email.critical_alert_sent",
+                    outcome=ActivityOutcome.FAILURE.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.email),
+                    metadata=failure_metadata,
+                )
+                # Release the guard so a genuinely failed send can be retried before TTL.
+                try:
+                    get_redis().delete(dedup_key)
+                except Exception:
+                    pass
+
+    def _send_alert_push(self, alert: CriticalAlert):
+        """Send a web push notification for critical (High severity) alerts only.
+        Same recipient set and Redis dedup pattern as _send_alert_email, gated
+        additionally on each user's push_enabled flag and per-device enabled flag."""
+        if alert.severity != AlertSeverity.HIGH.value:
+            logger.debug(
+                f"Skipping push for non-critical alert_id={alert.alert_id} (severity={alert.severity})"
+            )
+            return
+
+        if not push_notifications_configured():
+            logger.debug("Skipping push for alert_id=%s: VAPID keys not configured", alert.alert_id)
+            return
+
+        recipients = self._resolve_alert_recipients(alert)
+        if not recipients:
+            return
+        all_users, branch, device_label = recipients
+
+        alerts_url = f"{settings.FRONTEND_URL}/dashboard?alert_id={alert.alert_id}"
+
+        for user in all_users:
+            if not user.push_enabled:
+                continue
+
+            # Same cross-process guard as email, keyed to the push channel so email and
+            # push dedup independently (a user could opt out of one and not the other).
+            dedup_key = f"alert:push:{alert.alert_id}:{user.user_id}"
+            try:
+                if not get_redis().set(dedup_key, 1, nx=True, ex=_EMAIL_DEDUP_TTL_SECONDS):
+                    logger.info(
+                        "Skipping duplicate push to %s for alert_id=%s (redis guard)",
+                        user.user_id, alert.alert_id,
+                    )
+                    continue
+            except Exception as exc:
+                logger.warning(
+                    "Redis push-dedup guard unavailable for alert_id=%s (%s); sending anyway",
+                    alert.alert_id, exc,
+                )
+
+            subscriptions = (
+                self.db.query(PushSubscription)
+                .filter(
+                    PushSubscription.user_id == user.user_id,
+                    PushSubscription.enabled == True,
+                )
+                .all()
+            )
+            if not subscriptions:
+                continue
+
+            payload = {
+                "title": f"Critical Alert: {alert.alert_type} - {device_label}",
+                "body": alert.message,
+                "alert_id": alert.alert_id,
+                "severity": alert.severity,
+                "tag": alert.dedup_key,
+                "url": alerts_url,
+                "device_label": device_label,
+                "occurred_at": alert.occurred_at.isoformat() if alert.occurred_at else None,
+            }
+
+            sent_any = False
+            for subscription in subscriptions:
+                if send_web_push(self.db, subscription, payload):
+                    sent_any = True
+
+            ActivityLogService(self.db).log_activity(
+                action="push.critical_alert_sent",
+                outcome=ActivityOutcome.SUCCESS.value if sent_any else ActivityOutcome.FAILURE.value,
+                actor=build_system_actor("critical_alert"),
+                target=build_target("user", user.user_id, user.email),
+                metadata={
+                    "recipient_user_id": user.user_id,
+                    "alert_id": alert.alert_id,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "message": alert.message,
+                    "branch_id": branch.branch_id if branch else None,
+                    "branch_name": branch.branch_name if branch else None,
+                    "subscription_count": len(subscriptions),
+                },
+            )
+            if not sent_any:
+                # Release the guard so a genuinely failed send can be retried before TTL.
+                try:
+                    get_redis().delete(dedup_key)
+                except Exception:
+                    pass
+
+    def _send_alert_email(
+        self,
+        alert: CriticalAlert,
+        *,
+        alert_name: Optional[str] = None,
+        kpi_name: Optional[str] = None,
+        first_alert_at: Optional[datetime] = None,
+        first_alert_value: Optional[str] = None,
+        current_value: Optional[str] = None,
+    ):
         """Send email notification for critical (High severity) alerts only.
-        Recipients: all Managers across the hospital + Users in the tank's branch."""
+        Recipients: all Managers across the hospital + Users in the tank's branch.
+
+        When first_alert_at is supplied the condition has already been alerted on in this
+        episode, so the continuation template is used instead of the new-alert one."""
         # Only send emails for critical (High severity) alerts
         if alert.severity != AlertSeverity.HIGH.value:
             logger.debug(
@@ -1430,35 +2110,11 @@ class CriticalAlertService:
             )
             return
 
-        # Resolve device label and branch — supports tank and refrigerator alerts
-        if alert.tank_id:
-            tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
-            if not tank:
-                return
-            device_label = tank.tank_code or f"Tank-{tank.tank_id}"
-            device_branch_id = tank.branch_id
-        elif alert.refrigerator_id:
-            refrigerator = self.db.query(Refrigerator).filter(
-                Refrigerator.refrigerator_id == alert.refrigerator_id
-            ).first()
-            if not refrigerator:
-                return
-            label = refrigerator.refrigerator_code or f"Refrigerator-{refrigerator.refrigerator_id}"
-            device_label = f"{label} {alert.zone_id}" if alert.zone_id else label
-            device_branch_id = refrigerator.branch_id
-        else:
-            return
-
-        branch = (
-            self.db.query(HospitalBranch)
-            .filter(HospitalBranch.branch_id == device_branch_id)
-            .first()
-        )
-        if not branch:
+        branch, ctx = self._resolve_alert_email_context(alert)
+        if branch is None:
             return
 
         hospital_id = branch.hospital_id
-
         all_branches = (
             self.db.query(HospitalBranch)
             .filter(HospitalBranch.hospital_id == hospital_id)
@@ -1486,175 +2142,52 @@ class CriticalAlertService:
             .filter(
                 User.department == "IVF",
                 User.role == "User",
-                User.branch_id == device_branch_id,
+                User.branch_id == ctx["device_branch_id"],
                 User.status == True,
                 User.approved_status == ApprovalStatus.APPROVED,
             )
             .all()
         )
 
-        all_users = {user.user_id: user for user in managers + branch_users}.values()
+        all_users = list({user.user_id: user for user in managers + branch_users}.values())
 
-        alerts_url = f"{settings.FRONTEND_URL}/dashboard?alert_id={alert.alert_id}"
+        self._dispatch_alert_emails(
+            alert,
+            all_users,
+            branch,
+            ctx,
+            alert_name=alert_name,
+            kpi_name=kpi_name,
+            first_alert_at=first_alert_at,
+            first_alert_value=first_alert_value,
+            current_value=current_value,
+            escalation_mode=False,
+        )
 
-        template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
-        jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))
-
-        try:
-            template = jinja_env.get_template("critical_alert_email.html")
-        except Exception as e:
-            logger.error(f"Failed to load alert email template: {str(e)}")
-            template = None
-
-        severity_class = "high-severity"
-        if alert.severity == "Medium":
-            severity_class = "medium-severity"
-        elif alert.severity == "Low":
-            severity_class = "low-severity"
-
-        for user in all_users:
-            # Cross-process guard: claim this (alert, recipient) atomically so concurrent
-            # runs / retries can never send the same alert to the same user twice. Fail-open
-            # if Redis is unreachable — never drop a critical alert because the cache is down.
-            dedup_key = f"alert:email:{alert.alert_id}:{user.user_id}"
-            try:
-                if not get_redis().set(dedup_key, 1, nx=True, ex=_EMAIL_DEDUP_TTL_SECONDS):
-                    logger.info(
-                        "Skipping duplicate email to %s for alert_id=%s (redis guard)",
-                        user.email, alert.alert_id,
-                    )
-                    continue
-            except Exception as exc:
-                logger.warning(
-                    "Redis email-dedup guard unavailable for alert_id=%s (%s); sending anyway",
-                    alert.alert_id, exc,
-                )
-            try:
-                subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {device_label}"
-                ist = timezone(timedelta(hours=5, minutes=30))
-                utc_time = alert.occurred_at.replace(tzinfo=timezone.utc)  # mark as UTC
-                timestamp_string = utc_time.astimezone(ist).strftime(
-                    "%Y-%m-%d %H:%M:%S IST"
-                )
-                if template:
-                    html_body = template.render(
-                        subject=subject,
-                        alert_type=alert.alert_type,
-                        severity=alert.severity,
-                        tank_id=alert.tank_id,
-                        tank_code=device_label,
-                        branch_name=branch.branch_name or "N/A",
-                        message=alert.message,
-                        occurred_at=timestamp_string,
-                        acknowledge_url=alerts_url,
-                        severity_class=severity_class,
-                    )
-                else:
-                    # Fallback to simple HTML if template fails
-                    html_body = f"""
-                    <html>
-                    <body>
-                        <h2>Critical Alert Notification</h2>
-                        <p><strong>Alert Type:</strong> {alert.alert_type}</p>
-                        <p><strong>Severity:</strong> {alert.severity}</p>
-                        <p><strong>Device:</strong> {device_label}</p>
-                        <p><strong>Branch:</strong> {branch.branch_name or "N/A"}</p>
-                        <p><strong>Message:</strong> {alert.message}</p>
-                        <p><strong>Occurred At:</strong> {timestamp_string}</p>
-                        <br/>
-                        <a href="{alerts_url}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                            View Alerts
-                        </a>
-                    </body>
-                    </html>
-                    """
-
-                send_email(user.email, subject, html_body)
-                logger.info(
-                    f"Sent alert email to {user.email} for alert_id={alert.alert_id}"
-                )
-                ActivityLogService(self.db).log_activity(
-                    action="email.critical_alert_sent",
-                    outcome=ActivityOutcome.SUCCESS.value,
-                    actor=build_system_actor("critical_alert"),
-                    target=build_target("user", user.user_id, user.email),
-                    metadata={
-                        "recipient_email": user.email,
-                        "recipient_user_id": user.user_id,
-                        "email_subject": subject,
-                        "email_message": alert.message,
-                        "alert_id": alert.alert_id,
-                        "alert_type": alert.alert_type,
-                        "severity": alert.severity,
-                        "message": alert.message,
-                        "occurred_at": timestamp_string,
-                        "tank_id": alert.tank_id,
-                        "tank_code": device_label,
-                        "branch_id": branch.branch_id if branch else None,
-                        "branch_name": branch.branch_name if branch else None,
-                    },
-                )
-            except Exception as e:
-                logger.error(f"Failed to send alert email to {user.email}: {str(e)}")
-                ActivityLogService(self.db).log_activity(
-                    action="email.critical_alert_sent",
-                    outcome=ActivityOutcome.FAILURE.value,
-                    actor=build_system_actor("critical_alert"),
-                    target=build_target("user", user.user_id, user.email),
-                    metadata={
-                        "recipient_email": user.email,
-                        "recipient_user_id": user.user_id,
-                        "alert_id": alert.alert_id,
-                        "alert_type": alert.alert_type,
-                        "severity": alert.severity,
-                        "message": alert.message,
-                        "tank_id": alert.tank_id,
-                        "tank_code": tank_code,
-                        "branch_id": branch.branch_id if branch else None,
-                        "branch_name": branch.branch_name if branch else None,
-                        "error": str(e),
-                    },
-                )
-                # Release the guard so a genuinely failed send can be retried before TTL.
-                try:
-                    get_redis().delete(dedup_key)
-                except Exception:
-                    pass
-
-    def _send_alert_email_to_users_only(self, alert: CriticalAlert):
+    def _send_alert_email_to_users_only(
+        self,
+        alert: CriticalAlert,
+        *,
+        alert_name: Optional[str] = None,
+        kpi_name: Optional[str] = None,
+        first_alert_at: Optional[datetime] = None,
+        first_alert_value: Optional[str] = None,
+        current_value: Optional[str] = None,
+    ):
         """Send critical alert email to branch Users only (role=User).
         Used when escalation mode is active — Admins/Managers are notified separately once the
-        unack_escalation_threshold is reached."""
+        unack_escalation_threshold is reached.
+
+        When first_alert_at is supplied the condition has already been alerted on in this
+        episode, so the continuation template is used instead of the new-alert one."""
         if alert.severity != AlertSeverity.HIGH.value:
             logger.debug(
                 f"Skipping users-only email for non-critical alert_id={alert.alert_id} (severity={alert.severity})"
             )
             return
 
-        if alert.tank_id:
-            tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
-            if not tank:
-                return
-            device_label = tank.tank_code or f"Tank-{tank.tank_id}"
-            device_branch_id = tank.branch_id
-        elif alert.refrigerator_id:
-            refrigerator = self.db.query(Refrigerator).filter(
-                Refrigerator.refrigerator_id == alert.refrigerator_id
-            ).first()
-            if not refrigerator:
-                return
-            label = refrigerator.refrigerator_code or f"Refrigerator-{refrigerator.refrigerator_id}"
-            device_label = f"{label} {alert.zone_id}" if alert.zone_id else label
-            device_branch_id = refrigerator.branch_id
-        else:
-            return
-
-        branch = (
-            self.db.query(HospitalBranch)
-            .filter(HospitalBranch.branch_id == device_branch_id)
-            .first()
-        )
-        if not branch:
+        branch, ctx = self._resolve_alert_email_context(alert)
+        if branch is None:
             return
 
         branch_users = (
@@ -1662,7 +2195,7 @@ class CriticalAlertService:
             .filter(
                 User.department == "IVF",
                 User.role == "User",
-                User.branch_id == device_branch_id,
+                User.branch_id == ctx["device_branch_id"],
                 User.status == True,
                 User.approved_status == ApprovalStatus.APPROVED,
             )
@@ -1673,128 +2206,22 @@ class CriticalAlertService:
             logger.info(
                 "No branch users found for alert_id=%s branch_id=%s — skipping users-only alert email",
                 alert.alert_id,
-                device_branch_id,
+                ctx["device_branch_id"],
             )
             return
 
-        alerts_url = f"{settings.FRONTEND_URL}/dashboard?alert_id={alert.alert_id}"
-        template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
-        jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))
-
-        try:
-            template = jinja_env.get_template("critical_alert_email.html")
-        except Exception as e:
-            logger.error(f"Failed to load alert email template: {str(e)}")
-            template = None
-
-        severity_class = "high-severity"
-        if alert.severity == "Medium":
-            severity_class = "medium-severity"
-        elif alert.severity == "Low":
-            severity_class = "low-severity"
-
-        for user in branch_users:
-            # Cross-process guard: claim this (alert, recipient) atomically so concurrent
-            # runs / retries can never send the same alert to the same user twice. Fail-open
-            # if Redis is unreachable — never drop a critical alert because the cache is down.
-            dedup_key = f"alert:email:{alert.alert_id}:{user.user_id}"
-            try:
-                if not get_redis().set(dedup_key, 1, nx=True, ex=_EMAIL_DEDUP_TTL_SECONDS):
-                    logger.info(
-                        "Skipping duplicate users-only email to %s for alert_id=%s (redis guard)",
-                        user.email, alert.alert_id,
-                    )
-                    continue
-            except Exception as exc:
-                logger.warning(
-                    "Redis email-dedup guard unavailable for alert_id=%s (%s); sending anyway",
-                    alert.alert_id, exc,
-                )
-            try:
-                subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {device_label}"
-                ist = timezone(timedelta(hours=5, minutes=30))
-                utc_time = alert.occurred_at.replace(tzinfo=timezone.utc)
-                timestamp_string = utc_time.astimezone(ist).strftime("%Y-%m-%d %H:%M:%S IST")
-                if template:
-                    html_body = template.render(
-                        subject=subject,
-                        alert_type=alert.alert_type,
-                        severity=alert.severity,
-                        tank_id=alert.tank_id,
-                        tank_code=device_label,
-                        branch_name=branch.branch_name or "N/A",
-                        message=alert.message,
-                        occurred_at=timestamp_string,
-                        acknowledge_url=alerts_url,
-                        severity_class=severity_class,
-                    )
-                else:
-                    html_body = f"""
-                    <html><body>
-                        <h2>Critical Alert Notification</h2>
-                        <p><strong>Alert Type:</strong> {alert.alert_type}</p>
-                        <p><strong>Severity:</strong> {alert.severity}</p>
-                        <p><strong>Device:</strong> {device_label}</p>
-                        <p><strong>Branch:</strong> {branch.branch_name or "N/A"}</p>
-                        <p><strong>Message:</strong> {alert.message}</p>
-                        <p><strong>Occurred At:</strong> {timestamp_string}</p>
-                        <br/>
-                        <a href="{alerts_url}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Alerts</a>
-                    </body></html>
-                    """
-
-                send_email(user.email, subject, html_body)
-                logger.info(
-                    f"Sent users-only alert email to {user.email} for alert_id={alert.alert_id}"
-                )
-                ActivityLogService(self.db).log_activity(
-                    action="email.critical_alert_sent",
-                    outcome=ActivityOutcome.SUCCESS.value,
-                    actor=build_system_actor("critical_alert"),
-                    target=build_target("user", user.user_id, user.email),
-                    metadata={
-                        "recipient_email": user.email,
-                        "recipient_user_id": user.user_id,
-                        "email_subject": subject,
-                        "alert_id": alert.alert_id,
-                        "alert_type": alert.alert_type,
-                        "severity": alert.severity,
-                        "message": alert.message,
-                        "occurred_at": timestamp_string,
-                        "tank_id": alert.tank_id,
-                        "tank_code": device_label,
-                        "branch_id": branch.branch_id,
-                        "branch_name": branch.branch_name,
-                        "escalation_mode": True,
-                    },
-                )
-            except Exception as e:
-                logger.error(f"Failed to send users-only alert email to {user.email}: {str(e)}")
-                ActivityLogService(self.db).log_activity(
-                    action="email.critical_alert_sent",
-                    outcome=ActivityOutcome.FAILURE.value,
-                    actor=build_system_actor("critical_alert"),
-                    target=build_target("user", user.user_id, user.email),
-                    metadata={
-                        "recipient_email": user.email,
-                        "recipient_user_id": user.user_id,
-                        "alert_id": alert.alert_id,
-                        "alert_type": alert.alert_type,
-                        "severity": alert.severity,
-                        "message": alert.message,
-                        "tank_id": alert.tank_id,
-                        "tank_code": tank_code,
-                        "branch_id": branch.branch_id,
-                        "branch_name": branch.branch_name,
-                        "escalation_mode": True,
-                        "error": str(e),
-                    },
-                )
-                # Release the guard so a genuinely failed send can be retried before TTL.
-                try:
-                    get_redis().delete(dedup_key)
-                except Exception:
-                    pass
+        self._dispatch_alert_emails(
+            alert,
+            branch_users,
+            branch,
+            ctx,
+            alert_name=alert_name,
+            kpi_name=kpi_name,
+            first_alert_at=first_alert_at,
+            first_alert_value=first_alert_value,
+            current_value=current_value,
+            escalation_mode=True,
+        )
 
     def _send_alert_whatsapp(self, alert: CriticalAlert, *, kpi_config=None, kpi_value: Optional[float] = None):
         """Send WhatsApp notification via Twilio for critical (High severity) alerts only.
@@ -1912,6 +2339,65 @@ class CriticalAlertService:
             )
             return
 
+        role_group = lambda u: "user" if u.role == "User" else "admin"
+        sent_groups: set = set()
+        if kpi_config is not None and alert.occurred_at is not None:
+            _aware = lambda ts: ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+            current_ts = _aware(alert.occurred_at)
+            latest_clear_reading = (
+                self.db.query(Readings)
+                .filter(
+                    Readings.tank_id == alert.tank_id,
+                    Readings.kpi_config_id == kpi_config.id,
+                    Readings.deviation == False,
+                )
+                .order_by(Readings.timestamp.desc())
+                .first()
+            )
+            clear_ts = _aware(latest_clear_reading.timestamp) if latest_clear_reading else None
+
+            # Baseline per group = reading timestamp of the group's last delivered
+            # WhatsApp (not the last alert — alerts whose WhatsApp was suppressed or
+            # disabled must not slide the window forward). Missing/unreadable key
+            # counts as never sent, so Redis outages can only over-notify.
+            def _last_sent_from_redis(group: str):
+                try:
+                    v = get_redis().get(_wa_last_sent_key(kpi_config.id, group))
+                    return datetime.fromisoformat(v) if v else None
+                except Exception as exc:
+                    logger.warning(
+                        "Redis WhatsApp last-sent lookup failed for kpi_config_id=%s %s (%s); treating as fresh",
+                        kpi_config.id, group, exc,
+                    )
+                    return None
+
+            group_last_sent = {
+                "user": _last_sent_from_redis("user"),
+                "admin": _last_sent_from_redis("admin"),
+            }
+            group_cooldowns = {
+                "user": _WA_USER_COOLDOWN_SECONDS,
+                "admin": _WA_ADMIN_COOLDOWN_SECONDS,
+            }
+            skipped_groups: set = set()
+            for group, last_sent in group_last_sent.items():
+                if last_sent is None:
+                    continue  # never messaged this group for this KPI — fresh
+                last_sent = _aware(last_sent)
+                if clear_ts is not None and clear_ts > last_sent:
+                    continue  # KPI recovered since this group's last message — fresh
+                elapsed = (current_ts - last_sent).total_seconds()
+                if elapsed < group_cooldowns[group]:
+                    skipped_groups.add(group)
+                    logger.info(
+                        "Skipping WhatsApp %s recipients for alert_id=%s kpi_config_id=%s: "
+                        "last delivered %.0fs before this reading (cooldown=%ss)",
+                        group, alert.alert_id, kpi_config.id, elapsed, group_cooldowns[group],
+                    )
+            recipients = [u for u in recipients if role_group(u) not in skipped_groups]
+            if not recipients:
+                return
+
         for user in recipients:
             try:
                 to_number = _to_whatsapp_number(user.phone_number)
@@ -1925,6 +2411,7 @@ class CriticalAlertService:
                     "Sent WhatsApp alert to %s for alert_id=%s (template=%s twilio_sid=%s)",
                     to_number, alert.alert_id, template_sid, msg.sid,
                 )
+                sent_groups.add(role_group(user))
                 ActivityLogService(self.db).log_activity(
                     action="whatsapp.critical_alert_sent",
                     outcome=ActivityOutcome.SUCCESS.value,
@@ -1971,6 +2458,24 @@ class CriticalAlertService:
                         "error": str(e),
                     },
                 )
+
+        # Stamp the delivered groups with this reading's timestamp.
+        if kpi_config is not None and alert.occurred_at is not None and sent_groups:
+            occurred = alert.occurred_at if alert.occurred_at.tzinfo else alert.occurred_at.replace(tzinfo=timezone.utc)
+            for group in sent_groups:
+                try:
+                    get_redis().set(
+                        _wa_last_sent_key(kpi_config.id, group),
+                        occurred.isoformat(),
+                        # Key lives exactly as long as the group's window; once it
+                        # expires the next alert is fresh by definition.
+                        ex=_WA_USER_COOLDOWN_SECONDS if group == "user" else _WA_ADMIN_COOLDOWN_SECONDS,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to store WhatsApp last-sent in Redis for kpi_config_id=%s %s: %s",
+                        kpi_config.id, group, exc,
+                    )
 
     def _check_escalation_needed(self, kpi_config, tank_id: int) -> bool:
         """Return True when N consecutive unacknowledged alerts exist for a KPI and the
@@ -2046,10 +2551,9 @@ class CriticalAlertService:
             return
 
         hospital_id = branch.hospital_id
-        is_email_enabled, _ = self._get_hospital_notification_config(hospital_id)
-        if not is_email_enabled:
+        if not (kpi_config.email_alert or kpi_config.whatsapp_alert):
             logger.info(
-                "Skipping escalation email — hospital_id=%s has email notifications disabled", hospital_id
+                "Skipping escalation email — kpi_config_id=%s has no notification channel enabled", kpi_config.id
             )
             return
 
@@ -2251,11 +2755,10 @@ class CriticalAlertService:
             return
 
         hospital_id = refrigerator.hospital_id
-        is_email_enabled, _ = self._get_hospital_notification_config(hospital_id)
-        if not is_email_enabled:
+        if not (kpi_config.email_alert or kpi_config.whatsapp_alert):
             logger.info(
-                "Skipping refrigerator escalation email — hospital_id=%s has email notifications disabled",
-                hospital_id,
+                "Skipping refrigerator escalation email — kpi_config_id=%s has no notification channel enabled",
+                kpi_config.id,
             )
             return
 
@@ -2717,6 +3220,7 @@ class CriticalAlertService:
                                     message=email_data["message"],
                                     occurred_at=email_data["occurred_at"],
                                     occurrence_count=email_data["occurrence_count"],
+                                    violation_type=email_data["violation_type"],
                                 )
                                 emails_sent += 1
                             except Exception as e:
@@ -2764,6 +3268,7 @@ class CriticalAlertService:
         message: str,
         occurred_at: datetime,
         occurrence_count: int,
+        violation_type: Optional[str] = None,
     ):
         """
         Send immediate alert email to a list of users.
@@ -2777,6 +3282,7 @@ class CriticalAlertService:
             message: Alert message
             occurred_at: When violation occurred
             occurrence_count: How many times this issue occurred
+            violation_type: Internal violation label (e.g. "shock") used to pick the callout icon
         """
         # Load email template
         template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
@@ -2806,11 +3312,20 @@ class CriticalAlertService:
 
         subject = f"Critical Alert: {alert_type} - {severity} Severity - {tank_code}"
 
+        # Attachment set is identical for every recipient; build it once, with the icon
+        # matching this violation's KPI rather than always defaulting to a thermometer.
+        immediate_inline_images = _inline_alert_images(
+            _IMMEDIATE_VIOLATION_ICON_KPI.get(violation_type)
+        )
+
         for user in recipients:
             try:
                 if template:
                     html_body = template.render(
                         subject=subject,
+                        logo_url="cid:mg_logo",
+                        device_image_url="cid:mg_tank",
+                        banner_url=f"{settings.FRONTEND_URL}{_EMAIL_BANNER_PATH}",
                         alert_type=alert_type,
                         severity=severity,
                         tank_id=None,  # Not needed for template
@@ -2843,7 +3358,7 @@ class CriticalAlertService:
                     """
 
                 # Send email and track result
-                send_email(user.email, subject, html_body)
+                send_email(user.email, subject, html_body, inline_images=immediate_inline_images)
                 logger.info(
                     f"✓ Successfully sent immediate alert email to {user.email} for tank {tank_code}, violation: {alert_type}"
                 )

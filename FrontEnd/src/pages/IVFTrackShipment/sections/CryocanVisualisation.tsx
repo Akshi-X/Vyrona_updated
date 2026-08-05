@@ -562,6 +562,12 @@ const SENSOR_ICONS: Record<string, ReactElement> = {
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
     </svg>
   ),
+  humidity: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/>
+      <path d="M12.56 6.6A10.97 10.97 0 0014 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 01-11.91 4.97"/>
+    </svg>
+  ),
 };
 
 const KPI_CARD_STYLES: Record<string, { accent: string; ring: string }> = {
@@ -572,6 +578,7 @@ const KPI_CARD_STYLES: Record<string, { accent: string; ring: string }> = {
   tive_battery_percentage: { accent: "#2563eb", ring: "rgba(37,99,235,0.12)" },
   ln2_lid_state: { accent: "#7c3aed", ring: "rgba(124,58,237,0.12)" },
   shock: { accent: "#dc2626", ring: "rgba(220,38,38,0.12)" },
+  humidity: { accent: "#0ea5e9", ring: "rgba(14,165,233,0.12)" },
 };
 
 const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerProps>(function CryocanVisualizer(
@@ -4272,7 +4279,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                       id={`onboarding-cryo-tile-${tile.id}`}
                       type="button"
                       onClick={() => onSensorSelect && onSensorSelect(tile.id)}
-                      className="text-left kpi-card"
+                      className="text-left kpi-card group"
                       style={{
                         cursor: "pointer",
                         borderRadius: 16,
@@ -4384,6 +4391,30 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                           opacity: 0.5,
                         }}
                       />
+                      <div
+                        className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 ease-out"
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          bottom: 0,
+                          zIndex: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "5px 10px 5px 8px",
+                          borderTopLeftRadius: 12,
+                          borderBottomRightRadius: 16,
+                          background: "var(--color-primary)",
+                          color: "#fff",
+                          boxShadow: "0 2px 8px rgba(64,17,83,0.3)",
+                        }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M7 7h10v10" />
+                          <path d="M7 17 17 7" />
+                        </svg>
+                        <span style={{ fontSize: 10, fontWeight: 600, whiteSpace: "nowrap" }}>View trend</span>
+                      </div>
                     </button>
                   );
                 })}

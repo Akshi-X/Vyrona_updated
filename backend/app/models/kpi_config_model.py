@@ -64,6 +64,21 @@ class KpiConfig(Base):
         comment="Cooldown period in minutes between repeated alerts for this KPI config. Default 60 minutes.",
     )
 
+    whatsapp_alert = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="Send WhatsApp notification when this KPI deviates",
+    )
+    email_alert = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="Send email notification when this KPI deviates",
+    )
+
     unack_escalation_threshold = Column(
         Integer,
         nullable=True,

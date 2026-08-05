@@ -9,6 +9,7 @@ from sendgrid.helpers.mail import Mail
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 
 from ..config.config import settings
 from ..constants.app_constants import (
@@ -31,6 +32,23 @@ logger = logging.getLogger(__name__)
 # Setup Jinja2 template environment
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "emails"
 jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
+
+# Brand artwork shared by the transactional templates. The logo is embedded inline so
+# it renders without a reachable host; the header texture stays a URL because cid:
+# does not resolve inside a CSS background-image.
+BRAND_ASSET_DIR = Path(__file__).resolve().parents[1] / "assets" / "email"
+BRAND_LOGO_CID = "mg_logo"
+
+
+def brand_logo_inline() -> dict:
+    """{cid: path} for the header logo, empty when the asset is unavailable."""
+    logo = BRAND_ASSET_DIR / "mygrape-logo.png"
+    return {BRAND_LOGO_CID: str(logo)} if logo.is_file() else {}
+
+
+def brand_banner_url() -> str:
+    """Absolute URL for the header texture, or '' when no frontend host is configured."""
+    return f"{settings.FRONTEND_URL}/banner-hex.png" if settings.FRONTEND_URL else ""
 
 
 def _current_utc_timestamp(fmt: str = "%Y-%m-%d %H:%M:%S UTC") -> str:
@@ -107,15 +125,24 @@ def send_email_via_sendgrid(recipient_email: str, subject: str, html_body: str):
         )
 
 
-def send_email_via_smpt(recipient_email: str, subject: str, html_body: str):
+def send_email_via_smpt(
+    recipient_email: str,
+    subject: str,
+    html_body: str,
+    inline_images: Optional[dict] = None,
+):
     """
     Send email using SMTP server
-    
+
     Args:
         recipient_email: Email address to send to
         subject: Email subject
         html_body: HTML content of email
-        
+        inline_images: Optional {content_id: file_path} embedded in the message and
+            referenced from the HTML as src="cid:content_id". Travels with the email,
+            so it renders without a reachable host and usually without the recipient
+            having to allow external images.
+
     Raises:
         EmailServiceException if sending fails
     """    
@@ -127,12 +154,26 @@ def send_email_via_smpt(recipient_email: str, subject: str, html_body: str):
                 reason="SMTP server or port not configured"
             )
         
-        # Create email message
-        msg = MIMEMultipart()
+        # 'related' so inline images are part of the same body as the HTML that
+        # references them; plain multipart would show them as loose attachments.
+        msg = MIMEMultipart('related' if inline_images else 'mixed')
         msg['From'] = settings.SENDER_EMAIL  # Using same from email for consistency
         msg['To'] = recipient_email
         msg['Subject'] = subject
         msg.attach(MIMEText(html_body, 'html'))
+
+        for content_id, image_path in (inline_images or {}).items():
+            try:
+                with open(image_path, 'rb') as fh:
+                    part = MIMEImage(fh.read())
+            except OSError as exc:
+                # A missing asset must never block a critical alert.
+                logger.warning("Inline image %s unreadable (%s); sending without it",
+                               image_path, exc)
+                continue
+            part.add_header('Content-ID', f'<{content_id}>')
+            part.add_header('Content-Disposition', 'inline', filename=Path(image_path).name)
+            msg.attach(part)
         
         # Connect to SMTP server and send email
         logger.info(f"Sending email via SMTP to {recipient_email}...")
@@ -156,7 +197,13 @@ def send_email_via_smpt(recipient_email: str, subject: str, html_body: str):
             reason=f"SMTP email send failed: {str(e)}"
         )
 
-def send_email(recipient_email: str, subject: str, html_body: str, use_smtp: bool = True):
+def send_email(
+    recipient_email: str,
+    subject: str,
+    html_body: str,
+    use_smtp: bool = True,
+    inline_images: Optional[dict] = None,
+):
     """
     Send email using SendGrid or SMTP.
 
@@ -171,8 +218,11 @@ def send_email(recipient_email: str, subject: str, html_body: str, use_smtp: boo
     """
     logger.info(f"Attempting to send email to {recipient_email} using {'SMTP' if use_smtp else 'SendGrid'}")
     if use_smtp:
-        send_email_via_smpt(recipient_email, subject, html_body)
+        send_email_via_smpt(recipient_email, subject, html_body, inline_images=inline_images)
     else:
+        # SendGrid path has no inline-image support here; it still delivers the HTML.
+        if inline_images:
+            logger.warning("inline_images ignored on the SendGrid path for %s", recipient_email)
         send_email_via_sendgrid(recipient_email, subject, html_body)
 
 
@@ -240,13 +290,14 @@ def send_otp_email(user_email: str, otp_code: str):
         html_body = template.render(
             subject=subject,
             otp_code=otp_code,
-            expiry_minutes=OTP_EXPIRY_MINUTES
+            expiry_minutes=OTP_EXPIRY_MINUTES,
+            logo_url=f"cid:{BRAND_LOGO_CID}",
+            banner_url=brand_banner_url(),
         )
     except TemplateError as e:
         raise TemplateRenderException(template_name="otp_email.html", reason=str(e))
-    
-    # Send email using SendGrid
-    send_email(user_email, subject, html_body)
+
+    send_email(user_email, subject, html_body, inline_images=brand_logo_inline())
 
 
 # ============================================

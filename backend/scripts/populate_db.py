@@ -51,8 +51,6 @@ HOSPITALS = [
         "hospital_name": "ARC Fertility Hospitals",
         "hospital_type": "IVF",
         "hospital_head_email": "head@arcfertility.com",
-        "is_email_notifify": True,
-        "is_whatsapp_notify": False,
         "branches": [
             {
                 "branch_name": "Chennai Main",
@@ -90,8 +88,6 @@ HOSPITALS = [
         "hospital_name": "Apollo Hospitals",
         "hospital_type": "Multi-Speciality",
         "hospital_head_email": "head@apollohospitals.com",
-        "is_email_notifify": True,
-        "is_whatsapp_notify": True,
         "branches": [
             {
                 "branch_name": "Delhi",
@@ -119,8 +115,6 @@ HOSPITALS = [
         "hospital_name": "Fortis Healthcare",
         "hospital_type": "Multi-Speciality",
         "hospital_head_email": "head@fortishealthcare.com",
-        "is_email_notifify": True,
-        "is_whatsapp_notify": False,
         "branches": [
             {
                 "branch_name": "Kolkata",
@@ -148,8 +142,6 @@ HOSPITALS = [
         "hospital_name": "Max Super Speciality Hospital",
         "hospital_type": "Super Speciality",
         "hospital_head_email": "head@maxhospital.com",
-        "is_email_notifify": True,
-        "is_whatsapp_notify": False,
         "branches": [
             {
                 "branch_name": "Noida",
@@ -292,8 +284,6 @@ def create_hospitals_and_branches(db: Session):
                 hospital_name=h_data["hospital_name"],
                 hospital_type=h_data["hospital_type"],
                 hospital_head_email=h_data["hospital_head_email"],
-                is_email_notifify=h_data["is_email_notifify"],
-                is_whatsapp_notify=h_data["is_whatsapp_notify"],
                 created_at=datetime.now(timezone.utc),
                 created_by="system",
             )

@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { User } from 'lucide-react';
 import { COLORS } from '../../constants/colors';
 import { feedbackApi, type UserTicketSummary } from '../../api/feedbackApi';
 import { userService, type UserProfileDto } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePushNotifications } from '../../contexts/PushNotificationContext';
 import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
 import { useHasVariant } from '../../components/VariantRoute';
-import Header from '../../components/Header';
+import PageLayout from '../../components/PageLayout';
 import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
 import { COUNTRIES, DEFAULT_COUNTRY_ISO, findCountryByIso, findCountryByPhone, flagEmoji } from '../../constants/countryCodes';
  
@@ -116,10 +118,13 @@ const UserProfilePage: React.FC = () => {
   // Refrigerator-only hospitals (gated via "/user-profile#hide-onboarding" variant flag)
   // don't use the guided tour, so hide the onboarding card.
   const hideOnboardingCard = useHasVariant('/user-profile#hide-onboarding');
-  const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token, onboardingCompleted } = useAuth();
+  const { isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token, onboardingCompleted } = useAuth();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
- 
- 
+  const push = usePushNotifications();
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
+
+
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadingTickets, setLoadingTickets] = useState<boolean>(false);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
@@ -507,11 +512,6 @@ const UserProfilePage: React.FC = () => {
     });
   };
  
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
- 
   // Onboarding: open edit mode via event so tour can walk through edit fields
   useEffect(() => {
     const fn = () => setIsEditingProfile(true);
@@ -519,23 +519,6 @@ const UserProfilePage: React.FC = () => {
     return () => document.removeEventListener("onboarding:open-edit-profile", fn);
   }, []);
 
-  const handleBackNavigation = () => {
-    if (isOnboarding) {
-      navigate("/onboarding/dashboard");
-      return;
-    }
-    // Check if we came from within the app (same origin)
-    const referrer = document.referrer;
-    const currentOrigin = window.location.origin;
-    const cameFromApp = referrer && referrer.startsWith(currentOrigin);
-
-    if (cameFromApp && window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate("/dashboard");
-    }
-  };
- 
   // Don't render anything until auth is verified
   // This prevents the UI flicker when redirecting to login
   if (isLoading || !isAuthChecked || !isAuthenticated) {
@@ -547,31 +530,12 @@ const UserProfilePage: React.FC = () => {
   }
  
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header
-        title="User Profile"
-        showBackButton={role?.toLowerCase() !== 'mygrape_admin'}
-        onBackClick={handleBackNavigation}
-        rightContent={
-          (role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin') ? (
-            <button
-              onClick={handleLogout}
-              className="flex items-center px-3 py-1.5 text-sm font-medium text-white rounded-md transition-opacity duration-200 hover:opacity-90"
-              style={{ backgroundColor: COLORS.primary.purple }}
-              title="Logout"
-            >
-              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              Logout
-            </button>
-          ) : undefined
-        }
-      />
- 
-      <div className="pt-[calc(63px+1rem)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="space-y-8">
+    <PageLayout
+      title="User Profile"
+      lucideIcon={User}
+      description="Manage your account information, preferences, and support tickets."
+    >
+      <div className="w-full max-w-6xl mx-auto space-y-8">
 
         {/* Basic Information Section */}
         <div id="onboarding-profile-basic-info" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
@@ -761,7 +725,7 @@ const UserProfilePage: React.FC = () => {
           )}
         </div>
 
-        {onboardingCompleted && !isOnboarding && !hideOnboardingCard && (
+        {onboardingCompleted && !isOnboarding && !hideOnboardingCard && !isMygrapeAdmin && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 flex items-center justify-between gap-6">
             <div className="flex items-center gap-5 min-w-0">
               <img src="/genie/explaining_casual.webp" alt="" className="w-40 h-40 object-contain shrink-0" />
@@ -1110,13 +1074,154 @@ const UserProfilePage: React.FC = () => {
                 />
               </button>
             </div>
-          </div>
-        </div>
+
+            <div className="border-t border-gray-100 pt-6">
+              <div id="onboarding-profile-notif-push" className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-gray-900">Push alerts on this browser</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Get a browser notification for critical alerts as soon as they happen
+                  </p>
+                  {!push.supported && (
+                    <p className="text-xs text-gray-400 mt-1">Not supported on this browser</p>
+                  )}
+                  {push.supported && push.permission === 'denied' && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Notifications are blocked for this site — re-enable them in your browser settings
+                    </p>
+                  )}
+                </div>
+                <button
+                  disabled={!push.supported || push.permission === 'denied' || pushBusy}
+                  onClick={async () => {
+                    setPushBusy(true);
+                    setPushStatusMessage(null);
+                    try {
+                      if (push.deviceEnabled) {
+                        await push.disableOnThisDevice();
+                      } else {
+                        await push.enableOnThisDevice();
+                      }
+                    } catch (err) {
+                      setPushStatusMessage(err instanceof Error ? err.message : 'Failed to update push settings');
+                    } finally {
+                      setPushBusy(false);
+                    }
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                    push.deviceEnabled ? 'bg-primary' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                      push.deviceEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {push.deviceEnabled && (
+                <div className="flex items-center justify-between mt-6">
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-gray-900">Receive push alerts</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Master switch for push alerts across all of your devices
+                    </p>
+                  </div>
+                  <button
+                    disabled={pushBusy}
+                    onClick={async () => {
+                      setPushBusy(true);
+                      try {
+                        await push.setGlobalEnabled(!push.globalEnabled);
+                      } finally {
+                        setPushBusy(false);
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                      push.globalEnabled ? 'bg-primary' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                        push.globalEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              )}
+
+              {push.subscriptions.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                    Registered devices
+                  </h4>
+                  <div className="space-y-2">
+                    {push.subscriptions.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-2.5"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-800">
+                            {sub.device_label || 'Unknown device'}
+                            {sub.current && (
+                              <span className="ml-2 text-[10px] font-bold text-primary uppercase">This device</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => push.toggleSubscription(sub.id, !sub.enabled)}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                              sub.enabled ? 'bg-primary' : 'bg-gray-200'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
+                                sub.enabled ? 'translate-x-4' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                          <button
+                            onClick={() => push.removeSubscription(sub.id)}
+                            className="text-xs font-semibold text-gray-400 hover:text-red-500"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {push.deviceEnabled && (
+                <button
+                  onClick={async () => {
+                    setPushStatusMessage(null);
+                    try {
+                      const result = await push.sendTest();
+                      setPushStatusMessage(`Sent ${result.sent}/${result.total} test notification(s)`);
+                    } catch (err) {
+                      setPushStatusMessage(err instanceof Error ? err.message : 'Failed to send test notification');
+                    }
+                  }}
+                  className="mt-4 text-sm font-semibold text-primary hover:underline"
+                >
+                  Send test notification
+                </button>
+              )}
+
+              {pushStatusMessage && (
+                <p className="text-xs text-gray-500 mt-2">{pushStatusMessage}</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 };
- 
+
 export default UserProfilePage;

@@ -163,8 +163,8 @@ export function useIvfKpiSnapshot({ tankId, enabled = true }: UseIvfKpiSnapshotO
   const [kpiLimits, setKpiLimits] = useState<KpiLimits>({});
   const [latestByName, setLatestByName] = useState<Record<string, LatestKpi>>({});
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
-  const [tankMaxCapacity, setTankMaxCapacity] = useState<number | null>(null);
-  const [tankMinCapacity, setTankMinCapacity] = useState<number | null>(null);
+  const [tankFullWeightKg, setTankFullWeightKg] = useState<number | null>(null);
+  const [tankEmptyWeightKg, setTankEmptyWeightKg] = useState<number | null>(null);
   const [nowTs, setNowTs] = useState<number>(Date.now());
   const [batteryTimestampMs, setBatteryTimestampMs] = useState<number | null>(null);
   const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
@@ -244,8 +244,8 @@ export function useIvfKpiSnapshot({ tankId, enabled = true }: UseIvfKpiSnapshotO
       .then((res) => {
         if (cancelled) return;
         setKpiLimits((res?.kpi_limits ?? {}) as KpiLimits);
-        setTankMaxCapacity(res?.tank_max_capacity_reading ?? null);
-        setTankMinCapacity(res?.tank_min_capacity_reading ?? null);
+        setTankFullWeightKg(res?.full_weight_kg ?? null);
+        setTankEmptyWeightKg(res?.empty_weight_kg ?? null);
       })
       .catch(() => {});
 
@@ -393,7 +393,9 @@ export function useIvfKpiSnapshot({ tankId, enabled = true }: UseIvfKpiSnapshotO
 
   const ln2LevelRaw = latestByName['ln2_level']?.value ?? null;
   const ln2_100per =
-    tankMaxCapacity != null && tankMinCapacity != null ? tankMaxCapacity - tankMinCapacity : null;
+    tankFullWeightKg != null && tankEmptyWeightKg != null
+      ? tankFullWeightKg - tankEmptyWeightKg
+      : null;
   const ln2LevelPercent =
     ln2LevelRaw != null && ln2_100per != null && ln2_100per > 0
       ? Math.floor((ln2LevelRaw / ln2_100per) * 100)

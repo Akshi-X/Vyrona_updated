@@ -28,3 +28,4 @@ from .onboarding_state_model import OnboardingState
 from .onboarding_event_model import OnboardingEvent
 from .activity_log_model import ActivityLog
 from .integration_api_token_model import IntegrationApiToken
+from .push_subscription_model import PushSubscription

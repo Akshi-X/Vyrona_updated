@@ -24,11 +24,6 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
     const { setCurrentStep } = useTour();
     const navigate = useNavigate();
 
-    const overallHighScore = Object.values(state.levels).reduce(
-        (sum, p) => sum + (p.highScore ?? 0),
-        0,
-    );
-
     const anyInProgress = levels.some((l) => state.levels[l.id]?.status === "in_progress");
     const activeLevel = levels.find((l) => state.levels[l.id]?.status === "in_progress");
     const activeLevelProgress = activeLevel ? state.levels[activeLevel.id] : undefined;
@@ -135,17 +130,16 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                         const progress = state.levels[level.id];
                         const status = (progress?.status ?? "locked") as keyof typeof STATUS_CONFIG;
                         const cfg = STATUS_CONFIG[status];
-                        const highScore = progress?.highScore ?? 0;
-                        const pointsRequired = level.pointsRequired ?? 0;
-                        const pct = pointsRequired > 0 ? Math.min(Math.round((highScore / pointsRequired) * 100), 100) : 0;
                         const isLocked = status === "locked";
                         const isCompleted = status === "completed";
                         const isAvailable = status === "available";
                         const isInProgress = status === "in_progress";
 
-                        // Per-level tour completion — determines whether Resume opens tour or quiz
+                        // Progress = tour steps completed (completed level shows 100%).
                         const levelSteps = getSteps(level.id);
                         const levelTourComplete = levelSteps.length > 0 && (progress?.lastStepIndex ?? 0) >= levelSteps.length;
+                        const stepsDone = isCompleted ? levelSteps.length : Math.min(progress?.lastStepIndex ?? 0, levelSteps.length);
+                        const pct = levelSteps.length > 0 ? Math.round((stepsDone / levelSteps.length) * 100) : 0;
 
                         const unlockDate = progress?.unlockedAt
                             ? new Date(progress.unlockedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
@@ -189,7 +183,12 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
 
                                             {/* Progress bar — only for non-locked */}
                                             {!isLocked && (
-                                                <div className="mt-2 space-y-1">
+                                                <div className="relative mt-2">
+                                                    {pct > 0 && (
+                                                        <span className={`absolute right-0 -top-4 text-[10px] font-semibold ${isCompleted ? "text-emerald-600" : "text-slate-500"}`}>
+                                                            {pct}%
+                                                        </span>
+                                                    )}
                                                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                                                         <div
                                                             className={`h-full rounded-full transition-all duration-700 ${
@@ -197,18 +196,6 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                                                             }`}
                                                             style={{ width: `${pct}%` }}
                                                         />
-                                                    </div>
-                                                    <div className="flex justify-between text-[10px] text-slate-400">
-                                                        <span>
-                                                            {highScore > 0
-                                                                ? `Your Best: ${highScore} pts | Minimum: ${pointsRequired} pts`
-                                                                : `${pointsRequired} pts to pass`}
-                                                        </span>
-                                                        {pct > 0 && (
-                                                            <span className={`font-semibold ${isCompleted ? "text-emerald-600" : "text-slate-500"}`}>
-                                                                {pct}%
-                                                            </span>
-                                                        )}
                                                     </div>
                                                 </div>
                                             )}
@@ -224,8 +211,6 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                                                 }
                                                 const now = new Date().toISOString();
                                                 const dateBlocked = progress?.unlockedAt != null && progress.unlockedAt > now;
-                                                const scoreRequired = level.scoreRequired ?? 0;
-                                                const scoreBlocked = overallHighScore < scoreRequired;
 
                                                 if (dateBlocked) {
                                                     return (
@@ -233,16 +218,6 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                                                             <Lock className="h-3 w-3 shrink-0 text-slate-400" />
                                                             <p className="text-[10px] font-semibold text-slate-500">
                                                                 Unlocks on {unlockDate}
-                                                            </p>
-                                                        </div>
-                                                    );
-                                                }
-                                                if (scoreBlocked) {
-                                                    return (
-                                                        <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-slate-100/80 px-3 py-1.5">
-                                                            <Lock className="h-3 w-3 shrink-0 text-slate-400" />
-                                                            <p className="text-[10px] font-semibold text-slate-500">
-                                                                Need {scoreRequired} pts total &mdash; {scoreRequired - overallHighScore} more to go
                                                             </p>
                                                         </div>
                                                     );
