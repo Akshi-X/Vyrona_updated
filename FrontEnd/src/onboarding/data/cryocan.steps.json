@@ -34,7 +34,7 @@
         "requireClick": true,
         "is_wide": true,
         "clickOnlyId": ["#onboarding-track-branch-dropdown"],
-        "startPage": "/onboarding/ivf-track-shipment",
+        "startPage": "/onboarding/cryocan-tracking",
         "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
@@ -47,7 +47,7 @@
         "is_wide": true,
         "requireClick": true,
         "clickOnlyId": ["#onboarding-branch-option-Bangalore"],
-        "startPage": "/onboarding/ivf-track-shipment",
+        "startPage": "/onboarding/cryocan-tracking",
         "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
@@ -60,7 +60,7 @@
         "requireClick": true,
         "is_wide": true,
         "clickOnlyId": ["#onboarding-track-tank-dropdown"],
-        "startPage": "/onboarding/ivf-track-shipment",
+        "startPage": "/onboarding/cryocan-tracking",
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
@@ -73,7 +73,7 @@
         "requireClick": true,
         "is_wide": true,
         "clickOnlyId": ["#onboarding-tank-option-T-161"],
-        "startPage": "/onboarding/ivf-track-shipment",
+        "startPage": "/onboarding/cryocan-tracking",
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
@@ -84,7 +84,7 @@
         "content": "You are now on the Cryocan page. This screen gives you a complete view of this container — a live 3D model, real-time sensor tiles, trend charts, and operational logs.",
         "placement": "middle_middle",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_from_inside_cryocan.webp"
     },
     {
@@ -98,7 +98,7 @@
         "skipIfMissing": true,
         "clickOnlyId": ["#onboarding-cryo-left-toggle"],
         "stepDelay": 800,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
@@ -109,7 +109,7 @@
         "content": "This panel shows the real-time sensor readings for the container — LN2 level, internal temperature, lid state, battery, and more. Click any tile to instantly jump to its trend chart below.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
@@ -121,7 +121,7 @@
         "placement": "right",
         "requireClick": false,
         "scrollIntoView": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_casual.webp"
     },
     {
@@ -133,7 +133,7 @@
         "placement": "right",
         "requireClick": false,
         "scrollIntoView": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/idea_with_thermometer.webp"
     },
     {
@@ -145,7 +145,7 @@
         "placement": "right",
         "requireClick": false,
         "scrollIntoView": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/ln2_tape.webp"
     },
     {
@@ -157,7 +157,7 @@
         "placement": "right",
         "requireClick": false,
         "scrollIntoView": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/refilling.webp"
     },
     {
@@ -169,7 +169,7 @@
         "placement": "right",
         "requireClick": false,
         "scrollIntoView": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_settings.webp"
     },
     {
@@ -181,7 +181,7 @@
         "placement": "right",
         "requireClick": false,
         "scrollIntoView": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/lid_state.webp"
     },
     {
@@ -195,7 +195,7 @@
         "skipIfMissing": true,
         "clickOnlyId": ["#onboarding-cryo-left-toggle"],
         "stepDelay": 400,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
@@ -206,7 +206,7 @@
         "content": "This is a live 3D model of the cryogenic tank. Drag to rotate it. The canisters inside are clickable — select one to inspect which patient samples it holds and their storage status.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
@@ -220,7 +220,7 @@
         "skipIfMissing": true,
         "clickOnlyId": ["#onboarding-cryo-right-toggle"],
         "stepDelay": 400,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
     },
     {
@@ -231,7 +231,7 @@
         "content": "A live feed of every action taken on this container — alerts fired, refills detected, tasks updated, configuration changes, and user logins. Each entry is timestamped and actor-tagged, giving you a full audit trail at a glance.",
         "placement": "left",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
     },
     {
@@ -243,7 +243,7 @@
         "placement": "left",
         "requireClick": false,
         "scrollIntoView": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
@@ -255,7 +255,7 @@
         "is_wide": true,
         "placement": "top",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/chart_explain.webp"
     },
     {
@@ -268,7 +268,7 @@
         "placement": "top",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-chart-tab-ln2"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
@@ -280,7 +280,7 @@
         "placement": "top",
         "requireClick": false,
         "is_wide": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
@@ -293,7 +293,7 @@
         "is_wide": true,
         "requireClick": true,
         "clickOnlyId": ["#onboarding-chart-range-24h"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
@@ -305,7 +305,7 @@
         "placement": "top",
         "is_wide": true,
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
@@ -317,7 +317,7 @@
         "placement": "left",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-ivf-critical-alerts-icon"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/shock.webp"
     },
     {
@@ -330,7 +330,7 @@
         "is_wide": true,
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/alerts.webp"
     },
     {
@@ -344,7 +344,7 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-critical-alert-ack-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_caution.webp"
     },
     {
@@ -358,7 +358,7 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-critical-alert-confirm-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_caution.webp"
     },
     {
@@ -372,7 +372,7 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
     },
     {
@@ -383,7 +383,7 @@
         "content": "This opens a live chat channel with stakeholders — doctors, embryologists, and lab coordinators — for this container. A red badge shows the number of unread messages. Keep this clear to ensure no important communication is missed.",
         "placement": "bottom",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
@@ -395,7 +395,7 @@
         "placement": "bottom",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-ivf-stakeholder-chats-icon"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
@@ -407,7 +407,7 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_ui_in_hand.webp"
     },
     {
@@ -420,7 +420,7 @@
         "requireClick": false,
         "prevDisable": true,
         "inputText": "LN2 level looks stable. Confirmed top-up is scheduled for tomorrow morning.",
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
@@ -434,7 +434,7 @@
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-chat-send-btn"],
         "stepDelay": 400,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
@@ -447,7 +447,7 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-chat-close-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
     },
     {
@@ -459,7 +459,7 @@
         "placement": "bottom",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-ivf-my-tasks-icon"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
@@ -472,7 +472,7 @@
         "is_wide": true,
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
@@ -485,7 +485,7 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-my-tasks-add-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
@@ -501,7 +501,7 @@
         "onboardingEvent": "onboarding:prefill-task-form",
         "clickOnlyId": ["#onboarding-my-tasks-save-btn"],
         "stepDelay": 600,
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
@@ -515,7 +515,7 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161",
+        "startPage": "/onboarding/cryocan-tracking/161",
         "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
     },
     {

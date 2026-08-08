@@ -5,11 +5,20 @@ import { pageTours } from "../onboarding/data";
 import ConfirmDialog from "./ConfirmDialog";
 
 // Real page route → its page tour. Decoupled from the gamified Timeline levels, so
-// every page can offer its own contextual walkthrough.
-const ROUTE_TO_TOUR: Record<string, { id: string; title: string }> = {};
+// every page can offer its own contextual walkthrough. `target` is the /onboarding
+// replica route the tour launches on.
+const ROUTE_TO_TOUR: Record<string, { id: string; title: string; target: string }> = {};
+// Tours that match dynamic routes (e.g. /cryocan-tracking/:tankId) by prefix rather
+// than exact pathname. Checked only when no exact match is found.
+const PREFIX_TOURS: { base: string; id: string; title: string; target: string }[] = [];
 for (const tour of pageTours) {
     const realRoute = tour.route.replace(/^\/onboarding/, "");
-    if (!(realRoute in ROUTE_TO_TOUR)) ROUTE_TO_TOUR[realRoute] = { id: tour.id, title: tour.title };
+    if (!(realRoute in ROUTE_TO_TOUR)) {
+        ROUTE_TO_TOUR[realRoute] = { id: tour.id, title: tour.title, target: tour.route };
+    }
+    if (tour.matchPrefix) {
+        PREFIX_TOURS.push({ base: realRoute, id: tour.id, title: tour.title, target: tour.route });
+    }
 }
 
 const TourEntryButton = ({ label }: { label?: string }) => {
@@ -17,8 +26,19 @@ const TourEntryButton = ({ label }: { label?: string }) => {
     const navigate = useNavigate();
     const [confirmOpen, setConfirmOpen] = useState(false);
 
-    const tour = ROUTE_TO_TOUR[location.pathname];
+    // Exact route match first; fall back to prefix tours for dynamic routes.
+    const exactTour = ROUTE_TO_TOUR[location.pathname];
+    const prefixTour = exactTour
+        ? undefined
+        : PREFIX_TOURS.find(
+              (t) => location.pathname === t.base || location.pathname.startsWith(`${t.base}/`),
+          );
+    const tour = exactTour ?? prefixTour;
     if (!tour) return null;
+
+    // Exact matches land on the current path's replica; prefix matches (dynamic routes)
+    // land on the tour's own replica route so we never hit an arbitrary :tankId.
+    const replicaTarget = exactTour ? `/onboarding${location.pathname}` : tour.target;
 
     const openConfirm = () => setConfirmOpen(true);
 
@@ -26,7 +46,7 @@ const TourEntryButton = ({ label }: { label?: string }) => {
         setConfirmOpen(false);
         // Land on the replica route; PreviewTourOverlay reads this state and opens the
         // tour's welcome card. "Begin Tour" there starts the walkthrough.
-        navigate(`/onboarding${location.pathname}`, {
+        navigate(replicaTarget, {
             state: { previewLevelId: tour.id, returnTo: location.pathname },
         });
     };

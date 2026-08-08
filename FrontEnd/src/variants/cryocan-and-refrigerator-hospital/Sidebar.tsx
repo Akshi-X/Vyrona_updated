@@ -55,7 +55,7 @@ const isDropdown = (item: NavItem): item is NavGroup =>
 
 const DASHBOARD_CHILD_PATHS = [
     "/dashboard",
-    "/ivf-track-shipment",
+    "/cryocan-tracking",
     "/incubator-tracking",
     "/refrigerator-tracking",
     "/embryo-console",
@@ -78,7 +78,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
         dropdown: true,
         children: [
             { label: "Overview",                  path: "/dashboard"          },
-            { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
+            { label: "Cryocan Quality Tracking",  path: "/cryocan-tracking" },
             { label: "Incubator Tracking",         path: "/incubator-tracking" },
             { label: "Refrigerator Tracking",      path: "/refrigerator-tracking" },
             { label: "Embryo Console",              path: "/embryo-console"     },
@@ -167,7 +167,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     }).map((item) => {
         if (isDropdown(item)) {
             const filtered = item.children.filter((child) => {
-                if (child.path === "/ivf-track-shipment") return isIVF;
+                if (child.path === "/cryocan-tracking") return isIVF;
                 if (child.path === "/refrigerator-tracking") return isIVF;
                 return true;
             });

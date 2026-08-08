@@ -156,7 +156,7 @@ const IVFTrackShipmentWithTankVariant = () => (
         restrictIVFAdmin={false}
     >
         <VariantRoute
-            routePath="/ivf-track-shipment/:tankId"
+            routePath="/cryocan-tracking/:tankId"
             defaultComponent={<IVFTrackShipmentPage />}
         />
     </RoleBasedRoute>
@@ -211,7 +211,7 @@ const IncubatorTrackingWithAuth = () => (
 );
 
 /**
- * Incubator detail page - /incubator-tracking/:id (like ivf-track-shipment/:tankId)
+ * Incubator detail page - /incubator-tracking/:id (like cryocan-tracking/:tankId)
  */
 const IncubatorDetailWithAuth = () => (
     <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
@@ -300,10 +300,8 @@ export const router = createBrowserRouter([
             // Playground routes — level tours run on top of these as invisible overlays
             { path: "/onboarding/dashboard",     element: <><Dashboard /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/control-tower", element: <><ControlTower /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/cryocan-tracking",                      element: <><IVFTrackShipmentPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/cryocan-tracking/:tankCode",            element: <><IVFTrackShipmentSearchPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/ivf-track-shipment",                    element: <><IVFTrackShipmentSearchPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/ivf-track-shipment/:tankId",            element: <><IVFTrackShipmentPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/cryocan-tracking",                      element: <><IVFTrackShipmentSearchPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/cryocan-tracking/:tankId",              element: <><IVFTrackShipmentPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/alert-setting",                         element: <><AlertSetting /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/reports",                               element: <><ReportsPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/refill-log",                            element: <><RefillLog /><ActiveOnboardingLevel /></> },
@@ -331,8 +329,8 @@ export const router = createBrowserRouter([
             { path: "/dashboard", element: <DashboardWithVariant /> },
             { path: "/control-tower", element: <ControlTowerWithVariant /> },
             { path: "/track/:patientId", element: <TrackPageWithVariant /> },
-            { path: "/ivf-track-shipment/:tankId", element: <IVFTrackShipmentWithTankVariant /> },
-            { path: "/ivf-track-shipment", element: <IVFTrackShipmentWithVariant /> },
+            { path: "/cryocan-tracking/:tankId", element: <IVFTrackShipmentWithTankVariant /> },
+            { path: "/cryocan-tracking", element: <IVFTrackShipmentWithVariant /> },
             { path: "/outbound-quality-tracking/:canisterId", element: <OutboundQualityTrackingWithCanisterVariant /> },
             { path: "/outbound-quality-tracking", element: <OutboundQualityTrackingWithVariant /> },
             { path: "/alert-setting", element: <AlertSettingWithAuth /> },
