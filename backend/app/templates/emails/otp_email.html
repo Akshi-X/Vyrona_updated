@@ -14,13 +14,16 @@
     <![endif]-->
     <style type="text/css">
         :root {color-scheme: light only; supported-color-schemes: light only;}
+        @media only screen and (max-width: 520px) {
+            .mg-illus {display: none !important;}
+        }
         @media only screen and (min-width: 621px) {
             .mg-pad   {padding-left: 40px !important; padding-right: 40px !important;}
-            .mg-h1    {font-size: 30px !important;}
-            .mg-lead  {font-size: 15px !important;}
+            .mg-h1    {font-size: 27px !important;}
+            .mg-lead  {font-size: 14.5px !important;}
             .mg-logo  {width: 190px !important; max-width: 190px !important;}
             .mg-tag   {font-size: 12px !important; letter-spacing: 2px !important;}
-            .mg-digit {width: 58px !important; height: 66px !important; font-size: 34px !important;}
+            .mg-digit {width: 52px !important; line-height: 60px !important; font-size: 30px !important;}
         }
     </style>
 </head>
@@ -35,10 +38,10 @@
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; background-color:#FFFFFF;">
         <tr>
-            <td align="center" style="text-align:center; padding:26px 10px;">
+            <td class="mg-outer" align="center" style="text-align:center; padding:8px 2px;">
 
                 <!--[if mso]><table role="presentation" width="640" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="mg-card" style="border-spacing:0; width:100%; max-width:640px; margin:0 auto; text-align:left; background-color:#FFFFFF; border-radius:12px; overflow:hidden;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="mg-card" style="border-spacing:0; width:100%; max-width:640px; margin:0 auto; text-align:left; background-color:#FFFFFF; border-radius:12px; overflow:hidden; border:1px solid #ECEAF2; box-shadow:0 6px 22px rgba(64,17,83,0.10);">
 
                     <!-- Header -->
                     <tr>
@@ -49,29 +52,40 @@
                                 <v:textbox inset="0,0,0,0"><![endif]-->
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
                                 <tr>
-                                    <td align="left" valign="middle" style="text-align:left; vertical-align:middle; padding:22px 0 22px 22px;">
+                                    <td align="left" valign="middle" style="text-align:left; vertical-align:middle; padding:22px 0 0 22px;">
                                         {% if logo_url %}
-                                        <img src="{{ logo_url }}" alt="mG SCALE" width="150" height="75" class="mg-logo" style="display:block; border:0; outline:none; text-decoration:none; width:150px; height:auto; max-width:150px; font-size:18px; font-weight:700; color:#FFFFFF;">
+                                        <img src="{{ logo_url }}" alt="mG SCALE" width="118" height="59" class="mg-logo" style="display:block; border:0; outline:none; text-decoration:none; width:118px; height:auto; max-width:118px; font-size:18px; font-weight:700; color:#FFFFFF;">
                                         {% else %}
                                         <span style="font-size:18px; font-weight:700; color:#FFFFFF; letter-spacing:0.3px;">mG SCALE</span>
                                         {% endif %}
                                     </td>
-                                    <td class="mg-tag" align="right" valign="middle" style="width:100%; text-align:right; vertical-align:middle; padding:22px 20px 22px 6px; font-size:10px; font-weight:700; color:#FFFFFF; letter-spacing:1.2px; text-transform:uppercase;">Verification</td>
+                                    <td class="mg-tag" align="right" valign="middle" style="width:100%; text-align:right; vertical-align:middle; padding:22px 20px 0 6px;">
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="right" style="border-spacing:0; margin:0 0 0 auto;">
+                                            <tr>
+                                                <td valign="middle" style="vertical-align:middle; padding-right:7px; font-size:0; line-height:0;"><img src="cid:otp_verify" alt="" width="30" height="30" style="display:block; border:0; outline:none; width:30px; height:30px;"></td>
+                                                <td valign="middle" style="vertical-align:middle; font-size:10px; font-weight:700; color:#FFFFFF; letter-spacing:1.2px; text-transform:uppercase; white-space:nowrap;">Verification</td>
+                                            </tr>
+                                        </table>
+                                    </td>
                                 </tr>
                             </table>
                             <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
                         </td>
                     </tr>
-                    <tr><td style="height:6px; line-height:6px; font-size:0; background-color:{{ brand_soft }};">&nbsp;</td></tr>
+                    <tr>
+                        <td style="padding:0; font-size:0; line-height:0; background-color:{{ brand }};">
+                            <img src="cid:otp_wave" alt="" width="640" height="55" style="display:block; border:0; outline:none; width:100%; max-width:640px; height:auto;">
+                        </td>
+                    </tr>
 
                     <!-- Intro -->
                     <tr>
-                        <td class="mg-pad" align="center" style="text-align:center; padding:30px 20px 0 20px;">
+                        <td class="mg-pad" align="center" style="background-color:#FCFFFD; text-align:center; padding:30px 14px 0 14px;">
                             <p style="margin:0 0 4px 0; font-size:15px; font-weight:700; color:{{ brand }};">Hello,</p>
                             <h1 class="mg-h1" style="margin:0 0 8px 0; font-size:24px; line-height:1.25; font-weight:800; color:#16171D; letter-spacing:-0.4px;">
                                 Here&rsquo;s your verification code
                             </h1>
-                            <p class="mg-lead" style="margin:0; font-size:14px; line-height:1.6; color:#6E7180;">
+                            <p class="mg-lead" style="margin:0; font-size:13.5px; line-height:1.6; color:#6E7180;">
                                 Enter the code below to finish signing in to your mG SCALE account.
                             </p>
                         </td>
@@ -79,10 +93,10 @@
 
                     <!-- Code -->
                     <tr>
-                        <td class="mg-pad" style="padding:22px 20px 0 20px;">
+                        <td class="mg-pad" style="background-color:#FCFFFD; padding:22px 14px 0 14px;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; background-color:#FAF6FD; border:1px solid #EDE2F4; border-radius:14px;">
                                 <tr>
-                                    <td align="center" style="text-align:center; padding:22px 10px 20px 10px;">
+                                    <td align="center" style="text-align:center; padding:22px 4px 20px 4px;">
 
                                         <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="border-spacing:0; margin:0 auto;">
                                             <tr>
@@ -91,14 +105,11 @@
                                             </tr>
                                         </table>
 
-                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="border-spacing:0; margin:14px auto 0 auto;">
-                                            <tr>
-                                                {% for digit in otp_code|string %}
-                                                <td class="mg-digit" align="center" valign="middle" style="width:42px; height:52px; text-align:center; vertical-align:middle; background-color:#FFFFFF; border:1px solid #E8DAF1; border-radius:10px; font-size:26px; font-weight:800; color:{{ brand }};">{{ digit }}</td>
-                                                {% if not loop.last %}<td style="width:7px; font-size:0; line-height:0;">&nbsp;</td>{% endif %}
-                                                {% endfor %}
-                                            </tr>
-                                        </table>
+                                        <div class="mg-code" style="margin:14px 0 0 0; font-size:0; line-height:0; white-space:nowrap;">
+                                            {%- for digit in otp_code|string -%}
+                                            <span class="mg-digit" style="display:inline-block; width:36px; line-height:44px; margin:0 2px; text-align:center; background-color:#FFFFFF; border:1px solid #E8DAF1; border-radius:10px; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:21px; font-weight:800; color:{{ brand }};">{{ digit }}</span>
+                                            {%- endfor -%}
+                                        </div>
 
                                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; margin-top:16px;">
                                             <tr><td style="height:1px; line-height:1px; font-size:0; background-color:#EDE2F4;">&nbsp;</td></tr>
@@ -118,25 +129,34 @@
 
                     <!-- Security note -->
                     <tr>
-                        <td class="mg-pad" style="padding:18px 20px 0 20px;">
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; background-color:#FDF3DC; border-radius:12px;">
+                        <td class="mg-pad" style="background-color:#FCFFFD; padding:18px 14px 0 14px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; background-color:#FDF6E7; border-radius:14px;">
                                 <tr>
-                                    <td valign="top" style="vertical-align:top; padding:16px 10px 16px 16px; font-size:0; line-height:0;"><img src="cid:otp_shield" alt="" width="22" height="22" style="display:block; border:0; outline:none; width:22px; height:22px;"></td>
-                                    <td valign="top" style="vertical-align:top; padding:15px 16px 16px 4px; font-size:13.5px; line-height:1.6; color:#7A5A12;">
-                                        <strong style="color:#6B4A08;">Keep this code private.</strong><br>
-                                        myGrape will never ask you for it. If you did not request this code, you can safely ignore this email.
+                                    <td valign="middle" width="46" style="width:46px; vertical-align:middle; padding:14px 0 14px 12px; font-size:0; line-height:0;">
+                                        <img src="cid:otp_shield_lock" alt="" width="34" height="34" style="display:block; border:0; outline:none; width:34px; height:34px;">
+                                    </td>
+                                    <td valign="middle" style="vertical-align:middle; padding:18px 12px 18px 6px; font-size:13.5px; line-height:1.65; color:#7A5A12;">
+                                        <div style="font-size:14px; font-weight:800; color:#6B4A08; margin-bottom:2px;">Keep this code private.</div>
+                                        <strong style="font-weight:700; color:#6B4A08;">myGrape</strong> will never ask you for it. If you did not request this code, you can safely ignore this email.
+                                    </td>
+                                    <td class="mg-illus" valign="middle" width="64" style="width:64px; vertical-align:middle; padding:10px 14px 10px 0; font-size:0; line-height:0;">
+                                        <img src="cid:otp_envelope" alt="" width="64" height="46" style="display:block; border:0; outline:none; width:64px; height:46px;">
                                     </td>
                                 </tr>
                             </table>
                         </td>
                     </tr>
 
-                    <tr><td style="height:30px; line-height:30px; font-size:0;">&nbsp;</td></tr>
+                    <tr><td style="background-color:#FCFFFD; height:30px; line-height:30px; font-size:0;">&nbsp;</td></tr>
 
                     <!-- Footer -->
-                    <tr><td style="height:2px; line-height:2px; font-size:0; background-color:{{ brand }};">&nbsp;</td></tr>
                     <tr>
-                        <td align="center" style="text-align:center; background-color:#F6F2F9; padding:22px 20px;">
+                        <td style="padding:0; font-size:0; line-height:0; background-color:#FCFFFD;">
+                            <img src="cid:otp_fdivider" alt="" width="640" height="60" style="display:block; border:0; outline:none; width:100%; max-width:640px; height:auto;">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center" style="text-align:center; background-color:#F6F2F9; padding:8px 20px 22px 20px;">
                             <p style="margin:0 0 5px 0; font-size:16px; font-weight:800; color:{{ brand }};">myGrape</p>
                             <p style="margin:0; font-size:12.5px; line-height:1.7; color:#8A8D9B;">
                                 Automated message &mdash; please do not reply.<br>

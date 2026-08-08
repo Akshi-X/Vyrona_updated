@@ -44,7 +44,11 @@ BRAND_LOGO_CID = "mg_logo"
 OTP_ICONS = {
     "otp_lock": "email-icons/otp_lock.png",
     "otp_clock": "email-icons/otp_clock.png",
-    "otp_shield": "email-icons/otp_shield.png",
+    "otp_shield_lock": "email-icons/otp_shield_lock.png",
+    "otp_envelope": "email-icons/otp_envelope.png",
+    "otp_wave": "email-icons/otp_wave.png",
+    "otp_verify": "email-icons/otp_verify.png",
+    "otp_fdivider": "email-icons/otp_fdivider.png",
 }
 
 

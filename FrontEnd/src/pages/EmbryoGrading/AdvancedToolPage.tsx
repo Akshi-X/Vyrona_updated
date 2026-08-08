@@ -456,10 +456,10 @@ export default function AdvancedEmbryoGradingPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
 
-      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(280px,1fr)_300px] xl:grid-rows-1 gap-4 flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(280px,1fr)_300px] xl:grid-rows-1 gap-4 xl:flex-1 xl:overflow-hidden xl:min-h-0">
 
         {/* ── LEFT PANEL ── hidden during processing spinner ── */}
-        <aside className={`overflow-y-auto flex flex-col gap-3 pr-0.5 h-full ${step === 'processing' ? 'hidden' : ''}`}>
+        <aside className={`xl:overflow-y-auto flex flex-col gap-3 pr-0.5 xl:h-full ${step === 'processing' ? 'hidden' : ''}`}>
           <OocyteList
             logs={logs}
             loading={logsLoading}
@@ -527,14 +527,14 @@ export default function AdvancedEmbryoGradingPage() {
           const selGrade   = selectedImageIdx != null ? existingGrades[selectedImageIdx] ?? null : null;
           const mainImgUrl = selGrade?.images[0]?.upload_image_url ?? null;
           return (
-            <div className="flex flex-col gap-3 h-full min-h-0">
+            <div className="flex flex-col gap-3 xl:h-full min-h-0">
               {/* Embryo Preview card */}
               <div className="rounded-xl border border-line bg-white overflow-hidden flex flex-col flex-1 min-h-0">
                 <div className="px-4 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0">
                   <p className="text-xs font-bold text-gray-800">Embryo Preview</p>
                   <p className="text-[9px] text-gray-400 mt-0.5">Select a graded image to preview it here.</p>
                 </div>
-                <div className={`relative flex-1 min-h-0 ${(mainImgUrl || imageSlots.length > 0) ? 'bg-black' : 'bg-gray-50'}`}>
+                <div className={`relative flex-1 min-h-[300px] xl:min-h-0 ${(mainImgUrl || imageSlots.length > 0) ? 'bg-black' : 'bg-gray-50'}`}>
                   {mainImgUrl ? (
                     <img src={mainImgUrl} alt="Selected oocyte" className="w-full h-full object-contain absolute inset-0" />
                   ) : existingGrades.length >= 4 ? (
@@ -814,7 +814,7 @@ export default function AdvancedEmbryoGradingPage() {
         {step === 'select-best' && (() => {
           const panelBg = { background: 'linear-gradient(135deg, #f5f0ff 0%, #ede9fe 100%)' };
           return (
-            <div className="overflow-y-auto flex flex-col gap-3 pr-0.5 h-full">
+            <div className="xl:overflow-y-auto flex flex-col gap-3 pr-0.5 xl:h-full">
 
               {/* Action buttons */}
               <div className="flex flex-col gap-2 shrink-0">

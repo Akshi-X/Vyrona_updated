@@ -1856,7 +1856,7 @@ export default function ReportsPage() {
                                                         <div className="flex flex-col">
                                                             {row.metadata?.tank_id ? (
                                                                 <Link
-                                                                    to={`/ivf-track-shipment/${row.metadata.tank_id}`}
+                                                                    to={`/cryocan-tracking/${row.metadata.tank_id}`}
                                                                     className="text-primary hover:underline"
                                                                 >
                                                                     {row.metadata?.tank_code || row.metadata?.tank_id}
@@ -1875,7 +1875,7 @@ export default function ReportsPage() {
                                                     ) : row.target_type === "tank" && row.target_id ? (
                                                         <div className="flex flex-col">
                                                             <Link
-                                                                to={`/ivf-track-shipment/${row.target_id}`}
+                                                                to={`/cryocan-tracking/${row.target_id}`}
                                                                 className="text-primary hover:underline"
                                                             >
                                                                 {formatTargetLabel(row)}
