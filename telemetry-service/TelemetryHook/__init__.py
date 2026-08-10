@@ -56,6 +56,11 @@ def _is_stale_event(event_data) -> bool:
     enqueued_time = getattr(event_data, "enqueued_time", None)
     if not enqueued_time:
         return False
+    # azure.functions' EventHubEvent.enqueued_time is naive (UTC, no tzinfo)
+    # even though the azure-eventhub SDK's is tz-aware — normalize before
+    # subtracting.
+    if enqueued_time.tzinfo is None:
+        enqueued_time = enqueued_time.replace(tzinfo=timezone.utc)
     age_seconds = (datetime.now(timezone.utc) - enqueued_time).total_seconds()
     return age_seconds > config.STALE_EVENT_THRESHOLD_SECONDS
 
