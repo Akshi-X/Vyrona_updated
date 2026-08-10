@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import List, Optional
 from pathlib import Path
 from datetime import datetime, timezone
@@ -182,7 +183,16 @@ def send_email_via_smpt(
         msg['Subject'] = subject
         msg.attach(MIMEText(html_body, 'html'))
 
+        # Only attach what the HTML actually references: an unreferenced part is shown
+        # by Gmail as a downloadable attachment instead of an inline image. Parsed as
+        # whole ids rather than substrings, so "mg_clock" is not matched by "mg_clockg".
+        referenced = set(re.findall(r'cid:([A-Za-z0-9_.\-]+)', html_body))
+
         for content_id, image_path in (inline_images or {}).items():
+            if content_id not in referenced:
+                logger.debug("Skipping inline image %s; not referenced by the template",
+                             content_id)
+                continue
             try:
                 with open(image_path, 'rb') as fh:
                     part = MIMEImage(fh.read())
