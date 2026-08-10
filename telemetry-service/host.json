@@ -16,11 +16,10 @@
   "extensions": {
     "eventHubs": {
       "batchCheckpointFrequency": 1,
-      "eventProcessorOptions": {
-        "maxBatchSize": 100,
-        "prefetchCount": 300,
-        "enableReceiverRuntimeMetric": false
-      },
+      "maxEventBatchSize": 100,
+      "minEventBatchSize": 25,
+      "maxWaitTime": "00:00:05",
+      "prefetchCount": 500,
       "initialOffsetOptions": {
         "type": "fromEnd"
       }
