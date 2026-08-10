@@ -56,7 +56,14 @@ class Settings(BaseSettings):
     ALERT_API_TIMEOUT: int = 5
     # Internal API Key for service-to-service authentication with dashboard-service
     INTERNAL_API_KEY: Optional[str] = None
-    
+
+    # Events older than this (Event Hub enqueued_time vs now) are treated as
+    # backlog catch-up: immediate alert emails are suppressed since the
+    # violation may already be resolved by the time we process it. Refill
+    # detection and alert-record creation are unaffected (factual, not
+    # time-sensitive notifications).
+    STALE_EVENT_THRESHOLD_SECONDS: int = 300
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
