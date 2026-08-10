@@ -24,11 +24,7 @@ from shared.alert_api_client import (
     trigger_immediate_alert_email,
 )
 from shared.database import ensure_telemetry_table_exists, get_session
-from shared.idempotency import (
-    check_message_processed,
-    generate_message_id,
-    mark_message_processed,
-)
+from shared.idempotency import generate_message_id, try_mark_message_processing
 from shared.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
@@ -793,8 +789,10 @@ def save_ln2_device_state(device_code: str, state_data: Dict[str, Any]) -> None:
             else "None",
             "refill_last_updated": state_data.get("refill_last_updated") or "None",
         }
-        r.hset(key, mapping=mapping)
-        r.expire(key, 86400)  # 24h TTL
+        pipe = r.pipeline(transaction=False)
+        pipe.hset(key, mapping=mapping)
+        pipe.expire(key, 86400)  # 24h TTL
+        pipe.execute()
     except Exception as e:
         logger.error(f"Error saving LN2 device state for {device_code}: {e}")
 
@@ -809,9 +807,11 @@ def append_ln2_window_point(
         entry = json.dumps({"ts": timestamp.isoformat(), "mass": round(mass_kg, 6)})
         max_len = cfg.window_minutes * 60 + 120
 
-        r.rpush(key, entry)
-        r.ltrim(key, -max_len, -1)
-        r.expire(key, 86400)
+        pipe = r.pipeline(transaction=False)
+        pipe.rpush(key, entry)
+        pipe.ltrim(key, -max_len, -1)
+        pipe.expire(key, 86400)
+        pipe.execute()
     except Exception as e:
         logger.error(f"Error appending LN2 window point for {device_code}: {e}")
 
@@ -826,9 +826,11 @@ def append_ln2_refill_point(
         entry = json.dumps({"ts": timestamp.isoformat(), "mass": round(mass_kg, 6)})
         max_len = REFILL_ANALYSIS_WINDOW_MINUTES * 60 + 120
 
-        r.rpush(key, entry)
-        r.ltrim(key, -max_len, -1)
-        r.expire(key, 86400)
+        pipe = r.pipeline(transaction=False)
+        pipe.rpush(key, entry)
+        pipe.ltrim(key, -max_len, -1)
+        pipe.expire(key, 86400)
+        pipe.execute()
     except Exception as e:
         logger.error(f"Error appending LN2 refill point for {device_code}: {e}")
 
@@ -1232,10 +1234,6 @@ def publish_ln2_to_redis(device_code: str, quality_data: Dict[str, Any]) -> bool
         r = get_redis_client()
         data_json = json.dumps(quality_data)
 
-        # Publish to channel
-        r.publish(f"ln2_readings_channel:{device_code}", data_json)
-        logger.info(f"✓ Published to ln2_readings_channel (device={device_code})")
-
         # Store in history – key by tank_id so the dashboard can read it back
         tank_id = quality_data.get("tank_id")
         history_key = (
@@ -1243,11 +1241,14 @@ def publish_ln2_to_redis(device_code: str, quality_data: Dict[str, Any]) -> bool
             if tank_id
             else f"ln2_quality_history:{device_code}"
         )
-        r.lpush(history_key, data_json)
-        r.ltrim(history_key, 0, 29)  # Keep last 30 (matches dashboard limit)
 
-        # Add to devices set
-        r.sadd("ln2_devices", device_code)
+        pipe = r.pipeline(transaction=False)
+        pipe.publish(f"ln2_readings_channel:{device_code}", data_json)
+        pipe.lpush(history_key, data_json)
+        pipe.ltrim(history_key, 0, 29)  # Keep last 30 (matches dashboard limit)
+        pipe.sadd("ln2_devices", device_code)
+        pipe.execute()
+        logger.debug(f"✓ Published to ln2_readings_channel (device={device_code})")
 
         return True
     except Exception as e:
@@ -1298,10 +1299,18 @@ def trigger_ln2_alerts(
     device_code: str,
     alert_conditions: Dict[str, bool],
     quality_data: Dict[str, Any],
+    is_stale: bool = False,
 ) -> None:
     """Trigger email alerts for LN2 violations."""
     if not any(alert_conditions.values()):
         return  # No alerts needed
+
+    if is_stale:
+        logger.info(
+            f"Skipping LN2 alert email for tank {tank_id}, device {device_code} "
+            "(stale/backlog event - condition may already be resolved)"
+        )
+        return
 
     alert_payload = {
         "device_code": device_code,
@@ -1327,7 +1336,9 @@ def trigger_ln2_alerts(
         logger.error(f"Error triggering LN2 alert: {e} (non-critical)")
 
 
-def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
+def process_custom_iot_ln2(
+    db_session, webhook_payload: Dict[str, Any], is_stale: bool = False
+) -> bool:
     """
     Process CUSTOM_IOT LN2 weight sensor readings.
 
@@ -1455,7 +1466,9 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
                 "excessive_evaporation": False,
                 "lid_open_beyond_threshold": False,
             }
-            trigger_ln2_alerts(cfg.tank_id, device_code, alert_conditions, quality_data)
+            trigger_ln2_alerts(
+                cfg.tank_id, device_code, alert_conditions, quality_data, is_stale
+            )
             return True
 
         # Load persisted state (needed by multiple downstream steps)
@@ -1909,7 +1922,9 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
         )
         # Add low-level alert condition
         alert_conditions["low_level_refill"] = low_level_alert_fired
-        trigger_ln2_alerts(cfg.tank_id, device_code, alert_conditions, quality_data)
+        trigger_ln2_alerts(
+            cfg.tank_id, device_code, alert_conditions, quality_data, is_stale
+        )
 
         logger.info(f"✓ Processed CUSTOM_IOT for {device_code}, tank {cfg.tank_id}")
         return True
@@ -1919,7 +1934,9 @@ def process_custom_iot_ln2(db_session, webhook_payload: Dict[str, Any]) -> bool:
         raise
 
 
-def process_custom_composite_iot(db_session, webhook_payload: Dict[str, Any]) -> bool:
+def process_custom_composite_iot(
+    db_session, webhook_payload: Dict[str, Any], is_stale: bool = False
+) -> bool:
     """
     Process CUSTOM_COMPOSITE_IOT payloads.
 
@@ -2028,7 +2045,7 @@ def process_custom_composite_iot(db_session, webhook_payload: Dict[str, Any]) ->
                     "lid_open_beyond_threshold": False,
                 }
                 trigger_ln2_alerts(
-                    cfg.tank_id, device_code, alert_conditions, quality_data
+                    cfg.tank_id, device_code, alert_conditions, quality_data, is_stale
                 )
                 # Note: unlike process_custom_iot_ln2, we do NOT return here —
                 # the other (independent) sensor KPIs below still get saved.
@@ -3445,7 +3462,9 @@ def publish_to_redis(
         return False  # Non-critical - don't fail entire processing
 
 
-def insert_ivf_telemetry_data(db_session, tank_id: int, data: Dict[str, Any]) -> bool:
+def insert_ivf_telemetry_data(
+    db_session, tank_id: int, data: Dict[str, Any], is_stale: bool = False
+) -> bool:
     """
     Insert IVF telemetry data into the ivf_telemetry_data table.
     Also inserts into ivf_quality_log and ivf_geolocation tables.
@@ -3520,7 +3539,7 @@ def insert_ivf_telemetry_data(db_session, tank_id: int, data: Dict[str, Any]) ->
         # Insert into ivf_quality_log table (includes automatic alert email trigger)
         try:
             insert_ivf_quality_log(
-                db_session, ivf_telemetry_data_id, tank_id, data, created_at
+                db_session, ivf_telemetry_data_id, tank_id, data, created_at, is_stale
             )
         except Exception as e:
             logger.error(f"Error inserting into ivf_quality_log: {e}", exc_info=True)
@@ -3565,6 +3584,7 @@ def insert_ivf_quality_log(
     tank_id: int,
     data: Dict[str, Any],
     created_at: datetime,
+    is_stale: bool = False,
 ) -> bool:
     """
     Insert data into ivf_quality_log table ONLY when there are red/yellow deviations.
@@ -3653,30 +3673,36 @@ def insert_ivf_quality_log(
         # Trigger immediate alert email notification (IVF only) - AUTOMATIC TRIGGER
         # This sends emails to branch users if occurrence < 3, or managers if >= 3
         # Same behavior as Publisher 7.py, but uses HTTP API instead of direct service call
-        try:
-            quality_log_data = {
-                "is_temp_internal_loss": is_temp_internal_loss,
-                "is_temp_external_loss": is_temp_external_loss,
-                "is_shock_loss": is_shock_loss,
-                "quality_loss": quality_loss,
-                "kpi_statuses": kpi_statuses,
-                "temp_internal": data.get("temp_internal"),
-                "temp_external": data.get("temp_external"),
-                "shock": data.get("shock"),
-            }
+        if is_stale:
+            logger.info(
+                f"Skipping immediate alert email for tank {tank_id} "
+                "(stale/backlog event - condition may already be resolved)"
+            )
+        else:
+            try:
+                quality_log_data = {
+                    "is_temp_internal_loss": is_temp_internal_loss,
+                    "is_temp_external_loss": is_temp_external_loss,
+                    "is_shock_loss": is_shock_loss,
+                    "quality_loss": quality_loss,
+                    "kpi_statuses": kpi_statuses,
+                    "temp_internal": data.get("temp_internal"),
+                    "temp_external": data.get("temp_external"),
+                    "shock": data.get("shock"),
+                }
 
-            # Call external API (non-critical - log errors but don't fail)
-            trigger_immediate_alert_email(
-                tank_id=tank_id,
-                quality_log_data=quality_log_data,
-                occurred_at=created_at,
-            )
-            logger.info(f"✓ Triggered immediate alert email check for tank {tank_id}")
-        except Exception as e:
-            logger.error(
-                f"Error triggering immediate alert email for tank {tank_id} (non-critical): {e}"
-            )
-            # Don't fail the insert if email trigger fails
+                # Call external API (non-critical - log errors but don't fail)
+                trigger_immediate_alert_email(
+                    tank_id=tank_id,
+                    quality_log_data=quality_log_data,
+                    occurred_at=created_at,
+                )
+                logger.info(f"✓ Triggered immediate alert email check for tank {tank_id}")
+            except Exception as e:
+                logger.error(
+                    f"Error triggering immediate alert email for tank {tank_id} (non-critical): {e}"
+                )
+                # Don't fail the insert if email trigger fails
 
         return True
 
@@ -4819,7 +4845,9 @@ def transform_webhook_to_ivf_quality_data(
     return data
 
 
-def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
+def process_webhook_payload(
+    event_data, webhook_payload: Dict[str, Any], db, is_stale: bool = False
+) -> int:
     """
     Process webhook payload - main processing function adapted for Azure Functions.
 
@@ -4829,23 +4857,32 @@ def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
     Args:
         event_data: Event Hub event data (for idempotency)
         webhook_payload: Parsed webhook payload
+        db: Database session, shared across the whole batch by the caller.
+            Each branch below still commits/rolls back its own transaction.
+        is_stale: True when this event's Event Hub enqueued_time is older than
+            config.STALE_EVENT_THRESHOLD_SECONDS (backlog catch-up). Suppresses
+            immediate alert emails for violations that may already be resolved;
+            all inserts and factual event records (e.g. refill detection) still
+            happen normally.
 
     Returns:
         Number of items processed
     """
-    SessionLocal = get_session()
-    db = SessionLocal()
-
     try:
-        logger.info(f"Printing event data: {event_data}:{webhook_payload}")
-        # 1. Idempotency check (with transaction safety)
+        logger.debug(f"Printing event data: {event_data}:{webhook_payload}")
+        # 1. Idempotency (atomic claim - single INSERT ... ON CONFLICT DO NOTHING).
+        # If this rolls back (processing fails below), the claim rolls back too,
+        # so a retry will correctly see the message as unprocessed.
         message_id = generate_message_id(event_data)
+        payload_summary = json.dumps(webhook_payload)[:200]
         try:
-            if check_message_processed(db, message_id):
+            claimed = try_mark_message_processing(db, message_id, payload_summary)
+            if not claimed:
                 logger.info(f"Message {message_id} already processed - skipping")
+                db.rollback()
                 return 0
         except Exception as e:
-            logger.warning(f"Idempotency check failed, continuing anyway: {e}")
+            logger.warning(f"Idempotency claim failed, continuing anyway: {e}")
             try:
                 db.rollback()
             except:
@@ -4853,13 +4890,10 @@ def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
 
         # 2. CUSTOM_IOT (LN2) - handled as before
         if is_custom_iot_source(webhook_payload):
-            logger.info("Processing CUSTOM_IOT (LN2) webhook...")
+            logger.debug("Processing CUSTOM_IOT (LN2) webhook...")
             try:
-                success = process_custom_iot_ln2(db, webhook_payload)
+                success = process_custom_iot_ln2(db, webhook_payload, is_stale=is_stale)
                 if success:
-                    mark_message_processed(
-                        db, message_id, json.dumps(webhook_payload)[:200]
-                    )
                     db.commit()
                     return 1
                 else:
@@ -4873,13 +4907,12 @@ def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
 
         # 2b. CUSTOM_COMPOSITE_IOT (LN2 + ambient/battery composite payload)
         if is_custom_composite_iot_source(webhook_payload):
-            logger.info("Processing CUSTOM_COMPOSITE_IOT webhook...")
+            logger.debug("Processing CUSTOM_COMPOSITE_IOT webhook...")
             try:
-                success = process_custom_composite_iot(db, webhook_payload)
+                success = process_custom_composite_iot(
+                    db, webhook_payload, is_stale=is_stale
+                )
                 if success:
-                    mark_message_processed(
-                        db, message_id, json.dumps(webhook_payload)[:200]
-                    )
                     db.commit()
                     return 1
                 else:
@@ -4894,14 +4927,10 @@ def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
                 raise
 
         # 3. IVF tank-level monitoring (Tive device_id maps to tank)
-        logger.info(
-            f"[DEBUG] Attempting IVF tank-level detection for payload: {webhook_payload}"
-        )
         device_id = extract_device_id_from_webhook(webhook_payload)
-        logger.info(f"[DEBUG] Extracted device_id for IVF lookup: {device_id}")
         tank_info = find_tank_by_tive_device_id(db, device_id) if device_id else None
-        logger.info(
-            f"[DEBUG] IVF tank_info from find_tank_by_tive_device_id: {tank_info}"
+        logger.debug(
+            f"IVF lookup: device_id={device_id} tank_info={tank_info}"
         )
         if tank_info:
             logger.info(
@@ -4918,29 +4947,28 @@ def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
                 "webhook_data": webhook_payload,
                 "received_at": datetime.now().isoformat(),
             }
-            logger.info(f"[DEBUG] IVF tank_ivf_info: {tank_ivf_info}")
             ivf_data = transform_webhook_to_ivf_quality_data(
                 webhook_response, tank_ivf_info
             )
-            logger.info(f"[DEBUG] IVF ivf_data: {ivf_data}")
             tank_id = tank_info.get("tank_id")
             kpi_data = KPI_NAMES.convert_ivf_quality_to_kpi_names_mapped_array(ivf_data)
-            logger.info(f"[DEBUG] IVF kpi_data: {kpi_data}")
+            logger.debug(f"IVF kpi_data: {kpi_data}")
             save_kpi_readings(db, device_id, kpi_data)
             try:
                 r = get_redis_client()
-                r.publish("ivf_quality_channel", json.dumps(ivf_data))
+                pipe = r.pipeline(transaction=False)
+                pipe.publish("ivf_quality_channel", json.dumps(ivf_data))
                 history_key = f"ivf_quality_history:{tank_id}"
-                r.lpush(history_key, json.dumps(ivf_data))
-                r.ltrim(history_key, 0, 9)
-                r.sadd("ivf_tanks", str(tank_id))
+                pipe.lpush(history_key, json.dumps(ivf_data))
+                pipe.ltrim(history_key, 0, 9)
+                pipe.sadd("ivf_tanks", str(tank_id))
+                pipe.execute()
             except Exception as e:
                 logger.error(f"Error publishing to Redis for tank {tank_id}: {e}")
-            insert_ivf_telemetry_data(db, tank_id, ivf_data)
+            insert_ivf_telemetry_data(db, tank_id, ivf_data, is_stale=is_stale)
             logger.info(
                 f"✓ Inserted IVF telemetry data for tank {tank_id} (tank monitoring)"
             )
-            mark_message_processed(db, message_id, json.dumps(webhook_payload)[:200])
             db.commit()
             return 1
 
@@ -4958,23 +4986,18 @@ def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
                 process_tive_refrigerator(
                     db, device_id, webhook_payload, refrigerator_info
                 )
-                mark_message_processed(
-                    db, message_id, json.dumps(webhook_payload)[:200]
-                )
                 db.commit()
                 return 1
             except Exception as e:
                 logger.error(f"Error in refrigerator processing: {e}", exc_info=True)
                 db.rollback()
                 raise
-        logger.info(
-            f"[DEBUG] IVF refrigerator_info from find_refrigerator_by_device_code: {refrigerator_info}"
-        )
+
         # 5. CGT (patient-based) - only if valid patient_id and shipment_id
         patient_id = webhook_payload.get("PatientId")
         shipment_id = webhook_payload.get("ShipmentId")
         if patient_id and shipment_id:
-            logger.info(
+            logger.debug(
                 f"Processing CGT shipment webhook: patient_id={patient_id}, shipment_id={shipment_id}"
             )
             webhook_response = {
@@ -4995,14 +5018,12 @@ def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
                 logger.info(
                     f"✓ Inserted telemetry data for shipment {shipment_id} (id={telemetry_data_id})"
                 )
-            mark_message_processed(db, message_id, json.dumps(webhook_payload)[:200])
             db.commit()
             return 1
         else:
             logger.warning(
                 "No valid patient_id and shipment_id found for CGT processing. Skipping CGT inserts."
             )
-            mark_message_processed(db, message_id, json.dumps(webhook_payload)[:200])
             db.commit()
             return 0
 
@@ -5010,5 +5031,3 @@ def process_webhook_payload(event_data, webhook_payload: Dict[str, Any]) -> int:
         db.rollback()
         logger.error(f"Error processing webhook payload: {e}", exc_info=True)
         raise
-    finally:
-        db.close()
