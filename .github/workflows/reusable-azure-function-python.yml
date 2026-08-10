@@ -31,7 +31,12 @@ jobs:
 
       - name: Install Azure Functions Core Tools
         run: |
-          npm install -g azure-functions-core-tools@4 --unsafe-perm true
+          set -e
+          if ! npm install -g azure-functions-core-tools@4.13.1 --unsafe-perm true; then
+            echo "Pinned version failed, retrying latest @4 in case it's now fixed..."
+            npm install -g azure-functions-core-tools@4 --unsafe-perm true
+          fi
+          func --version
 
       - name: Azure Login
         uses: azure/login@v2
