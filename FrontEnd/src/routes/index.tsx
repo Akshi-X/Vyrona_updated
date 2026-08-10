@@ -310,7 +310,7 @@ export const router = createBrowserRouter([
             { path: "/onboarding/success",                               element: <><OnboardingSuccess /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/users",                                 element: <><UsersPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/embryo-console",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/embryo-console/:his/advanced",          element: <><AdvancedEmbryoGradingPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/embryo-console/:his/ai-grading",        element: <><AdvancedEmbryoGradingPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking/:id",                element: <><IncubatorDetailPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/track/:patientId",                      element: <><TrackPage /><ActiveOnboardingLevel /></> },
@@ -341,7 +341,7 @@ export const router = createBrowserRouter([
                 element: <EmbryoShellWithAuth />,
                 children: [
                     { index: true,         element: <EmbryoGradingDetailPage /> },
-                    { path: "advanced",    element: <AdvancedEmbryoGradingPage /> },
+                    { path: "ai-grading",  element: <AdvancedEmbryoGradingPage /> },
                     { path: "compare",     element: <EmbryoComparePage /> },
                     { path: "reports",     element: <EmbryoReportsPage /> },
                 ],
