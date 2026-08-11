@@ -44,6 +44,7 @@ export interface HospitalUserItem {
   role: string;
   branch_name?: string | null;
   department?: string | null;
+  phone_number?: string | null;
   status: boolean;
   approved_status: string;
   invite_pending: boolean;
@@ -53,6 +54,13 @@ export interface HospitalUserItem {
 export interface HospitalUserListResponse {
   total_users: number;
   users: HospitalUserItem[];
+}
+
+export interface HospitalUserDetailsUpdate {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone_number?: string | null;
 }
 
 export interface UserListResponse {
@@ -217,6 +225,33 @@ export class UserService extends BaseApiService {
     return await this.request<{ message: string }>('/api/hospital/users/invite', {
       method: 'POST',
       body: JSON.stringify({ email, role, branch_name: branch ?? null }),
+    });
+  }
+
+  async updateHospitalUserDetails(userId: string, data: HospitalUserDetailsUpdate): Promise<HospitalUserItem> {
+    return await this.request<HospitalUserItem>(`/api/hospital/users/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateHospitalUserStatus(userId: string, status: boolean): Promise<HospitalUserItem> {
+    return await this.request<HospitalUserItem>(`/api/hospital/users/${encodeURIComponent(userId)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async updateHospitalUserBranch(userId: string, branchName: string): Promise<HospitalUserItem> {
+    return await this.request<HospitalUserItem>(`/api/hospital/users/${encodeURIComponent(userId)}/branch`, {
+      method: 'PATCH',
+      body: JSON.stringify({ branch_name: branchName }),
+    });
+  }
+
+  async sendPasswordResetLink(userId: string): Promise<{ message: string; email: string }> {
+    return await this.request(`/api/hospital/users/${encodeURIComponent(userId)}/send-reset-link`, {
+      method: 'POST',
     });
   }
 
