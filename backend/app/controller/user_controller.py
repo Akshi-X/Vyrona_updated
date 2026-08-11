@@ -29,7 +29,11 @@ from app.schemas.response_schema import (
     UserDetailsResponse,
     UserProfileResponse
 )
-from app.schemas.user_schema import UserListResponse, UserNameUpdateRequest, UserUpdateResponse, HospitalUserListResponse, HospitalUserItem, InviteUserRequest, InviteTokenResponse, RegisterFromInviteRequest
+from app.schemas.user_schema import (
+    UserListResponse, UserNameUpdateRequest, UserUpdateResponse, HospitalUserListResponse,
+    HospitalUserItem, InviteUserRequest, InviteTokenResponse, RegisterFromInviteRequest,
+    HospitalUserDetailsUpdateRequest, HospitalUserStatusUpdateRequest, HospitalUserBranchUpdateRequest,
+)
 from app.constants.messages import SuccessMessages
 from app.dependencies.auth_dependencies import get_current_user, validate_registration_request
 from app.service.activity_log_service import ActivityLogService, build_actor_from_user
@@ -355,6 +359,13 @@ def get_all_users(
     return result
 
 
+def _require_admin_or_manager(current_user: user_model.User) -> None:
+    """Restrict an endpoint to Admin/Manager roles. Raises 403 otherwise."""
+    role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if role.lower() not in ("admin", "manager"):
+        raise HTTPException(status_code=403, detail="Admin or Manager role required")
+
+
 # ---------------------------
 # Get all users of the current user's hospital
 # ---------------------------
@@ -399,6 +410,71 @@ def resend_invite(
     """Resend invite email to a pending user with a fresh token."""
     try:
         return user_service.resend_invite(db=db, current_user=current_user, user_id=user_id, base_url=settings.FRONTEND_URL)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/hospital/users/{user_id}", response_model=HospitalUserItem)
+def update_hospital_user_details(
+    user_id: str,
+    body: HospitalUserDetailsUpdateRequest,
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Admin/Manager: update another hospital user's name, email, or phone number."""
+    _require_admin_or_manager(current_user)
+    try:
+        return user_service.update_user_details(
+            db=db, current_user=current_user, user_id=user_id, update_request=body
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/hospital/users/{user_id}/status", response_model=HospitalUserItem)
+def update_hospital_user_status(
+    user_id: str,
+    body: HospitalUserStatusUpdateRequest,
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Admin/Manager: enable or disable a hospital user's account."""
+    _require_admin_or_manager(current_user)
+    try:
+        return user_service.update_user_status(
+            db=db, current_user=current_user, user_id=user_id, status=body.status
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/hospital/users/{user_id}/branch", response_model=HospitalUserItem)
+def update_hospital_user_branch(
+    user_id: str,
+    body: HospitalUserBranchUpdateRequest,
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Admin/Manager: change a hospital user's assigned branch."""
+    _require_admin_or_manager(current_user)
+    try:
+        return user_service.update_user_branch(
+            db=db, current_user=current_user, user_id=user_id, branch_name=body.branch_name
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/hospital/users/{user_id}/send-reset-link")
+def send_hospital_user_reset_link(
+    user_id: str,
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Admin/Manager: send a password reset link to a hospital user."""
+    _require_admin_or_manager(current_user)
+    try:
+        return user_service.send_password_reset_link(db=db, current_user=current_user, user_id=user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

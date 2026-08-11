@@ -13,15 +13,31 @@ type FilterState = {
 };
 
 export default function UsersPage() {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, userRole } = useAuth();
+    const canManageUsers = ["admin", "manager"].includes((userRole || "").toLowerCase());
 
     const [users, setUsers] = useState<HospitalUserItem[]>([]);
     const [allBranches, setAllBranches] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [filters, setFilters] = useState<FilterState>({ role: "All", branch: "All" });
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
     const [resendingId, setResendingId] = useState<string | null>(null);
+    const [resetLinkSendingId, setResetLinkSendingId] = useState<string | null>(null);
+    const [statusTogglingId, setStatusTogglingId] = useState<string | null>(null);
+
+    const [editingUser, setEditingUser] = useState<HospitalUserItem | null>(null);
+    const [editForm, setEditForm] = useState({ first_name: "", last_name: "", email: "", phone_number: "" });
+    const [editSaving, setEditSaving] = useState(false);
+    const [editError, setEditError] = useState<string | null>(null);
+
+    const [branchEditingUser, setBranchEditingUser] = useState<HospitalUserItem | null>(null);
+    const [branchSelection, setBranchSelection] = useState("");
+    const [branchSaving, setBranchSaving] = useState(false);
+    const [branchError, setBranchError] = useState<string | null>(null);
+
+    const [confirmDisableUser, setConfirmDisableUser] = useState<HospitalUserItem | null>(null);
 
     // Onboarding: open invite modal via event so tour can walk through it
     useEffect(() => {
@@ -56,9 +72,10 @@ export default function UsersPage() {
             setLoading(true);
             setError(null);
             try {
-                const [res, branchesData] = await Promise.all([
+                const [res, branchesData, profile] = await Promise.all([
                     userService.getHospitalUsers(),
                     ivfService.getBranches().catch(() => ({ branches: [] })),
+                    userService.getProfile().catch(() => null),
                 ]);
                 setUsers(res.users ?? []);
                 setAllBranches(
@@ -67,6 +84,7 @@ export default function UsersPage() {
                         .filter(Boolean)
                         .sort()
                 );
+                setCurrentUserId(profile?.user_id ?? null);
             } catch (err) {
                 setError((err as Error)?.message || "Failed to load users");
             } finally {
@@ -93,6 +111,123 @@ export default function UsersPage() {
     }, [users, filters]);
 
     const handleReset = () => setFilters({ role: "All", branch: "All" });
+
+    const handleSendResetLink = async (user: HospitalUserItem) => {
+        setResetLinkSendingId(user.user_id);
+        try {
+            await userService.sendPasswordResetLink(user.user_id);
+            toast.success(`Password reset link sent to ${user.email}`);
+        } catch (err) {
+            toast.error((err as Error)?.message || "Failed to send reset link");
+        } finally {
+            setResetLinkSendingId(null);
+        }
+    };
+
+    const handleToggleStatus = async (user: HospitalUserItem) => {
+        if (user.status) {
+            setConfirmDisableUser(user);
+            return;
+        }
+        setStatusTogglingId(user.user_id);
+        try {
+            const updated = await userService.updateHospitalUserStatus(user.user_id, true);
+            setUsers((prev) => prev.map((u) => (u.user_id === updated.user_id ? updated : u)));
+            toast.success("User enabled");
+        } catch (err) {
+            toast.error((err as Error)?.message || "Failed to enable user");
+        } finally {
+            setStatusTogglingId(null);
+        }
+    };
+
+    const confirmDisable = async () => {
+        if (!confirmDisableUser) return;
+        const userId = confirmDisableUser.user_id;
+        setStatusTogglingId(userId);
+        try {
+            const updated = await userService.updateHospitalUserStatus(userId, false);
+            setUsers((prev) => prev.map((u) => (u.user_id === updated.user_id ? updated : u)));
+            toast.success("User disabled");
+            setConfirmDisableUser(null);
+        } catch (err) {
+            toast.error((err as Error)?.message || "Failed to disable user");
+        } finally {
+            setStatusTogglingId(null);
+        }
+    };
+
+    const openEditModal = (user: HospitalUserItem) => {
+        setEditingUser(user);
+        setEditForm({
+            first_name: user.first_name,
+            last_name: user.last_name,
+            email: user.email,
+            phone_number: user.phone_number ?? "",
+        });
+        setEditError(null);
+    };
+
+    const closeEditModal = () => {
+        setEditingUser(null);
+        setEditError(null);
+    };
+
+    const handleSaveDetails = async () => {
+        if (!editingUser) return;
+        if (!editForm.first_name.trim() || !editForm.last_name.trim()) {
+            setEditError("First and last name are required.");
+            return;
+        }
+        if (!validateEmail(editForm.email)) {
+            setEditError("Enter a valid email address.");
+            return;
+        }
+        setEditSaving(true);
+        setEditError(null);
+        try {
+            const updated = await userService.updateHospitalUserDetails(editingUser.user_id, {
+                first_name: editForm.first_name.trim(),
+                last_name: editForm.last_name.trim(),
+                email: editForm.email.trim(),
+                phone_number: editForm.phone_number.trim() || null,
+            });
+            setUsers((prev) => prev.map((u) => (u.user_id === updated.user_id ? updated : u)));
+            toast.success("User details updated");
+            closeEditModal();
+        } catch (err) {
+            setEditError((err as Error)?.message || "Failed to update user");
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    const openBranchModal = (user: HospitalUserItem) => {
+        setBranchEditingUser(user);
+        setBranchSelection(user.branch_name ?? "");
+        setBranchError(null);
+    };
+
+    const closeBranchModal = () => {
+        setBranchEditingUser(null);
+        setBranchError(null);
+    };
+
+    const handleSaveBranch = async () => {
+        if (!branchEditingUser || !branchSelection) return;
+        setBranchSaving(true);
+        setBranchError(null);
+        try {
+            const updated = await userService.updateHospitalUserBranch(branchEditingUser.user_id, branchSelection);
+            setUsers((prev) => prev.map((u) => (u.user_id === updated.user_id ? updated : u)));
+            toast.success("Branch updated");
+            closeBranchModal();
+        } catch (err) {
+            setBranchError((err as Error)?.message || "Failed to update branch");
+        } finally {
+            setBranchSaving(false);
+        }
+    };
 
     const handleInvite = async () => {
         if (!inviteEmail.trim() || !validateEmail(inviteEmail)) {
@@ -219,6 +354,158 @@ export default function UsersPage() {
                 </div>
             </div>
         )}
+        {editingUser && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-lg w-full max-w-md mx-4 p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-1">Edit User</h3>
+                    <p className="text-sm text-gray-500 mb-5">Update name, email, or phone number.</p>
+
+                    <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-gray-600">First Name</label>
+                                <input
+                                    type="text"
+                                    className="border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    value={editForm.first_name}
+                                    onChange={(e) => setEditForm((prev) => ({ ...prev, first_name: e.target.value }))}
+                                    disabled={editSaving}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-gray-600">Last Name</label>
+                                <input
+                                    type="text"
+                                    className="border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    value={editForm.last_name}
+                                    onChange={(e) => setEditForm((prev) => ({ ...prev, last_name: e.target.value }))}
+                                    disabled={editSaving}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-semibold text-gray-600">Email</label>
+                            <input
+                                type="email"
+                                className="border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                value={editForm.email}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))}
+                                disabled={editSaving}
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-semibold text-gray-600">Phone Number</label>
+                            <input
+                                type="tel"
+                                placeholder="Optional"
+                                className="border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                value={editForm.phone_number}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, phone_number: e.target.value }))}
+                                disabled={editSaving}
+                            />
+                        </div>
+
+                        {editError && <p className="text-sm font-medium text-red-600">{editError}</p>}
+                    </div>
+
+                    <div className="flex gap-3 justify-end mt-6">
+                        <button
+                            type="button"
+                            onClick={closeEditModal}
+                            disabled={editSaving}
+                            className="px-4 py-2 bg-primary-bg text-primary rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSaveDetails}
+                            disabled={editSaving}
+                            className="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
+                        >
+                            {editSaving ? "Saving..." : "Save Changes"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        {branchEditingUser && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-lg w-full max-w-sm mx-4 p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-1">Change Branch</h3>
+                    <p className="text-sm text-gray-500 mb-5">
+                        Reassign {branchEditingUser.first_name} {branchEditingUser.last_name} to a different branch.
+                    </p>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-gray-600">Branch</label>
+                        <select
+                            className="border border-line rounded-md px-3 py-2 text-sm"
+                            value={branchSelection}
+                            onChange={(e) => setBranchSelection(e.target.value)}
+                            disabled={branchSaving}
+                        >
+                            <option value="">Select branch</option>
+                            {allBranches.map((name) => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {branchError && <p className="mt-3 text-sm font-medium text-red-600">{branchError}</p>}
+
+                    <div className="flex gap-3 justify-end mt-6">
+                        <button
+                            type="button"
+                            onClick={closeBranchModal}
+                            disabled={branchSaving}
+                            className="px-4 py-2 bg-primary-bg text-primary rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSaveBranch}
+                            disabled={branchSaving || !branchSelection}
+                            className="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
+                        >
+                            {branchSaving ? "Saving..." : "Save Branch"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        {confirmDisableUser && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-lg w-full max-w-sm mx-4 p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-1">Disable User</h3>
+                    <p className="text-sm text-gray-500 mb-5">
+                        {confirmDisableUser.first_name} {confirmDisableUser.last_name} will no longer be able to log in. You can re-enable them anytime.
+                    </p>
+
+                    <div className="flex gap-3 justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmDisableUser(null)}
+                            disabled={statusTogglingId === confirmDisableUser.user_id}
+                            className="px-4 py-2 bg-primary-bg text-primary rounded-md text-sm font-semibold hover:bg-[#E8D4F0] transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={confirmDisable}
+                            disabled={statusTogglingId === confirmDisableUser.user_id}
+                            className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50"
+                        >
+                            {statusTogglingId === confirmDisableUser.user_id ? "Disabling..." : "Disable User"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
         <PageLayout
             title="Users"
             description="Manage your team's roles and branch access."
@@ -308,13 +595,16 @@ export default function UsersPage() {
                                 <th id="onboarding-users-col-approved" className="px-4 py-3 text-left font-semibold text-primary">Approved</th>
                                 <th id="onboarding-users-col-lastlogin" className="px-4 py-3 text-left font-semibold text-primary">Last Login</th>
                                 <th id="onboarding-users-col-invite" className="px-4 py-3 text-left font-semibold text-primary">Invite</th>
+                                {canManageUsers && (
+                                    <th className="px-4 py-3 text-left font-semibold text-primary">Actions</th>
+                                )}
                             </tr>
                         </thead>
                         <tbody>
                             {loading
                                 ? Array.from({ length: 6 }).map((_, i) => (
                                     <tr key={i} className="border-b border-primary-bg bg-white">
-                                        {[120, 160, 80, 100, 70, 80, 110, 100].map((w, col) => (
+                                        {(canManageUsers ? [120, 160, 80, 100, 70, 80, 110, 100, 140] : [120, 160, 80, 100, 70, 80, 110, 100]).map((w, col) => (
                                             <td key={col} className="px-4 py-3">
                                                 <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
                                                     <div
@@ -371,11 +661,54 @@ export default function UsersPage() {
                                                 <span className="text-xs text-gray-400">—</span>
                                             )}
                                         </td>
+                                        {canManageUsers && (
+                                            <td className="px-4 py-3">
+                                                {user.invite_pending ? (
+                                                    <span className="text-xs text-gray-400">—</span>
+                                                ) : (
+                                                    <div className="flex items-center gap-3 whitespace-nowrap">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openEditModal(user)}
+                                                            className="text-xs font-semibold text-primary hover:underline"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        {user.role !== "Manager" && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openBranchModal(user)}
+                                                                className="text-xs font-semibold text-primary hover:underline"
+                                                            >
+                                                                Branch
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleSendResetLink(user)}
+                                                            disabled={resetLinkSendingId === user.user_id}
+                                                            className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                                                        >
+                                                            {resetLinkSendingId === user.user_id ? "Sending…" : "Reset Link"}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleToggleStatus(user)}
+                                                            disabled={statusTogglingId === user.user_id || user.user_id === currentUserId}
+                                                            title={user.user_id === currentUserId ? "You cannot disable your own account" : undefined}
+                                                            className={`text-xs font-semibold hover:underline disabled:opacity-50 disabled:no-underline ${user.status ? "text-red-600" : "text-green-600"}`}
+                                                        >
+                                                            {statusTogglingId === user.user_id ? "..." : user.status ? "Disable" : "Enable"}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                             {!loading && filteredUsers.length === 0 && (
                                 <tr>
-                                    <td colSpan={8} className="px-4 py-6 text-center text-gray-400">
+                                    <td colSpan={canManageUsers ? 9 : 8} className="px-4 py-6 text-center text-gray-400">
                                         No users found.
                                     </td>
                                 </tr>
