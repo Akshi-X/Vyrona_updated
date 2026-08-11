@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { MessageSquare } from 'lucide-react';
 import { chatService } from '../../services/chatService';
 import { userService, type UserListItem } from '../../services/userService';
 import renderMessageWithMentions from './utils/renderMessageWithMentions';
@@ -753,8 +754,9 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                 });
               })()
             ) : (
-              <div className="text-center text-xs text-gray-500 mt-10">
-                {chatIdentifier ? 'No messages yet. Start the conversation!' : 'No messages to display'}
+              <div className="flex flex-col items-center justify-center gap-2 text-center mt-10 px-4">
+                <MessageSquare size={28} strokeWidth={1.5} style={{ color: '#c4a8d8' }} />
+                <span className="text-xs text-gray-500">Send a message to all the stakeholders here.</span>
               </div>
             )}
           </div>
