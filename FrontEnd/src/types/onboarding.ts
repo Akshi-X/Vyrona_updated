@@ -76,6 +76,9 @@ export interface PageTour {
     /** The /onboarding replica route this tour runs on (real page = route minus /onboarding). */
     route: string;
     title: string;
+    /** Match this tour when the current path equals the base route OR is a sub-path of it
+     *  (for dynamic routes like /cryocan-tracking/:tankId). Default: exact match only. */
+    matchPrefix?: boolean;
     quick_start?: OnboardingLevelQuickStart;
     quick_exit?: OnboardingLevelQuickExit;
 }

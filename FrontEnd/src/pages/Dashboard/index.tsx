@@ -2046,7 +2046,7 @@ export default function Dashboard({ }: DashboardProps) {
         onTrack={(canisterId) => {
           setCanisterError(undefined);
           setShowTrackCanister(false);
-          navigate(`/ivf-track-shipment/${encodeURIComponent(canisterId)}`);
+          navigate(`/cryocan-tracking/${encodeURIComponent(canisterId)}`);
         }}
       />
 

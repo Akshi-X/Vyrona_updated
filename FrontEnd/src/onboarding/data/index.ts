@@ -89,6 +89,14 @@ export const pageTours: PageTour[] = [
         quick_start: { message: "See how to filter by role and branch, invite members, and control who has access." },
         quick_exit: { headerTitle: "Users Tour Complete", title: "Users Tour Complete", message: "You can manage who has access to your mgSCALE account." },
     },
+    {
+        id: "tour-cryocan",
+        route: "/onboarding/cryocan-tracking",
+        title: "Cryocan Quality Tracking",
+        matchPrefix: true,
+        quick_start: { message: "Take a guided tour of Cryocan Quality Tracking — live conditions, the 3D canister view, system activity, and container data." },
+        quick_exit: { headerTitle: "Cryocan Tour Complete", title: "Cryocan Tour Complete", message: "You've explored live conditions, the canister view, system activity, and container data." },
+    },
 ];
 
 export const pageTourStepsById: Record<string, OnboardingStep[]> = {
@@ -99,6 +107,7 @@ export const pageTourStepsById: Record<string, OnboardingStep[]> = {
     "tour-reports": filterSteps(reportsSteps),
     "tour-user-profile": filterSteps(userProfileSteps),
     "tour-users": filterSteps(usersSteps),
+    "tour-cryocan": filterSteps(cryocanSteps),
 };
 
 export const getPageTour = (id: string): PageTour | undefined =>
