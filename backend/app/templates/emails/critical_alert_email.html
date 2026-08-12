@@ -14,6 +14,11 @@
     <![endif]-->
     <style type="text/css">
         :root {color-scheme: light only; supported-color-schemes: light only;}
+        @media only screen and (min-width: 621px) {
+            .mg-outer {padding: 26px 10px !important;}
+            .mg-logo {width: 190px !important; max-width: 190px !important;}
+            .mg-tag  {font-size: 12px !important; letter-spacing: 2px !important;}
+        }
         @media only screen and (max-width: 620px) {
             .mg-card     {width: 100% !important;}
             .mg-pad      {padding-left: 22px !important; padding-right: 22px !important;}
@@ -28,27 +33,25 @@
             .mg-kv-v     {display: block !important; width: auto !important; text-align: left !important; margin-top: 3px !important;}
             .mg-stat     {font-size: 26px !important;}
             .mg-pad      {padding-left: 16px !important; padding-right: 16px !important;}
-            .mg-logo     {width: 104px !important; max-width: 104px !important;}
-            .mg-tag      {font-size: 9px !important; letter-spacing: 0.8px !important; padding-right: 14px !important;}
         }
     </style>
 </head>
 {% set accent    = '#DC2626' if severity == 'High' else ('#D97706' if severity == 'Medium' else '#2563EB') %}
 {% set accent_bg = '#FEECEC' if severity == 'High' else ('#FFF6E5' if severity == 'Medium' else '#EAF2FE') %}
 {% set brand     = '#6b1176' %}
-<body style="margin:0; padding:0; background-color:#EFEFF3; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased;">
+<body style="margin:0; padding:0; background-color:#FFFFFF; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased;">
 
     <!-- Preheader: inbox preview text -->
-    <div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#EFEFF3; opacity:0;">
+    <div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#FFFFFF; opacity:0;">
         {{ severity }} severity &middot; {{ tank_code }}{% if branch_name %} &middot; {{ branch_name }}{% endif %} &mdash; {{ message }}
     </div>
 
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; background-color:#EFEFF3;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%; background-color:#FFFFFF;">
         <tr>
-            <td align="center" style="text-align:center; padding:26px 10px;">
+            <td class="mg-outer" align="center" style="text-align:center; padding:8px 2px;">
 
                 <!--[if mso]><table role="presentation" width="640" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="mg-card" style="border-spacing:0; width:100%; max-width:640px; margin:0 auto; text-align:left; background-color:#FFFFFF; border-radius:10px; overflow:hidden;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="mg-card" style="border-spacing:0; table-layout:fixed; width:100%; max-width:640px; margin:0 auto; text-align:left; background-color:#FCFFFD; border-radius:10px; overflow:hidden;">
 
                     <!-- Header -->
                     <tr>
@@ -59,20 +62,31 @@
                                 <v:textbox inset="0,0,0,0"><![endif]-->
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-spacing:0; width:100%;">
                                 <tr>
-                                    <td align="left" valign="middle" style="text-align:left; vertical-align:middle; padding:26px 0 26px 34px;">
+                                    <td align="left" valign="middle" style="text-align:left; vertical-align:middle; padding:22px 0 0 22px;">
                                         {% if logo_url %}
-                                        <img src="{{ logo_url }}" alt="mG SCALE" width="150" height="80" class="mg-logo" style="display:block; border:0; outline:none; text-decoration:none; width:150px; height:auto; max-width:150px; font-size:19px; font-weight:700; color:#FFFFFF;">
+                                        <img src="{{ logo_url }}" alt="mG SCALE" width="118" height="59" class="mg-logo" style="display:block; border:0; outline:none; text-decoration:none; width:118px; height:auto; max-width:118px; font-size:19px; font-weight:700; color:#FFFFFF;">
                                         {% else %}
                                         <span style="font-size:19px; font-weight:700; color:#FFFFFF; letter-spacing:0.3px;">mG SCALE</span>
                                         {% endif %}
                                     </td>
-                                    <td class="mg-tag" align="right" valign="middle" style="width:100%; text-align:right; vertical-align:middle; padding:26px 20px 26px 8px; font-size:12px; font-weight:700; color:#FFFFFF; letter-spacing:2px; text-transform:uppercase;">Alert Notification</td>
+                                    <td class="mg-tag" align="right" valign="middle" style="width:100%; text-align:right; vertical-align:middle; padding:22px 20px 0 6px;">
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="right" style="border-spacing:0; margin:0 0 0 auto;">
+                                            <tr>
+                                                <td valign="middle" style="vertical-align:middle; padding-right:7px; font-size:0; line-height:0;"><img src="cid:mg_alert_badge" alt="" width="30" height="30" style="display:block; border:0; outline:none; width:30px; height:30px;"></td>
+                                                <td valign="middle" style="vertical-align:middle; font-size:10px; font-weight:700; color:#FFFFFF; letter-spacing:1.2px; text-transform:uppercase; white-space:nowrap;">Alert Notification</td>
+                                            </tr>
+                                        </table>
+                                    </td>
                                 </tr>
                             </table>
                             <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
                         </td>
                     </tr>
-                    <tr><td style="height:4px; line-height:4px; font-size:0; background-color:#8b2a96;">&nbsp;</td></tr>
+                    <tr>
+                        <td style="padding:0; font-size:0; line-height:0; background-color:{{ brand }};">
+                            <img src="cid:otp_wave" alt="" width="640" height="55" style="display:block; border:0; outline:none; width:100%; max-width:100%; height:auto;">
+                        </td>
+                    </tr>
 
                     <!-- Hero -->
                     <tr>
@@ -237,9 +251,13 @@
                     </tr>
 
                     <!-- Footer -->
-                    <tr><td style="height:2px; line-height:2px; font-size:0; background-color:#8b2a96;">&nbsp;</td></tr>
                     <tr>
-                        <td style="background-color:#F5F4F8; padding:22px 34px; text-align:center;">
+                        <td style="padding:0; font-size:0; line-height:0; background-color:#FCFFFD;">
+                            <img src="cid:otp_fdivider" alt="" width="640" height="60" style="display:block; border:0; outline:none; width:100%; max-width:100%; height:auto;">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color:#F6F2F9; padding:8px 34px 22px 34px; text-align:center;">
                             <p style="margin:0 0 6px 0; font-size:15px; font-weight:700; color:{{ brand }};">myGrape</p>
                             <p style="margin:0; font-size:13px; line-height:1.7; color:#8A8D9B;">
                                 Automated alert notification &mdash; please do not reply.<br>

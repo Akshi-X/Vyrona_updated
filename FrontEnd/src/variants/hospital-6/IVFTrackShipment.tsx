@@ -1,7 +1,7 @@
 /**
  * @variant IVFTrackShipmentHospital6
  * @hospital Yellow IVF (ID: 6)
- * @route /ivf-track-shipment, /ivf-track-shipment/:tankId
+ * @route /cryocan-tracking, /cryocan-tracking/:tankId
  * Custom IVF Track Shipment for Yellow IVF — same layout, pale yellow background.
  */
 
