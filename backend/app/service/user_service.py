@@ -15,7 +15,12 @@ from app.schemas.response_schema import (
     UserRejectionResponse,
     UserDetailsResponse
 )
-from app.schemas.user_schema import UserListResponse, UserListItem, UserNameUpdateRequest, UserUpdateResponse, HospitalUserItem, HospitalUserListResponse, InviteUserRequest, InviteTokenResponse, RegisterFromInviteRequest
+from app.schemas.user_schema import (
+    UserListResponse, UserListItem, UserNameUpdateRequest, UserUpdateResponse,
+    HospitalUserItem, HospitalUserListResponse, InviteUserRequest, InviteTokenResponse,
+    RegisterFromInviteRequest, HospitalUserDetailsUpdateRequest, HospitalUserStatusUpdateRequest,
+    HospitalUserBranchUpdateRequest,
+)
 from app.service.email_service import send_approval_email, send_user_approved_notification, send_invite_email
 from app.service.activity_log_service import (
     ActivityLogService,
@@ -881,6 +886,24 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
         raise DatabaseQueryException(operation="list users", reason=str(e))
 
 
+def _to_hospital_user_item(user: User) -> HospitalUserItem:
+    """Build a HospitalUserItem DTO from a User row."""
+    return HospitalUserItem(
+        user_id=user.user_id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email=user.email,
+        role=normalize_role_to_title_case(user.role),
+        branch_name=user.branch.branch_name if user.branch else None,
+        department=user.department,
+        phone_number=user.phone_number,
+        status=bool(user.status),
+        approved_status=user.approved_status if isinstance(user.approved_status, str) else user.approved_status.value,
+        invite_pending=user.invite_token is not None,
+        last_login=user.last_login,
+    )
+
+
 def get_hospital_users(db: Session, current_user: User) -> HospitalUserListResponse:
     """
     Get all users belonging to the same hospital as the current user.
@@ -894,26 +917,148 @@ def get_hospital_users(db: Session, current_user: User) -> HospitalUserListRespo
             User.hospital_id == current_user.hospital_id,
         ).all()
 
-        user_items = [
-            HospitalUserItem(
-                user_id=user.user_id,
-                first_name=user.first_name,
-                last_name=user.last_name,
-                email=user.email,
-                role=normalize_role_to_title_case(user.role),
-                branch_name=user.branch.branch_name if user.branch else None,
-                department=user.department,
-                status=bool(user.status),
-                approved_status=user.approved_status if isinstance(user.approved_status, str) else user.approved_status.value,
-                invite_pending=user.invite_token is not None,
-                last_login=user.last_login,
-            )
-            for user in users
-        ]
+        user_items = [_to_hospital_user_item(user) for user in users]
 
         return HospitalUserListResponse(total_users=len(user_items), users=user_items)
     except Exception as e:
         raise DatabaseQueryException(operation="list hospital users", reason=str(e))
+
+
+def _get_hospital_target_user(db: Session, current_user: User, user_id: str) -> User:
+    """Look up a user by id, scoped to the current user's hospital."""
+    target = db.query(User).filter(User.user_id == user_id).first()
+    if not target:
+        raise ValueError("User not found.")
+    if current_user.hospital_id is None or target.hospital_id != current_user.hospital_id:
+        raise ValueError("Access denied.")
+    return target
+
+
+def update_user_details(
+    db: Session,
+    current_user: User,
+    user_id: str,
+    update_request: HospitalUserDetailsUpdateRequest,
+) -> HospitalUserItem:
+    """Admin/Manager: update another hospital user's name, email, or phone number."""
+    target = _get_hospital_target_user(db, current_user, user_id)
+
+    fields = []
+    if update_request.first_name is not None:
+        target.first_name = update_request.first_name
+        fields.append("first_name")
+    if update_request.last_name is not None:
+        target.last_name = update_request.last_name
+        fields.append("last_name")
+    if update_request.phone_number is not None:
+        target.phone_number = update_request.phone_number or None
+        fields.append("phone_number")
+    if update_request.email is not None:
+        new_email = update_request.email.lower().strip()
+        if new_email != target.email:
+            existing = db.query(User).filter(
+                User.email == new_email, User.user_id != target.user_id
+            ).first()
+            if existing:
+                raise ValueError("A user with this email already exists.")
+            target.email = new_email
+            fields.append("email")
+
+    if not fields:
+        raise ValueError("No fields to update.")
+
+    target.updated_by = current_user.user_id
+    target.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(target)
+
+    ActivityLogService(db).log_activity(
+        action="user.details_updated_by_admin",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("user", target.user_id, f"{target.first_name} {target.last_name}".strip()),
+        metadata={"fields": fields},
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
+
+    return _to_hospital_user_item(target)
+
+
+def update_user_status(
+    db: Session,
+    current_user: User,
+    user_id: str,
+    status: bool,
+) -> HospitalUserItem:
+    """Admin/Manager: enable or disable another hospital user's account."""
+    target = _get_hospital_target_user(db, current_user, user_id)
+
+    if target.user_id == current_user.user_id:
+        raise ValueError("You cannot disable your own account.")
+
+    target.status = status
+    target.updated_by = current_user.user_id
+    target.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(target)
+
+    ActivityLogService(db).log_activity(
+        action="user.enabled" if status else "user.disabled",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("user", target.user_id, f"{target.first_name} {target.last_name}".strip()),
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
+
+    return _to_hospital_user_item(target)
+
+
+def update_user_branch(
+    db: Session,
+    current_user: User,
+    user_id: str,
+    branch_name: str,
+) -> HospitalUserItem:
+    """Admin/Manager: reassign another hospital user's branch."""
+    target = _get_hospital_target_user(db, current_user, user_id)
+
+    if normalize_role_to_title_case(target.role) == "Manager":
+        raise ValueError("Managers are not assigned to a branch.")
+
+    branch = db.query(HospitalBranch).filter(
+        HospitalBranch.branch_name == branch_name,
+        HospitalBranch.hospital_id == current_user.hospital_id,
+    ).first()
+    if not branch:
+        raise ValueError(f"Branch '{branch_name}' not found.")
+
+    target.branch_id = branch.branch_id
+    target.updated_by = current_user.user_id
+    target.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(target)
+
+    ActivityLogService(db).log_activity(
+        action="user.branch_updated",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("user", target.user_id, f"{target.first_name} {target.last_name}".strip()),
+        metadata={"branch_name": branch_name},
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
+
+    return _to_hospital_user_item(target)
+
+
+def send_password_reset_link(db: Session, current_user: User, user_id: str) -> dict:
+    """Admin/Manager: trigger a password reset link email for another hospital user."""
+    target = _get_hospital_target_user(db, current_user, user_id)
+
+    if target.invite_token is not None:
+        raise ValueError("User has a pending invite; resend the invite instead.")
+
+    from app.service.password_reset_service import request_password_reset
+    return request_password_reset(target.email, db)
 
 
 def invite_user(db: Session, current_user: User, email: str, role: str, base_url: str, branch_name: str = None) -> dict:

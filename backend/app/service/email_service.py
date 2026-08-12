@@ -40,10 +40,26 @@ BRAND_ASSET_DIR = Path(__file__).resolve().parents[1] / "assets" / "email"
 BRAND_LOGO_CID = "mg_logo"
 
 
-def brand_logo_inline() -> dict:
-    """{cid: path} for the header logo, empty when the asset is unavailable."""
-    logo = BRAND_ASSET_DIR / "mygrape-logo.png"
-    return {BRAND_LOGO_CID: str(logo)} if logo.is_file() else {}
+# Icons the OTP layout references by cid, alongside the header logo.
+OTP_ICONS = {
+    "otp_lock": "email-icons/otp_lock.png",
+    "otp_clock": "email-icons/otp_clock.png",
+    "otp_shield": "email-icons/otp_shield.png",
+}
+
+
+def brand_logo_inline(extra: Optional[dict] = None) -> dict:
+    """{cid: path} for the header logo plus any extra {cid: relative path} assets.
+
+    Missing files are dropped rather than raising, so a stripped-down deployment
+    still sends the mail with its alt text intact."""
+    assets = {BRAND_LOGO_CID: "mygrape-logo.png"}
+    assets.update(extra or {})
+    return {
+        cid: str(BRAND_ASSET_DIR / rel)
+        for cid, rel in assets.items()
+        if (BRAND_ASSET_DIR / rel).is_file()
+    }
 
 
 def brand_banner_url() -> str:
@@ -297,7 +313,7 @@ def send_otp_email(user_email: str, otp_code: str):
     except TemplateError as e:
         raise TemplateRenderException(template_name="otp_email.html", reason=str(e))
 
-    send_email(user_email, subject, html_body, inline_images=brand_logo_inline())
+    send_email(user_email, subject, html_body, inline_images=brand_logo_inline(OTP_ICONS))
 
 
 # ============================================
