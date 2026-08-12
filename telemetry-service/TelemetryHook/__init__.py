@@ -1,6 +1,7 @@
 import json
 import logging
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
@@ -11,7 +12,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import config
 from shared.database import (
     ensure_ln2_event_detection_columns,
+    ensure_processed_messages_table,
     ensure_telemetry_table_exists,
+    get_session,
 )
 from shared.publisher_logic import process_webhook_payload
 
@@ -33,6 +36,7 @@ def initialize():
 
             # Ensure database tables exist
             ensure_telemetry_table_exists()
+            ensure_processed_messages_table()
             ensure_ln2_event_detection_columns()
 
             _initialized = True
@@ -40,6 +44,25 @@ def initialize():
         except Exception as e:
             logger.error(f"Initialization failed: {e}", exc_info=True)
             raise
+
+
+def _is_stale_event(event_data) -> bool:
+    """
+    True if this Event Hub message was enqueued longer ago than
+    config.STALE_EVENT_THRESHOLD_SECONDS — e.g. during backlog catch-up
+    after an outage. Used to suppress immediate alert emails for violations
+    that may already be resolved by the time we get to processing them.
+    """
+    enqueued_time = getattr(event_data, "enqueued_time", None)
+    if not enqueued_time:
+        return False
+    # azure.functions' EventHubEvent.enqueued_time is naive (UTC, no tzinfo)
+    # even though the azure-eventhub SDK's is tz-aware — normalize before
+    # subtracting.
+    if enqueued_time.tzinfo is None:
+        enqueued_time = enqueued_time.replace(tzinfo=timezone.utc)
+    age_seconds = (datetime.now(timezone.utc) - enqueued_time).total_seconds()
+    return age_seconds > config.STALE_EVENT_THRESHOLD_SECONDS
 
 
 def main(eventhub_message: List[func.EventHubEvent]):
@@ -78,53 +101,66 @@ def main(eventhub_message: List[func.EventHubEvent]):
             logger.warning("No Event Hub messages received in this batch")
             return
 
-        # Process each event hub message
-        for idx, event_data in enumerate(eventhub_message):
-            try:
-                # Parse the event hub message body
-                body_str = event_data.get_body().decode("utf-8")
-                body_json = json.loads(body_str)
+        # One session for the whole batch (was one per event) — each event
+        # still gets its own commit/rollback inside process_webhook_payload,
+        # so a mid-batch failure only loses that event's transaction, not
+        # connection-setup overhead per event.
+        SessionLocal = get_session()
+        db = SessionLocal()
 
-                # Extract the payload from the body
-                if "payload" in body_json:
-                    payload = body_json["payload"]
+        try:
+            for idx, event_data in enumerate(eventhub_message):
+                try:
+                    # Parse the event hub message body
+                    body_str = event_data.get_body().decode("utf-8")
+                    body_json = json.loads(body_str)
 
-                    if (
-                        payload.get("source") == "CUSTOM_IOT"
-                        or payload.get("source") == "CUSTOM-IOT"
-                    ):
-                        logger.info(f"Received Custom IoT Device Payload: {payload}")
-                        payload["timestamp"] = body_json.get(
-                            "receivedAt", None
-                        )  # Add timestamp from outer body if available
-                else:
-                    # If no 'payload' field, use entire body as payload
-                    payload = body_json
+                    # Extract the payload from the body
+                    if "payload" in body_json:
+                        payload = body_json["payload"]
 
-                device_id = (
-                    payload.get("DeviceId") or payload.get("EntityName") or "Unknown"
-                )
+                        if (
+                            payload.get("source") == "CUSTOM_IOT"
+                            or payload.get("source") == "CUSTOM-IOT"
+                        ):
+                            logger.debug(f"Received Custom IoT Device Payload: {payload}")
+                            payload["timestamp"] = body_json.get(
+                                "receivedAt", None
+                            )  # Add timestamp from outer body if available
+                    else:
+                        # If no 'payload' field, use entire body as payload
+                        payload = body_json
 
-                # Process webhook payload using Publisher logic
-                count = process_webhook_payload(event_data, payload)
-                processed_count += count
+                    device_id = (
+                        payload.get("DeviceId") or payload.get("EntityName") or "Unknown"
+                    )
 
-                logger.info(
-                    f"Processed message for DeviceId: {device_id} ({count} items)"
-                )
+                    is_stale = _is_stale_event(event_data)
 
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON from event hub message: {str(e)}")
-                failed_count += 1
-                continue
-            except Exception as e:
-                # Log error but continue processing other messages
-                # Event Hub will retry failed messages automatically
-                logger.error(
-                    f"Error processing event hub message: {str(e)}", exc_info=True
-                )
-                failed_count += 1
-                continue
+                    # Process webhook payload using Publisher logic
+                    count = process_webhook_payload(
+                        event_data, payload, db, is_stale=is_stale
+                    )
+                    processed_count += count
+
+                    logger.debug(
+                        f"Processed message for DeviceId: {device_id} ({count} items)"
+                    )
+
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse JSON from event hub message: {str(e)}")
+                    failed_count += 1
+                    continue
+                except Exception as e:
+                    # Log error but continue processing other messages
+                    # Event Hub will retry failed messages automatically
+                    logger.error(
+                        f"Error processing event hub message: {str(e)}", exc_info=True
+                    )
+                    failed_count += 1
+                    continue
+        finally:
+            db.close()
 
         # Log summary
         total_messages = len(eventhub_message)
