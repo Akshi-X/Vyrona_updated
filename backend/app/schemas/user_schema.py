@@ -136,6 +136,7 @@ class HospitalUserItem(BaseModel):
     role: str
     branch_name: Optional[str] = None
     department: Optional[str] = None
+    phone_number: Optional[str] = None
     status: bool = False
     approved_status: str = "pending"
     invite_pending: bool = False
@@ -181,6 +182,50 @@ class UserNameUpdateRequest(BaseModel):
         if not re.match(r'^[+]?[\d\s\-().]{7,20}$', stripped):
             raise ValueError("Enter a valid phone number")
         return stripped
+
+
+class HospitalUserDetailsUpdateRequest(BaseModel):
+    """Schema for admin/manager updating another hospital user's details"""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+
+    @field_validator('first_name', 'last_name')
+    @classmethod
+    def validate_names(cls, v):
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Name cannot be empty")
+        if len(v.strip()) < 2:
+            raise ValueError("Name must be at least 2 characters long")
+        if len(v.strip()) > 50:
+            raise ValueError("Name cannot exceed 50 characters")
+        return v.strip()
+
+    @field_validator('phone_number')
+    @classmethod
+    def validate_phone(cls, v):
+        if v is None:
+            return v
+        stripped = v.strip()
+        if not stripped:
+            return None
+        import re
+        if not re.match(r'^[+]?[\d\s\-().]{7,20}$', stripped):
+            raise ValueError("Enter a valid phone number")
+        return stripped
+
+
+class HospitalUserStatusUpdateRequest(BaseModel):
+    """Schema for admin/manager enabling or disabling a hospital user"""
+    status: bool
+
+
+class HospitalUserBranchUpdateRequest(BaseModel):
+    """Schema for admin/manager changing a hospital user's branch"""
+    branch_name: str
 
 
 class UserUpdateResponse(BaseModel):
