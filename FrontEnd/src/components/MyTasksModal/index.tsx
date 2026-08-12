@@ -565,7 +565,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         </button>
                     )}
                 </div>
-                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto max-xl:min-h-[180px]">
                     <div className="flex flex-col gap-3 p-4">
                         {visibleTasks.length === 0 && !showInputRow && (
                             <div className="flex flex-col items-center justify-center gap-2 text-center py-8 px-4">
