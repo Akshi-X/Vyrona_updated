@@ -1053,7 +1053,7 @@ export default function EmbryoGradingDetailPage() {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => navigate(`/embryo-console/${his}/advanced`, { state: { savedLogForm: logForm, savedEditingLogId: editingLogId } })}
+                              onClick={() => navigate(`/embryo-console/${his}/ai-grading`, { state: { savedLogForm: logForm, savedEditingLogId: editingLogId } })}
                               className="w-full px-4 py-3 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-primary transition-colors"
                             >
                               Start AI Grading

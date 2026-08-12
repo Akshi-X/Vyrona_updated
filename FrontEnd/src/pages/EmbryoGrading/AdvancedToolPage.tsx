@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChevronRight, ChevronLeft, Check, Trash2, ImageIcon, Lightbulb, Pencil, X, ShieldCheck, Upload, User, Hash, FlaskConical, Dna, Award, Flag, Egg, Droplets, Layers } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -61,96 +61,6 @@ const scoreTextCls = (score: number) => {
 
 
 
-// ── Canvas embryo animations ──────────────────────────────────────────────────
-
-const _2PI = Math.PI * 2;
-const _PRP = { te: '#8b2a96', teStroke: '#6b1176', icm: '#6b1176', icmHi: '#9c3aa6', cavFill: 'rgba(247,236,255,0.45)', blasto: '#9c3aa6', blastoStroke: '#7c1f8a', zona: '#b05cc0' };
-function _lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
-function _ease(t: number) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
-function _zona(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, alpha = 1) {
-  ctx.save(); ctx.globalAlpha = alpha;
-  ctx.beginPath(); ctx.ellipse(cx, cy, r, r, 0, 0, _2PI);
-  ctx.strokeStyle = _PRP.zona; ctx.lineWidth = 1.5; ctx.setLineDash([5, 3]); ctx.stroke(); ctx.setLineDash([]);
-  ctx.restore();
-}
-function _cell(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string, stroke: string, alpha = 1) {
-  ctx.save(); ctx.globalAlpha = alpha;
-  ctx.beginPath(); ctx.arc(x, y, r, 0, _2PI);
-  ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke();
-  ctx.restore();
-}
-function _nucleus(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
-  ctx.beginPath(); ctx.arc(x, y, r * 0.38, 0, _2PI);
-  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill();
-}
-function _tePos(cx: number, cy: number, r: number) {
-  return Array.from({ length: 12 }, (_, i) => {
-    const a = (i / 12) * _2PI - Math.PI / 2;
-    return [cx + Math.cos(a) * r, cy + Math.sin(a) * r] as [number, number];
-  });
-}
-function _icmPos(cx: number, cy: number, s: number): [number, number][] {
-  return [[cx-s*.5,cy-s*.5],[cx+s*.3,cy-s*.6],[cx-s*.2,cy+s*.1],[cx+s*.55,cy+s*.2],[cx-s*.55,cy+s*.45],[cx+s*.1,cy+s*.55],[cx,cy-s*.05]];
-}
-function _drawICM(ctx: CanvasRenderingContext2D, t: number) {
-  ctx.clearRect(0, 0, 180, 180);
-  const cx = 90, cy = 90, pulse = Math.sin(t * _2PI) * 0.03;
-  ctx.beginPath(); ctx.ellipse(cx, cy, 78+78*pulse, 78+78*pulse, 0, 0, _2PI); ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
-  _tePos(cx, cy, 62).forEach(([x, y]) => _cell(ctx, x, y, 10, '#9c3aa6', '#6b1176', 0.5));
-  const cb = 1 + Math.sin(t * _2PI) * 0.02;
-  ctx.beginPath(); ctx.ellipse(cx, cy+4, 52*cb, 46*cb, 0, 0, _2PI); ctx.fillStyle = _PRP.cavFill; ctx.strokeStyle = '#AFA9EC'; ctx.lineWidth = 0.5; ctx.fill(); ctx.stroke();
-  const ip = 1 + Math.sin(t * _2PI * 0.7) * 0.07;
-  _icmPos(cx-14, cy-8, 14).forEach(([x, y], i) => { const r = (i===6?6:i<3?9:8)*ip; _cell(ctx, x, y, r, _PRP.icm, _PRP.icmHi); _nucleus(ctx, x, y, r); });
-  ctx.beginPath(); ctx.ellipse(cx-14, cy-8, 26*ip, 22*ip, 0, 0, _2PI); ctx.strokeStyle = '#9c3aa6'; ctx.lineWidth = 0.8; ctx.setLineDash([3,2]); ctx.stroke(); ctx.setLineDash([]);
-  _zona(ctx, cx, cy, 78+78*pulse);
-}
-function _drawTE(ctx: CanvasRenderingContext2D, t: number) {
-  ctx.clearRect(0, 0, 180, 180);
-  const cx = 90, cy = 90, pulse = Math.sin(t * _2PI) * 0.025;
-  ctx.beginPath(); ctx.ellipse(cx, cy, 78+78*pulse, 78+78*pulse, 0, 0, _2PI); ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx, cy+4, 50, 44, 0, 0, _2PI); ctx.fillStyle = _PRP.cavFill; ctx.strokeStyle = '#AFA9EC'; ctx.lineWidth = 0.5; ctx.fill(); ctx.stroke();
-  _icmPos(cx-14, cy-8, 14).forEach(([x, y], i) => _cell(ctx, x, y, i===6?6:i<3?9:8, 'rgba(107,17,118,0.3)', 'rgba(156,58,166,0.4)', 0.5));
-  for (let i = 0; i < 12; i++) {
-    const glow = (Math.sin(((i / 12) + t * 0.6) * _2PI) + 1) / 2;
-    const a = (i / 12) * _2PI - Math.PI / 2;
-    const [x, y] = [cx + Math.cos(a)*(62+62*pulse), cy + Math.sin(a)*(62+62*pulse)];
-    const r = 10 + glow * 2.5;
-    const fill = `rgb(${Math.round(_lerp(0x9c,0x6b,glow))},${Math.round(_lerp(0x3a,0x11,glow))},${Math.round(_lerp(0xa6,0x76,glow))})`;
-    _cell(ctx, x, y, r, fill, '#6b1176'); _nucleus(ctx, x, y, r);
-  }
-  _zona(ctx, cx, cy, 78+78*pulse);
-}
-function _drawExpansion(ctx: CanvasRenderingContext2D, t: number) {
-  ctx.clearRect(0, 0, 180, 180);
-  const cx = 90, cy = 90;
-  const cycle = (t % 4) / 4;
-  let phase: number, zonaAlpha: number;
-  if (cycle < 0.6)      { phase = _ease(cycle / 0.6); zonaAlpha = 1; }
-  else if (cycle < 0.75){ phase = 1; zonaAlpha = 1 - (cycle - 0.6) / 0.15; }
-  else if (cycle < 0.85){ phase = 1; zonaAlpha = 0; }
-  else                  { phase = 1 - _ease((cycle - 0.85) / 0.15); zonaAlpha = 0; }
-  const blastoR = _lerp(42, 72, phase), zonaR = blastoR + _lerp(14, 7, phase);
-  ctx.beginPath(); ctx.ellipse(cx, cy, zonaR+2, zonaR+2, 0, 0, _2PI); ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx, cy, blastoR, blastoR, 0, 0, _2PI); ctx.fillStyle = _PRP.cavFill; ctx.strokeStyle = '#AFA9EC'; ctx.lineWidth = 0.5; ctx.fill(); ctx.stroke();
-  const n = Math.round(_lerp(8, 14, phase));
-  for (let i = 0; i < n; i++) {
-    const a = (i/n)*_2PI - Math.PI/2;
-    _cell(ctx, cx+Math.cos(a)*blastoR, cy+Math.sin(a)*blastoR, _lerp(8,10,phase), '#8b2a96', '#6b1176');
-    _nucleus(ctx, cx+Math.cos(a)*blastoR, cy+Math.sin(a)*blastoR, _lerp(8,10,phase));
-  }
-  const ispr = _lerp(10, 15, phase), icx = cx - ispr*0.8, icy = cy - ispr*0.5;
-  _icmPos(icx, icy, ispr).forEach(([x, y], i) => { const r = _lerp(6,9,phase)*(i===6?.7:i<3?1:.88); _cell(ctx, x, y, r, _PRP.icm, _PRP.icmHi); _nucleus(ctx, x, y, r); });
-  if (zonaAlpha > 0) {
-    ctx.save(); ctx.globalAlpha = zonaAlpha;
-    ctx.beginPath(); ctx.ellipse(cx, cy, zonaR, zonaR, 0, 0, _2PI);
-    ctx.strokeStyle = '#8b2a96'; ctx.lineWidth = _lerp(2.5, 1, phase); ctx.setLineDash([5,3]); ctx.stroke(); ctx.setLineDash([]);
-    ctx.restore();
-  }
-  if (zonaAlpha === 0 && phase === 1) {
-    ctx.save(); ctx.font = '600 10px sans-serif'; ctx.fillStyle = '#6b1176'; ctx.textAlign = 'center'; ctx.fillText('hatching', cx, cy+blastoR+16); ctx.restore();
-  }
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AdvancedEmbryoGradingPage() {
@@ -201,30 +111,7 @@ export default function AdvancedEmbryoGradingPage() {
   const [noGradeDeleteOpen, setNoGradeDeleteOpen] = useState(false);
   const [noBestGradeOpen, setNoBestGradeOpen] = useState(false);
   const [stagedViewIdx, setStagedViewIdx] = useState(0);
-
-  const icmCanvasRef  = useRef<HTMLCanvasElement>(null);
-  const teCanvasRef   = useRef<HTMLCanvasElement>(null);
-  const expCanvasRef  = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    let rafId: number;
-    let t1 = 0, t2 = 0, t3 = 0;
-    const S = 400 / 180;
-    const draw = (ref: React.RefObject<HTMLCanvasElement | null>, fn: (ctx: CanvasRenderingContext2D, t: number) => void, t: number) => {
-      const canvas = ref.current; if (!canvas) return;
-      const ctx = canvas.getContext('2d'); if (!ctx) return;
-      ctx.save(); ctx.scale(S, S); fn(ctx, t); ctx.restore();
-    };
-    const tick = () => {
-      t1 += 0.004; t2 += 0.004; t3 += 0.0028;
-      draw(icmCanvasRef, _drawICM, t1);
-      draw(teCanvasRef,  _drawTE,  t2);
-      draw(expCanvasRef, _drawExpansion, t3);
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
+  const [previewStaged, setPreviewStaged] = useState(false);
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -258,6 +145,7 @@ export default function AdvancedEmbryoGradingPage() {
   const addImageSlot = (file: File) => {
     if (existingGrades.length + imageSlots.length >= 4) return;
     setImageSlots(prev => [...prev, { file, url: URL.createObjectURL(file) }]);
+    setPreviewStaged(true);
   };
 
   const handleOocyteSelect = (no: number) => {
@@ -269,6 +157,7 @@ export default function AdvancedEmbryoGradingPage() {
     setGradesLoading(true);
     setGradesError(null);
     setSelectedImageIdx(null);
+    setPreviewStaged(false);
     setSelectedOocyteNo(no);
   };
 
@@ -326,6 +215,13 @@ export default function AdvancedEmbryoGradingPage() {
         if (cancelled) return;
         const active = g.filter(gr => gr.is_active !== false);
         setExistingGrades(active);
+        if (active.length > 0) {
+          let bestIdx = active.findIndex(gr => gr.is_best);
+          if (bestIdx < 0) {
+            bestIdx = active.reduce((bi, gr, i, arr) => (gr.ai_score ?? -1) > (arr[bi].ai_score ?? -1) ? i : bi, 0);
+          }
+          setSelectedImageIdx(bestIdx);
+        }
         setGradesLoading(false);
       })
       .catch((err) => {
@@ -456,10 +352,25 @@ export default function AdvancedEmbryoGradingPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
 
-      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(280px,1fr)_300px] xl:grid-rows-1 gap-4 flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+      {selectedOocyteNo == null ? (
+        <div className="flex-1 min-h-0 flex items-center justify-center p-4">
+          <div className="w-full max-w-[360px] max-h-full flex flex-col">
+            <OocyteList
+              logs={logs}
+              loading={logsLoading}
+              selectedOocyteNo={selectedOocyteNo}
+              imageSlots={imageSlots}
+              gradeCountMap={gradeCountMap}
+              locked={locked}
+              onSelect={handleOocyteSelect}
+            />
+          </div>
+        </div>
+      ) : (
+      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(280px,1fr)_300px] xl:grid-rows-1 gap-4 xl:flex-1 xl:overflow-hidden xl:min-h-0">
 
         {/* ── LEFT PANEL ── hidden during processing spinner ── */}
-        <aside className={`overflow-y-auto flex flex-col gap-3 pr-0.5 h-full ${step === 'processing' ? 'hidden' : ''}`}>
+        <aside className={`xl:overflow-y-auto flex flex-col gap-3 pr-0.5 xl:h-full ${step === 'processing' ? 'hidden' : ''}`}>
           <OocyteList
             logs={logs}
             loading={logsLoading}
@@ -479,6 +390,81 @@ export default function AdvancedEmbryoGradingPage() {
               </p>
             </div>
           </div>
+
+          {/* Action buttons */}
+          {step === 'select-best' && (
+            <div className="flex flex-col gap-2 shrink-0">
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Actions</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button"
+                  onClick={() => setOverrideModalOpen(true)}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                  style={{ background: 'var(--gradient-primary)' }}>
+                  <Pencil size={13} />
+                  Override Grade
+                </button>
+                <button type="button"
+                  onClick={() => setActiveSection(prev => prev === 'note' ? null : 'note')}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                  style={{ background: 'var(--gradient-primary)', opacity: activeSection === 'note' ? 1 : 0.85 }}>
+                  <Lightbulb size={13} />
+                  Clinical Note
+                </button>
+                <button type="button"
+                  onClick={() => { setApproveSelectedIdx(selectedImageIdx); setApproveModalOpen(true); }}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                  style={{ background: 'var(--gradient-primary)' }}>
+                  <ShieldCheck size={13} />
+                  Approve
+                </button>
+                {existingGrades.length + imageSlots.length >= 4 ? (
+                  <button type="button"
+                    onClick={() => setMaxImagesOpen(true)}
+                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                    style={{ background: 'var(--gradient-primary)' }}>
+                    <Upload size={13} />
+                    Upload Image
+                  </button>
+                ) : (
+                  <label className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity cursor-pointer"
+                    style={{ background: 'var(--gradient-primary)' }}>
+                    <Upload size={13} />
+                    Upload Image
+                    <input type="file" accept="image/*" className="hidden"
+                      onChange={e => { if (e.target.files?.[0]) { addImageSlot(e.target.files[0]); setStagedViewIdx(imageSlots.length); } e.target.value = ''; }} />
+                  </label>
+                )}
+                <button type="button"
+                  onClick={() => {
+                    if (selectedImageIdx != null && existingGrades[selectedImageIdx!]) {
+                      setDeactivateGradeId(existingGrades[selectedImageIdx!].grade_id);
+                    } else {
+                      setNoGradeDeleteOpen(true);
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                  style={{ background: 'var(--gradient-primary)' }}>
+                  <Trash2 size={13} />
+                  Delete Grade
+                </button>
+                <button type="button"
+                  onClick={async () => {
+                    const g = selectedImageIdx != null ? existingGrades[selectedImageIdx] : null;
+                    if (!g || !cycleId || !selectedLog) { setNoBestGradeOpen(true); return; }
+                    if (g.is_best) return;
+                    try {
+                      await ivfService.selectBestGrade(cycleId, selectedLog.log_id, g.grade_id);
+                      setExistingGrades(prev => prev.map((eg, i) => ({ ...eg, is_best: i === selectedImageIdx })));
+                    } catch { /* silent */ }
+                  }}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+                  style={{ background: 'var(--gradient-primary)' }}>
+                  <Check size={13} />
+                  Mark as Best
+                </button>
+              </div>
+            </div>
+          )}
         </aside>
 
         {/* ── CENTER PANEL ── */}
@@ -526,16 +512,18 @@ export default function AdvancedEmbryoGradingPage() {
         {step === 'select-best' && (() => {
           const selGrade   = selectedImageIdx != null ? existingGrades[selectedImageIdx] ?? null : null;
           const mainImgUrl = selGrade?.images[0]?.upload_image_url ?? null;
+          const showStaged = imageSlots.length > 0 && (previewStaged || (!mainImgUrl && existingGrades.length < 4));
           return (
-            <div className="flex flex-col gap-3 h-full min-h-0">
+            <div className="flex flex-col gap-3 xl:h-full min-h-0">
+              <div className="flex gap-3 flex-1 min-h-0">
               {/* Embryo Preview card */}
               <div className="rounded-xl border border-line bg-white overflow-hidden flex flex-col flex-1 min-h-0">
                 <div className="px-4 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white shrink-0">
                   <p className="text-xs font-bold text-gray-800">Embryo Preview</p>
                   <p className="text-[9px] text-gray-400 mt-0.5">Select a graded image to preview it here.</p>
                 </div>
-                <div className={`relative flex-1 min-h-0 ${(mainImgUrl || imageSlots.length > 0) ? 'bg-black' : 'bg-gray-50'}`}>
-                  {mainImgUrl ? (
+                <div className={`relative flex-1 min-h-[300px] xl:min-h-0 ${(mainImgUrl || imageSlots.length > 0) ? 'bg-black' : 'bg-gray-50'}`}>
+                  {(mainImgUrl && !showStaged) ? (
                     <img src={mainImgUrl} alt="Selected oocyte" className="w-full h-full object-contain absolute inset-0" />
                   ) : existingGrades.length >= 4 ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-4">
@@ -558,12 +546,12 @@ export default function AdvancedEmbryoGradingPage() {
                         {imageSlots.length > 1 && (
                           <>
                             <button type="button" disabled={si === 0}
-                              onClick={() => setStagedViewIdx(p => Math.max(0, p - 1))}
+                              onClick={() => { setPreviewStaged(true); setStagedViewIdx(p => Math.max(0, p - 1)); }}
                               className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/90 shadow-lg flex items-center justify-center disabled:opacity-25 hover:bg-white transition-all">
                               <ChevronLeft size={16} className="text-gray-700" />
                             </button>
                             <button type="button" disabled={si === imageSlots.length - 1}
-                              onClick={() => setStagedViewIdx(p => Math.min(imageSlots.length - 1, p + 1))}
+                              onClick={() => { setPreviewStaged(true); setStagedViewIdx(p => Math.min(imageSlots.length - 1, p + 1)); }}
                               className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/90 shadow-lg flex items-center justify-center disabled:opacity-25 hover:bg-white transition-all">
                               <ChevronRight size={16} className="text-gray-700" />
                             </button>
@@ -651,7 +639,7 @@ export default function AdvancedEmbryoGradingPage() {
                         onChange={e => { if (e.target.files?.[0]) addImageSlot(e.target.files[0]); e.target.value = ''; }} />
                     </label>
                   )}
-                  {selGrade && (
+                  {!showStaged && selGrade && (
                     <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                       <span className="px-2 py-0.5 rounded-lg bg-black/60 text-white text-[9px] font-bold backdrop-blur-sm">
                         Image #{selectedImageIdx! + 1}
@@ -663,94 +651,50 @@ export default function AdvancedEmbryoGradingPage() {
                       )}
                     </div>
                   )}
-                  {selGrade?.is_best && (
+                  {!showStaged && selGrade?.is_best && (
                     <span className="absolute top-2.5 right-2.5 px-1.5 py-0.5 rounded-md bg-primary/80 text-white text-[8px] font-bold backdrop-blur-sm">Best</span>
                   )}
                 </div>
               </div>
 
-              {/* Expansion / ICM / TE sub-image tiles row */}
-              <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
-                <div className="grid grid-cols-3 divide-x divide-line-light">
+              {/* Expansion / ICM / TE sub-image tiles column */}
+              {!showStaged && (selectedGrade?.images[0]?.exp_img_url || selectedGrade?.images[0]?.icm_img_url || selectedGrade?.images[0]?.te_img_url) && (
+              <div className="w-[190px] shrink-0 flex flex-col gap-2 min-h-0">
                   {[
-                    { label: 'Expansion', grade: expDigit,  src: selectedGrade?.images[0]?.exp_img_url, canvasRef: expCanvasRef },
-                    { label: 'ICM',       grade: icmLetter, src: selectedGrade?.images[0]?.icm_img_url, canvasRef: icmCanvasRef },
-                    { label: 'TE',        grade: teLetter,  src: selectedGrade?.images[0]?.te_img_url,  canvasRef: teCanvasRef  },
+                    { label: 'Expansion', grade: expDigit,  src: selectedGrade?.images[0]?.exp_img_url },
+                    { label: 'ICM',       grade: icmLetter, src: selectedGrade?.images[0]?.icm_img_url },
+                    { label: 'TE',        grade: teLetter,  src: selectedGrade?.images[0]?.te_img_url  },
                   ].map(tile => (
-                    <div key={tile.label} className="relative bg-gray-50 overflow-hidden">
-                      {tile.src ? (
-                        <img src={tile.src} alt={tile.label} className="block w-full h-auto" />
-                      ) : (
-                        <div className="p-3">
-                          <canvas ref={tile.canvasRef} width={400} height={400} style={{ display: 'block', width: '100%', height: 'auto' }} />
-                        </div>
-                      )}
-                      <div className="absolute top-0 left-0 right-0 px-2.5 pt-2 flex items-start justify-between">
-                        <div>
-                          <p className="text-[7px] font-black uppercase tracking-[0.14em] text-gray-500 leading-none">{tile.label}</p>
-                          <div className="mt-1 w-4 h-[1.5px] rounded-full bg-primary/30" />
-                        </div>
+                    <div key={tile.label} className="relative flex-1 min-h-0 bg-gray-50 overflow-hidden rounded-xl border border-line">
+                      {tile.src
+                        ? <img src={tile.src} alt={tile.label} className="absolute inset-0 w-full h-full object-cover" />
+                        : <div className="w-full h-full" />
+                      }
+                      <div className="absolute top-0 left-0 flex items-center gap-1.5 bg-white pl-2 pr-2.5 py-1.5 rounded-br-[14px]">
+                        <span className="text-[7px] font-black uppercase tracking-[0.14em] text-gray-500 leading-none">{tile.label}</span>
                         {tile.grade && tile.grade !== '—' && (
                           <span className="text-[10px] font-black text-primary leading-none bg-primary/8 px-1.5 py-0.5 rounded-md border border-primary/15">{tile.grade}</span>
                         )}
+                        <span
+                          className="absolute left-full top-0 w-[14px] h-[14px] pointer-events-none"
+                          style={{ background: 'radial-gradient(circle 14px at 100% 100%, transparent 97%, #fff 100%)' }}
+                        />
+                        <span
+                          className="absolute top-full left-0 w-[14px] h-[14px] pointer-events-none"
+                          style={{ background: 'radial-gradient(circle 14px at 100% 100%, transparent 97%, #fff 100%)' }}
+                        />
                       </div>
                     </div>
                   ))}
-                </div>
+              </div>
+              )}
               </div>
 
               {/* Instruction Bar */}
-              <div className="rounded-xl border border-line-light bg-primary-bg shrink-0">
-                  {imageSlots.length > 0 ? (
-                    /* ── Ready to be graded view ── */
-                    <>
-                      <div className="px-3 py-2 border-b border-primary/10 flex items-center justify-between">
-                        <p className="text-[9px] font-bold text-primary/70 uppercase tracking-widest">Ready to be Graded</p>
-                        <span className="text-[9px] text-gray-400">{imageSlots.length} image{imageSlots.length !== 1 ? 's' : ''}</span>
-                      </div>
-                      {(() => {
-                        const si = Math.min(stagedViewIdx, imageSlots.length - 1);
-                        return (
-                          <div className="flex items-center gap-2 px-3 py-2">
-                            <button type="button" disabled={si === 0}
-                              onClick={() => setStagedViewIdx(p => Math.max(0, p - 1))}
-                              className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center disabled:opacity-25 hover:bg-primary/20 transition-colors shrink-0">
-                              <ChevronLeft size={12} className="text-primary" />
-                            </button>
-                            <div className="flex gap-1.5 flex-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                              {imageSlots.map((slot, idx) => (
-                                <button key={slot.url} type="button" onClick={() => setStagedViewIdx(idx)}
-                                  className={`w-10 h-10 rounded-md overflow-hidden border-2 shrink-0 transition-all ${idx === si ? 'border-primary shadow-md' : 'border-primary/20 opacity-50 hover:opacity-80'}`}>
-                                  <img src={slot.url} alt={`Staged ${idx + 1}`} className="w-full h-full object-cover" />
-                                </button>
-                              ))}
-                            </div>
-                            <button type="button" disabled={si === imageSlots.length - 1}
-                              onClick={() => setStagedViewIdx(p => Math.min(imageSlots.length - 1, p + 1))}
-                              className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center disabled:opacity-25 hover:bg-primary/20 transition-colors shrink-0">
-                              <ChevronRight size={12} className="text-primary" />
-                            </button>
-                            <button type="button" disabled={uploading || selectedOocyteNo == null}
-                              onClick={handleStartAnalysis}
-                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-white text-[9px] font-bold hover:bg-primary-light transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
-                              {uploading ? 'Uploading…' : 'Start AI Analysis'}
-                              {!uploading && <ChevronRight size={10} />}
-                            </button>
-                          </div>
-                        );
-                      })()}
-                    </>
-                  ) : existingGrades.length === 0 && !gradesLoading ? (
-                    /* ── No oocyte selected / nothing graded ── */
-                    <div className="px-3 py-3 flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <ImageIcon size={12} className="text-primary/40" />
-                      </div>
-                      <p className="text-[9px] text-gray-400 font-medium">Select an oocyte to view graded images</p>
-                    </div>
-                  ) : (
-                    /* ── Graded images view ── */
-                    <>
+              <div className="shrink-0 flex gap-3 items-stretch">
+                  {/* ── Graded images (left) ── */}
+                  {(gradesLoading || existingGrades.length > 0) ? (
+                    <div className={`flex-1 min-w-0 flex flex-col rounded-xl border border-line-light overflow-hidden transition-all ${imageSlots.length > 0 ? 'grayscale bg-gray-100 pointer-events-none' : 'bg-primary-bg'}`}>
                       <div className="px-3 py-2 border-b border-primary/10 flex items-center justify-between">
                         <p className="text-[9px] font-bold text-primary/70 uppercase tracking-widest">Graded Images</p>
                         {!gradesLoading && existingGrades.length > 0 && (
@@ -767,7 +711,7 @@ export default function AdvancedEmbryoGradingPage() {
                         <div className="flex items-center gap-2 px-3 pt-3 pb-2">
                           <button type="button"
                             disabled={(selectedImageIdx ?? 0) === 0}
-                            onClick={() => setSelectedImageIdx(i => Math.max(0, (i ?? 0) - 1))}
+                            onClick={() => { setPreviewStaged(false); setSelectedImageIdx(i => Math.max(0, (i ?? 0) - 1)); }}
                             className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center disabled:opacity-25 hover:bg-primary/20 transition-colors shrink-0">
                             <ChevronLeft size={12} className="text-primary" />
                           </button>
@@ -776,7 +720,7 @@ export default function AdvancedEmbryoGradingPage() {
                               const imgUrl = g.images[0]?.upload_image_url;
                               return (
                                 <div key={g.grade_id} className="relative shrink-0">
-                                  <button type="button" onClick={() => setSelectedImageIdx(i)}
+                                  <button type="button" onClick={() => { setPreviewStaged(false); setSelectedImageIdx(i); }}
                                     className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${selectedImageIdx === i ? 'border-primary shadow-md' : 'border-primary/20 opacity-60 hover:opacity-100'}`}>
                                     {imgUrl
                                       ? <img src={imgUrl} alt={`Grade ${i + 1}`} className="w-full h-full object-cover" />
@@ -797,13 +741,61 @@ export default function AdvancedEmbryoGradingPage() {
                           </div>
                           <button type="button"
                             disabled={(selectedImageIdx ?? 0) >= existingGrades.length - 1}
-                            onClick={() => setSelectedImageIdx(i => Math.min(existingGrades.length - 1, (i ?? 0) + 1))}
+                            onClick={() => { setPreviewStaged(false); setSelectedImageIdx(i => Math.min(existingGrades.length - 1, (i ?? 0) + 1)); }}
                             className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center disabled:opacity-25 hover:bg-primary/20 transition-colors shrink-0">
                             <ChevronRight size={12} className="text-primary" />
                           </button>
                         </div>
                       )}
-                    </>
+                    </div>
+                  ) : imageSlots.length === 0 ? (
+                    /* ── No oocyte selected / nothing graded ── */
+                    <div className="flex-1 rounded-xl border border-line-light bg-primary-bg px-3 py-3 flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <ImageIcon size={12} className="text-primary/40" />
+                      </div>
+                      <p className="text-[9px] text-gray-400 font-medium">Select an oocyte to view graded images</p>
+                    </div>
+                  ) : null}
+
+                  {/* ── Ready to be graded (right) ── */}
+                  {imageSlots.length > 0 && (
+                    <div className={`flex flex-col rounded-xl border border-line-light bg-primary-bg overflow-hidden ${(gradesLoading || existingGrades.length > 0) ? 'w-[300px] shrink-0' : 'flex-1'}`}>
+                      <div className="px-3 py-2 border-b border-primary/10 flex items-center justify-between">
+                        <p className="text-[9px] font-bold text-primary/70 uppercase tracking-widest">Ready to be Graded</p>
+                        <span className="text-[9px] text-gray-400">{imageSlots.length} image{imageSlots.length !== 1 ? 's' : ''}</span>
+                      </div>
+                      {(() => {
+                        const si = Math.min(stagedViewIdx, imageSlots.length - 1);
+                        return (
+                          <div className="flex-1 flex items-center gap-2 px-3 py-2">
+                            <button type="button" disabled={si === 0}
+                              onClick={() => { setPreviewStaged(true); setStagedViewIdx(p => Math.max(0, p - 1)); }}
+                              className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center disabled:opacity-25 hover:bg-primary/20 transition-colors shrink-0">
+                              <ChevronLeft size={12} className="text-primary" />
+                            </button>
+                            <div className="flex gap-1.5 flex-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                              {imageSlots.map((slot, idx) => (
+                                <button key={slot.url} type="button" onClick={() => { setPreviewStaged(true); setStagedViewIdx(idx); }}
+                                  className={`w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${idx === si ? 'border-primary shadow-md' : 'border-primary/20 opacity-50 hover:opacity-80'}`}>
+                                  <img src={slot.url} alt={`Staged ${idx + 1}`} className="w-full h-full object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                            <button type="button" disabled={si === imageSlots.length - 1}
+                              onClick={() => { setPreviewStaged(true); setStagedViewIdx(p => Math.min(imageSlots.length - 1, p + 1)); }}
+                              className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center disabled:opacity-25 hover:bg-primary/20 transition-colors shrink-0">
+                              <ChevronRight size={12} className="text-primary" />
+                            </button>
+                            <button type="button" disabled={uploading || selectedOocyteNo == null}
+                              onClick={handleStartAnalysis}
+                              className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-lg bg-primary text-white text-[11px] font-bold leading-tight text-center hover:bg-primary-light transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                              {uploading ? 'Uploading…' : <span>Start AI<br />Analysis</span>}
+                            </button>
+                          </div>
+                        );
+                      })()}
+                    </div>
                   )}
                 </div>
             </div>
@@ -814,80 +806,7 @@ export default function AdvancedEmbryoGradingPage() {
         {step === 'select-best' && (() => {
           const panelBg = { background: 'linear-gradient(135deg, #f5f0ff 0%, #ede9fe 100%)' };
           return (
-            <div className="overflow-y-auto flex flex-col gap-3 pr-0.5 h-full">
-
-              {/* Action buttons */}
-              <div className="flex flex-col gap-2 shrink-0">
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Actions</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button"
-                    onClick={() => setOverrideModalOpen(true)}
-                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
-                    style={{ background: 'var(--gradient-primary)' }}>
-                    <Pencil size={13} />
-                    Override Grade
-                  </button>
-                  <button type="button"
-                    onClick={() => setActiveSection(prev => prev === 'note' ? null : 'note')}
-                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
-                    style={{ background: 'var(--gradient-primary)', opacity: activeSection === 'note' ? 1 : 0.85 }}>
-                    <Lightbulb size={13} />
-                    Clinical Note
-                  </button>
-                  <button type="button"
-                    onClick={() => { setApproveSelectedIdx(selectedImageIdx); setApproveModalOpen(true); }}
-                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
-                    style={{ background: 'var(--gradient-primary)' }}>
-                    <ShieldCheck size={13} />
-                    Approve
-                  </button>
-                  {existingGrades.length + imageSlots.length >= 4 ? (
-                    <button type="button"
-                      onClick={() => setMaxImagesOpen(true)}
-                      className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
-                      style={{ background: 'var(--gradient-primary)' }}>
-                      <Upload size={13} />
-                      Upload Image
-                    </button>
-                  ) : (
-                    <label className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity cursor-pointer"
-                      style={{ background: 'var(--gradient-primary)' }}>
-                      <Upload size={13} />
-                      Upload Image
-                      <input type="file" accept="image/*" className="hidden"
-                        onChange={e => { if (e.target.files?.[0]) { addImageSlot(e.target.files[0]); setStagedViewIdx(imageSlots.length); } e.target.value = ''; }} />
-                    </label>
-                  )}
-                  <button type="button"
-                    onClick={() => {
-                      if (selectedImageIdx != null && existingGrades[selectedImageIdx!]) {
-                        setDeactivateGradeId(existingGrades[selectedImageIdx!].grade_id);
-                      } else {
-                        setNoGradeDeleteOpen(true);
-                      }
-                    }}
-                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
-                    style={{ background: 'var(--gradient-primary)' }}>
-                    <Trash2 size={13} />
-                    Delete Grade
-                  </button>
-                  <button type="button"
-                    onClick={async () => {
-                      const g = selectedImageIdx != null ? existingGrades[selectedImageIdx] : null;
-                      if (!g || !cycleId || !selectedLog) { setNoBestGradeOpen(true); return; }
-                      if (g.is_best) return;
-                      try {
-                        await ivfService.selectBestGrade(cycleId, selectedLog.log_id, g.grade_id);
-                        setExistingGrades(prev => prev.map((eg, i) => ({ ...eg, is_best: i === selectedImageIdx })));
-                      } catch { /* silent */ }
-                    }}
-                    className="w-full py-2.5 rounded-xl text-[11px] font-bold text-white text-left px-4 flex items-center gap-2.5 hover:opacity-90 transition-opacity"
-                    style={{ background: 'var(--gradient-primary)' }}>
-                    <Check size={13} />
-                    Mark as Best
-                  </button>
-                </div>
-              </div>
+            <div className="xl:overflow-y-auto flex flex-col gap-3 pr-0.5 xl:h-full">
 
               {/* Clinical Note panel */}
               {activeSection === 'note' && (
@@ -938,33 +857,6 @@ export default function AdvancedEmbryoGradingPage() {
                 </div>
               )}
 
-              {/* Embryo Details */}
-              <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
-                <div className="px-3 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white">
-                  <p className="text-[9px] font-semibold tracking-widest text-gray-400 uppercase">Embryo Details</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 p-3">
-                  {[
-                    { icon: User,         label: 'Patient ID',  value: embryo?.hisNumber || his || '—',                           color: 'text-violet-500',  bg: 'bg-violet-50'  },
-                    { icon: Hash,         label: 'Oocyte No.',  value: selectedOocyteNo != null ? String(selectedOocyteNo) : '—', color: 'text-primary',     bg: 'bg-primary/10' },
-                    { icon: FlaskConical, label: 'D0 Maturity', value: selectedLog?.d0_maturity || '—',                           color: 'text-cyan-600',    bg: 'bg-cyan-50'    },
-                    { icon: Dna,          label: 'D1 PN',       value: selectedLog?.d1_pn || '—',                                 color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { icon: Award,        label: 'D3 Grade',    value: selectedLog?.d3_grade || '—',                              color: 'text-amber-600',   bg: 'bg-amber-50'   },
-                    { icon: Flag,         label: 'Fate',        value: selectedLog?.fate || '—',                                  color: 'text-rose-500',    bg: 'bg-rose-50'    },
-                  ].map(({ icon: Icon, label, value, color, bg }) => (
-                    <div key={label} className="rounded-xl border border-gray-100 bg-white px-2.5 py-2 flex items-center gap-2">
-                      <div className={`w-6 h-6 rounded-full ${bg} flex items-center justify-center shrink-0`}>
-                        <Icon size={11} className={color} />
-                      </div>
-                      <div className="flex flex-col gap-0.5 min-w-0">
-                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">{label}</span>
-                        <span className="text-[10px] font-bold text-gray-800 leading-none truncate">{value}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Result Preview */}
               <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
                 <div className="px-3 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white">
@@ -974,10 +866,30 @@ export default function AdvancedEmbryoGradingPage() {
                   const g = selectedGrade;
                   const thumb = g?.images[0]?.upload_image_url ?? null;
                   const score = g?.ai_score ?? null;
-                  const ARC_R = 26, circ = 2 * Math.PI * ARC_R;
-                  const trackArc = 0.75 * circ;
-                  const fillArc  = score != null ? (score / 10) * trackArc : 0;
-                  const arcStroke = score != null ? (score >= 8.5 ? '#10b981' : score >= 7 ? '#f59e0b' : '#f97316') : '#e5e7eb';
+                  const f = score != null ? Math.max(0, Math.min(1, score / 10)) : 0;
+                  const GX = 110, GY = 116, GR = 82;
+                  const GC = 2 * Math.PI * GR;
+                  const gHalf = GC / 2;
+                  const polar = (r: number, deg: number): [number, number] => {
+                    const a = (deg * Math.PI) / 180;
+                    return [GX + r * Math.cos(a), GY - r * Math.sin(a)];
+                  };
+                  const needleDeg = 180 - f * 180;
+                  const [nx1, ny1] = polar(GR - 26, needleDeg);
+                  const [nx2, ny2] = polar(GR + 2, needleDeg);
+                  const gaugeDots: { x: number; y: number; on: boolean }[] = [];
+                  for (const r of [79, 72]) {
+                    for (let i = 0; i <= 10; i++) {
+                      const [x, y] = polar(r, 180 - i * 18);
+                      gaugeDots.push({ x, y, on: i / 10 <= f });
+                    }
+                  }
+                  const status = score == null
+                    ? { t: 'No score yet', s: 'Run AI analysis to grade' }
+                    : score >= 8.5 ? { t: 'Excellent state', s: 'Top-tier morphology' }
+                    : score >= 7 ? { t: 'Stable state', s: "Keep going — you're on track" }
+                    : score >= 5 ? { t: 'Fair state', s: 'Watch closely' }
+                    : { t: 'Low state', s: 'Needs review' };
                   return (
                     <div className="flex flex-col">
                       {/* Identity */}
@@ -1008,36 +920,54 @@ export default function AdvancedEmbryoGradingPage() {
                         </div>
                       </div>
 
-                      {/* Grade + Score ring hero */}
-                      <div className="mx-2.5 mb-2.5 rounded-xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #f5f0ff 0%, #ede9fe 100%)' }}>
-                        <div className="flex divide-x divide-primary/10 items-end">
-                          {/* Grade half */}
-                          <div className="flex-1 flex flex-col items-center justify-center py-4 px-3 gap-1">
-                            <div className={`text-4xl font-black leading-none ${g?.grade ? gradeTextCls(g.grade) : 'text-gray-300'}`}>
-                              {g?.grade || '—'}
-                            </div>
-                            <span className="text-[7px] font-bold text-primary/40 uppercase tracking-widest">Grade</span>
-                          </div>
-                          {/* Score ring half */}
-                          <div className="flex-1 flex flex-col items-center justify-center py-3 px-3 gap-0.5">
-                            <div className="relative w-16 h-16">
-                              <svg width="64" height="64" viewBox="0 0 64 64">
-                                <circle cx="32" cy="32" r={ARC_R} fill="none" stroke="rgba(107,17,118,0.13)" strokeWidth="5"
-                                  strokeDasharray={`${trackArc} ${circ}`} strokeLinecap="round" transform="rotate(135 32 32)" />
-                                <circle cx="32" cy="32" r={ARC_R} fill="none" stroke={arcStroke} strokeWidth="5"
-                                  strokeDasharray={`${fillArc} ${circ}`} strokeLinecap="round" transform="rotate(135 32 32)"
-                                  style={{ transition: 'stroke-dasharray 0.5s ease' }} />
-                              </svg>
-                              <div className="absolute inset-0 flex flex-col items-center justify-center gap-0">
-                                <span className="text-[13px] font-black leading-none" style={{ color: arcStroke }}>
-                                  {score != null ? score.toFixed(1) : '—'}
-                                </span>
-                                <span className="text-[7px] font-bold text-gray-400">/10</span>
-                              </div>
-                            </div>
-                            <span className="text-[7px] font-bold text-primary/40 uppercase tracking-widest">AI Score</span>
+                      {/* AI Score gauge hero */}
+                      <div className="mx-2.5 mb-2 rounded-xl overflow-hidden relative pb-4" style={{ background: 'linear-gradient(180deg, #faf8ff 0%, #f3eefb 100%)' }}>
+                        <div className="relative pt-2">
+                          <svg viewBox="0 0 220 130" className="w-full block">
+                            <defs>
+                              <linearGradient id="gauge-fill" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#cdb4e6" />
+                                <stop offset="100%" stopColor="#6b1176" />
+                              </linearGradient>
+                            </defs>
+                            {/* track */}
+                            <circle cx={GX} cy={GY} r={GR} fill="none" stroke="#ece7f4" strokeWidth="24"
+                              strokeDasharray={`${gHalf} ${GC}`} strokeLinecap="round" transform={`rotate(180 ${GX} ${GY})`} />
+                            {/* fill */}
+                            <circle cx={GX} cy={GY} r={GR} fill="none" stroke="url(#gauge-fill)" strokeWidth="24"
+                              strokeDasharray={`${f * gHalf} ${GC}`} strokeLinecap="round" transform={`rotate(180 ${GX} ${GY})`}
+                              style={{ transition: 'stroke-dasharray 0.6s ease' }} />
+                            {/* dotted texture */}
+                            {gaugeDots.map((d, i) => (
+                              <circle key={i} cx={d.x} cy={d.y} r={1.2} fill={d.on ? 'rgba(255,255,255,0.75)' : 'rgba(107,17,118,0.14)'} />
+                            ))}
+                            {/* outer ticks */}
+                            {Array.from({ length: 11 }, (_, i) => 180 - i * 18).map((deg, i) => {
+                              const [x1, y1] = polar(GR + 4, deg);
+                              const [x2, y2] = polar(GR + 10, deg);
+                              return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#d6cfe4" strokeWidth="1.5" strokeLinecap="round" />;
+                            })}
+                            {/* needle */}
+                            {score != null && (
+                              <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="#3f3550" strokeWidth="3" strokeLinecap="round" />
+                            )}
+                          </svg>
+                          <div className="absolute inset-x-0 top-[54%] flex flex-col items-center gap-0.5 px-3 text-center">
+                            <span className="text-3xl font-black leading-none text-gray-800">
+                              {score != null ? score.toFixed(1) : '—'}
+                            </span>
+                            <span className="text-[11px] font-bold text-gray-700 leading-none">{status.t}</span>
+                            <span className="text-[9px] text-gray-400 leading-tight">{status.s}</span>
                           </div>
                         </div>
+                      </div>
+
+                      {/* Grade row */}
+                      <div className="mx-2.5 mb-2.5 rounded-xl border border-primary/10 bg-primary/[0.04] px-3 py-2.5 flex items-center justify-between">
+                        <span className="text-[8px] font-black text-primary/50 uppercase tracking-widest">Grade</span>
+                        <span className={`text-lg font-black leading-none ${g?.grade ? gradeTextCls(g.grade) : 'text-gray-300'}`}>
+                          {g?.grade || '—'}
+                        </span>
                       </div>
 
                       {g ? (
@@ -1101,10 +1031,38 @@ export default function AdvancedEmbryoGradingPage() {
                 })()}
               </div>
 
+              {/* Embryo Details */}
+              <div className="rounded-xl border border-line bg-white overflow-hidden shrink-0">
+                <div className="px-3 py-2.5 border-b border-line-light bg-gradient-to-r from-surface to-white">
+                  <p className="text-[9px] font-semibold tracking-widest text-gray-400 uppercase">Embryo Details</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 p-3">
+                  {[
+                    { icon: User,         label: 'Patient ID',  value: embryo?.hisNumber || his || '—',                           color: 'text-violet-500',  bg: 'bg-violet-50'  },
+                    { icon: Hash,         label: 'Oocyte No.',  value: selectedOocyteNo != null ? String(selectedOocyteNo) : '—', color: 'text-primary',     bg: 'bg-primary/10' },
+                    { icon: FlaskConical, label: 'D0 Maturity', value: selectedLog?.d0_maturity || '—',                           color: 'text-cyan-600',    bg: 'bg-cyan-50'    },
+                    { icon: Dna,          label: 'D1 PN',       value: selectedLog?.d1_pn || '—',                                 color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { icon: Award,        label: 'D3 Grade',    value: selectedLog?.d3_grade || '—',                              color: 'text-amber-600',   bg: 'bg-amber-50'   },
+                    { icon: Flag,         label: 'Fate',        value: selectedLog?.fate || '—',                                  color: 'text-rose-500',    bg: 'bg-rose-50'    },
+                  ].map(({ icon: Icon, label, value, color, bg }) => (
+                    <div key={label} className="rounded-xl border border-gray-100 bg-white px-2.5 py-2 flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded-full ${bg} flex items-center justify-center shrink-0`}>
+                        <Icon size={11} className={color} />
+                      </div>
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">{label}</span>
+                        <span className="text-[10px] font-bold text-gray-800 leading-none truncate">{value}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
           );
         })()}
       </div>
+      )}
 
 
       {/* ── Approve Embryo Grading Modal ── */}

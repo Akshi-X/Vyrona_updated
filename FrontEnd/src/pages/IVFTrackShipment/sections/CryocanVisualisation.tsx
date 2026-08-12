@@ -5149,16 +5149,18 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             >
               <div
                 style={{
-                  fontWeight: 600,
-                  fontSize: 14,
-                  color: "#5f3b73",
                   padding: "12px 16px 10px",
                   background: "#f7f2fa",
                   flexShrink: 0,
                   borderBottom: "1px solid #efe5f4",
                 }}
               >
-                System Activity
+                <div style={{ fontWeight: 600, fontSize: 14, color: "#5f3b73" }}>
+                  System Activity
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 500, color: "#8b6c97", marginTop: 2 }}>
+                  Recent alert and configuration changes.
+                </div>
               </div>
               <div
                 style={{ flex: 1, overflow: "hidden", position: "relative", padding: "8px 0 0" }}

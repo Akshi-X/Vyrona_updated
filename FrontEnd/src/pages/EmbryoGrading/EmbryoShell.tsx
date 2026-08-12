@@ -22,7 +22,7 @@ export default function EmbryoShell() {
 
   const hisPart = `HIS: ${his.toUpperCase()}${patientName ? ` (${patientName})` : ''}`;
 
-  const isAdvanced = pathname.endsWith('/advanced');
+  const isAdvanced = pathname.endsWith('/ai-grading');
   const isCompare  = pathname.endsWith('/compare');
   const isReports  = pathname.endsWith('/reports');
 
