@@ -24,7 +24,7 @@ const NAV_ITEMS = [
         dropdown: true,
         children: [
             { label: "Overview",                  path: "/onboarding/dashboard"           },
-            { label: "Cryocan Quality Tracking",  path: "/onboarding/ivf-track-shipment"  },
+            { label: "Cryocan Quality Tracking",  path: "/onboarding/cryocan-tracking"  },
             { label: "Incubator Tracking",         path: "/onboarding/incubator-tracking"  },
             { label: "Embryo Console",              path: "/onboarding/embryo-console"      },
         ],
@@ -37,7 +37,7 @@ const NAV_ITEMS = [
 
 const DASHBOARD_CHILD_PATHS = [
     "/onboarding/dashboard",
-    "/onboarding/ivf-track-shipment",
+    "/onboarding/cryocan-tracking",
     "/onboarding/incubator-tracking",
     "/onboarding/embryo-console",
 ];

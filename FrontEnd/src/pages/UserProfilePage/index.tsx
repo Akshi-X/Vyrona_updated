@@ -726,9 +726,9 @@ const UserProfilePage: React.FC = () => {
         </div>
 
         {onboardingCompleted && !isOnboarding && !hideOnboardingCard && !isMygrapeAdmin && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 flex items-center justify-between gap-6">
-            <div className="flex items-center gap-5 min-w-0">
-              <img src="/genie/explaining_casual.webp" alt="" className="w-40 h-40 object-contain shrink-0" />
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sm:p-8 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 xl:gap-6 text-center xl:text-left">
+            <div className="flex flex-col xl:flex-row items-center gap-4 xl:gap-5 min-w-0">
+              <img src="/genie/explaining_casual.webp" alt="" className="w-28 h-28 sm:w-32 sm:h-32 object-contain shrink-0" />
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-900">You know your way around mgSCALE</p>
                 <p className="text-xs text-gray-500 mt-1 leading-relaxed">All onboarding levels completed. Drop back in anytime to revisit a workflow, explore advanced features, or walk a new team member through the tour.</p>
@@ -736,7 +736,7 @@ const UserProfilePage: React.FC = () => {
             </div>
             <button
               onClick={() => navigate("/onboarding/dashboard")}
-              className="shrink-0 flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              className="shrink-0 w-full xl:w-auto flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 xl:py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
             >
               Go to Onboarding
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
