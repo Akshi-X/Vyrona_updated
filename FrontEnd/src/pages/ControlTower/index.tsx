@@ -1092,7 +1092,7 @@ const ControlTower = () => {
                                                                                         ? canister.tankId
                                                                                         : canister.canisterId,
                                                                                 );
-                                                                                navigate(`${prefix}/ivf-track-shipment/${tankParam}`);
+                                                                                navigate(`${prefix}/cryocan-tracking/${tankParam}`);
                                                                             }
                                                                         } catch {}
                                                                     }}

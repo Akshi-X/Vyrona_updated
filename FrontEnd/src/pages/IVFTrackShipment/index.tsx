@@ -309,7 +309,7 @@ export default function IVFTrackShipmentPage() {
     useEffect(() => {
         if (!accessDenied) return;
         if (countdown <= 0) {
-            navigate("/ivf-track-shipment");
+            navigate("/cryocan-tracking");
             return;
         }
         const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
@@ -527,7 +527,7 @@ export default function IVFTrackShipmentPage() {
 
     return (
         <>
-          <PageLayout title="Cryocan" icon={ContainerQualityTrackingIcon} actions={pageActions}>
+          <PageLayout title="Cryocan" description="Live cryogenic monitoring and canister storage." icon={ContainerQualityTrackingIcon} actions={pageActions}>
                             {/* Breadcrumb */}
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                                 <div className="flex items-center gap-1 text-sm">

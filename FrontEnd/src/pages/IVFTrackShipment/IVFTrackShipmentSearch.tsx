@@ -27,7 +27,7 @@ export default function IVFTrackShipmentSearchPage() {
                     onTrack={(canisterId) => {
                         setCanisterError(undefined);
                         const prefix = isOnboarding ? "/onboarding" : "";
-                        navigate(`${prefix}/ivf-track-shipment/${encodeURIComponent(canisterId)}`);
+                        navigate(`${prefix}/cryocan-tracking/${encodeURIComponent(canisterId)}`);
                     }}
                 />
             </div>

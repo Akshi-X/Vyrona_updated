@@ -51,7 +51,7 @@ const isDropdown = (item: NavItem): item is NavGroup =>
 
 const DASHBOARD_CHILD_PATHS = [
     "/dashboard",
-    "/ivf-track-shipment",
+    "/cryocan-tracking",
     "/incubator-tracking",
     "/refrigerator-tracking",
     "/embryo-console",
@@ -173,7 +173,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         // Filter dropdown children by department
         if (isDropdown(item)) {
             const filtered = item.children.filter((child) => {
-                if (child.path === "/ivf-track-shipment") return isIVF;
+                if (child.path === "/cryocan-tracking") return isIVF;
                 if (child.path === "/refrigerator-tracking") return isIVF;
                 return true;
             });
@@ -312,7 +312,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                 return (
                                                     <button
                                                         key={ci}
-                                                        id={isAlertConfig ? `onboarding-sidebar-alert-${child.label.toLowerCase()}` : child.path === "/ivf-track-shipment" ? "onboarding-sidebar-cryocan-tracking" : undefined}
+                                                        id={isAlertConfig ? `onboarding-sidebar-alert-${child.label.toLowerCase()}` : child.path === "/cryocan-tracking" ? "onboarding-sidebar-cryocan-tracking" : undefined}
                                                         onClick={() => {
                                                             setOpen(true);
                                                             handleNavigation(child.path);
