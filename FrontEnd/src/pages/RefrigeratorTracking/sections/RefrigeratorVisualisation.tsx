@@ -196,7 +196,7 @@ function EmbeddedRefrigeratorAlerts({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-3">
+    <div className="flex-1 overflow-y-auto p-3 max-xl:min-h-[200px]">
       <div className="space-y-3">
         {Object.entries(grouped).map(([dateLabel, groups]) => (
           <div key={dateLabel} className="space-y-2">
@@ -1496,7 +1496,7 @@ export default function RefrigeratorVisualisation({
 
   return (
     <>
-      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_320px] gap-4 h-full min-h-0">
+      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_320px] gap-4 min-h-0 max-xl:h-auto xl:h-full">
         {/* Left: Live Conditions (top) + Tasks (bottom) */}
         <aside className="flex flex-col gap-3 min-h-0">
           {/* Live Conditions card */}
@@ -1551,7 +1551,7 @@ export default function RefrigeratorVisualisation({
                 </div>
               )}
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2">
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2 max-xl:min-h-[210px]">
               {sensorTiles.length === 0 ? (
                 <div className="text-xs text-gray-400 italic">
                   No sensor data.
@@ -1766,7 +1766,7 @@ export default function RefrigeratorVisualisation({
           </div>
 
           {/* Tasks card */}
-          <div className="flex-[1.4] min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
+          <div className="flex-[1.4] min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col max-xl:min-h-[260px]">
             <MyTasksModal
               embedded
               isOpen={false}
@@ -2074,7 +2074,7 @@ export default function RefrigeratorVisualisation({
         <aside className="flex flex-col gap-3 min-h-0">
           {/* System Activity card */}
           <div
-            className="flex-1 min-h-0 flex flex-col"
+            className="flex-1 min-h-0 flex flex-col max-xl:min-h-[280px]"
             style={{
               border: "1px solid #e6d6ee",
               borderRadius: 18,
@@ -2117,6 +2117,7 @@ export default function RefrigeratorVisualisation({
               </div>
             </div>
             <div
+              className="max-xl:min-h-[220px]"
               style={{
                 flex: 1,
                 overflow: "hidden",
@@ -2308,7 +2309,7 @@ export default function RefrigeratorVisualisation({
           </div>
 
           {/* Alerts card */}
-          <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col max-xl:min-h-[260px]">
             <div
               className="flex items-center gap-2 px-4 py-3 shrink-0"
               style={{
