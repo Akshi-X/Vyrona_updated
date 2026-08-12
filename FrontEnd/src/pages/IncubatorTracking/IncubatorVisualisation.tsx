@@ -347,6 +347,7 @@ export default function IncubatorVisualisation({
 
     const scene = new THREE.Scene();
     scene.background = null;
+    scene.fog = new THREE.Fog(0xe8d4f4, 22, 60);
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(32, w / h, 0.1, 100);
@@ -412,6 +413,7 @@ export default function IncubatorVisualisation({
     // ─── Root group (holds the entire incubator) ──────────────────────────────
     const group = new THREE.Group();
     group.position.y = -0.15;
+    group.scale.setScalar(0.78); // shrink whole rig so it stays in-frame while rotating
     scene.add(group);
     sceneGroupRef.current = group;
 
@@ -461,7 +463,8 @@ export default function IncubatorVisualisation({
       new THREE.BoxGeometry(INC_BODY_W * 1.005, 0.04, INC_BODY_D * 1.005),
       trimMat,
     );
-    topTrim.position.y = INC_BODY_H / 2 - 0.02;
+    // Raise so the trim's top face sits above the body's top face (avoids z-fighting)
+    topTrim.position.y = INC_BODY_H / 2 - 0.016;
     group.add(topTrim);
 
     // Center seam between the two chamber lids
@@ -693,6 +696,261 @@ export default function IncubatorVisualisation({
       group.add(vent);
     }
 
+    // ─── Data logger unit on right side (white case, blue face plate) ─────────
+    const LOGGER_T = 0.14;
+    const LOGGER_H = 1.1;
+    const LOGGER_D = 0.66;
+    const LOGGER_X = INC_BODY_W / 2 + LOGGER_T / 2;
+    const LOGGER_Z = 0.55;
+
+    const loggerCaseMat = new THREE.MeshPhysicalMaterial({
+      color: 0xd9d6db, metalness: 0.15, roughness: 0.45,
+      clearcoat: 0.4, clearcoatRoughness: 0.25,
+    });
+    const logger = new THREE.Mesh(
+      new THREE.BoxGeometry(LOGGER_T, LOGGER_H, LOGGER_D),
+      loggerCaseMat,
+    );
+    logger.position.set(LOGGER_X, 0, LOGGER_Z);
+    group.add(logger);
+
+    // Face plate drawn on canvas (blue gradient, waves, LCD, branding)
+    const loggerFaceCanvas = document.createElement("canvas");
+    loggerFaceCanvas.width = 256;
+    loggerFaceCanvas.height = 416;
+    const lfc = loggerFaceCanvas.getContext("2d")!;
+    lfc.fillStyle = "#f2f0f3";
+    lfc.fillRect(0, 0, 256, 416);
+    const plateGrad = lfc.createLinearGradient(0, 26, 256, 390);
+    plateGrad.addColorStop(0, "#262a6e");
+    plateGrad.addColorStop(0.5, "#1c1f54");
+    plateGrad.addColorStop(1, "#12143a");
+    lfc.beginPath();
+    lfc.roundRect(14, 26, 228, 364, 18);
+    lfc.fillStyle = plateGrad;
+    lfc.fill();
+    lfc.save();
+    lfc.clip();
+    lfc.strokeStyle = "rgba(255,255,255,0.2)";
+    lfc.lineWidth = 1.2;
+    for (let i = 0; i < 5; i++) {
+      lfc.beginPath();
+      lfc.moveTo(14, 90 + i * 18);
+      lfc.bezierCurveTo(90, 56 + i * 26, 170, 132 - i * 14, 242, 88 + i * 20);
+      lfc.stroke();
+    }
+    lfc.fillStyle = "rgba(255,255,255,0.6)";
+    for (let i = 0; i < 26; i++) {
+      const dx = 20 + ((i * 53) % 216);
+      const dy = 40 + ((i * 97) % 200);
+      lfc.beginPath();
+      lfc.arc(dx, dy, 1.4, 0, Math.PI * 2);
+      lfc.fill();
+    }
+    lfc.restore();
+    // LCD screen
+    lfc.fillStyle = "#3f4547";
+    lfc.beginPath();
+    lfc.roundRect(66, 106, 124, 84, 6);
+    lfc.fill();
+    lfc.fillStyle = "#12181a";
+    lfc.beginPath();
+    lfc.roundRect(72, 112, 112, 72, 4);
+    lfc.fill();
+    // sensor badge
+    lfc.fillStyle = "#15161c";
+    lfc.beginPath();
+    lfc.roundRect(126, 224, 26, 26, 6);
+    lfc.fill();
+    lfc.fillStyle = "#ffffff";
+    lfc.font = "bold 15px sans-serif";
+    lfc.textBaseline = "middle";
+    lfc.fillText("UH₂", 160, 238);
+    // myGrape branding
+    lfc.font = "bold 24px sans-serif";
+    lfc.fillText("myGrape", 62, 300);
+    lfc.fillStyle = "#b98ecb";
+    for (const [gx, gy] of [[48, 292], [42, 300], [54, 300], [48, 308]] as const) {
+      lfc.beginPath();
+      lfc.arc(gx, gy, 4, 0, Math.PI * 2);
+      lfc.fill();
+    }
+    // "on" + USB-C port
+    lfc.fillStyle = "#e58a2f";
+    lfc.font = "bold 16px sans-serif";
+    lfc.fillText("on", 168, 332);
+    lfc.fillStyle = "#f5f3f6";
+    lfc.beginPath();
+    lfc.roundRect(148, 344, 62, 18, 9);
+    lfc.fill();
+    lfc.fillStyle = "#1a1c50";
+    lfc.beginPath();
+    lfc.roundRect(154, 349, 50, 8, 4);
+    lfc.fill();
+    const loggerFaceTexture = new THREE.CanvasTexture(loggerFaceCanvas);
+    loggerFaceTexture.colorSpace = THREE.SRGBColorSpace;
+    const loggerFace = new THREE.Mesh(
+      new THREE.PlaneGeometry(LOGGER_D, LOGGER_H),
+      new THREE.MeshBasicMaterial({ map: loggerFaceTexture }),
+    );
+    loggerFace.rotation.y = Math.PI / 2;
+    loggerFace.position.set(LOGGER_X + LOGGER_T / 2 + 0.002, 0, LOGGER_Z);
+    group.add(loggerFace);
+
+    // Metal cable glands: 3 on front edge, 2 on bottom
+    const glandMat = new THREE.MeshPhysicalMaterial({
+      color: 0xc0c0c8, metalness: 0.95, roughness: 0.25,
+    });
+    const glandGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.1, 20);
+    const glandTipGeo = new THREE.CylinderGeometry(0.026, 0.026, 0.07, 16);
+    for (const gy of [0.3, 0, -0.3]) {
+      const g = new THREE.Mesh(glandGeo, glandMat);
+      g.rotation.x = Math.PI / 2;
+      g.position.set(LOGGER_X, gy, LOGGER_Z + LOGGER_D / 2 + 0.04);
+      group.add(g);
+      const tip = new THREE.Mesh(glandTipGeo, glandMat);
+      tip.rotation.x = Math.PI / 2;
+      tip.position.set(LOGGER_X, gy, LOGGER_Z + LOGGER_D / 2 + 0.11);
+      group.add(tip);
+    }
+    for (const gz of [LOGGER_Z - 0.14, LOGGER_Z + 0.14]) {
+      const g = new THREE.Mesh(glandGeo, glandMat);
+      g.position.set(LOGGER_X, -LOGGER_H / 2 - 0.04, gz);
+      group.add(g);
+    }
+    // Top mounting tab
+    const tab = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.09), glandMat);
+    tab.position.set(LOGGER_X, LOGGER_H / 2 + 0.05, LOGGER_Z);
+    group.add(tab);
+
+    // ─── Chamber interior trays: black insert with embossed dish rings ────────
+    const trayMat = new THREE.MeshPhysicalMaterial({
+      color: 0x141417, metalness: 0.3, roughness: 0.55,
+      clearcoat: 0.5, clearcoatRoughness: 0.25,
+    });
+    const trayRimMat = new THREE.MeshPhysicalMaterial({
+      color: 0x0b0b0e, metalness: 0.4, roughness: 0.45,
+    });
+    const trayRingMat = new THREE.MeshPhysicalMaterial({
+      color: 0x2e2e35, metalness: 0.5, roughness: 0.38,
+    });
+    const dishRingGeo = new THREE.TorusGeometry(0.13, 0.007, 10, 40);
+    const pocketRimGeo = new THREE.TorusGeometry(0.21, 0.01, 10, 48);
+    const makeChamberTray = (x: number) => {
+      const tray = new THREE.Mesh(
+        new THREE.BoxGeometry(INC_LID_W * 0.92, 0.05, INC_LID_D * 0.92),
+        trayMat,
+      );
+      tray.position.set(x, INC_BODY_H / 2 - 0.018, 0);
+      group.add(tray);
+      // 2x2 dish pockets, each with a rounded rim + two overlapping circle moulds
+      for (const px of [-0.37, 0.37]) {
+        for (const pz of [-0.45, 0.45]) {
+          const rim = new THREE.Mesh(pocketRimGeo, trayRimMat);
+          rim.rotation.x = -Math.PI / 2;
+          rim.position.set(x + px, INC_BODY_H / 2 + 0.006, pz);
+          group.add(rim);
+          for (const cx of [-0.07, 0.07]) {
+            const ring = new THREE.Mesh(dishRingGeo, trayRingMat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.set(x + px + cx, INC_BODY_H / 2 + 0.008, pz);
+            group.add(ring);
+          }
+        }
+      }
+    };
+    makeChamberTray(leftHalfX);
+    makeChamberTray(rightHalfX);
+
+    // ─── In-chamber sensor pucks (visible when a lid opens) ───────────────────
+    const puckMat = new THREE.MeshPhysicalMaterial({
+      color: 0x17171c, metalness: 0.55, roughness: 0.35,
+      clearcoat: 0.7, clearcoatRoughness: 0.15,
+    });
+    const puckCapMat = new THREE.MeshPhysicalMaterial({
+      color: 0xe3e3e0, metalness: 0.1, roughness: 0.8,
+    });
+    const makeSensorPuck = (x: number) => {
+      const puck = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.13, 0.13, 0.07, 32),
+        puckMat,
+      );
+      puck.position.set(x, INC_BODY_H / 2 + 0.042, 0);
+      group.add(puck);
+      const cap = new THREE.Mesh(new THREE.CircleGeometry(0.09, 32), puckCapMat);
+      cap.rotation.x = -Math.PI / 2;
+      cap.position.set(x, INC_BODY_H / 2 + 0.078, 0);
+      group.add(cap);
+    };
+    makeSensorPuck(leftHalfX);
+    makeSensorPuck(rightHalfX);
+
+    // ─── Flat kapton ribbon cables: logger → each chamber sensor ─────────────
+    const ribbonMat = new THREE.MeshPhysicalMaterial({
+      color: 0xb5722f, metalness: 0.15, roughness: 0.35,
+      clearcoat: 0.5, clearcoatRoughness: 0.2,
+      transparent: true, opacity: 0.92, side: THREE.DoubleSide,
+    });
+    const makeRibbon = (pts: THREE.Vector3[], width: number) => {
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const segs = 80;
+      const positions: number[] = [];
+      const indices: number[] = [];
+      const half = width / 2;
+      const sideV = new THREE.Vector3();
+      const nh = new THREE.Vector3();
+      for (let i = 0; i <= segs; i++) {
+        const t = i / segs;
+        const p = curve.getPointAt(t);
+        const tan = curve.getTangentAt(t);
+        // Ribbon surface normal blends from +x (against side wall) to +y (flat on top)
+        const k = THREE.MathUtils.smoothstep(t, 0.05, 0.3);
+        nh.set(1 - k, k, 0).normalize();
+        sideV.crossVectors(tan, nh).normalize();
+        positions.push(
+          p.x + sideV.x * half, p.y + sideV.y * half, p.z + sideV.z * half,
+          p.x - sideV.x * half, p.y - sideV.y * half, p.z - sideV.z * half,
+        );
+        if (i < segs) {
+          const a = i * 2;
+          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, ribbonMat);
+      group.add(mesh);
+      return mesh;
+    };
+
+    const TOP_Y = INC_BODY_H / 2 + 0.018;
+    makeRibbon(
+      [
+        new THREE.Vector3(2.22, 0.56, 0.42),
+        new THREE.Vector3(2.17, 0.8, 0.4),
+        new THREE.Vector3(2.14, 0.95, 0.38),
+        new THREE.Vector3(1.95, TOP_Y, 0.32),
+        new THREE.Vector3(1.5, TOP_Y, 0.16),
+        new THREE.Vector3(1.16, 0.99, 0.02),
+      ],
+      0.16,
+    );
+    makeRibbon(
+      [
+        new THREE.Vector3(2.22, 0.56, 0.7),
+        new THREE.Vector3(2.17, 0.82, 0.75),
+        new THREE.Vector3(2.13, 0.95, 0.8),
+        new THREE.Vector3(1.7, TOP_Y, 0.92),
+        new THREE.Vector3(0.5, TOP_Y, 1.02),
+        new THREE.Vector3(-0.5, TOP_Y, 0.98),
+        new THREE.Vector3(-0.85, TOP_Y, 0.55),
+        new THREE.Vector3(-0.87, 0.99, 0.05),
+      ],
+      0.16,
+    );
+
     // ─── Status LEDs on front-right corner ────────────────────────────────────
     const ledColors = [0x22dd88, 0xffa030, 0x4a90ff];
     ledColors.forEach((c, i) => {
@@ -709,7 +967,11 @@ export default function IncubatorVisualisation({
       group.add(led);
     });
 
-    // ─── Floor reflection plane (subtle) ──────────────────────────────────────
+    // ─── Floor: subtle glow plane + perspective grid to fog horizon (matches cryocan) ──
+    const GROUP_BASE_Y = -0.15;
+    const GROUP_SCALE = 0.78;
+    const floorY = GROUP_BASE_Y - (INC_BODY_H / 2 + INC_PLINTH_H) * GROUP_SCALE - 0.12;
+
     const floorMat = new THREE.MeshBasicMaterial({
       color: 0x9b4aaa, transparent: true, opacity: 0.08,
     });
@@ -718,8 +980,23 @@ export default function IncubatorVisualisation({
       floorMat,
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -INC_BODY_H / 2 - INC_PLINTH_H - 0.12 + 0.001;
+    floor.position.y = floorY + 0.001;
     scene.add(floor);
+
+    const GRID_SIZE = 110;
+    const GRID_DIVS = 88;
+    const floorGrid = new THREE.GridHelper(GRID_SIZE, GRID_DIVS, 0xc4a8dc, 0xc4a8dc);
+    floorGrid.position.y = floorY - 0.02;
+    const setGridOpacity = (m: THREE.Material | THREE.Material[]) => {
+      const mats = Array.isArray(m) ? m : [m];
+      mats.forEach((mat) => {
+        mat.transparent = true;
+        (mat as THREE.LineBasicMaterial).opacity = 0.52;
+        (mat as THREE.LineBasicMaterial).depthWrite = false;
+      });
+    };
+    setGridOpacity(floorGrid.material);
+    scene.add(floorGrid);
 
     // ─── Raycaster for lid clicks ─────────────────────────────────────────────
     const raycaster = new THREE.Raycaster();
@@ -825,6 +1102,7 @@ export default function IncubatorVisualisation({
       });
       screenTexture.dispose();
       labelTexture.dispose();
+      loggerFaceTexture.dispose();
       renderer.dispose();
     };
     // Scene built once on mount; sensor/alert updates handled by separate effect below
