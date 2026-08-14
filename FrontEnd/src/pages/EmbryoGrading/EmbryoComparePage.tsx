@@ -202,7 +202,7 @@ export default function EmbryoComparePage() {
     <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
 
       {/* ── Leaderboard ── */}
-      <div className="w-[290px] shrink-0 flex flex-col overflow-hidden bg-white border border-gray-200 rounded-2xl">
+      <div className="w-[300px] shrink-0 flex flex-col overflow-hidden bg-white border border-gray-200 rounded-2xl">
 
         <div className="shrink-0 border-b border-gray-100" style={{ background: 'linear-gradient(135deg,#f9f4ff 0%,#ffffff 100%)' }}>
           <div className="px-4 py-3 flex items-center gap-2.5">

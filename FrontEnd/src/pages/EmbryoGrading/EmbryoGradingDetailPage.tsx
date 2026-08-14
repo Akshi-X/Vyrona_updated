@@ -60,6 +60,7 @@ export default function EmbryoGradingDetailPage() {
   const [chamberHealthLoading, setChamberHealthLoading] = useState(false);
   const [isAddLogFormOpen, setIsAddLogFormOpen] = useState(false);
   const [logSaving, setLogSaving] = useState(false);
+  const [oocyteNoError, setOocyteNoError] = useState<string | null>(null);
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
   const [logModalStep, setLogModalStep] = useState(0);
   const [logForm, setLogForm] = useState<EmbryologyLogFormState>({
@@ -188,6 +189,7 @@ export default function EmbryoGradingDetailPage() {
       notes: '',
     });
     setLogModalStep(0);
+    setOocyteNoError(null);
   };
 
   const handleLogFieldChange = (field: keyof EmbryologyLogFormState, value: string) => {
@@ -282,6 +284,21 @@ export default function EmbryoGradingDetailPage() {
 
   const handleAddLogEntry = async () => {
     if (!selectedCycle) return;
+    const oocyteNoNum = parseInt(logForm.oocyteNo, 10);
+    if (!logForm.oocyteNo.trim() || oocyteNoNum <= 0) {
+      setOocyteNoError('Enter an oocyte number');
+      setLogModalStep(0);
+      return;
+    }
+    const duplicate = (selectedCycle.logs ?? []).some(
+      (l) => l.oocyte_no === oocyteNoNum && l.log_id !== editingLogId
+    );
+    if (duplicate) {
+      setOocyteNoError(`Oocyte #${oocyteNoNum} already exists`);
+      setLogModalStep(0);
+      return;
+    }
+    setOocyteNoError(null);
     setLogSaving(true);
 
     const day3Grade = generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation);
@@ -804,7 +821,7 @@ export default function EmbryoGradingDetailPage() {
                 <div className="flex items-center justify-between">
                   <button
                     type="button"
-                    onClick={() => setIsAddLogFormOpen(true)}
+                    onClick={() => { setEditingLogId(null); resetLogForm(); setIsAddLogFormOpen(true); }}
                     className="px-2.5 py-1.5 rounded bg-primary text-white text-sm font-medium hover:bg-[#5a0f62] transition-colors"
                   >
                     Add Oocyte
@@ -874,11 +891,14 @@ export default function EmbryoGradingDetailPage() {
                   <div className="flex flex-col items-center">
                     <span className="text-[9px] font-bold uppercase tracking-widest text-primary-ring/60 mb-1">Oocyte No</span>
                     <input
-                      className="bg-transparent border border-white/30 rounded-lg text-white font-bold text-sm w-20 h-8 px-2 text-center focus:outline-none focus:border-white/70 placeholder:text-white/30"
+                      className={`bg-transparent border rounded-lg text-white font-bold text-sm w-20 h-8 px-2 text-center focus:outline-none placeholder:text-white/30 ${oocyteNoError ? 'border-red-400 focus:border-red-300' : 'border-white/30 focus:border-white/70'}`}
                       placeholder="#"
                       value={logForm.oocyteNo}
-                      onChange={(e) => handleLogFieldChange('oocyteNo', e.target.value)}
+                      onChange={(e) => { handleLogFieldChange('oocyteNo', e.target.value); if (oocyteNoError) setOocyteNoError(null); }}
                     />
+                    {oocyteNoError && (
+                      <span className="text-[9px] font-semibold text-red-200 mt-1 whitespace-nowrap">{oocyteNoError}</span>
+                    )}
                   </div>
                 </div>
               </div>

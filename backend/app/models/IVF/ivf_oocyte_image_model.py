@@ -16,6 +16,7 @@ class IvfOocyteImage(Base):
     exp_img_url = Column(Text, nullable=True)
     te_img_url = Column(Text, nullable=True)
     icm_img_url = Column(Text, nullable=True)
+    annotated_img_url = Column(Text, nullable=True)
     file_name = Column(String(255), nullable=True)
     file_size = Column(Integer, nullable=True)
     uploaded_by = Column(String(100), nullable=True)

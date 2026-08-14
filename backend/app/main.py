@@ -45,6 +45,7 @@ from app.controller.IVF import (
     ivf_dashboard_controller,
     ivf_quality_controller,
     ivf_reports_controller,
+    ml_grading_controller,
     quality_tracking_controller,
     refrigerator_dashboard_controller,
 )
@@ -188,17 +189,17 @@ async def startup_event():
     asyncio.create_task(ivf_quality_controller.refrigerator_kpi_redis_listener())
 
     # Step 4: Start scheduled task to fetch World Bank LPI data daily at midnight
-    logger.info("Starting World Bank LPI daily fetch scheduler...")
-    asyncio.create_task(schedule_daily_lpi_fetch())
+    # logger.info("Starting World Bank LPI daily fetch scheduler...")
+    # asyncio.create_task(schedule_daily_lpi_fetch())
 
     # Step 5: Start scheduled task for hourly alert reminders
-    logger.info("Starting hourly alert reminder scheduler...")
-    asyncio.create_task(schedule_alert_reminders())
+    # logger.info("Starting hourly alert reminder scheduler...")
+    # asyncio.create_task(schedule_alert_reminders())
 
     # Step 6: Start ARC IVF autorun scheduler when enabled
-    if settings.ARC_AUTORUN:
-        logger.info("ARC_AUTORUN enabled. Starting ARC midnight scheduler...")
-        asyncio.create_task(schedule_arc_ivf_storage_midnight())
+    # if settings.ARC_AUTORUN:
+    #     logger.info("ARC_AUTORUN enabled. Starting ARC midnight scheduler...")
+    #     asyncio.create_task(schedule_arc_ivf_storage_midnight())
 
     print("!" * 60 + "\n")
 
@@ -259,6 +260,7 @@ app.include_router(refrigerator_dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)
 app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_reports_controller.router, prefix=API_PREFIX)
+app.include_router(ml_grading_controller.router, prefix=API_PREFIX)
 app.include_router(internal_alert_controller.router, prefix=API_PREFIX)
 app.include_router(internal_refill_controller.router, prefix=API_PREFIX)
 app.include_router(integration_auth_controller.router, prefix=API_PREFIX)
