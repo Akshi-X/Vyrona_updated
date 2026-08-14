@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Home } from 'lucide-react';
+import { Outlet, useLocation, useParams } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import EmbryoTabBar from './EmbryoTabBar';
 import { ivfService } from '../../services/ivfService';
@@ -8,7 +7,6 @@ import { ivfService } from '../../services/ivfService';
 export default function EmbryoShell() {
   const { his = '' } = useParams<{ his: string }>();
   const { pathname } = useLocation();
-  const navigate = useNavigate();
 
   const [patientName, setPatientName] = useState('');
 
@@ -43,20 +41,13 @@ export default function EmbryoShell() {
     : 'Track day-by-day embryo development from fertilization to fate';
 
   return (
-    <PageLayout title={title} description={description}>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => navigate('/embryo-console')}
-          className="inline-flex items-center gap-1.5 px-3.5 py-3 rounded-lg text-xs font-semibold text-[#6b1176]/60 hover:text-[#6b1176]/90 hover:bg-white hover:shadow-sm transition-all shrink-0"
-          style={{ background: '#ede5f4' }}
-        >
-          <Home size={12} />
-          Embryo Dashboard
-        </button>
-        <EmbryoTabBar his={his} />
+    <div className="flex w-full h-dvh min-h-0">
+      <EmbryoTabBar his={his} />
+      <div className="flex-1 min-w-0 min-h-0">
+        <PageLayout title={title} description={description}>
+          <Outlet />
+        </PageLayout>
       </div>
-      <Outlet />
-    </PageLayout>
+    </div>
   );
 }

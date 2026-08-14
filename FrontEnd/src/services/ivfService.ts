@@ -1564,47 +1564,94 @@ export class IvfService extends BaseApiService {
         });
     }
 
-    async uploadImage(cycleId: number, gradeId: number, file: File, options?: { expFile?: File; teFile?: File; icmFile?: File; day?: number }): Promise<IvfImage> {
-        const presign = await this.request<{ container_sas_url: string; prefix: string }>(
-            `/api/ivf/cycles/${cycleId}/grades/${gradeId}/images/presign`,
-            { method: 'GET' },
+    /**
+     * Create a grade and upload its source image in a single request.
+     * Replaces createGrade + presign + direct blob PUT.
+     */
+    async createGradeWithImage(cycleId: number, logId: number, file: File, stage = 1): Promise<GradeUploadResult> {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('stage', String(stage));
+        const res = await fetch(
+            `${this.baseUrl}/api/ivf/cycles/${cycleId}/logs/${logId}/grades/upload`,
+            { method: 'POST', headers: this.getAuthHeaders(), body: form },
         );
+        if (!res.ok) throw new Error(`Failed to upload embryo image (${res.status})`);
+        return res.json();
+    }
 
-        const [baseUrl, sasQuery] = presign.container_sas_url.split('?');
+    /** Read an ML job's SSE stream to its terminal event. */
+    private async consumeMlStream(
+        res: Response,
+        label: string,
+        onEvent?: (e: MlJobEvent) => void,
+    ): Promise<MlJobEvent> {
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        try {
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
 
-        const uploadBlob = async (f: File, label: string): Promise<string> => {
-            const ext = f.name.includes('.') ? '.' + f.name.split('.').pop() : '';
-            const blobName = `${presign.prefix}/${label}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
-            const blobUrl = `${baseUrl}/${blobName}?${sasQuery}`;
-            await fetch(blobUrl, {
-                method: 'PUT',
-                headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': f.type || 'application/octet-stream' },
-                body: f,
-            });
-            return `${baseUrl}/${blobName}`;
-        };
+                // SSE frames are separated by a blank line; a frame may span reads.
+                let sep: number;
+                while ((sep = buffer.indexOf('\n\n')) !== -1) {
+                    const frame = buffer.slice(0, sep);
+                    buffer = buffer.slice(sep + 2);
+                    const data = frame.split('\n')
+                        .filter(l => l.startsWith('data:'))
+                        .map(l => l.slice(5).trim())
+                        .join('');
+                    if (!data) continue;
 
-        const upload_image_url = await uploadBlob(file, 'upload');
-        const exp_img_url  = options?.expFile  ? await uploadBlob(options.expFile,  'exp')  : undefined;
-        const te_img_url   = options?.teFile   ? await uploadBlob(options.teFile,   'te')   : undefined;
-        const icm_img_url  = options?.icmFile  ? await uploadBlob(options.icmFile,  'icm')  : undefined;
+                    let event: MlJobEvent;
+                    try { event = JSON.parse(data); } catch { continue; }
+                    onEvent?.(event);
+                    if (event.status === 'failed') throw new Error(event.error || `${label} job failed`);
+                    if (event.status === 'complete') return event;
+                }
+            }
+        } finally {
+            reader.cancel().catch(() => { /* stream already closed */ });
+        }
+        throw new Error(`${label} stream ended before completion`);
+    }
 
-        return this.request<IvfImage>(
-            `/api/ivf/cycles/${cycleId}/grades/${gradeId}/images/register`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    upload_image_url,
-                    exp_img_url:  exp_img_url  ?? null,
-                    te_img_url:   te_img_url   ?? null,
-                    icm_img_url:  icm_img_url  ?? null,
-                    file_name:    file.name,
-                    file_size:    file.size,
-                    day:          options?.day ?? null,
-                }),
-            },
+    /**
+     * Trigger the ML analysis job (segmentation + grading, one model pass) and
+     * consume its SSE progress stream.
+     *
+     * EventSource cannot set an Authorization header, so this reads the stream
+     * with fetch. Resolves with the terminal event; rejects if the job fails.
+     */
+    async streamMlJob(
+        imageId: string,
+        onEvent?: (e: MlJobEvent) => void,
+        signal?: AbortSignal,
+    ): Promise<MlJobEvent> {
+        const res = await fetch(
+            `${this.baseUrl}/api/ivf/ml/analysis/stream?image_id=${encodeURIComponent(imageId)}`,
+            { headers: { ...this.getAuthHeaders(), Accept: 'text/event-stream' }, signal },
         );
+        if (!res.ok || !res.body) throw new Error(`Failed to start analysis job (${res.status})`);
+        return this.consumeMlStream(res, 'analysis', onEvent);
+    }
+
+    /** Re-attach to a job already running on the server, without starting a new one. */
+    async attachMlJob(
+        jobId: number,
+        onEvent?: (e: MlJobEvent) => void,
+        signal?: AbortSignal,
+    ): Promise<MlJobEvent> {
+        const res = await fetch(
+            `${this.baseUrl}/api/ivf/ml/jobs/${jobId}/stream`,
+            { headers: { ...this.getAuthHeaders(), Accept: 'text/event-stream' }, signal },
+        );
+        if (res.status === 404) throw new MlJobGoneError(jobId);
+        if (!res.ok || !res.body) throw new Error(`Failed to attach to ML job ${jobId} (${res.status})`);
+        return this.consumeMlStream(res, `job ${jobId}`, onEvent);
     }
 
     async upsertLog(cycleId: number, data: IvfLogUpsert): Promise<IvfCycleLog> {
@@ -1703,6 +1750,7 @@ export interface IvfImage {
     exp_img_url: string | null;
     te_img_url: string | null;
     icm_img_url: string | null;
+    annotated_img_url: string | null;
     file_name: string | null;
     file_size: number | null;
     uploaded_by: string | null;
@@ -1727,6 +1775,9 @@ export interface IvfGrade {
     cytoplasmic_granularity: string | null;
     bridge: string | null;
     note: string | null;
+    icm_inference: string | null;
+    te_inference: string | null;
+    exp_inference: string | null;
     images: IvfImage[];
     graded_by: string | null;
     created_at: string;
@@ -1735,6 +1786,56 @@ export interface IvfGrade {
 
 export interface IvfCycleWithLogs extends IvfCycle {
     logs: IvfCycleLog[];
+}
+
+/** Result of creating a grade and uploading its image in one request. */
+export interface GradeUploadResult {
+    grade_id: number;
+    image_id: number;
+    upload_image_url: string;
+    file_name: string | null;
+    file_size: number | null;
+}
+
+/** One SSE frame from /api/ivf/ml/analysis/stream. */
+export interface MlJobEvent {
+    status: 'queued' | 'running' | 'complete' | 'failed';
+    job_id?: number;
+    kind?: 'analysis';
+    progress?: number;
+    output?: Record<string, string | number>;
+    error?: string;
+    code?: string;
+}
+
+/** The job id we tried to re-attach to no longer exists server-side. */
+export class MlJobGoneError extends Error {
+    jobId: number;
+    constructor(jobId: number) {
+        super(`ML job ${jobId} no longer exists`);
+        this.jobId = jobId;
+        this.name = 'MlJobGoneError';
+    }
+}
+
+/**
+ * Analysis job output — segmentation overlays and the grade come from the
+ * same model forward pass, so one job returns both.
+ */
+export interface MlAnalysisOutput {
+    exp: string;
+    icm: string;
+    te: string;
+    annotated: string;
+    grade: string;
+    ai_score: number;
+    icm_inference: string;
+    te_inference: string;
+    exp_inference: string;
+    hatching: string;
+    zona_pellucida: string;
+    blastocoel: string;
+    prognosis?: string;
 }
 
 export interface IvfCycleCreate {

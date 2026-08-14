@@ -30,6 +30,7 @@ class ImageResponse(BaseModel):
     exp_img_url: Optional[str]
     te_img_url: Optional[str]
     icm_img_url: Optional[str]
+    annotated_img_url: Optional[str]
     file_name: Optional[str]
     file_size: Optional[int]
     uploaded_by: Optional[str]
@@ -37,16 +38,6 @@ class ImageResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class ImageRegisterBody(BaseModel):
-    upload_image_url: str
-    exp_img_url: Optional[str] = None
-    te_img_url: Optional[str] = None
-    icm_img_url: Optional[str] = None
-    file_name: Optional[str] = None
-    file_size: Optional[int] = None
-    day: Optional[int] = None
 
 
 class ImagePresignResponse(BaseModel):
@@ -182,6 +173,18 @@ class GradeUpsert(BaseModel):
     cytoplasmic_granularity: Optional[str] = None
     bridge: Optional[str] = None
     note: Optional[str] = None
+    icm_inference: Optional[str] = None
+    te_inference: Optional[str] = None
+    exp_inference: Optional[str] = None
+
+
+class GradeUploadResponse(BaseModel):
+    """Result of creating a grade and uploading its source image together."""
+    grade_id: int
+    image_id: int
+    upload_image_url: str
+    file_name: Optional[str] = None
+    file_size: Optional[int] = None
 
 
 class GradeResponse(BaseModel):
@@ -202,6 +205,9 @@ class GradeResponse(BaseModel):
     cytoplasmic_granularity: Optional[str]
     bridge: Optional[str]
     note: Optional[str]
+    icm_inference: Optional[str] = None
+    te_inference: Optional[str] = None
+    exp_inference: Optional[str] = None
     images: List[ImageResponse] = []
     graded_by: Optional[str]
     created_at: datetime
