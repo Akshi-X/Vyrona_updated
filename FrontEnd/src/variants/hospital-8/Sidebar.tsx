@@ -50,7 +50,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
 
   const navItems = [
     { id: 'dashboard', icon: Grid3x3, label: 'Dashboard', path: '/dashboard' },
-    { id: 'alerts', icon: Settings, label: 'Alert Config', path: '/alert-setting' },
+    { id: 'alerts', icon: Settings, label: 'Alert Config', path: '/alert-setting?direction=refrigerators' },
     { id: 'refrigerator', icon: Refrigerator, label: 'Refrigerator Tracking', path: '/refrigerator-tracking' },
     { id: 'reports', icon: FileText, label: 'Reports', path: '/reports' },
     { id: 'users', icon: Users, label: 'Users', path: '/users' },
