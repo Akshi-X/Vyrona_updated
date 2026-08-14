@@ -41,7 +41,7 @@ def _prettify_kpi(kpi_name: str) -> str:
     return kpi_name.replace("_", " ").title()
 
 
-REFRIGERATOR_TEMP_KPI = "refrigerator_temperature"
+REFRIGERATOR_TEMP_KPI = "refrigerator_temp"
 REFRIGERATOR_HUMIDITY_KPI = "refrigerator_humidity"
 
 
