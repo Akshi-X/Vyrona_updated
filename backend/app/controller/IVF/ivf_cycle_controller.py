@@ -16,11 +16,11 @@ from app.schemas.IVF.ivf_cycle_schema import (
     LogUpsert,
     LogResponse,
     ImageResponse,
-    ImageRegisterBody,
     ImagePresignResponse,
     ReportResponse,
     GradeUpsert,
     GradeResponse,
+    GradeUploadResponse,
 )
 
 from app.models.IVF.hospital_branch_model import HospitalBranch
@@ -37,6 +37,9 @@ from app.service.activity_log_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ivf", tags=["IVF Cycles"])
+
+# Matches the limit the upload UI advertises.
+MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
 
 def _ivf_user(request: Request):
@@ -358,7 +361,7 @@ def delete_grade(
 # ── Image helpers ────────────────────────────────────────────────────────────
 
 def _sas_image(r: ImageResponse) -> ImageResponse:
-    for field in ("upload_image_url", "exp_img_url", "te_img_url", "icm_img_url"):
+    for field in ("upload_image_url", "exp_img_url", "te_img_url", "icm_img_url", "annotated_img_url"):
         val = getattr(r, field, None)
         if val:
             setattr(r, field, ivf_blob.generate_read_sas_url(val))
@@ -403,33 +406,63 @@ def get_image_presign(
     )
 
 
-@router.post("/cycles/{cycle_id}/grades/{grade_id}/images/register", response_model=ImageResponse, status_code=201)
-def register_image(
+@router.post("/cycles/{cycle_id}/logs/{log_id}/grades/upload",
+             response_model=GradeUploadResponse, status_code=201)
+def create_grade_with_image(
     cycle_id: int,
-    grade_id: int,
-    body: ImageRegisterBody,
-    request: Request,
+    log_id: int,
+    file: UploadFile = File(...),
+    stage: Optional[int] = Form(None),
+    request: Request = None,
     db: Session = Depends(get_db),
 ):
-    """Record blob URLs (uploaded directly by the browser) in the database."""
+    """Create a grade with its source image in one round trip.
+
+    The presign + direct-to-blob flow costs three calls before inference can even
+    start. The image row is written here rather than after grading so the grade is
+    displayable — with its image — for the whole time the model is running; the
+    annotation URLs are filled in later by grading-service itself once analysis
+    completes (see grading-service/shared/job_handler.py:_save_result).
+    """
     user = _ivf_user(request)
-    _hospital_id(request, db, user)
+    hospital_id = _hospital_id(request, db, user)
     svc = IvfCycleService(db)
-    if not svc.get_grade_by_id(grade_id, cycle_id):
-        raise HTTPException(status_code=404, detail="Grade record not found")
-    img = svc.add_image(
-        grade_id=grade_id,
+    if not svc.get_cycle(cycle_id, hospital_id):
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    grade = svc.create_grade(log_id, cycle_id, GradeUpsert(stage=stage), user_id=str(user.user_id))
+
+    try:
+        data = file.file.read()
+        if len(data) > MAX_IMAGE_BYTES:
+            raise ValueError(f"Image exceeds the {MAX_IMAGE_BYTES // (1024 * 1024)}MB limit")
+        blob_path = ivf_blob.make_blob_path(
+            f"ivf/oocytes/{cycle_id}/{grade.grade_id}", file.filename or "", "upload",
+        )
+        image_url = ivf_blob.upload_bytes(data, blob_path, file.content_type or "application/octet-stream")
+    except ValueError as e:
+        svc.delete_grade(grade.grade_id, cycle_id)
+        raise HTTPException(status_code=413, detail=str(e))
+    except Exception as e:
+        logger.exception("Blob upload failed for grade=%s", grade.grade_id)
+        svc.delete_grade(grade.grade_id, cycle_id)
+        raise HTTPException(status_code=500, detail=f"Storage error: {e}")
+
+    image = svc.add_image(
+        grade_id=grade.grade_id,
         cycle_id=cycle_id,
-        upload_image_url=body.upload_image_url,
-        exp_img_url=body.exp_img_url,
-        te_img_url=body.te_img_url,
-        icm_img_url=body.icm_img_url,
-        file_name=body.file_name,
-        file_size=body.file_size,
-        day=body.day,
+        upload_image_url=image_url,
+        file_name=file.filename,
+        file_size=len(data),
         user_id=str(user.user_id),
     )
-    return _with_read_sas(img)
+
+    return GradeUploadResponse(
+        grade_id=grade.grade_id,
+        image_id=image.image_id,
+        upload_image_url=image_url,
+        file_name=file.filename,
+        file_size=len(data),
+    )
 
 
 @router.get("/cycles/{cycle_id}/grades/{grade_id}/images", response_model=List[ImageResponse])

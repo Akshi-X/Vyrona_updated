@@ -21,6 +21,7 @@ from .ivf_cycle_log_model import IvfCycleLog
 from .ivf_oocyte_grade_model import IvfOocyteGrade
 from .ivf_oocyte_image_model import IvfOocyteImage
 from .ivf_cycle_report_model import IvfCycleReport
+from .ml_job_model import MlJob
 
 # Register UIRouteVariant so Hospital.ui_variants relationship resolves (same Base registry).
 # Without this, any code that touches Hospital (e.g. CriticalAlert -> ... -> Hospital) fails with
