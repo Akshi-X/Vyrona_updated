@@ -6,6 +6,7 @@ import {
   ShieldAlert, ArrowUpRight,
 } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
+import EmbryoTabBar from './EmbryoTabBar';
 import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import WavePurple from '../../assets/bottom-right1.svg';
 import WaveGreen  from '../../assets/bottom-right2.svg';
@@ -440,6 +441,9 @@ export default function EmbryoGradingPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
+    <div className="flex w-full h-dvh min-h-0">
+      <EmbryoTabBar his="" />
+      <div className="flex-1 min-w-0 min-h-0">
     <PageLayout
       title="Embryo Console"
       description="Monitor and manage all embryo development cycles across your lab"
@@ -1042,5 +1046,7 @@ export default function EmbryoGradingPage() {
         </div>
       </Modal>
     </PageLayout>
+      </div>
+    </div>
   );
 }

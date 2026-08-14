@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+ENV/
+*.egg-info/
+
+# Azure Functions
+.azure/
+
+# Local settings / secrets
+local.settings.json
+.env*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Model checkpoints (shipped into the image at build time, never committed)
+
+# *.pth
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/

@@ -185,6 +185,9 @@ class Settings(BaseSettings):
     #   BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;
     AZURE_STORAGE_CONNECTION_STRING: Optional[str] = None
     AZURE_STORAGE_BLOB_CONTAINER: str = "ivf-media"
+    # Grading (ML) Service — Azure Functions host for segmentation/grading jobs
+    GRADING_SERVICE_URL: str = "http://localhost:7073"
+    GRADING_SERVICE_KEY: Optional[str] = None  # Function key (x-functions-key) when hosted on Azure
     # Twilio (Optional - for WhatsApp notifications)
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None

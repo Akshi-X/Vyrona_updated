@@ -20,11 +20,16 @@ class IvfOocyteGrade(Base):
     hatching = Column(String(50), nullable=True)
     vacuolization = Column(String(50), nullable=True)
     multinucleation = Column(String(50), nullable=True)
-    zona_pellucida = Column(String(50), nullable=True)
-    blastocoel = Column(String(50), nullable=True)
+    # Free-text descriptions from the grading service, not short enum-ish labels
+    zona_pellucida = Column(Text, nullable=True)
+    blastocoel = Column(Text, nullable=True)
     cytoplasmic_granularity = Column(String(50), nullable=True)
     bridge = Column(String(50), nullable=True)
     note = Column(Text, nullable=True)
+    # Per-region clinical descriptions returned by the grading service
+    icm_inference = Column(Text, nullable=True)
+    te_inference = Column(Text, nullable=True)
+    exp_inference = Column(Text, nullable=True)
     graded_by = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
