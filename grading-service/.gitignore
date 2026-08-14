@@ -33,8 +33,8 @@ Thumbs.db
 *.log
 
 # Model checkpoints (shipped into the image at build time, never committed)
-models/
-*.pth
+
+# *.pth
 
 # Testing
 .pytest_cache/
