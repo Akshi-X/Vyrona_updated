@@ -412,8 +412,16 @@ function buildCompartment(
   return { group, doorHit, doorGroup, highlightRing, interiorLight, interiorBack: back, mistMeshes };
 }
 
+// Backend serialises alert timestamps from naive UTC DateTime columns, so the
+// string carries no offset and Date() would read it as local time.
+function parseUtcTimestamp(ts: string): Date {
+  const norm = ts.trim().replace(' ', 'T');
+  const withZ = /([zZ]|[+-]\d{2}:?\d{2})$/.test(norm) ? norm : `${norm}Z`;
+  return new Date(withZ);
+}
+
 function getDateLabel(ts: string): string {
-  const d = new Date(ts);
+  const d = parseUtcTimestamp(ts);
   if (isNaN(d.getTime())) return 'Unknown';
   const today = new Date(); today.setHours(0,0,0,0);
   const item = new Date(d); item.setHours(0,0,0,0);
@@ -424,7 +432,7 @@ function getDateLabel(ts: string): string {
 }
 
 function formatAlertTime(ts: string): string {
-  const d = new Date(ts);
+  const d = parseUtcTimestamp(ts);
   if (isNaN(d.getTime())) return ts;
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
 }
@@ -493,7 +501,7 @@ function EmbeddedAlerts({ refrigeratorId }: { refrigeratorId?: number }) {
 
   const grouped = useMemo(() => {
     const byDate: Record<string, AlertGroup[]> = {};
-    const sorted = [...alerts].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const sorted = [...alerts].sort((a, b) => parseUtcTimestamp(b.created_at).getTime() - parseUtcTimestamp(a.created_at).getTime());
     for (const a of sorted) {
       const dateKey = getDateLabel(a.created_at);
       if (!byDate[dateKey]) byDate[dateKey] = [];
@@ -632,9 +640,11 @@ function isTempKpi(kpiName: string): boolean {
 function ZoneKpiSection({
   zone,
   refrigeratorId,
+  sideBySide = false,
 }: {
   zone: RefrigeratorZone;
   refrigeratorId?: number;
+  sideBySide?: boolean;
 }) {
   const allowedKpiNames = useRefrigeratorAlertKpiNames(refrigeratorId, zone.zone_id, !!refrigeratorId);
   const { sensorTiles, isInitialLoading } = useRefrigeratorKpiSnapshot({
@@ -644,16 +654,20 @@ function ZoneKpiSection({
     allowedKpiNames,
   });
 
+  const layout = sideBySide
+    ? 'grid grid-cols-1 @[420px]:grid-cols-2 gap-3 items-start'
+    : 'flex flex-col gap-2';
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className={layout}>
       {isInitialLoading || allowedKpiNames == null ? (
-        <div className="flex flex-col gap-2">
+        <div className={sideBySide ? 'contents' : 'flex flex-col gap-2'}>
           {[0, 1].map((i) => (
             <div key={i} className="animate-pulse h-16 rounded-xl bg-[#f2eaf7]" />
           ))}
         </div>
       ) : sensorTiles.length === 0 ? (
-        <div className="text-xs text-gray-400 italic">No data</div>
+        <div className="text-xs text-gray-400 italic col-span-full">No data</div>
       ) : (
         [...sensorTiles].sort((a, b) => {
           const aIsTemp = isTempKpi(a.id) ? 0 : 1;
@@ -1252,7 +1266,7 @@ export default function RefrigeratorVisualisation({
             </div>
             <TrendingUp size={16} style={{ color: '#6b4a78' }} />
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-3 grid grid-cols-1 @[650px]:grid-cols-2 gap-4 content-start">
+          <div className={`flex-1 min-h-0 overflow-y-auto p-3 grid grid-cols-1 gap-4 content-start ${zones.length > 1 ? '@[650px]:grid-cols-2' : ''}`}>
             {isLoadingType ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, width: '100%' }}>
                 <svg className="animate-spin" style={{ width: 20, height: 20, color: '#8b6c97' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1268,6 +1282,7 @@ export default function RefrigeratorVisualisation({
                   key={zone.zone_id}
                   zone={zone}
                   refrigeratorId={refrigeratorId}
+                  sideBySide={zones.length === 1}
                 />
               ))
             )}
