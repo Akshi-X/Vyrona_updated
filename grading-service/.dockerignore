@@ -1,0 +1,8 @@
+.git
+.gitignore
+.funcignore
+local.settings.json
+.env*
+__pycache__
+*.pyc
+test_*.py
