@@ -386,13 +386,12 @@ def check_and_create_refrigerator_kpi_alerts(
         Empty list immediately (actual API call happens in background)
     """
     try:
-        # thread = threading.Thread(
-        #     target=_check_and_create_refrigerator_kpi_alerts_sync,
-        #     args=(refrigerator_id, zone_id),
-        #     daemon=True,
-        # )
-        # thread.start()
-        _check_and_create_refrigerator_kpi_alerts_sync(refrigerator_id, zone_id)
+        thread = threading.Thread(
+            target=_check_and_create_refrigerator_kpi_alerts_sync,
+            args=(refrigerator_id, zone_id),
+            daemon=True,
+        )
+        thread.start()
         logger.info(
             f"✓ Triggered refrigerator alert check for refrigerator_id={refrigerator_id} zone_id={zone_id} (background thread)"
         )

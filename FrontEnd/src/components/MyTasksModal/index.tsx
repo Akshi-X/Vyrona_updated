@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { ClipboardList } from "lucide-react";
 import AlertCard from "../AlertCard";
 import MyTasksIcon from "../../assets/DashBoardIcons/My_Tasks.svg";
 import { tasksService } from "../../services/tasksService";
@@ -544,10 +545,13 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             <>
             <div className="flex flex-col h-full overflow-hidden">
                 {/* Header with ADD button */}
-                <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}>
-                    <div>
-                        <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>{taskTitle}</span>
-                        <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Assign and track work items</span>
+                <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ background: '#eddcf3', borderBottom: '1px solid #efe5f4' }}>
+                    <div className="flex items-center gap-2">
+                        <ClipboardList size={16} style={{ color: '#3d1f52' }} className="shrink-0" />
+                        <div>
+                            <span className="block text-sm font-semibold" style={{ color: '#3d1f52' }}>{taskTitle}</span>
+                            <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Assign and track work items</span>
+                        </div>
                     </div>
                     {onAdd && (
                         <button
@@ -561,10 +565,13 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         </button>
                     )}
                 </div>
-                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto max-xl:min-h-[180px]">
                     <div className="flex flex-col gap-3 p-4">
                         {visibleTasks.length === 0 && !showInputRow && (
-                            <div className="text-center text-gray-500 text-sm py-4">No tasks yet</div>
+                            <div className="flex flex-col items-center justify-center gap-2 text-center py-8 px-4">
+                                <ClipboardList size={28} strokeWidth={1.5} style={{ color: '#c4a8d8' }} />
+                                <span className="text-xs text-gray-500">You can create tasks here and assign it to others to keep track of the progress.</span>
+                            </div>
                         )}
                         {visibleTasks.map((task) => {
                             const isEditing = editingTaskId === task.id;
@@ -763,7 +770,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 ) : undefined
             }
             containerClassName="w-full max-w-[750px]"
-            contentHeightClassName="md:h-[520px]"
+            contentHeightClassName="md:h-[400px]"
             loading={loading}
             loadingText="Loading tasks..."
             emptyText="No tasks found"
