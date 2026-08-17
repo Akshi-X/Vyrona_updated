@@ -202,7 +202,11 @@ export default function EmbryoComparePage() {
     <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
 
       {/* ── Leaderboard ── */}
-      <div className="w-[300px] shrink-0 flex flex-col overflow-hidden bg-white border border-gray-200 rounded-2xl">
+      <div className="w-[300px] shrink-0 flex flex-col min-h-0 overflow-hidden">
+        <div className="rounded-t-2xl overflow-hidden shrink-0">
+          <img src="/bg_emb.png" alt="" className="w-full h-auto block" />
+        </div>
+        <div className="relative z-10 -mt-6 flex-1 flex flex-col min-h-0 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
 
         <div className="shrink-0 border-b border-gray-100" style={{ background: 'linear-gradient(135deg,#f9f4ff 0%,#ffffff 100%)' }}>
           <div className="px-4 py-3 flex items-center gap-2.5">
@@ -399,6 +403,7 @@ export default function EmbryoComparePage() {
               </div>
             );
           })}
+        </div>
         </div>
       </div>
 

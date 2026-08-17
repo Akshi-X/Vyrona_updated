@@ -133,6 +133,13 @@ class IvfCycleService:
             log.grade_count = counts.get(log.log_id, 0)
         return logs
 
+    def get_log(self, log_id: int, cycle_id: int) -> Optional[IvfCycleLog]:
+        return (
+            self.db.query(IvfCycleLog)
+            .filter(IvfCycleLog.log_id == log_id, IvfCycleLog.cycle_id == cycle_id)
+            .first()
+        )
+
     def delete_log(self, log_id: int, cycle_id: int) -> bool:
         log = (
             self.db.query(IvfCycleLog)
