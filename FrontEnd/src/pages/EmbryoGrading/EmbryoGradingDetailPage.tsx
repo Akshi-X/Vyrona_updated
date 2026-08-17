@@ -285,7 +285,7 @@ export default function EmbryoGradingDetailPage() {
   const handleAddLogEntry = async () => {
     if (!selectedCycle) return;
     const oocyteNoNum = parseInt(logForm.oocyteNo, 10);
-    if (!logForm.oocyteNo.trim() || oocyteNoNum <= 0) {
+    if (!logForm.oocyteNo.trim() || Number.isNaN(oocyteNoNum) || oocyteNoNum <= 0) {
       setOocyteNoError('Enter an oocyte number');
       setLogModalStep(0);
       return;
