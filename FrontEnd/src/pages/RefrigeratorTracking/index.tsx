@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Snowflake } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
-import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
-import CriticalAlertsModal from '../../components/CriticalAlertsModal';
+import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
+import StakeholderChatBox from '../../components/StakeholderChatBox';
 import { shipmentService } from '../../services/shipmentService';
 import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { activityLogService, type ActivityLogRecord } from '../../services/activityLogService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { userService } from '../../services/userService';
+import { useRefrigeratorChatWebSocket } from '../../hooks/useChatWebSocket';
 import RefrigeratorVisualisation from './sections/RefrigeratorVisualisation';
 import { useRefrigeratorKpiSnapshot } from './sections/useRefrigeratorKpiSnapshot';
 import { useRefrigeratorAlertKpiNames } from './commonComponent/useRefrigeratorAlertConfig';
@@ -29,12 +30,17 @@ export default function RefrigeratorTrackingPage() {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
   const [criticalAlerts, setCriticalAlerts] = useState<IVFAlert[]>([]);
-  const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [systemActivity, setSystemActivity] = useState<ActivityLogRecord[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentUserName, setCurrentUserName] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
+  const [showMessages, setShowMessages] = useState(false);
+
+  const { unreadCount: messagesUnreadCount } = useRefrigeratorChatWebSocket(
+    hasRefrigeratorId ? refrigeratorIdNum : undefined,
+    selectedZoneId ?? undefined,
+  );
 
   const allowedKpiNames = useRefrigeratorAlertKpiNames(
     hasRefrigeratorId ? refrigeratorIdNum : undefined,
@@ -143,19 +149,19 @@ export default function RefrigeratorTrackingPage() {
     <div className="flex items-center gap-6">
       <div
         className="relative group flex flex-col items-center cursor-pointer"
-        onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}
+        onClick={() => setShowMessages(true)}
       >
         <img
           className="w-[25px] h-[25px]"
-          alt="Critical Alerts"
-          src={CriticalAlertsIcon}
+          alt="Messages"
+          src={StakeholderChatsIcon}
         />
-        {criticalAlertsCount > 0 && (
+        {messagesUnreadCount > 0 && (
           <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-white flex items-center justify-center">
-            <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+            <span className="font-semibold text-white text-[10px]">{messagesUnreadCount}</span>
           </div>
         )}
-        <span className="text-[9px] font-semibold text-gray-500 mt-0.5 leading-none">Critical Alerts</span>
+        <span className="text-[9px] font-semibold text-gray-500 mt-0.5 leading-none">Messages</span>
       </div>
     </div>
   );
@@ -188,30 +194,7 @@ export default function RefrigeratorTrackingPage() {
         </div>
       </div>
 
-      {zones.length > 0 && (
-        <div className="flex items-center gap-2 mt-3">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Zone</span>
-          {zones.map((z) => {
-            const isActive = selectedZoneId === z.zone_id;
-            return (
-              <button
-                key={z.zone_id}
-                type="button"
-                onClick={() => setSelectedZoneId(z.zone_id)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                  isActive
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-primary hover:text-primary'
-                }`}
-              >
-                {z.zone_name}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 mt-3">
         <RefrigeratorVisualisation
           sensorTiles={sensorTiles}
           selectedSensorId={selectedSensorId}
@@ -228,37 +211,24 @@ export default function RefrigeratorTrackingPage() {
           refrigeratorId={hasRefrigeratorId ? refrigeratorIdNum : undefined}
           branchName={branchName !== '-' ? branchName : undefined}
           zoneId={selectedZoneId}
+          zones={zones}
+          onZoneSelect={setSelectedZoneId}
+          alerts={criticalAlerts}
+          alertsLoading={loadingAlerts}
+          onAcknowledgeAlert={async (alertId) => {
+            await ivfAlertsService.acknowledgeAlert(alertId);
+            fetchCriticalAlerts();
+          }}
           type={refrigeratorType || 'default'}
           isLoadingType={isLoadingType}
         />
       </div>
     </PageLayout>
 
-    <CriticalAlertsModal
-      isOpen={showCriticalAlerts}
-      onClose={() => setShowCriticalAlerts(false)}
-      alerts={criticalAlerts.map((a) => ({
-        id: a.alert_id,
-        type: a.alert_type,
-        severity: a.severity === 'High' ? 'High' : a.severity === 'Medium' ? 'Medium' : 'Low',
-        patientId: a.refrigerator_code ?? `Refrigerator ${a.refrigerator_id}`,
-        branchName: (a as typeof a & { branch_name?: string }).branch_name,
-        dedupKey: (a as typeof a & { dedup_key?: string }).dedup_key,
-        message: a.message,
-        timestamp: new Date(a.occurred_at + 'Z').toLocaleString(),
-        status: a.status === 'Active' ? 'Active' : 'Acknowledged',
-        acknowledgementReason: a.acknowledgment_reason,
-      }))}
-      loading={loadingAlerts}
-      patientIdLabel=""
-      onAcknowledge={async (alertId, reason) => {
-        await ivfAlertsService.acknowledgeAlert(alertId, reason);
-        fetchCriticalAlerts();
-      }}
-      onAcknowledgeAll={async (alertIds, reason) => {
-        await ivfAlertsService.acknowledgeAlerts(alertIds, reason);
-        fetchCriticalAlerts();
-      }}
+    <StakeholderChatBox
+      isOpen={showMessages}
+      onClose={() => setShowMessages(false)}
+      refrigeratorId={hasRefrigeratorId ? refrigeratorIdNum : undefined}
     />
     </>
   );

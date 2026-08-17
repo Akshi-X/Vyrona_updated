@@ -50,22 +50,49 @@ def get_session():
     return _SessionLocal
 
 
+def _table_exists(conn, table_name: str) -> bool:
+    return conn.execute(
+        text("SELECT to_regclass(:name) IS NOT NULL"), {"name": table_name}
+    ).scalar()
+
+
 def ensure_telemetry_table_exists():
-    """Ensure telemetry_data table exists (idempotent)."""
+    """Ensure telemetry_data table exists (idempotent, checked once at startup)."""
     try:
         engine = get_engine()
-        ddl = text("""
-        CREATE TABLE IF NOT EXISTS telemetry_data (
-            id BIGSERIAL PRIMARY KEY,
-            shipment_id VARCHAR(255) NOT NULL,
-            telemetry_data JSONB NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-        )
-        """)
         with engine.begin() as conn:
-            conn.execute(ddl)
+            if _table_exists(conn, "telemetry_data"):
+                return
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS telemetry_data (
+                    id BIGSERIAL PRIMARY KEY,
+                    shipment_id VARCHAR(255) NOT NULL,
+                    telemetry_data JSONB NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+                )
+            """))
     except Exception as e:
         logger.error(f"✗ Failed to ensure telemetry_data table: {e}")
+        raise
+
+
+def ensure_processed_messages_table():
+    """Ensure processed_messages table exists (idempotent, checked once at startup)."""
+    try:
+        engine = get_engine()
+        with engine.begin() as conn:
+            if _table_exists(conn, "processed_messages"):
+                return
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS processed_messages (
+                    id BIGSERIAL PRIMARY KEY,
+                    message_id VARCHAR(255) UNIQUE NOT NULL,
+                    payload_summary TEXT,
+                    processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+                )
+            """))
+    except Exception as e:
+        logger.error(f"✗ Failed to ensure processed_messages table: {e}")
         raise
 
 
@@ -83,8 +110,31 @@ def ensure_ln2_event_detection_columns():
     All columns are nullable with sensible defaults so existing rows
     continue to work without manual backfill.
     """
+    expected_columns = {
+        "spike_tolerance_kg", "spike_max_duration_s",
+        "lid_weight_min_kg", "lid_weight_max_kg", "lid_confirm_stable_points",
+        "low_level_threshold_kg", "low_level_consecutive_readings",
+        "canister_weight_kg", "canister_tolerance_kg", "product_change_max_kg",
+        "precaution_level_pct",
+    }
     try:
         engine = get_engine()
+
+        # ADD COLUMN IF NOT EXISTS still takes an ACCESS EXCLUSIVE lock on the
+        # table even when the column already exists, so check the catalog
+        # first and skip entirely once migrated — avoids re-locking
+        # ln2_iot_devices (read on every telemetry event) on every cold start.
+        with engine.connect() as conn:
+            existing = {
+                row[0]
+                for row in conn.execute(text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'ln2_iot_devices'"
+                ))
+            }
+        if expected_columns <= existing:
+            logger.info("✓ ln2_iot_devices event-detection columns already present")
+            return
 
         # Each statement is idempotent (IF NOT EXISTS / ADD COLUMN IF NOT EXISTS).
         alter_statements = [
