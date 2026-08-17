@@ -74,7 +74,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
         dropdown: true,
         children: [
             { label: "Overview",                  path: "/dashboard"          },
-            { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
+            { label: "Cryocan Quality Tracking",  path: "/cryocan-tracking" },
           //  { label: "Incubator Tracking",      path: "/incubator-tracking"    },
             { label: "Refrigerator Tracking",     path: "/refrigerator-tracking" },
           //  { label: "Embryo Console",          path: "/embryo-console"        },
