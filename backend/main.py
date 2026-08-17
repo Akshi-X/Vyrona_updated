@@ -58,7 +58,6 @@ from app.schemas.response_schema import HealthCheckResponse
 from app.service.health_service import get_health_response
 from app.service.quality_service import QualityService
 from app.service.redis_service import get_redis
-from app.utils.lane_risk_utils import schedule_daily_lpi_fetch
 
 # Create logs directory if it doesn't exist (BEFORE logging setup)
 os.makedirs("logs", exist_ok=True)
@@ -178,10 +177,6 @@ async def startup_event():
     asyncio.create_task(ivf_quality_controller.tank_kpi_redis_listener())
     asyncio.create_task(ivf_quality_controller.incubator_kpi_redis_listener())
     asyncio.create_task(ivf_quality_controller.refrigerator_kpi_redis_listener())
-
-    # Step 4: Start scheduled task to fetch World Bank LPI data daily at midnight
-    # logger.info("Starting World Bank LPI daily fetch scheduler...")
-    asyncio.create_task(schedule_daily_lpi_fetch())
 
     print("!" * 60 + "\n")
 

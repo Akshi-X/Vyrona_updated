@@ -9,6 +9,7 @@ import {
   Award, Info, CircleDashed, CircleDot, Pencil, Camera, Syringe, Tag,
 } from 'lucide-react';
 import type { IVFTreatment } from '../../types/ivf';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import {
   ivfService,
   type IvfCycle, type IvfCycleLog, type IvfGrade, type IvfImage,
@@ -234,7 +235,7 @@ export default function AdvancedEmbryoGradingPage() {
   const [cycle, setCycle] = useState<IvfCycle | null>(null);
   const [cycleId, setCycleId] = useState<number | null>(null);
   const [logs, setLogs] = useState<IvfCycleLog[]>([]);
-  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsLoading, setLogsLoading] = useState(true);
 
   // Resolved from urlLogId once the logs land.
   const [selectedOocyteNo, setSelectedOocyteNo] = useState<number | null>(() => resumeRecord?.oocyteNo ?? null);
@@ -265,13 +266,14 @@ export default function AdvancedEmbryoGradingPage() {
   // ── Fetch cycle + logs ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!his) return;
+    if (!his) { setLogsLoading(false); return; }
     const detailHis = his.trim().toUpperCase();
     let cancelled = false;
     setLogsLoading(true);
     ivfService.listCycles({ his_id: detailHis }).then(async cycles => {
+      if (cancelled) return;
       const matched = cycles.find(c => c.his_id.toUpperCase() === detailHis);
-      if (!matched || cancelled) { setLogsLoading(false); return; }
+      if (!matched) { setLogsLoading(false); return; }
       setCycleId(matched.cycle_id);
       const full = await ivfService.getCycleWithLogs(matched.cycle_id);
       if (cancelled) return;
@@ -580,6 +582,19 @@ export default function AdvancedEmbryoGradingPage() {
     setExistingGrades(prev => prev.map(g => g.grade_id === gradeId ? { ...g, ...fields } : g));
   }, [cycleId]);
 
+  /** Soft-delete: retire the row so it drops out of isUsableGrade, then land on a valid index. */
+  const handleDeleteGrade = useCallback(async (gradeId: number) => {
+    if (cycleId == null || !selectedLog) return;
+    await ivfService.updateGrade(cycleId, gradeId, { is_active: false });
+    const gs = await refreshGrades(cycleId, selectedLog.log_id);
+    const idx = Math.min(selectedGradeIdx, Math.max(0, gs.length - 1));
+    setSelectedGradeIdx(idx);
+    setSearchParams({
+      log: String(selectedLog.log_id), step: 'result',
+      ...(gs[idx] ? { grade: String(gs[idx].grade_id) } : {}),
+    }, { replace: true });
+  }, [cycleId, selectedLog, refreshGrades, selectedGradeIdx, setSearchParams]);
+
   // ── Skip upload → view existing grades ──────────────────────────────────────
 
   const skipToResult = useCallback(async () => {
@@ -686,7 +701,7 @@ export default function AdvancedEmbryoGradingPage() {
         <SelectScreen
           cycle={cycle} his={his} logs={logs} loading={logsLoading} bestImages={bestImages}
           selectedOocyteNo={selectedOocyteNo} onSelect={setSelectedOocyteNo}
-          onBack={() => navigate('/embryo-console')}
+          onBack={() => navigate(`/embryo-console/${his}`)}
           onContinue={() => selectedOocyteNo != null && goUpload(selectedOocyteNo)}
         />
       )}
@@ -718,6 +733,7 @@ export default function AdvancedEmbryoGradingPage() {
             ? { running: uploading, progress: mlProgress, stage: mlStage }
             : null}
           onResumeGrade={resumeGrade}
+          onDeleteGrade={handleDeleteGrade}
         />
       )}
     </div>
@@ -843,7 +859,7 @@ function SelectScreen({ cycle, his, logs, loading, bestImages, selectedOocyteNo,
         <div className="mt-4 flex-1 min-h-0 overflow-y-auto px-5 pb-1">
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5, 6].map(n => <div key={n} className="h-56 rounded-2xl bg-gray-100 animate-pulse" />)}
+              {[1, 2, 3, 4, 5, 6].map(n => <OocyteCardSkeleton key={n} />)}
             </div>
           ) : logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
@@ -873,6 +889,49 @@ function SelectScreen({ cycle, his, logs, loading, bestImages, selectedOocyteNo,
             Continue <ArrowRight size={14} />
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SkeletonBar({ className }: { className: string }) {
+  return (
+    <div className={`relative overflow-hidden bg-gray-200/90 ${className}`}>
+      <div className="absolute -inset-y-4 inset-x-0 -skew-x-[20deg] bg-gradient-to-r from-transparent via-white to-transparent animate-shimmer" />
+    </div>
+  );
+}
+
+function OocyteCardSkeleton() {
+  return (
+    <div className="rounded-2xl border-2 border-line bg-white p-4 flex flex-col gap-3">
+      <div className="flex items-start justify-between">
+        <SkeletonBar className="h-3.5 w-20 rounded" />
+        <SkeletonBar className="h-4 w-24 rounded-full" />
+      </div>
+
+      <div className="flex gap-3">
+        <div className="flex-1 min-w-0 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <SkeletonBar className="h-2.5 w-14 rounded" />
+            <SkeletonBar className="h-5 w-8 rounded-md" />
+          </div>
+        </div>
+        <SkeletonBar className="w-16 h-16 rounded-full shrink-0" />
+      </div>
+
+      <div className="rounded-xl px-3 py-2.5 border border-gray-100 bg-gray-50 flex flex-col gap-2">
+        <SkeletonBar className="h-2.5 w-24 rounded" />
+        <div className="flex items-end justify-between">
+          <SkeletonBar className="h-5 w-14 rounded" />
+          <SkeletonBar className="h-2.5 w-16 rounded" />
+        </div>
+        <SkeletonBar className="h-2 w-full rounded mt-1" />
+      </div>
+
+      <div className="flex items-center gap-2 border-t border-line-light pt-2.5">
+        <SkeletonBar className="w-4 h-4 rounded-full shrink-0" />
+        <SkeletonBar className="h-2.5 w-24 rounded" />
       </div>
     </div>
   );
@@ -1603,7 +1662,7 @@ function AnnotatedViewer({ src, resetKey, label, tint }: {
   );
 }
 
-function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeIds, grade, saving, onBack, onApprove, onOverride, pending, onResumeGrade }: {
+function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeIds, grade, saving, onBack, onApprove, onOverride, pending, onResumeGrade, onDeleteGrade }: {
   log: IvfCycleLog; cycle?: IvfCycle | null;
   grades: IvfGrade[]; selectedIdx: number; onSelectIdx: (i: number) => void; newGradeIds: number[];
   grade: IvfGrade | null;
@@ -1612,12 +1671,14 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
   /** Live state for a grade still being processed, if the selected one is. */
   pending?: { running: boolean; progress: number; stage: string } | null;
   onResumeGrade?: (gradeId: number) => void;
+  onDeleteGrade?: (gradeId: number) => Promise<void>;
 }) {
   // The row exists with its image from the moment of upload; the grade only
   // lands when the model returns, so this is what "still working" looks like.
   const incomplete = !!grade && grade.grade == null;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [overrideOpen, setOverrideOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [overriding, setOverriding] = useState(false);
   const [ov, setOv] = useState({ grade: '', hatching: '', vacuolization: '', multinucleation: '', zona_pellucida: '', blastocoel: '', cytoplasmic_granularity: '', bridge: '' });
   useEffect(() => {
@@ -1726,8 +1787,12 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                 const isNew = newGradeIds.includes(g.grade_id);
                 const isBest = g.grade_id === bestGradeId;
                 return (
-                <button key={g.grade_id} type="button" onClick={() => onSelectIdx(i)}
-                  className={`relative w-[88px] flex flex-col gap-1 rounded-xl border-2 p-1.5 transition-all ${
+                // A plain div (not <button>) so the delete icon below can be a real
+                // nested <button> — a <button> can't validly contain another one.
+                <div key={g.grade_id} role="button" tabIndex={0}
+                  onClick={() => onSelectIdx(i)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectIdx(i); } }}
+                  className={`relative w-[88px] flex flex-col gap-1 rounded-xl border-2 p-1.5 transition-all cursor-pointer ${
                     i === selectedIdx ? 'border-primary bg-primary/[0.06] ring-2 ring-primary/25 shadow-md shadow-primary/15 -translate-y-0.5'
                     : isNew ? 'border-gray-300 bg-gray-50'
                     : 'border-line hover:border-primary/30'
@@ -1738,6 +1803,13 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                     </span>
                   ) : isNew && (
                     <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 text-[7px] font-black uppercase tracking-wide shadow-sm whitespace-nowrap">Just graded</span>
+                  )}
+                  {onDeleteGrade && (
+                    <button type="button"
+                      onClick={e => { e.stopPropagation(); setDeleteConfirmId(g.grade_id); }}
+                      className="absolute top-1 right-1 z-10 w-[18px] h-[18px] rounded-full bg-white/90 border border-gray-200 flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors">
+                      <Trash2 size={9} />
+                    </button>
                   )}
                   <div className="flex items-center px-0.5 min-h-4">
                     <span className={`text-[9px] font-bold ${i === selectedIdx ? 'text-primary' : 'text-gray-500'}`}>Image #{i + 1}</span>
@@ -1754,7 +1826,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                       <Check size={9} strokeWidth={3} className="text-white" />
                     </span>
                   )}
-                </button>
+                </div>
                 );
               })}
               {/* pad the strip out to a full row of 6 so it never looks sparsely populated */}
@@ -2183,6 +2255,21 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
           </div>
         </div>,
         document.body
+      )}
+
+      {deleteConfirmId != null && (
+        <ConfirmDialog
+          title="Delete this image?"
+          message="It will be removed from this oocyte's graded images."
+          confirmLabel="Delete"
+          confirmClassName="px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+          onCancel={() => setDeleteConfirmId(null)}
+          onConfirm={async () => {
+            if (!onDeleteGrade) return;
+            await onDeleteGrade(deleteConfirmId);
+            setDeleteConfirmId(null);
+          }}
+        />
       )}
     </div>
   );
