@@ -429,6 +429,8 @@ def create_grade_with_image(
     svc = IvfCycleService(db)
     if not svc.get_cycle(cycle_id, hospital_id):
         raise HTTPException(status_code=404, detail="Cycle not found")
+    if not svc.get_log(log_id, cycle_id):
+        raise HTTPException(status_code=404, detail="Log entry not found")
     grade = svc.create_grade(log_id, cycle_id, GradeUpsert(stage=stage), user_id=str(user.user_id))
 
     try:
@@ -439,22 +441,21 @@ def create_grade_with_image(
             f"ivf/oocytes/{cycle_id}/{grade.grade_id}", file.filename or "", "upload",
         )
         image_url = ivf_blob.upload_bytes(data, blob_path, file.content_type or "application/octet-stream")
+        image = svc.add_image(
+            grade_id=grade.grade_id,
+            cycle_id=cycle_id,
+            upload_image_url=image_url,
+            file_name=file.filename,
+            file_size=len(data),
+            user_id=str(user.user_id),
+        )
     except ValueError as e:
         svc.delete_grade(grade.grade_id, cycle_id)
         raise HTTPException(status_code=413, detail=str(e))
     except Exception as e:
-        logger.exception("Blob upload failed for grade=%s", grade.grade_id)
+        logger.exception("Upload failed for grade=%s", grade.grade_id)
         svc.delete_grade(grade.grade_id, cycle_id)
         raise HTTPException(status_code=500, detail=f"Storage error: {e}")
-
-    image = svc.add_image(
-        grade_id=grade.grade_id,
-        cycle_id=cycle_id,
-        upload_image_url=image_url,
-        file_name=file.filename,
-        file_size=len(data),
-        user_id=str(user.user_id),
-    )
 
     return GradeUploadResponse(
         grade_id=grade.grade_id,
