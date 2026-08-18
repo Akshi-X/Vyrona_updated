@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   CalendarRange, Microscope, ClipboardCheck, Gem, Search, SlidersHorizontal,
   ChevronRight, Timer, Camera, Clock,
-  ShieldAlert, ArrowUpRight,
+  ShieldAlert, ArrowUpRight, ArrowDownRight,
 } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 import FeedbackButton from '../../components/FeedbackButton';
@@ -17,6 +17,7 @@ import Modal from '../../components/Modal';
 import Tooltip from '../../components/Tooltip';
 import { ivfService, type IvfBranch, type IvfCycle, type IvfCycleCreate, type IvfCycleWithLogs } from '../../services/ivfService';
 import { shipmentService } from '../../services/shipmentService';
+import { bestGrade } from '../../utils/embryoGrades';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,15 @@ function gradeTier(grade: string): 'high' | 'mid' | 'low' {
   if (expansion >= 4 && (icmTe === 'AA' || icmTe === 'AB' || icmTe === 'BA')) return 'high';
   if (expansion >= 3 && icmTe !== 'CC') return 'mid';
   return 'low';
+}
+
+// Gardner grade as a comparable number: expansion (1–6) plus ICM and TE
+// letters (A=3, B=2, C=1). Only used for trending, never shown as a grade.
+function gradeScore(grade: string): number | null {
+  const expansion = parseInt(grade[0]);
+  if (isNaN(expansion)) return null;
+  const letter = (c?: string) => (c === 'A' ? 3 : c === 'B' ? 2 : c === 'C' ? 1 : 0);
+  return expansion + letter(grade[1]) + letter(grade[2]);
 }
 
 function statusLabel(status: string) {
@@ -97,8 +107,10 @@ function StatCard({
         <p className="text-3xl font-extrabold text-gray-900 mt-2 leading-none">{value}</p>
         {trend ? (
           <div className="flex items-center gap-1 mt-2">
-            <ArrowUpRight size={11} className="text-emerald-500" />
-            <span className="text-[11px] font-semibold text-emerald-500">{trend.value}</span>
+            {trend.up
+              ? <ArrowUpRight size={11} className="text-emerald-500" />
+              : <ArrowDownRight size={11} className="text-rose-500" />}
+            <span className={`text-[11px] font-semibold ${trend.up ? 'text-emerald-500' : 'text-rose-500'}`}>{trend.value}</span>
             <span className="text-[10px] text-gray-400">{sub}</span>
           </div>
         ) : (
@@ -162,10 +174,10 @@ function DonutChart({ high, mid, low, notGraded, total }: {
 }
 
 function Sparkline({
-  points = [3, 4.5, 3.8, 5.2, 4.1, 5.8, 5.5, 6.2, 5.9, 7],
+  points,
   color = '#6b1176',
   fillOpacity = 0.15,
-}: { points?: number[]; color?: string; fillOpacity?: number }) {
+}: { points: number[]; color?: string; fillOpacity?: number }) {
   const w = 100, h = 40;
   const min = Math.min(...points), max = Math.max(...points);
   const range = max - min || 1;
@@ -196,7 +208,7 @@ function Sparkline({
 // ── Form state type ───────────────────────────────────────────────────────────
 
 interface NewEmbryoFormState {
-  hisNumber: string; patientName: string; oocytes: string;
+  hisNumber: string; oocytes: string;
   m2: string; m1: string; gv: string; others: string; injected: string;
   cryolockNum: string; embryoGrading: string; siteName: string;
   branch_id: number | null; status: string; tankCode: string;
@@ -233,7 +245,7 @@ export default function EmbryoGradingPage() {
   const [completedSearchQuery, setCompletedSearchQuery] = useState('');
 
   const [newEmbryoForm, setNewEmbryoForm] = useState<NewEmbryoFormState>({
-    hisNumber: '', patientName: '', oocytes: '', m2: '', m1: '', gv: '',
+    hisNumber: '', oocytes: '', m2: '', m1: '', gv: '',
     others: '', injected: '', cryolockNum: '', embryoGrading: '4AA',
     siteName: '', branch_id: null, status: 'Stored', tankCode: '',
     canisterNum: '', caneCode: '', gobletColor: '', cryolockColor: '',
@@ -293,8 +305,7 @@ export default function EmbryoGradingPage() {
   const allGrades = useMemo(() => {
     const g: string[] = [];
     cyclesWithLogs.forEach(c => c.logs.forEach(l => {
-      if (l.d5_grade) g.push(l.d5_grade);
-      if (l.d6_grade) g.push(l.d6_grade);
+      if (l.blast_grade) g.push(l.blast_grade);
     }));
     return g;
   }, [cyclesWithLogs]);
@@ -302,7 +313,7 @@ export default function EmbryoGradingPage() {
   const gradingOverview = useMemo(() => {
     let high = 0, mid = 0, low = 0, notGraded = 0;
     cyclesWithLogs.forEach(c => c.logs.forEach(l => {
-      const grade = l.d5_grade || l.d6_grade;
+      const grade = l.blast_grade;
       if (!grade) { notGraded++; return; }
       const t = gradeTier(grade);
       if (t === 'high') high++;
@@ -312,15 +323,33 @@ export default function EmbryoGradingPage() {
     return { high, mid, low, notGraded, total: high + mid + low + notGraded };
   }, [cyclesWithLogs]);
 
-  const topGrade = useMemo(() => {
-    const hg = allGrades.filter(g => gradeTier(g) === 'high');
-    if (!hg.length) return null;
-    const counts = new Map<string, number>();
-    hg.forEach(g => counts.set(g, (counts.get(g) ?? 0) + 1));
-    let best = '', bestN = 0;
-    counts.forEach((n, g) => { if (n > bestN) { bestN = n; best = g; } });
-    return best || null;
-  }, [allGrades]);
+  const topGrade = useMemo(() => bestGrade(allGrades), [allGrades]);
+
+  // Weekly average grade score over the last 8 weeks, anchored on when each log
+  // was last touched. Weeks with no grading are dropped rather than carried
+  // forward, so the line only ever joins weeks that actually have grades.
+  const gradeTrend = useMemo(() => {
+    const WEEKS = 8;
+    const now = Date.now();
+    const buckets = Array.from({ length: WEEKS }, () => ({ sum: 0, n: 0 }));
+
+    cyclesWithLogs.forEach(c => c.logs.forEach(l => {
+      if (!l.blast_grade) return;
+      const score = gradeScore(l.blast_grade);
+      if (score == null) return;
+      const at = new Date(l.updated_at ?? l.created_at).getTime();
+      if (isNaN(at)) return;
+      const weeksAgo = Math.floor((now - at) / (7 * 86_400_000));
+      if (weeksAgo < 0 || weeksAgo >= WEEKS) return;
+      const b = buckets[WEEKS - 1 - weeksAgo];
+      b.sum += score;
+      b.n += 1;
+    }));
+
+    const points = buckets.filter(b => b.n > 0).map(b => b.sum / b.n);
+    const delta = points.length >= 2 ? points[points.length - 1] - points[points.length - 2] : null;
+    return { points, delta, latest: points[points.length - 1] ?? null };
+  }, [cyclesWithLogs]);
 
   const todayQueue = useMemo(() => cycles
     .filter(c => c.status === 'Active' && c.opu_date)
@@ -332,8 +361,8 @@ export default function EmbryoGradingPage() {
 
   const needsAttentionItems = useMemo(() => {
     const overdue   = cycles.filter(c => c.status === 'Active' && c.opu_date && cycleDay(c.opu_date) > 6).length;
-    const noBlast   = cyclesWithLogs.filter(c => c.logs.length > 0 && !c.logs.some(l => l.d5_grade || l.d6_grade)).length;
-    const lowQual   = cyclesWithLogs.filter(c => c.logs.some(l => { const g = l.d5_grade || l.d6_grade; return g && gradeTier(g) === 'low'; })).length;
+    const noBlast   = cyclesWithLogs.filter(c => c.logs.length > 0 && !c.logs.some(l => l.blast_grade)).length;
+    const lowQual   = cyclesWithLogs.filter(c => c.logs.some(l => l.blast_grade && gradeTier(l.blast_grade) === 'low')).length;
     return [
       { Icon: Timer,      label: 'Cycles waiting for grading', sub: `${todayQueue.length} cycles are pending grading`, count: todayQueue.length, iBg: 'bg-orange-50', iCl: 'text-orange-500', cBg: 'bg-orange-50', cCl: 'text-orange-600' },
       { Icon: Camera,     label: 'Images awaiting upload',     sub: `${noBlast} oocytes need images`,                  count: noBlast,           iBg: 'bg-purple-50', iCl: 'text-purple-500', cBg: 'bg-purple-50', cCl: 'text-purple-600' },
@@ -363,7 +392,7 @@ export default function EmbryoGradingPage() {
 
   const resetNewEmbryoForm = () => {
     setNewEmbryoForm({
-      hisNumber: '', patientName: '', oocytes: '', m2: '', m1: '', gv: '',
+      hisNumber: '', oocytes: '', m2: '', m1: '', gv: '',
       others: '', injected: '', cryolockNum: '', embryoGrading: '4AA',
       siteName: '', branch_id: null, status: 'Stored', tankCode: '',
       canisterNum: '', caneCode: '', gobletColor: '', cryolockColor: '',
@@ -397,7 +426,6 @@ export default function EmbryoGradingPage() {
     const m1 = parseCount(newEmbryoForm.m1) ?? 0;
     const missing: string[] = [];
     if (!hisNumber) missing.push('HIS Number');
-    if (!newEmbryoForm.patientName.trim()) missing.push('Patient Name');
     if (!newEmbryoForm.opuDate) missing.push('OPU Date');
     if (!newEmbryoForm.injectionMethod) missing.push('Method of Injection');
     if (!newEmbryoForm.spermQuality) missing.push('Sperm Quality');
@@ -414,7 +442,6 @@ export default function EmbryoGradingPage() {
     setCycleCreating(true);
     const payload: IvfCycleCreate = {
       his_id: hisNumber,
-      ...(newEmbryoForm.patientName.trim()       && { patient_name:       newEmbryoForm.patientName.trim() }),
       ...(newEmbryoForm.branch_id   != null      && { branch_id:          newEmbryoForm.branch_id }),
       ...(newEmbryoForm.incubator_id != null     && { incubator_id:       newEmbryoForm.incubator_id }),
       ...(newEmbryoForm.chamberPosition          && { chamber_position:   newEmbryoForm.chamberPosition }),
@@ -506,12 +533,14 @@ export default function EmbryoGradingPage() {
           <StatCard
             label="Avg. Top Grade"
             value={topGrade ?? 'N/A'}
-            sub="vs yesterday"
+            sub="vs previous graded week"
             accent="#f59e0b"
             iconBg="#fff6ea"
             wave={WaveAmber}
             icon={<Gem size={32} color="#f59e0b" strokeWidth={1.5} />}
-            trend={topGrade ? { value: '0.6', up: true } : undefined}
+            trend={gradeTrend.delta != null
+              ? { value: `${gradeTrend.delta >= 0 ? '+' : ''}${gradeTrend.delta.toFixed(1)}`, up: gradeTrend.delta >= 0 }
+              : undefined}
           />
         </div>
 
@@ -535,7 +564,7 @@ export default function EmbryoGradingPage() {
                 <Search size={13} className="text-gray-400 shrink-0" />
                 <input
                   type="text"
-                  placeholder="Search by patient name or HIS no."
+                  placeholder="Search by HIS no."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="flex-1 text-xs bg-transparent outline-none text-gray-600 placeholder-gray-400"
@@ -565,11 +594,10 @@ export default function EmbryoGradingPage() {
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-bold text-gray-900 truncate">{cycle.patient_name || cycle.his_id}</p>
+                            <p className="text-sm font-bold text-gray-900 truncate">HIS: {cycle.his_id}</p>
                             <p className="text-[11px] text-gray-400 shrink-0">{day != null ? `Day ${day}` : ''}</p>
                           </div>
                           <div className="flex items-center gap-3 mt-2">
-                            <p className="text-[11px] text-gray-400 shrink-0">HIS: {cycle.his_id}</p>
                             <div className="flex gap-1 flex-1">
                               {[1, 2, 3, 4, 5, 6].map(d => (
                                 <div
@@ -698,17 +726,31 @@ export default function EmbryoGradingPage() {
                       <p className="text-[10px] text-white/60 uppercase tracking-widest font-semibold">Top Grade Trend</p>
                       <div className="flex items-end gap-3 mt-2">
                         <p className="text-4xl font-extrabold text-white leading-none">{topGrade ?? '—'}</p>
-                        {topGrade && (
-                          <div className="flex items-center gap-1 bg-emerald-400/20 border border-emerald-300/30 rounded-full px-2.5 py-0.5 mb-0.5">
-                            <ArrowUpRight size={11} className="text-emerald-300" />
-                            <span className="text-[11px] font-bold text-emerald-300">0.6</span>
+                        {gradeTrend.delta != null && (
+                          <div className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 mb-0.5 border ${
+                            gradeTrend.delta >= 0
+                              ? 'bg-emerald-400/20 border-emerald-300/30'
+                              : 'bg-rose-400/20 border-rose-300/30'
+                          }`}>
+                            {gradeTrend.delta >= 0
+                              ? <ArrowUpRight size={11} className="text-emerald-300" />
+                              : <ArrowDownRight size={11} className="text-rose-200" />}
+                            <span className={`text-[11px] font-bold ${gradeTrend.delta >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}>
+                              {gradeTrend.delta >= 0 ? '+' : ''}{gradeTrend.delta.toFixed(1)}
+                            </span>
                           </div>
                         )}
                       </div>
-                      <p className="text-[10px] text-white/40 mt-1.5">vs last week</p>
+                      <p className="text-[10px] text-white/40 mt-1.5">
+                        {gradeTrend.latest != null
+                          ? `Avg score ${gradeTrend.latest.toFixed(1)} · last ${gradeTrend.points.length} graded ${gradeTrend.points.length === 1 ? 'week' : 'weeks'}`
+                          : 'No grades in the last 8 weeks'}
+                      </p>
                     </div>
                     <div className="w-28 h-14 mt-1 shrink-0">
-                      <Sparkline color="rgba(255,255,255,0.85)" fillOpacity={0.2} />
+                      {gradeTrend.points.length >= 2 && (
+                        <Sparkline points={gradeTrend.points} color="rgba(255,255,255,0.85)" fillOpacity={0.2} />
+                      )}
                     </div>
                   </div>
 
@@ -751,7 +793,7 @@ export default function EmbryoGradingPage() {
                   <Search size={13} className="text-gray-400 shrink-0" />
                   <input
                     type="text"
-                    placeholder="Search by patient name or HIS no."
+                    placeholder="Search by HIS no."
                     value={completedSearchQuery}
                     onChange={e => setCompletedSearchQuery(e.target.value)}
                     className="flex-1 text-xs bg-transparent outline-none text-gray-600 placeholder-gray-400"
@@ -763,30 +805,24 @@ export default function EmbryoGradingPage() {
                 <table className="w-full">
                   <thead className="sticky top-0 z-10">
                     <tr className="border-b border-gray-100 bg-gray-50/95 backdrop-blur-sm">
-                      {['HIS No.', 'Patient', 'Graded', 'Top Grade', 'Status', 'Last Activity'].map(h => (
+                      {['HIS No.', 'Graded', 'Top Grade', 'Status', 'Last Activity'].map(h => (
                         <th key={h} className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {loading ? (
-                      <tr><td colSpan={6} className="px-4 py-10 text-center text-xs text-gray-400">Loading…</td></tr>
+                      <tr><td colSpan={5} className="px-4 py-10 text-center text-xs text-gray-400">Loading…</td></tr>
                     ) : recentActivity.length === 0 ? (
-                      <tr><td colSpan={6} className="px-4 py-10 text-center text-xs text-gray-400">No completed cycles yet</td></tr>
+                      <tr><td colSpan={5} className="px-4 py-10 text-center text-xs text-gray-400">No completed cycles yet</td></tr>
                     ) : (
                       filteredCompletedCycles.map(c => {
                         const day = c.opu_date ? cycleDay(c.opu_date) : null;
                         const totalOocytes = (c.oocyte_m2 ?? 0) + (c.oocyte_m1 ?? 0) + (c.oocyte_gv ?? 0) + (c.oocyte_others ?? 0);
                         const withLogs = cyclesWithLogs.find(w => w.cycle_id === c.cycle_id);
-                        const gradedCount = withLogs?.logs.filter(l => l.d5_grade || l.d6_grade).length ?? 0;
+                        const gradedCount = withLogs?.logs.filter(l => l.blast_grade).length ?? 0;
                         const gradedPct = totalOocytes > 0 ? Math.round((gradedCount / totalOocytes) * 100) : 0;
-                        const cycleTopGrade = withLogs?.logs
-                          .flatMap(l => [l.d5_grade, l.d6_grade].filter(Boolean) as string[])
-                          .sort((a, b) => {
-                            const ta = gradeTier(a), tb = gradeTier(b);
-                            if (ta === tb) return 0;
-                            return ta === 'high' ? -1 : tb === 'high' ? 1 : ta === 'mid' ? -1 : 1;
-                          })[0] ?? null;
+                        const cycleTopGrade = bestGrade((withLogs?.logs ?? []).map(l => l.blast_grade));
                         const actDate = c.opu_date
                           ? new Date(new Date(c.opu_date).getTime() + (day ?? 0) * 86_400_000)
                           : null;
@@ -802,7 +838,6 @@ export default function EmbryoGradingPage() {
                             onClick={() => navigate(`/embryo-console/${c.his_id}`)}
                           >
                             <td className="px-4 py-3 text-xs font-bold text-primary whitespace-nowrap">{c.his_id}</td>
-                            <td className="px-4 py-3 text-xs font-medium text-gray-800 truncate max-w-[140px]">{c.patient_name || '—'}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-gray-600 shrink-0 tabular-nums">{gradedCount} ({gradedPct}%)</span>
@@ -855,10 +890,6 @@ export default function EmbryoGradingPage() {
                 <div className="flex flex-col">
                   <label className={lbl}>HIS Number <span className="text-red-500">*</span></label>
                   <input className={inp} value={newEmbryoForm.hisNumber} onChange={e => handleNewEmbryoFieldChange('hisNumber', e.target.value)} />
-                </div>
-                <div className="flex flex-col">
-                  <label className={lbl}>Patient Name</label>
-                  <input className={inp} value={newEmbryoForm.patientName} onChange={e => handleNewEmbryoFieldChange('patientName', e.target.value)} />
                 </div>
                 <div className="flex flex-col">
                   <label className={lbl}>OPU Date</label>

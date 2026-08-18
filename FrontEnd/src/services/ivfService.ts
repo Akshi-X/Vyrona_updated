@@ -1731,10 +1731,10 @@ export interface IvfCycleLog {
     d3_grade: string | null;
     d3_symmetry: string | null;
     d5_stage: string | null;
-    d5_grade: string | null;
     d6_stage: string | null;
-    d6_grade: string | null;
     d6_progression: string | null;
+    // The backend has one shared blast_grade column, not separate d5/d6 grade
+    // columns — d5_stage/d6_stage === 'Blastocyst' says which day it belongs to.
     blast_grade: string | null;
     fate: string | null;
     freeze_no: string | null;
@@ -1886,8 +1886,10 @@ export interface IvfLogUpsert {
     d3_drop_no?: string;
     d3_grade?: string;
     d3_symmetry?: string;
-    d5_stage?: string;
-    d6_stage?: string;
+    // null (not just omitted) explicitly clears the column server-side —
+    // needed to enforce that only one of the two can be 'Blastocyst'.
+    d5_stage?: string | null;
+    d6_stage?: string | null;
     d6_progression?: string;
     blast_grade?: string;
     fate?: string;

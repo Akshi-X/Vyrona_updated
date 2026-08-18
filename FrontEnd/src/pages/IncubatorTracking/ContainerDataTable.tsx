@@ -114,7 +114,6 @@ export default function MockContainerDataTable({ incubatorId, chamberId }: Props
           <thead className="sticky top-0 z-10 bg-surface text-primary text-[12px] font-medium h-[56px]">
             <tr>
               <th className="px-3 py-2 text-left rounded-tl-[10px] whitespace-nowrap">HIS #</th>
-              <th className="px-3 py-2 text-left whitespace-nowrap">Patient Name</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">OPU Date</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Cycle Type</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Injection Method</th>
@@ -132,11 +131,11 @@ export default function MockContainerDataTable({ incubatorId, chamberId }: Props
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={14} className="px-3 py-10 text-center text-xs text-gray-400">Loading…</td>
+                <td colSpan={13} className="px-3 py-10 text-center text-xs text-gray-400">Loading…</td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={14} className="px-3 py-10 text-center text-xs text-gray-400">
+                <td colSpan={13} className="px-3 py-10 text-center text-xs text-gray-400">
                   {chamberId ? `No cycles in Chamber ${chamberId}` : 'No cycles in this incubator'}
                 </td>
               </tr>
@@ -144,7 +143,6 @@ export default function MockContainerDataTable({ incubatorId, chamberId }: Props
               rows.map(r => (
                 <tr key={r.cycle_id} className="text-black text-[13px] h-[52px] hover:bg-gray-50 border-b border-gray-50 last:border-0">
                   <td className="px-3 py-2 whitespace-nowrap font-medium">{r.his_id}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{r.patient_name || '—'}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {r.opu_date ? new Date(r.opu_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                   </td>
