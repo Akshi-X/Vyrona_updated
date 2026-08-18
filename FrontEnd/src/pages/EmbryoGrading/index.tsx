@@ -6,6 +6,7 @@ import {
   ShieldAlert, ArrowUpRight,
 } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
+import FeedbackButton from '../../components/FeedbackButton';
 import EmbryoTabBar from './EmbryoTabBar';
 import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import WavePurple from '../../assets/bottom-right1.svg';
@@ -451,13 +452,23 @@ export default function EmbryoGradingPage() {
       description="Monitor and manage all embryo development cycles across your lab"
       icon={EmbryosIcon}
       actions={
-        <button
-          type="button"
-          onClick={() => setIsAddEmbryoFormOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
-        >
-          + Add Cycle
-        </button>
+        <>
+          <FeedbackButton
+            variant="text"
+            feedbackType="ux_workflow_improvement"
+            module="embryo_grading"
+            priority="high"
+            title="Embryo Console Feedback"
+            focusField="description"
+          />
+          <button
+            type="button"
+            onClick={() => setIsAddEmbryoFormOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors"
+          >
+            + Add Cycle
+          </button>
+        </>
       }
     >
       <div className="flex-1 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-h-0">

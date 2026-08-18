@@ -149,7 +149,11 @@ class AffectedModule(str, Enum):
     SIGN_IN = "sign_in"
     SIGNUP = "signup"
     ALERT_CONFIGURATION = "alert_configuration"
-    
+    REFRIGERATOR_QUALITY_TRACKING = "refrigerator_quality_tracking"
+    EMBRYO_GRADING = "embryo_grading"
+    REPORTS = "reports"
+    USER_MANAGEMENT = "user_management"
+
     @classmethod
     def list(cls):
         return [module.value for module in cls]

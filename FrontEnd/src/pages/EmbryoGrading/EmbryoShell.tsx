@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useParams } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import EmbryoTabBar from './EmbryoTabBar';
+import FeedbackButton from '../../components/FeedbackButton';
 import { ivfService } from '../../services/ivfService';
 
 export default function EmbryoShell() {
@@ -46,7 +47,19 @@ export default function EmbryoShell() {
       {/* PageLayout's <main> is h-dvh; without this it ignores the flex slot and
           pushes the bottom nav off the viewport on mobile. */}
       <div className="flex-1 min-w-0 min-h-0 [&>main]:h-full">
-        <PageLayout title={title} description={description}>
+        <PageLayout
+          title={title}
+          description={description}
+          actions={
+            <FeedbackButton
+              feedbackType="ux_workflow_improvement"
+              module="embryo_grading"
+              priority="high"
+              title="Embryo Console Feedback"
+              focusField="description"
+            />
+          }
+        >
           <Outlet />
         </PageLayout>
       </div>
