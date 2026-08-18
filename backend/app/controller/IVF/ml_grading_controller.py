@@ -61,7 +61,12 @@ def _terminal_event(row) -> Optional[dict]:
         return None
     if row.status == "completed":
         return {"status": "complete", "progress": 100, "output": row.output}
-    return {"status": "failed", "error": row.error}
+    event = {"status": "failed", "error": row.error}
+    detection = row.output.get("detection") if isinstance(row.output, dict) else None
+    if detection is not None:
+        event["code"] = "no_embryo"
+        event["detection"] = detection
+    return event
 
 
 def _read_terminal_state(job_id: int) -> Optional[dict]:

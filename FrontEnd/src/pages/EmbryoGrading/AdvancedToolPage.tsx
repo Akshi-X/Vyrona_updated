@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import {
   Brain, ChevronDown, ArrowLeft, ArrowRight, Check, CheckCircle2,
   UploadCloud, Trash2, Sun, Contrast, Monitor, FileText, Sparkles,
@@ -11,7 +12,7 @@ import {
 import type { IVFTreatment } from '../../types/ivf';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import {
-  ivfService,
+  ivfService, MlNoEmbryoError,
   type IvfCycle, type IvfCycleLog, type IvfGrade, type IvfImage,
   type MlJobEvent,
 } from '../../services/ivfService';
@@ -42,7 +43,11 @@ interface MlRunImage {
   fileSize: number;
   jobId?: number;  // the one analysis job for this image — segmentation + grading in one pass
   done?: boolean;  // the job completed; grading-service already persisted the result
+  rejected?: string[];  // detector reasons; set (even empty) means the row was retired, never graded
 }
+
+/** Nothing left to do for this image — it either graded or the detector turned it down. */
+const isSettled = (im: MlRunImage) => !!im.done || !!im.rejected;
 
 interface MlRunRecord {
   v: 1;
@@ -101,6 +106,15 @@ const PHASE_LABEL: Record<MlPhase, string> = {
   upload: 'Uploading images',
   analyse: 'Analyzing embryo',
 };
+
+/** One sentence naming the files the detector turned down. */
+function rejectionMessage(rejected: MlRunImage[]): string {
+  const names = rejected.map(im => im.fileName).filter(Boolean).join(', ');
+  if (!names) return `No embryo detected in ${rejected.length} image${rejected.length > 1 ? 's' : ''} — not graded.`;
+  return rejected.length === 1
+    ? `No embryo detected in ${names} — it was not graded.`
+    : `No embryo detected in ${names} — they were not graded.`;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -248,11 +262,13 @@ export default function AdvancedEmbryoGradingPage() {
   const [bestImages, setBestImages] = useState<Record<number, string>>({});
   const [mlProgress, setMlProgress] = useState(() => {
     if (!resumeRecord) return 0;
-    const next = resumeRecord.images.findIndex(im => !im.done);
+    const next = resumeRecord.images.findIndex(im => !isSettled(im));
     return mlProgressFor(resumeRecord, next < 0 ? resumeRecord.expected : next, 'analyse', 0);
   });
   const [mlStage, setMlStage] = useState(() => (resumeRecord ? 'Reconnecting to AI grading' : ''));
   const [mlError, setMlError] = useState<string | null>(null);
+  const [skippedFiles, setSkippedFiles] = useState<string[]>(
+    () => resumeRecord?.images.filter(im => im.rejected).map(im => im.fileName) ?? []);
   const [newGradeIds, setNewGradeIds] = useState<number[]>([]);
   const [activeGradeId, setActiveGradeId] = useState<number | null>(null);
 
@@ -414,7 +430,7 @@ export default function AdvancedEmbryoGradingPage() {
       try {
         return await ivfService.attachMlJob(known, onEvent, signal);
       } catch (err) {
-        if (signal?.aborted || retriedRef.current.has(`${i}`)) throw err;
+        if (signal?.aborted || err instanceof MlNoEmbryoError || retriedRef.current.has(`${i}`)) throw err;
         console.warn(`Re-running analysis for image ${i + 1}:`, err);
         retriedRef.current.add(`${i}`);
       }
@@ -434,7 +450,7 @@ export default function AdvancedEmbryoGradingPage() {
   const processPhase = useCallback(async (rec: MlRunRecord): Promise<void> => {
     for (let i = 0; i < rec.images.length; i++) {
       const img = rec.images[i];
-      if (img.done) continue;
+      if (isSettled(img)) continue;
 
       if (!img.imageUrl) {
         // Reload landed between createGrade and the upload — retire the empty row.
@@ -443,9 +459,20 @@ export default function AdvancedEmbryoGradingPage() {
       }
 
       report(rec, i, 'analyse', 0);
-      // grading-service writes the grade/image row itself as part of the job —
-      // there is nothing left for the client to persist once this resolves.
-      await runMlStep(rec, i);
+      try {
+        // grading-service writes the grade/image row itself as part of the job —
+        // there is nothing left for the client to persist once this resolves.
+        await runMlStep(rec, i);
+      } catch (err) {
+        if (!(err instanceof MlNoEmbryoError)) throw err;
+        console.warn(`No embryo detected in ${img.fileName || `image ${i + 1}`}:`, err.reasons);
+        // Recorded before the retire call so a reload mid-request still knows to skip it.
+        img.rejected = err.reasons;
+        writeMlRun(rec);
+        await ivfService.updateGrade(rec.cycleId, img.gradeId, { is_active: false }).catch(() => { /* best effort */ });
+        setSkippedFiles(prev => [...prev, img.fileName]);
+        continue;
+      }
 
       img.done = true;
       writeMlRun(rec);
@@ -458,7 +485,9 @@ export default function AdvancedEmbryoGradingPage() {
     setMlProgress(100);
     const refreshed = await ivfService.listGrades(rec.cycleId, rec.logId);
     const active = refreshed.filter(isUsableGrade);
-    const lost = rec.expected - rec.images.filter(im => im.done).length;
+    const graded = rec.images.filter(im => im.done);
+    const rejected = rec.images.filter(im => im.rejected);
+    const lost = rec.expected - rec.images.filter(isSettled).length;
     // Stay on the image this run just finished; the best one is only badged.
     // If it dropped out of `active` (e.g. retired concurrently), fall back to
     // best-graded rather than silently landing on an unrelated index 0.
@@ -469,17 +498,29 @@ export default function AdvancedEmbryoGradingPage() {
       if (idx < 0) idx = active.reduce((bi, g, i, arr) => (g.ai_score ?? -1) > (arr[bi].ai_score ?? -1) ? i : bi, 0);
     }
     idx = Math.max(0, idx);
-    setNewGradeIds(rec.images.filter(im => im.done).map(im => im.gradeId));
+
+    const notes = [
+      rejected.length > 0 ? rejectionMessage(rejected) : null,
+      lost > 0 ? `${lost} image(s) could not be graded after the page reloaded` : null,
+    ].filter((n): n is string => n !== null);
+    // Nothing from this run survived — the result screen would have nothing of
+    // its own to show, so send them back to pick better images.
+    const backToUpload = graded.length === 0 && rejected.length > 0;
+
+    setNewGradeIds(graded.map(im => im.gradeId));
     setExistingGrades(active);
     setSelectedGradeIdx(idx);
-    setMlError(lost > 0 ? `${lost} image(s) could not be graded after the page reloaded` : null);
+    setMlError(notes.length > 0 ? notes.join(' ') : null);
     clearMlRun();
     removeAllSlots();
-    setStep('result');
-    setSearchParams({
-      log: String(rec.logId), step: 'result',
-      ...(active[idx] ? { grade: String(active[idx].grade_id) } : {}),
-    }, { replace: true });
+    if (rejected.length > 0 && !backToUpload) toast.error(rejectionMessage(rejected));
+    setStep(backToUpload ? 'upload' : 'result');
+    setSearchParams(backToUpload
+      ? { log: String(rec.logId), step: 'upload' }
+      : {
+        log: String(rec.logId), step: 'result',
+        ...(active[idx] ? { grade: String(active[idx].grade_id) } : {}),
+      }, { replace: true });
   }, [removeAllSlots, setSearchParams]);
 
   /**
@@ -489,7 +530,7 @@ export default function AdvancedEmbryoGradingPage() {
    */
   const retireIncomplete = useCallback(async (rec: MlRunRecord | null) => {
     if (!rec) return;
-    await Promise.all(rec.images.filter(im => !im.done).map(im =>
+    await Promise.all(rec.images.filter(im => !isSettled(im)).map(im =>
       ivfService.updateGrade(rec.cycleId, im.gradeId, { is_active: false })
         .catch(() => { /* best effort — the row is already junk */ })));
   }, []);
@@ -501,6 +542,7 @@ export default function AdvancedEmbryoGradingPage() {
     setUploading(true);
     setStep('processing');
     setMlError(null);
+    setSkippedFiles([]);
     setMlProgress(0);
     setMlStage(PHASE_LABEL.upload);
     let rec: MlRunRecord | null = null;
@@ -541,7 +583,7 @@ export default function AdvancedEmbryoGradingPage() {
     setStep('result');
 
     // Show the half-finished grade straight away, then keep working behind it.
-    const nextPending = rec.images.find(im => !im.done)?.gradeId ?? null;
+    const nextPending = rec.images.find(im => !isSettled(im))?.gradeId ?? null;
     setActiveGradeId(nextPending);
     setSearchParams({
       log: String(rec.logId), step: 'result',
@@ -647,6 +689,7 @@ export default function AdvancedEmbryoGradingPage() {
     writeMlRun(rec);
     setUploading(true);
     setMlError(null);
+    setSkippedFiles([]);
     setActiveGradeId(gradeId);
     try {
       await processPhase(rec);
@@ -717,7 +760,7 @@ export default function AdvancedEmbryoGradingPage() {
 
       {step === 'processing' && (
         <ProcessingScreen oocyteNo={selectedOocyteNo} progress={mlProgress} stage={mlStage}
-          resumed={resumeRecord != null} />
+          resumed={resumeRecord != null} skipped={skippedFiles} />
       )}
 
       {step === 'result' && selectedLog && (
@@ -1477,8 +1520,8 @@ function DetailBlock({ title, rows }: { title: string; rows: { label: string; va
 
 // ── Processing ─────────────────────────────────────────────────────────────────
 
-function ProcessingScreen({ oocyteNo, progress, stage, resumed }: {
-  oocyteNo: number | null; progress: number; stage: string; resumed?: boolean;
+function ProcessingScreen({ oocyteNo, progress, stage, resumed, skipped }: {
+  oocyteNo: number | null; progress: number; stage: string; resumed?: boolean; skipped?: string[];
 }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-6 min-h-[420px] rounded-2xl border border-line bg-white">
@@ -1495,6 +1538,11 @@ function ProcessingScreen({ oocyteNo, progress, stage, resumed }: {
         <p className="text-xs text-gray-400 mt-1">Analyzing embryo images for Oocyte #{oocyteNo ?? '—'}</p>
         {resumed && (
           <p className="text-[11px] text-primary/70 mt-1.5">Reconnected — this run started before the page reloaded</p>
+        )}
+        {!!skipped?.length && (
+          <p className="text-[11px] font-semibold text-red-500 mt-1.5">
+            Skipped {skipped.length} image{skipped.length > 1 ? 's' : ''} — no embryo detected
+          </p>
         )}
       </div>
 
