@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import PageLayout from "../../components/PageLayout";
 import Modal from "../../components/Modal";
@@ -58,6 +59,102 @@ const RefillLog = () => {
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [containers, setContainers] = useState<ContainerItem[]>([]);
     const [containersLoading, setContainersLoading] = useState(false);
+
+    // Tank picker for the Add Refill Log modal — loaded independently via its own
+    // API so it doesn't depend on the (page-scoped) `containers` list.
+    const [tankOptions, setTankOptions] = useState<Array<{ tank_id: number; tank_code: string; branch_id: number; branch_name: string }>>([]);
+    const [tankOptionsLoading, setTankOptionsLoading] = useState(false);
+
+    // Branch → Tank cascading popup dropdowns for the Add Refill Log tank picker,
+    // matching TrackCanisterModal's dropdown pattern (branch chosen first).
+    const [selectedRefillBranchId, setSelectedRefillBranchId] = useState<number | null>(null);
+    const [selectedRefillBranchName, setSelectedRefillBranchName] = useState("");
+    const [isRefillBranchDropdownOpen, setIsRefillBranchDropdownOpen] = useState(false);
+    const [isRefillTankDropdownOpen, setIsRefillTankDropdownOpen] = useState(false);
+    const refillBranchDropdownRef = useRef<HTMLDivElement | null>(null);
+    const refillBranchMenuRef = useRef<HTMLDivElement | null>(null);
+    const refillTankDropdownRef = useRef<HTMLDivElement | null>(null);
+    const refillTankMenuRef = useRef<HTMLDivElement | null>(null);
+    const [refillBranchMenuStyle, setRefillBranchMenuStyle] = useState<{
+        top: number; left: number; width: number; placement: "bottom" | "top";
+    } | null>(null);
+    const [refillTankMenuStyle, setRefillTankMenuStyle] = useState<{
+        top: number; left: number; width: number; placement: "bottom" | "top";
+    } | null>(null);
+
+    const refillBranchOptions = useMemo(() => {
+        const seen = new Map<number, string>();
+        tankOptions.forEach((t) => { if (!seen.has(t.branch_id)) seen.set(t.branch_id, t.branch_name); });
+        return Array.from(seen, ([branch_id, branch_name]) => ({ branch_id, branch_name }))
+            .sort((a, b) => a.branch_name.localeCompare(b.branch_name));
+    }, [tankOptions]);
+
+    const refillTanksForSelectedBranch = useMemo(
+        () => tankOptions.filter((t) => t.branch_id === selectedRefillBranchId),
+        [tankOptions, selectedRefillBranchId]
+    );
+
+    const updateRefillBranchMenuPosition = useCallback(() => {
+        const el = refillBranchDropdownRef.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const margin = 8;
+        const availableBelow = window.innerHeight - rect.bottom - margin;
+        const availableAbove = rect.top - margin;
+        const placement: "bottom" | "top" = availableBelow < 176 && availableAbove > availableBelow ? "top" : "bottom";
+        setRefillBranchMenuStyle({ top: placement === "bottom" ? rect.bottom + margin : rect.top - margin, left: rect.left, width: rect.width, placement });
+    }, []);
+
+    const updateRefillTankMenuPosition = useCallback(() => {
+        const el = refillTankDropdownRef.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const margin = 8;
+        const availableBelow = window.innerHeight - rect.bottom - margin;
+        const availableAbove = rect.top - margin;
+        const placement: "bottom" | "top" = availableBelow < 176 && availableAbove > availableBelow ? "top" : "bottom";
+        setRefillTankMenuStyle({ top: placement === "bottom" ? rect.bottom + margin : rect.top - margin, left: rect.left, width: rect.width, placement });
+    }, []);
+
+    useEffect(() => {
+        if (!isRefillBranchDropdownOpen) return;
+        updateRefillBranchMenuPosition();
+        const reposition = () => updateRefillBranchMenuPosition();
+        window.addEventListener("resize", reposition);
+        window.addEventListener("scroll", reposition, true);
+        const handleClickOutside = (e: MouseEvent) => {
+            const t = e.target as Node;
+            if (!refillBranchDropdownRef.current?.contains(t) && !refillBranchMenuRef.current?.contains(t)) {
+                setIsRefillBranchDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            window.removeEventListener("resize", reposition);
+            window.removeEventListener("scroll", reposition, true);
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isRefillBranchDropdownOpen, updateRefillBranchMenuPosition]);
+
+    useEffect(() => {
+        if (!isRefillTankDropdownOpen) return;
+        updateRefillTankMenuPosition();
+        const reposition = () => updateRefillTankMenuPosition();
+        window.addEventListener("resize", reposition);
+        window.addEventListener("scroll", reposition, true);
+        const handleClickOutside = (e: MouseEvent) => {
+            const t = e.target as Node;
+            if (!refillTankDropdownRef.current?.contains(t) && !refillTankMenuRef.current?.contains(t)) {
+                setIsRefillTankDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            window.removeEventListener("resize", reposition);
+            window.removeEventListener("scroll", reposition, true);
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isRefillTankDropdownOpen, updateRefillTankMenuPosition]);
 
     const [activityBranch, setActivityBranch] = useState<string>("All");
     const [isActivityBranchOpen, setIsActivityBranchOpen] = useState(false);
@@ -287,6 +384,37 @@ const RefillLog = () => {
     useEffect(() => {
         if (isAuthenticated && userRole !== undefined) loadReservoirData();
     }, [isAuthenticated, userRole]);
+
+    // Load the Add Refill Log tank picker fresh each time the modal opens.
+    useEffect(() => {
+        if (!isAddRefillOpen) return;
+        setSelectedRefillBranchId(null);
+        setSelectedRefillBranchName("");
+        let cancelled = false;
+        setTankOptionsLoading(true);
+        ivfService
+            .getTanksForSelect()
+            .then((res) => { if (!cancelled) setTankOptions(res.tanks ?? []); })
+            .catch(() => { if (!cancelled) setTankOptions([]); })
+            .finally(() => { if (!cancelled) setTankOptionsLoading(false); });
+        return () => { cancelled = true; };
+    }, [isAddRefillOpen]);
+
+    // Single-branch users only ever see one option here (the backend already scopes
+    // tankOptions to their branch) — skip making them click through a dropdown that
+    // has nothing to choose from.
+    useEffect(() => {
+        if (!isAddRefillOpen || tankOptionsLoading) return;
+        if (refillBranchOptions.length === 1 && !selectedRefillBranchId) {
+            setSelectedRefillBranchId(refillBranchOptions[0].branch_id);
+            setSelectedRefillBranchName(refillBranchOptions[0].branch_name);
+        }
+    }, [isAddRefillOpen, tankOptionsLoading, refillBranchOptions, selectedRefillBranchId]);
+
+    // Branch changed — the previously selected tank (if any) no longer applies.
+    useEffect(() => {
+        setSelectedTankId(null);
+    }, [selectedRefillBranchId]);
 
     useEffect(() => {
         const handler = () => {
@@ -712,25 +840,30 @@ const RefillLog = () => {
                         </div>
 
                         {/* Table header */}
-                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)] px-4 py-2 bg-primary-bg text-xs font-semibold text-primary shrink-0">
+                        {/* LN2 Level column removed — commented out, not deleted. Original:
+                        grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)]
+                        <div className="text-center">LN2 Level</div>
+                        */}
+                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,80px)_minmax(0,110px)] px-4 py-2 bg-primary-bg text-xs font-semibold text-primary shrink-0">
                             <div>Container #</div>
-                            <div className="text-center">LN2 Level</div>
-                            <div className="text-center">View</div>
                             <div className="text-center">Last Refill</div>
+                            <div className="text-center">View</div>
                         </div>
 
                         {/* Container list */}
                         <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-100">
                             {containersLoading && (
                                 [0,1,2,3].map((i) => (
-                                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)] px-4 py-2.5 items-center gap-x-2">
+                                    // LN2 Level skeleton cell removed — commented out, not deleted. Original:
+                                    // grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)]
+                                    // <div className="px-2"><div className="relative overflow-hidden h-2.5 w-full rounded-full bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></div>
+                                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,80px)_minmax(0,110px)] px-4 py-2.5 items-center gap-x-2">
                                         <div className="flex flex-col gap-1.5">
                                             <div className="relative overflow-hidden h-3 w-24 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
                                             <div className="relative overflow-hidden h-2.5 w-16 rounded bg-gray-100"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
                                         </div>
-                                        <div className="px-2"><div className="relative overflow-hidden h-2.5 w-full rounded-full bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></div>
-                                        <div className="relative overflow-hidden h-3 w-10 rounded bg-gray-200 mx-auto"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
                                         <div className="relative overflow-hidden h-3 w-14 rounded bg-gray-200 mx-auto"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                        <div className="relative overflow-hidden h-3 w-10 rounded bg-gray-200 mx-auto"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
                                     </div>
                                 ))
                             )}
@@ -741,7 +874,7 @@ const RefillLog = () => {
                                 <div
                                     key={container.id}
                                     id={cIdx === 0 ? "onboarding-refill-tank-first-row" : undefined}
-                                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)] px-4 py-2.5 items-center"
+                                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,80px)_minmax(0,110px)] px-4 py-2.5 items-center"
                                 >
                                     <div className="min-w-0">
                                         <span className="text-primary text-xs font-bold block truncate">
@@ -749,7 +882,8 @@ const RefillLog = () => {
                                         </span>
                                         <span className="text-xs text-gray-500 truncate block">{container.branch}</span>
                                     </div>
-                                    {/* LN2 Level progress bar */}
+                                    {/* LN2 Level progress bar — removed, commented out below rather than deleted.
+                                    Original grid-cols: minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)
                                     <div className="px-2 flex flex-col items-stretch gap-0.5">
                                         {container.ln2LevelKg != null && container.kpiStatus === true ? (() => {
                                             const usableCapacity = container.tankMaxCapacity != null && container.tankMinCapacity != null
@@ -763,7 +897,6 @@ const RefillLog = () => {
                                                 : null;
                                             return (
                                                 <>
-                                                    {/* Bar */}
                                                     <div className="relative h-2.5 rounded-full bg-[#E7D4F0] overflow-visible">
                                                         {ln2Pct != null && (
                                                             <div
@@ -771,7 +904,6 @@ const RefillLog = () => {
                                                                 style={{ width: `${ln2Pct}%` }}
                                                             />
                                                         )}
-                                                        {/* L2 threshold marker */}
                                                         {l2Pct != null && (
                                                             <div
                                                                 className="absolute top-0 w-0.5 h-full bg-orange-400 -translate-x-1/2"
@@ -791,6 +923,10 @@ const RefillLog = () => {
                                             <span className="text-xs text-gray-400 self-center">—</span>
                                         )}
                                     </div>
+                                    */}
+                                    <div className="text-center text-xs text-gray-600 font-medium truncate">
+                                        {formatDaysAgo(container.lastRefillDate)}
+                                    </div>
                                     <div className="flex items-center justify-center gap-1.5">
                                         <button
                                             id={cIdx === 0 ? "onboarding-refill-tank-view-btn" : undefined}
@@ -800,9 +936,6 @@ const RefillLog = () => {
                                         >
                                             View
                                         </button>
-                                    </div>
-                                    <div className="text-center text-xs text-gray-600 font-medium truncate">
-                                        {formatDaysAgo(container.lastRefillDate)}
                                     </div>
                                 </div>
                             ))}
@@ -1152,29 +1285,109 @@ const RefillLog = () => {
                         {addModalTab === "refill" && (
                             <form onSubmit={submitAddRefillLog} className="space-y-3">
                                 <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Tank <span className="text-red-500">*</span></label>
-                                        <select value={selectedTankId ?? ""} onChange={(e) => {
-                                                const tankId = e.target.value || null;
-                                                setSelectedTankId(tankId);
-                                                const tank = containers.find((c) => c.tankId === tankId);
-                                                const branchReservoirs = tank
-                                                    ? reservoirs.filter((r) => r.branch_id === tank.branchId)
-                                                    : [];
-                                                const firstReservoir = branchReservoirs[0] ?? reservoirs[0];
-                                                setAddForm((p) => ({ ...p, reservoir_id: firstReservoir ? String(firstReservoir.reservoir_id) : "" }));
-                                            }} className="w-full h-10 px-3 border border-line rounded-lg text-sm bg-white" required>
-                                            <option value="">Select tank</option>
-                                            {containers.map((c) => (
-                                                <option key={c.tankId} value={c.tankId}>{c.tankCode} ({c.tankId})</option>
-                                            ))}
-                                        </select>
+                                    {/* Branch — picked first; filters the Tank dropdown below */}
+                                    <div className="relative" ref={refillBranchDropdownRef}>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Branch <span className="text-red-500">*</span></label>
+                                        <div
+                                            className={`relative w-full h-10 px-3 border rounded-lg text-sm flex items-center ${
+                                                tankOptionsLoading ? "bg-gray-50 cursor-not-allowed text-gray-400 border-line"
+                                                : "bg-white cursor-pointer border-line " + (!selectedRefillBranchName ? "text-gray-400" : "text-black")
+                                            }`}
+                                            onClick={() => {
+                                                if (tankOptionsLoading) return;
+                                                if (!isRefillBranchDropdownOpen) updateRefillBranchMenuPosition();
+                                                setIsRefillBranchDropdownOpen(!isRefillBranchDropdownOpen);
+                                            }}
+                                            role="button"
+                                            tabIndex={0}
+                                            onKeyDown={(e) => {
+                                                if (tankOptionsLoading) return;
+                                                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!isRefillBranchDropdownOpen) updateRefillBranchMenuPosition(); setIsRefillBranchDropdownOpen(!isRefillBranchDropdownOpen); }
+                                                if (e.key === "Escape") setIsRefillBranchDropdownOpen(false);
+                                            }}
+                                        >
+                                            <span className="pr-6 block truncate">
+                                                {tankOptionsLoading ? "Loading..." : selectedRefillBranchName || "Select branch"}
+                                            </span>
+                                            <svg className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 transition-transform ${isRefillBranchDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Branch</label>
-                                        <input type="text" value={containers.find((c) => c.tankId === selectedTankId)?.branch ?? ""} readOnly className="w-full h-10 px-3 border border-line rounded-lg text-sm bg-gray-50 text-gray-500" placeholder="Auto-filled" />
+                                    {/* Tank — scoped to the selected branch */}
+                                    <div className="relative" ref={refillTankDropdownRef}>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Tank <span className="text-red-500">*</span></label>
+                                        <div
+                                            className={`relative w-full h-10 px-3 border rounded-lg text-sm flex items-center ${
+                                                !selectedRefillBranchId ? "bg-gray-50 cursor-not-allowed text-gray-300 border-line"
+                                                : "bg-white cursor-pointer border-line " + (!selectedTankId ? "text-gray-400" : "text-black")
+                                            }`}
+                                            onClick={() => {
+                                                if (!selectedRefillBranchId || refillTanksForSelectedBranch.length === 0) return;
+                                                if (!isRefillTankDropdownOpen) updateRefillTankMenuPosition();
+                                                setIsRefillTankDropdownOpen(!isRefillTankDropdownOpen);
+                                            }}
+                                            role="button"
+                                            tabIndex={0}
+                                            onKeyDown={(e) => {
+                                                if (!selectedRefillBranchId) return;
+                                                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!isRefillTankDropdownOpen) updateRefillTankMenuPosition(); setIsRefillTankDropdownOpen(!isRefillTankDropdownOpen); }
+                                                if (e.key === "Escape") setIsRefillTankDropdownOpen(false);
+                                            }}
+                                        >
+                                            <span className="pr-6 block truncate">
+                                                {!selectedRefillBranchId ? "Select branch first" :
+                                                 (() => { const t = tankOptions.find((x) => String(x.tank_id) === selectedTankId); return t ? t.tank_code : "Select tank"; })()}
+                                            </span>
+                                            <svg className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 transition-transform ${isRefillTankDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
                                     </div>
                                 </div>
+
+                                {/* Branch dropdown menu */}
+                                {isRefillBranchDropdownOpen && refillBranchOptions.length > 0 && refillBranchMenuStyle &&
+                                    createPortal(
+                                        <div ref={refillBranchMenuRef} className="fixed z-[1000] bg-white border border-gray-300 rounded-[10px] shadow-lg max-h-44 overflow-y-auto text-sm"
+                                            style={{ top: refillBranchMenuStyle.top, left: refillBranchMenuStyle.left, width: refillBranchMenuStyle.width, transform: refillBranchMenuStyle.placement === "top" ? "translateY(-100%)" : undefined }}>
+                                            {refillBranchOptions.map((option) => (
+                                                <div key={option.branch_id}
+                                                    className={`px-3 py-1.5 cursor-pointer hover:bg-primary-light hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${selectedRefillBranchId === option.branch_id ? "bg-primary-light text-white" : "text-black"}`}
+                                                    onClick={() => {
+                                                        setSelectedRefillBranchName(option.branch_name);
+                                                        setSelectedRefillBranchId(option.branch_id);
+                                                        setIsRefillBranchDropdownOpen(false);
+                                                    }}>
+                                                    {option.branch_name}
+                                                </div>
+                                            ))}
+                                        </div>,
+                                        document.body
+                                    )}
+
+                                {/* Tank dropdown menu */}
+                                {isRefillTankDropdownOpen && refillTanksForSelectedBranch.length > 0 && refillTankMenuStyle &&
+                                    createPortal(
+                                        <div ref={refillTankMenuRef} className="fixed z-[1000] bg-white border border-gray-300 rounded-[10px] shadow-lg max-h-44 overflow-y-auto text-sm"
+                                            style={{ top: refillTankMenuStyle.top, left: refillTankMenuStyle.left, width: refillTankMenuStyle.width, transform: refillTankMenuStyle.placement === "top" ? "translateY(-100%)" : undefined }}>
+                                            {refillTanksForSelectedBranch.map((t) => (
+                                                <div key={t.tank_id}
+                                                    className={`px-3 py-1.5 cursor-pointer hover:bg-primary-light hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${selectedTankId === String(t.tank_id) ? "bg-primary-light text-white" : "text-black"}`}
+                                                    onClick={() => {
+                                                        const tankId = String(t.tank_id);
+                                                        setSelectedTankId(tankId);
+                                                        const branchReservoirs = reservoirs.filter((r) => r.branch_id === t.branch_id);
+                                                        const firstReservoir = branchReservoirs[0] ?? reservoirs[0];
+                                                        setAddForm((p) => ({ ...p, reservoir_id: firstReservoir ? String(firstReservoir.reservoir_id) : "" }));
+                                                        setIsRefillTankDropdownOpen(false);
+                                                    }}>
+                                                    {t.tank_code}
+                                                </div>
+                                            ))}
+                                        </div>,
+                                        document.body
+                                    )}
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Reservoir <span className="text-red-500">*</span></label>
                                     <select
@@ -1185,7 +1398,7 @@ const RefillLog = () => {
                                     >
                                         <option value="">Select reservoir</option>
                                         {(selectedTankId
-                                            ? reservoirs.filter((r) => r.branch_id === containers.find((c) => c.tankId === selectedTankId)?.branchId)
+                                            ? reservoirs.filter((r) => r.branch_id === tankOptions.find((t) => String(t.tank_id) === selectedTankId)?.branch_id)
                                             : reservoirs
                                         ).map((r) => (
                                             <option key={r.reservoir_id} value={r.reservoir_id}>
