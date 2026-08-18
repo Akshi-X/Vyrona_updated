@@ -1504,6 +1504,21 @@ export class IvfService extends BaseApiService {
         });
     }
 
+    // Lightweight tank list for dropdowns (e.g. the Add Refill Log tank picker) —
+    // independent of getRefillLogPageData so the picker can load on its own.
+    async getTanksForSelect(): Promise<{
+        tanks: Array<{
+            tank_id: number;
+            tank_code: string;
+            branch_id: number;
+            branch_name: string;
+        }>;
+    }> {
+        return await this.request("/api/quality-tracking/tanks/select-options", {
+            method: "GET",
+        });
+    }
+
     // ── IVF Cycles ────────────────────────────────────────────────────────────
 
     async listCycles(params?: { his_id?: string; status?: string; incubator_id?: number; chamber_position?: string; skip?: number; limit?: number }): Promise<IvfCycle[]> {
