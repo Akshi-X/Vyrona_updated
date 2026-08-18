@@ -752,6 +752,7 @@ export default function AdvancedEmbryoGradingPage() {
       {step === 'upload' && selectedLog && (
         <UploadScreen
           log={selectedLog} index={logs.findIndex(l => l.log_id === selectedLog.log_id)} cycleId={cycleId}
+          bestImageUrl={bestImages[selectedLog.log_id] ?? null}
           imageSlots={imageSlots} onAdd={addImageSlot} onRemove={removeImageSlot} onRemoveAll={removeAllSlots}
           uploading={uploading} onCancel={cancelUpload} onStart={runGrading} onSkip={skipToResult}
           error={mlError}
@@ -807,7 +808,7 @@ function WorkflowRail() {
   return (
     <aside className="w-[300px] shrink-0 hidden xl:flex flex-col gap-0 pr-2 overflow-y-auto min-h-0">
       <div className="rounded-t-2xl overflow-hidden shrink-0">
-        <img src="/bg_emb.png" alt="" className="w-full h-auto block" />
+        <img src="/emb_embryo_grading.png" alt="" className="w-full h-auto block" />
       </div>
       <div className="relative z-10 -mt-6 shrink-0 flex flex-col gap-4 rounded-2xl bg-[#F3EAF5] border border-primary/10 p-4 shadow-sm">
         <div className="flex flex-col gap-2">
@@ -881,20 +882,24 @@ function SelectScreen({ cycle, his, logs, loading, bestImages, selectedOocyteNo,
 
       <div className="flex-1 min-w-0 flex flex-col min-h-0 rounded-2xl border border-line bg-white overflow-hidden">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 shrink-0 px-5 pt-5">
-          <div className="flex items-start gap-3 min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3 shrink-0 px-5 pt-5">
+          {/* basis keeps the heading from being squeezed to one word per line —
+              the chip wraps to its own row instead. */}
+          <div className="flex items-start gap-3 min-w-0 flex-1 basis-[260px]">
             <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
               <Brain size={22} className="text-primary" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-black text-gray-800 leading-tight">What would you like to grade?</h1>
+              <h1 className="text-lg xl:text-xl font-black text-gray-800 leading-tight">What would you like to grade?</h1>
               <p className="text-xs text-gray-400 mt-0.5">Select an oocyte to start the AI-assisted embryo grading process.</p>
             </div>
           </div>
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-line bg-surface text-xs font-semibold text-gray-700 shrink-0">
-            <User size={13} className="text-primary" />
-            Patient : {cycle?.patient_name || '—'} {his && <span className="text-gray-400">(ID: {his.toUpperCase()})</span>}
-            <ChevronDown size={13} className="text-gray-400 ml-1" />
+          <div className="inline-flex items-center gap-2 max-w-full px-4 py-2 rounded-xl border border-line bg-surface text-xs font-semibold text-gray-700 shrink-0">
+            <User size={13} className="text-primary shrink-0" />
+            <span className="truncate">
+              Patient : {cycle?.patient_name || '—'} {his && <span className="text-gray-400">(ID: {his.toUpperCase()})</span>}
+            </span>
+            <ChevronDown size={13} className="text-gray-400 ml-1 shrink-0" />
           </div>
         </div>
 
@@ -1092,8 +1097,8 @@ function OocyteCard({ log, index, bestImageUrl, selected, onSelect }: {
 
 // ── Screen 2: Upload ───────────────────────────────────────────────────────────
 
-function UploadScreen({ log, index, cycleId, imageSlots, onAdd, onRemove, onRemoveAll, uploading, onCancel, onStart, onSkip, error }: {
-  log: IvfCycleLog; index: number; cycleId: number | null; imageSlots: ImageSlot[];
+function UploadScreen({ log, index, cycleId, bestImageUrl, imageSlots, onAdd, onRemove, onRemoveAll, uploading, onCancel, onStart, onSkip, error }: {
+  log: IvfCycleLog; index: number; cycleId: number | null; bestImageUrl: string | null; imageSlots: ImageSlot[];
   onAdd: (f: File) => void; onRemove: (i: number) => void; onRemoveAll: () => void;
   uploading: boolean; onCancel: () => void; onStart: () => void; onSkip: () => void;
   error?: string | null;
@@ -1103,6 +1108,7 @@ function UploadScreen({ log, index, cycleId, imageSlots, onAdd, onRemove, onRemo
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const d3 = parseDay3(log.d3_grade);
   const num = String(index + 1).padStart(2, '0');
+  const state = ooState(log);
 
   // Prior attempts at this oocyte, shown read-only above the requirements so
   // the embryologist can see what's already on file before adding more.
@@ -1131,14 +1137,17 @@ function UploadScreen({ log, index, cycleId, imageSlots, onAdd, onRemove, onRemo
     Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).forEach(onAdd);
   };
 
+  // Stacked in portrait; a short landscape viewport gets the side-by-side split
+  // instead, so the upload panel keeps usable height.
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-5 flex-1 min-h-0">
+    <div className="grid grid-cols-1 max-xl:landscape:grid-cols-[240px_1fr] xl:grid-cols-[300px_1fr] auto-rows-[minmax(360px,65vh)] max-xl:landscape:auto-rows-auto xl:auto-rows-auto gap-5 max-xl:landscape:gap-3 flex-1 min-h-0">
       {/* LEFT: selected oocyte */}
-      <div className="flex flex-col min-h-0 w-[300px]">
-        <div className="rounded-t-2xl overflow-hidden shrink-0">
-          <img src="/bg_emb.png" alt="" className="w-full h-auto block" />
+      <div className="flex flex-col min-h-0 w-full xl:w-[300px]">
+        {/* Decorative only — stretched full width below xl it dwarfs the panel. */}
+        <div className="hidden xl:block rounded-t-2xl overflow-hidden shrink-0">
+          <img src="/emb_select_oocyte.png" alt="" className="w-full h-auto block" />
         </div>
-        <div className="relative z-10 -mt-6 flex-1 flex flex-col min-h-0 rounded-2xl border border-line bg-white p-3 shadow-sm">
+        <div className="relative z-10 xl:-mt-6 flex-1 flex flex-col min-h-0 rounded-2xl border border-line bg-white p-3 shadow-sm">
         <p className="text-sm font-black text-gray-800">Select Oocyte</p>
         <p className="text-[11px] text-gray-400 mb-2">1 oocyte selected</p>
 
@@ -1152,15 +1161,26 @@ function UploadScreen({ log, index, cycleId, imageSlots, onAdd, onRemove, onRemo
                 <span className="font-bold bg-white text-primary rounded-md px-1.5 py-0.5">{log.d3_drop_no || log.d0_drop_no || '—'}</span>
               </div>
               <div>
-                <p className="text-[11px] text-primary/60">Day 3 Grade</p>
-                <p className="text-xl font-black">{log.d3_grade || '—'}</p>
+                <p className="text-[11px] text-primary/60">Final Grade</p>
+                <p className="text-xl font-black">{log.blast_grade || '—'}</p>
               </div>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <div className="w-14 h-14 rounded-full border-2 border-primary/20 bg-white/60 flex items-center justify-center">
-                <ImageIcon size={18} className="text-primary/60" />
+              {bestImageUrl ? (
+                <div className={`w-14 h-14 rounded-full shrink-0 border-2 overflow-hidden flex items-center justify-center bg-gray-900 ${
+                  state === 'final' ? 'border-emerald-300' : 'border-primary/30'
+                }`}>
+                  <img src={bestImageUrl} alt={`Oocyte ${num} best image`} className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-14 h-14 rounded-full shrink-0 border-2 border-dashed border-primary/20 bg-white/60 flex items-center justify-center">
+                  <ImageIcon size={18} className="text-primary/40" />
+                </div>
+              )}
+              <div className="flex items-center gap-1 text-[10px] text-primary/70">
+                <span className={`w-1.5 h-1.5 rounded-full ${state === 'final' ? 'bg-emerald-500' : state === 'ai' ? 'bg-blue-400' : 'bg-gray-400'}`} />
+                {state === 'final' ? 'Graded' : state === 'ai' ? (bestImageUrl ? 'AI Graded' : 'Best image pending') : 'Not Graded'}
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-primary/70"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> AI Graded</div>
             </div>
           </div>
           {/* white inner detail */}
@@ -1170,15 +1190,10 @@ function UploadScreen({ log, index, cycleId, imageSlots, onAdd, onRemove, onRemo
               { label: 'Zygote Status', value: log.d1_zygote_status || '—' },
             ]} />
             <DetailBlock title="Day 3 – Cleavage" rows={[
-              { label: 'Drop No.', value: log.d3_drop_no || '—' },
               { label: 'Cell Count', value: d3.cells || '—' },
               { label: 'Fragmentation', value: d3.frag || '—' },
               { label: 'Symmetry', value: log.d3_symmetry || '—' },
             ]} />
-            <div className="flex items-center justify-between border-t border-line-light pt-2">
-              <span className="text-sm font-bold text-gray-700">Auto Grade</span>
-              <span className="text-xl font-black text-primary">{log.d3_grade || '—'}</span>
-            </div>
           </div>
         </div>
 
@@ -1625,14 +1640,45 @@ function Donut({ percent }: { percent: number }) {
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 6;
 
+function AnnotThumb({ src, label }: { src: string | null | undefined; label: string }) {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [loaded, setLoaded] = useState(true);
+  useEffect(() => { setLoaded(!src || !!imgRef.current?.complete); }, [src]);
+
+  return (
+    <div className="relative flex-1 min-h-0 rounded-2xl overflow-hidden border border-line bg-gray-950">
+      {src
+        ? <img ref={imgRef} src={src} alt={label} className="w-full h-full object-contain"
+            onLoad={() => setLoaded(true)} onError={() => setLoaded(true)} />
+        : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={16} className="text-gray-600" /></div>}
+
+      {src && !loaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-950/60">
+          <span className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
+        </div>
+      )}
+
+      <div className="absolute inset-x-0 bottom-0 px-2 pt-3 pb-1.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
+        <span className="text-[10px] font-black uppercase tracking-wide text-white">{label}</span>
+      </div>
+    </div>
+  );
+}
+
 function AnnotatedViewer({ src, resetKey, label, tint }: {
   src: string | null; resetKey: string; label?: string; tint?: string | null;
 }) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const drag = useRef<{ px: number; py: number; ox: number; oy: number } | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [loaded, setLoaded] = useState(true);
 
   useEffect(() => { setZoom(1); setPan({ x: 0, y: 0 }); }, [resetKey]);
+
+  // Already-decoded sources (a tab flipped back, a thumbnail revisited) must not
+  // flash the spinner, so seed from the element's own complete flag.
+  useEffect(() => { setLoaded(!src || !!imgRef.current?.complete); }, [src]);
 
   const applyZoom = (next: number) => {
     const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
@@ -1662,7 +1708,8 @@ function AnnotatedViewer({ src, resetKey, label, tint }: {
         onPointerCancel={endDrag}
         onDoubleClick={() => applyZoom(zoom >= ZOOM_MAX ? 1 : zoom + 1)}>
         {src ? (
-          <img src={src} alt="annotated" draggable={false}
+          <img ref={imgRef} src={src} alt="annotated" draggable={false}
+            onLoad={() => setLoaded(true)} onError={() => setLoaded(true)}
             className="w-full h-full object-contain select-none"
             style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transition: drag.current ? 'none' : 'transform 150ms ease-out' }} />
         ) : (
@@ -1671,6 +1718,12 @@ function AnnotatedViewer({ src, resetKey, label, tint }: {
           </div>
         )}
       </div>
+
+      {src && !loaded && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-950/60">
+          <span className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
+        </div>
+      )}
 
       {src && (
         <>
@@ -1740,8 +1793,8 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
   const img = grade?.images[0];
   const score = grade?.ai_score ?? null;
   const confidence = score != null ? Math.min(99, Math.round(score * 10 + 5)) : 0;
-  const [mainTab, setMainTab] = useState<'source' | 'annotated'>('source');
-  useEffect(() => { setMainTab('source'); }, [selectedIdx]);
+  const [mainTab, setMainTab] = useState<'source' | 'annotated'>('annotated');
+  useEffect(() => { setMainTab('annotated'); }, [selectedIdx]);
   const mainSrc = (mainTab === 'annotated' ? img?.annotated_img_url : img?.upload_image_url) || null;
   const num = String(log.oocyte_no).padStart(2, '0');
   const d3m = (log.d3_grade || '').match(/^(\d+)\s*C\s*(\d+)/i);
@@ -1768,7 +1821,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(440px,1fr)_360px] gap-5 flex-1 min-h-0">
+      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(440px,1fr)_360px] auto-rows-[minmax(420px,55vh)] xl:auto-rows-auto gap-5 flex-1 min-h-0">
 
         {/* LEFT */}
         <div className="rounded-2xl border border-line bg-white flex flex-col min-h-0 overflow-hidden">
@@ -1926,30 +1979,20 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
           </div>
 
           {/* The panels fill the row in both axes; the images inside are
-              object-contain, so each is shown whole whatever shape its panel is. */}
-          <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex gap-2.5">
-            <div className="flex-1 min-w-0 flex flex-col min-h-0">
+              object-contain, so each is shown whole whatever shape its panel is.
+              Below sm there isn't room for a 70/30 split, so the annotation
+              thumbnails move under the main image as a horizontal strip. */}
+          <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col sm:flex-row gap-2.5">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col">
               <AnnotatedViewer src={mainSrc} resetKey={`${selectedIdx}-${mainTab}`}
                 label={mainTab === 'annotated' ? 'Annotated' : 'Source'} />
             </div>
 
             {/* what the model produced, beside the source it was given */}
-            <div className="w-[30%] max-w-[220px] shrink-0 flex flex-col gap-2.5 min-h-0">
-              {ANNOT_VIEWS.map(({ label, url }) => {
-                const src = url(img);
-                return (
-                  <div key={label}
-                    className="relative flex-1 min-h-0 rounded-2xl overflow-hidden border border-line bg-gray-950">
-                    {src
-                      ? <img src={src} alt={label} className="w-full h-full object-contain" />
-                      : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={16} className="text-gray-600" /></div>}
-
-                    <div className="absolute inset-x-0 bottom-0 px-2 pt-3 pb-1.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
-                      <span className="text-[10px] font-black uppercase tracking-wide text-white">{label}</span>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="flex flex-row sm:flex-col gap-2.5 h-24 sm:h-auto shrink-0 sm:w-[30%] sm:max-w-[220px] sm:min-h-0">
+              {ANNOT_VIEWS.map(({ label, url }) => (
+                <AnnotThumb key={label} src={url(img)} label={label} />
+              ))}
             </div>
           </div>
 
@@ -1957,8 +2000,8 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
             {[
               { c: '#eab308', l: 'Zona Pellucida' },
               { c: '#06b6d4', l: 'TE' },
-              { c: '#ec4899', l: 'ICM' },
-              { c: '#22c55e', l: 'Blastocoel' },
+              { c: '#22c55e', l: 'ICM' },
+              { c: '#ec4899', l: 'Blastocoel' },
             ].map(x => (
               <div key={x.l} className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: x.c }} />

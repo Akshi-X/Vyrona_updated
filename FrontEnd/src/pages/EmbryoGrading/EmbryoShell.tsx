@@ -41,9 +41,11 @@ export default function EmbryoShell() {
     : 'Track day-by-day embryo development from fertilization to fate';
 
   return (
-    <div className="flex w-full h-dvh min-h-0">
+    <div className="flex flex-col md:flex-row w-full h-dvh min-h-0">
       <EmbryoTabBar his={his} />
-      <div className="flex-1 min-w-0 min-h-0">
+      {/* PageLayout's <main> is h-dvh; without this it ignores the flex slot and
+          pushes the bottom nav off the viewport on mobile. */}
+      <div className="flex-1 min-w-0 min-h-0 [&>main]:h-full">
         <PageLayout title={title} description={description}>
           <Outlet />
         </PageLayout>
