@@ -441,9 +441,11 @@ export default function EmbryoGradingPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex w-full h-dvh min-h-0">
+    <div className="flex flex-col md:flex-row w-full h-dvh min-h-0">
       <EmbryoTabBar his="" />
-      <div className="flex-1 min-w-0 min-h-0">
+      {/* PageLayout's <main> is h-dvh; without this it ignores the flex slot and
+          pushes the bottom nav off the viewport on mobile. */}
+      <div className="flex-1 min-w-0 min-h-0 [&>main]:h-full">
     <PageLayout
       title="Embryo Console"
       description="Monitor and manage all embryo development cycles across your lab"

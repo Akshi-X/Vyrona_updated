@@ -1,6 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Trophy, GitCompare, Star, Info, ChevronDown, Check } from 'lucide-react';
-import type { BlastocystMorphology } from '../../types/embryo';
+import { useParams } from 'react-router-dom';
+import { X, Trophy, GitCompare, Star, Info, ChevronDown, Check, Sparkles } from 'lucide-react';
+import { ivfService, type IvfGrade } from '../../services/ivfService';
+
+interface EmbryoMorphology {
+  hatching: string;
+  zonaPellucida: string;
+  blastocoelQuality: string;
+  expInference: string;
+  icmInference: string;
+  teInference: string;
+}
+
+interface LeaderboardImage { url: string; grade: string; score: number; morphology: EmbryoMorphology }
 
 interface LeaderboardEmbryo {
   id: string;
@@ -11,94 +23,37 @@ interface LeaderboardEmbryo {
   quality: string;
   rank: number;
   src: string;
-  images: { url: string; grade: string; score: number; morphology: BlastocystMorphology }[];
-  morphology: BlastocystMorphology;
+  images: LeaderboardImage[];
+  morphology: EmbryoMorphology;
 }
 
-const LEADERBOARD_EMBRYOS: LeaderboardEmbryo[] = [
-  {
-    id: 'EID 1.2', oocyteNo: 2, time: '17.57 h', aiScore: 9.2, grade: '5AA', quality: 'High Quality', rank: 1,
-    src: '/embryo/list/emb2.png',
-    images: [
-      { url: '/embryo/list/emb2.png', grade: '5AA', score: 9.2, morphology: { expansion: 5, icm: 'A', te: 'A', hatching: 'Not Hatching', vacuolization: 'None', multinucleation: 'None', fragmentation: '< 5%', symmetry: 'Excellent', zonaPellucida: 'Intact', blastocoelQuality: 'Excellent', cytoplasmicGranularity: 'Fine', bridge: 'None' } },
-      { url: '/embryo/list/em1.png',  grade: '5AB', score: 8.4, morphology: { expansion: 5, icm: 'A', te: 'B', hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None', fragmentation: '5 - 10%', symmetry: 'Good', zonaPellucida: 'Intact', blastocoelQuality: 'Good', cytoplasmicGranularity: 'Fine', bridge: 'None' } },
-    ],
-    morphology: {
-      expansion: 5, icm: 'A', te: 'A',
-      hatching: 'Not Hatching', vacuolization: 'None', multinucleation: 'None',
-      fragmentation: '< 5%', symmetry: 'Excellent',
-      zonaPellucida: 'Intact', blastocoelQuality: 'Excellent', cytoplasmicGranularity: 'Fine', bridge: 'None',
-    },
-  },
-  {
-    id: 'EID 1.1', oocyteNo: 1, time: '17.32 h', aiScore: 8.7, grade: '4AA', quality: 'High Quality', rank: 2,
-    src: '/embryo/list/em1.png',
-    images: [
-      { url: '/embryo/list/em1.png',  grade: '4AA', score: 8.7, morphology: { expansion: 4, icm: 'A', te: 'A', hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None', fragmentation: '5 - 10%', symmetry: 'Excellent', zonaPellucida: 'Intact', blastocoelQuality: 'Excellent', cytoplasmicGranularity: 'Fine', bridge: 'None' } },
-      { url: '/embryo/list/emb2.png', grade: '4AA', score: 8.1, morphology: { expansion: 4, icm: 'A', te: 'A', hatching: 'Not Hatching', vacuolization: 'None', multinucleation: 'None', fragmentation: '< 5%', symmetry: 'Good', zonaPellucida: 'Intact', blastocoelQuality: 'Good', cytoplasmicGranularity: 'Fine', bridge: 'None' } },
-      { url: '/embryo/list/emb3.png', grade: '4AB', score: 7.5, morphology: { expansion: 4, icm: 'A', te: 'B', hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None', fragmentation: '10 - 15%', symmetry: 'Good', zonaPellucida: 'Good', blastocoelQuality: 'Good', cytoplasmicGranularity: 'Coarse', bridge: 'Minimal' } },
-    ],
-    morphology: {
-      expansion: 4, icm: 'A', te: 'A',
-      hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None',
-      fragmentation: '5 - 10%', symmetry: 'Excellent',
-      zonaPellucida: 'Intact', blastocoelQuality: 'Excellent', cytoplasmicGranularity: 'Fine', bridge: 'None',
-    },
-  },
-  {
-    id: 'EID 1.3', oocyteNo: 3, time: '18.41 h', aiScore: 7.9, grade: '4AB', quality: 'Good Quality', rank: 3,
-    src: '/embryo/list/emb3.png',
-    images: [
-      { url: '/embryo/list/emb3.png', grade: '4AB', score: 7.9, morphology: { expansion: 4, icm: 'A', te: 'B', hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None', fragmentation: '10 - 15%', symmetry: 'Good', zonaPellucida: 'Good', blastocoelQuality: 'Good', cytoplasmicGranularity: 'Fine', bridge: 'Minimal' } },
-    ],
-    morphology: {
-      expansion: 4, icm: 'A', te: 'B',
-      hatching: 'Not Hatching', vacuolization: 'Minimal', multinucleation: 'None',
-      fragmentation: '10 - 15%', symmetry: 'Good',
-      zonaPellucida: 'Good', blastocoelQuality: 'Good', cytoplasmicGranularity: 'Fine', bridge: 'Minimal',
-    },
-  },
-  {
-    id: 'EID 1.4', oocyteNo: 4, time: '17.20 h', aiScore: 6.5, grade: '3BB', quality: 'Medium Quality', rank: 4,
-    src: '/embryo/list/em4.png',
-    images: [
-      { url: '/embryo/list/em4.png',  grade: '3BB', score: 6.5, morphology: { expansion: 3, icm: 'B', te: 'B', hatching: 'Not Hatching', vacuolization: 'Mild', multinucleation: 'Minimal', fragmentation: '15 - 20%', symmetry: 'Fair', zonaPellucida: 'Intact', blastocoelQuality: 'Fair', cytoplasmicGranularity: 'Coarse', bridge: 'Present' } },
-      { url: '/embryo/list/emb5.png', grade: '3BC', score: 5.8, morphology: { expansion: 3, icm: 'B', te: 'C', hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present', fragmentation: '20 - 25%', symmetry: 'Fair', zonaPellucida: 'Thinning', blastocoelQuality: 'Fair', cytoplasmicGranularity: 'Coarse', bridge: 'Present' } },
-    ],
-    morphology: {
-      expansion: 3, icm: 'B', te: 'B',
-      hatching: 'Not Hatching', vacuolization: 'Mild', multinucleation: 'Minimal',
-      fragmentation: '15 - 20%', symmetry: 'Fair',
-      zonaPellucida: 'Intact', blastocoelQuality: 'Fair', cytoplasmicGranularity: 'Coarse', bridge: 'Present',
-    },
-  },
-  {
-    id: 'EID 1.5', oocyteNo: 5, time: '16.50 h', aiScore: 5.3, grade: '3BC', quality: 'Low Quality', rank: 5,
-    src: '/embryo/list/emb5.png',
-    images: [
-      { url: '/embryo/list/emb5.png', grade: '3BC', score: 5.3, morphology: { expansion: 3, icm: 'B', te: 'C', hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present', fragmentation: '20 - 25%', symmetry: 'Fair', zonaPellucida: 'Thinning', blastocoelQuality: 'Fair', cytoplasmicGranularity: 'Coarse', bridge: 'Present' } },
-    ],
-    morphology: {
-      expansion: 3, icm: 'B', te: 'C',
-      hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present',
-      fragmentation: '20 - 25%', symmetry: 'Fair',
-      zonaPellucida: 'Thinning', blastocoelQuality: 'Fair', cytoplasmicGranularity: 'Coarse', bridge: 'Present',
-    },
-  },
-  {
-    id: 'EID 1.6', oocyteNo: 6, time: '17.10 h', aiScore: 4.1, grade: '2BC', quality: 'Low Quality', rank: 6,
-    src: '/embryo/list/emb6.png',
-    images: [
-      { url: '/embryo/list/emb6.png', grade: '2BC', score: 4.1, morphology: { expansion: 2, icm: 'B', te: 'C', hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present', fragmentation: '25 - 30%', symmetry: 'Poor', zonaPellucida: 'Thinning', blastocoelQuality: 'Poor', cytoplasmicGranularity: 'Coarse', bridge: 'Present' } },
-    ],
-    morphology: {
-      expansion: 2, icm: 'B', te: 'C',
-      hatching: 'Not Hatching', vacuolization: 'Moderate', multinucleation: 'Present',
-      fragmentation: '25 - 30%', symmetry: 'Poor',
-      zonaPellucida: 'Thinning', blastocoelQuality: 'Poor', cytoplasmicGranularity: 'Coarse', bridge: 'Present',
-    },
-  },
-];
+// Backend IVF timestamps are UTC stored in naive columns, so they serialize
+// without an offset — JS would otherwise parse them as local time.
+function parseUtc(iso?: string | null): Date | null {
+  if (!iso) return null;
+  return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
+}
+
+function toMorphology(g: IvfGrade): EmbryoMorphology {
+  return {
+    hatching: g.hatching ?? '—',
+    zonaPellucida: g.zona_pellucida ?? '—',
+    blastocoelQuality: g.blastocoel ?? '—',
+    expInference: g.exp_inference ?? 'No expansion inference recorded.',
+    icmInference: g.icm_inference ?? 'No ICM inference recorded.',
+    teInference: g.te_inference ?? 'No TE inference recorded.',
+  };
+}
+
+function qualityLabel(score: number): string {
+  if (score >= 8) return 'High Quality';
+  if (score >= 6) return 'Good Quality';
+  return 'Low Quality';
+}
+
+function isUsableGrade(g: IvfGrade): boolean {
+  return g.is_active !== false && g.grade != null && g.images.length > 0 && !!g.images[0].upload_image_url;
+}
 
 const SLOT_COLORS = [
   { hex: '#4f46e5' },
@@ -174,9 +129,12 @@ function RankBadge({ rank }: { rank: number }) {
 type CompareMode = 'embryos' | 'images';
 
 export default function EmbryoComparePage() {
+  const { his } = useParams<{ his: string }>();
+  const [embryos, setEmbryos] = useState<LeaderboardEmbryo[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedEmbryoIds, setSelectedEmbryoIds] = useState<string[]>([]);
   const [compareMode, setCompareMode] = useState<CompareMode>('embryos');
-  const [selectedOocyteId, setSelectedOocyteId] = useState<string>(LEADERBOARD_EMBRYOS[0]?.id ?? '');
+  const [selectedOocyteId, setSelectedOocyteId] = useState<string>('');
   const [oocyteDropdownOpen, setOocyteDropdownOpen] = useState(false);
   const oocyteDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -189,6 +147,78 @@ export default function EmbryoComparePage() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => {
+    if (!his) { setLoading(false); return; }
+    const detailHis = his.trim().toUpperCase();
+    let cancelled = false;
+    setLoading(true);
+    ivfService.listCycles({ his_id: detailHis }).then(async cycles => {
+      if (cancelled) return;
+      const matched = cycles.find(c => c.his_id.toUpperCase() === detailHis);
+      if (!matched) { setLoading(false); return; }
+      const full = await ivfService.getCycleWithLogs(matched.cycle_id);
+      if (cancelled) return;
+      const graded = full.logs.filter(l => (l.grade_count ?? 0) > 0);
+      const opuAt = parseUtc(matched.opu_date);
+
+      const built = (await Promise.all(graded.map(async log => {
+        const grades = (await ivfService.listGrades(matched.cycle_id, log.log_id).catch(() => [] as IvfGrade[]))
+          .filter(isUsableGrade);
+        if (grades.length === 0) return null;
+
+        // Re-running AI grading on the same upload leaves one row per attempt —
+        // collapse attempts that landed on the same grade + score down to their
+        // most recent run so the list reads as distinct results, not a log.
+        const latestByResult = new Map<string, IvfGrade>();
+        for (const g of grades) {
+          const key = `${g.grade}::${g.ai_score}`;
+          const existing = latestByResult.get(key);
+          if (!existing || (parseUtc(g.created_at)?.getTime() ?? 0) > (parseUtc(existing.created_at)?.getTime() ?? 0)) {
+            latestByResult.set(key, g);
+          }
+        }
+
+        const sorted = Array.from(latestByResult.values()).sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1));
+        const best = sorted.find(g => g.is_best) ?? sorted[0];
+        const images: LeaderboardImage[] = sorted.map(g => ({
+          url: g.images[0].upload_image_url,
+          grade: g.grade!,
+          score: g.ai_score ?? 0,
+          morphology: toMorphology(g),
+        }));
+        const bestAt = parseUtc(best.created_at);
+        const hours = opuAt && bestAt ? (bestAt.getTime() - opuAt.getTime()) / 3_600_000 : null;
+
+        const embryo: LeaderboardEmbryo = {
+          id: `EID ${matched.cycle_id}.${log.oocyte_no}`,
+          oocyteNo: log.oocyte_no,
+          time: hours != null && hours > 0 ? `${hours.toFixed(2)} h` : '—',
+          aiScore: best.ai_score ?? 0,
+          grade: best.grade!,
+          quality: qualityLabel(best.ai_score ?? 0),
+          rank: 0,
+          src: images[0].url,
+          images,
+          morphology: toMorphology(best),
+        };
+        return embryo;
+      })))
+        .filter((e): e is LeaderboardEmbryo => e !== null)
+        .sort((a, b) => a.oocyteNo - b.oocyteNo)
+        // Oocyte numbers are embryologist-entered and can start at 0 or have
+        // gaps; the leaderboard relabels them 1..N for display purposes only.
+        .map((e, i) => ({ ...e, oocyteNo: i + 1 }))
+        .sort((a, b) => b.aiScore - a.aiScore)
+        .map((e, i) => ({ ...e, rank: i + 1 }));
+
+      if (cancelled) return;
+      setEmbryos(built);
+      setSelectedOocyteId(prev => (prev && built.some(e => e.id === prev)) ? prev : (built[0]?.id ?? ''));
+      setLoading(false);
+    }).catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [his]);
 
   const toggleEmbryo = (id: string) => {
     setSelectedEmbryoIds(prev => {
@@ -204,7 +234,7 @@ export default function EmbryoComparePage() {
       {/* ── Leaderboard ── */}
       <div className="w-[300px] shrink-0 flex flex-col min-h-0 overflow-hidden">
         <div className="rounded-t-2xl overflow-hidden shrink-0">
-          <img src="/bg_emb.png" alt="" className="w-full h-auto block" />
+          <img src="/emb_compare.png" alt="" className="w-full h-auto block" />
         </div>
         <div className="relative z-10 -mt-6 flex-1 flex flex-col min-h-0 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
 
@@ -218,7 +248,7 @@ export default function EmbryoComparePage() {
               <p className="text-[10px] text-gray-400 mt-0.5">Ranked by AI Score</p>
             </div>
             <span className="text-[10px] font-bold text-primary bg-primary-bg border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
-              {LEADERBOARD_EMBRYOS.length} embryos
+              {embryos.length} embryos
             </span>
           </div>
           {/* Compare mode toggle */}
@@ -247,7 +277,7 @@ export default function EmbryoComparePage() {
                   {/* Custom oocyte dropdown */}
                   <div className="relative" ref={oocyteDropdownRef}>
                     {(() => {
-                      const sel = LEADERBOARD_EMBRYOS.find(e => e.id === selectedOocyteId);
+                      const sel = embryos.find(e => e.id === selectedOocyteId);
                       const gc = sel ? gradeCls(sel.grade) : null;
                       return (
                         <button
@@ -277,7 +307,7 @@ export default function EmbryoComparePage() {
                     {oocyteDropdownOpen && (
                       <div className="absolute top-full left-0 right-0 mt-1 z-20 rounded-xl overflow-hidden shadow-lg"
                         style={{ border: '1px solid #e8d5f0', background: 'white' }}>
-                        {LEADERBOARD_EMBRYOS.map(emb => {
+                        {embryos.map(emb => {
                           const gc = gradeCls(emb.grade);
                           const isActive = emb.id === selectedOocyteId;
                           return (
@@ -308,9 +338,40 @@ export default function EmbryoComparePage() {
         </div>
 
         <div className="flex-1 overflow-y-auto flex flex-col gap-1.5 p-2.5">
-          {compareMode === 'images'
+          {loading ? (
+            <>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={`lb-shimmer-${i}`} className="flex items-center gap-2.5 pl-3 pr-4 py-2.5 rounded-xl"
+                  style={{ border: '1px solid #EEE8F8', background: 'white' }}>
+                  <div className="shrink-0 w-6 flex items-center justify-center">
+                    <div className="w-5 h-5 rounded-full ivf-shimmer" />
+                  </div>
+                  <div className="shrink-0 w-10 h-10 rounded-lg ivf-shimmer" />
+                  <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                    <div className="h-2.5 w-16 rounded-full ivf-shimmer" />
+                    <div className="h-1.5 w-full rounded-full ivf-shimmer" />
+                  </div>
+                  <div className="shrink-0 w-10 h-9 rounded-lg ivf-shimmer" />
+                </div>
+              ))}
+              <style>{`
+                .ivf-shimmer {
+                  background: linear-gradient(90deg, #f3f4f6 25%, #e9ebee 37%, #f3f4f6 63%);
+                  background-size: 400% 100%;
+                  animation: ivf-shimmer-sweep 1.4s ease-in-out infinite;
+                }
+                @keyframes ivf-shimmer-sweep { 0% { background-position: 100% 50% } 100% { background-position: 0% 50% } }
+              `}</style>
+            </>
+          ) : embryos.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 py-10 text-center px-4">
+              <Trophy size={18} className="text-gray-300" />
+              <span className="text-[11px] font-semibold text-gray-400">No graded embryos yet</span>
+              <span className="text-[10px] text-gray-300">Grade an oocyte to see it ranked here.</span>
+            </div>
+          ) : compareMode === 'images'
             ? (() => {
-                const oocyte = LEADERBOARD_EMBRYOS.find(e => e.id === selectedOocyteId);
+                const oocyte = embryos.find(e => e.id === selectedOocyteId);
                 const sorted = [...(oocyte?.images ?? [])].sort((a, b) => b.score - a.score);
                 return sorted.map((img, idx) => {
                   const rank = idx + 1;
@@ -341,7 +402,7 @@ export default function EmbryoComparePage() {
                   );
                 });
               })()
-            : LEADERBOARD_EMBRYOS.map(emb => {
+            : embryos.map(emb => {
             const isSelected = selectedEmbryoIds.includes(emb.id);
             const slotIdx = selectedEmbryoIds.indexOf(emb.id);
             const slot = slotIdx >= 0 ? SLOT_COLORS[slotIdx] : null;
@@ -422,7 +483,7 @@ export default function EmbryoComparePage() {
               </h3>
               <p className="text-[10px] text-gray-400 mt-0.5">
                 {compareMode === 'images'
-                  ? `All images for Oocyte #${LEADERBOARD_EMBRYOS.find(e => e.id === selectedOocyteId)?.oocyteNo ?? '—'} ranked by AI score`
+                  ? `All images for Oocyte #${embryos.find(e => e.id === selectedOocyteId)?.oocyteNo ?? '—'} ranked by AI score`
                   : 'Select up to 4 embryos to compare'}
               </p>
             </div>
@@ -445,7 +506,7 @@ export default function EmbryoComparePage() {
 
         {/* Images compare panel */}
         {compareMode === 'images' ? (() => {
-          const oocyte = LEADERBOARD_EMBRYOS.find(e => e.id === selectedOocyteId);
+          const oocyte = embryos.find(e => e.id === selectedOocyteId);
           const sorted = [...(oocyte?.images ?? [])].sort((a, b) => b.score - a.score);
           return (
             <div className="flex-1 min-h-0 overflow-x-auto">
@@ -488,9 +549,7 @@ export default function EmbryoComparePage() {
                         </div>
                         <div className="divide-y divide-gray-50">
                           {([
-                            { label: 'Hatching',        value: img.morphology.hatching        },
-                            { label: 'Vacuolization',   value: img.morphology.vacuolization   },
-                            { label: 'Multinucleation', value: img.morphology.multinucleation },
+                            { label: 'Hatching', value: img.morphology.hatching },
                           ]).map(item => {
                             const s = criticalStyle(item.value);
                             return (
@@ -507,16 +566,29 @@ export default function EmbryoComparePage() {
                         </div>
                         <div className="divide-y divide-gray-50">
                           {([
-                            { label: 'Fragmentation',  value: img.morphology.fragmentation          },
-                            { label: 'Symmetry',       value: img.morphology.symmetry               },
-                            { label: 'Zona Pellucida', value: img.morphology.zonaPellucida          },
-                            { label: 'Blastocoel',     value: img.morphology.blastocoelQuality      },
-                            { label: 'Cyto. Gran.',    value: img.morphology.cytoplasmicGranularity },
-                            { label: 'Bridge',         value: img.morphology.bridge                 },
+                            { label: 'Zona Pellucida', value: img.morphology.zonaPellucida     },
+                            { label: 'Blastocoel',     value: img.morphology.blastocoelQuality },
                           ]).map(item => (
                             <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
                               <span className="text-[10px] font-medium text-gray-400 leading-tight">{item.label}</span>
                               <span className="text-[10px] font-bold text-gray-700 shrink-0">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* AI Inference */}
+                        <div className="px-3 py-2 flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest border-y border-gray-100" style={{ background: '#faf4ff', color: '#6b1176' }}>
+                          <Sparkles size={10} />
+                          AI Inference
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                          {([
+                            { label: 'Expansion', value: img.morphology.expInference },
+                            { label: 'ICM',       value: img.morphology.icmInference },
+                            { label: 'TE',        value: img.morphology.teInference  },
+                          ]).map(item => (
+                            <div key={item.label} className="px-3 py-2.5">
+                              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">{item.label}</span>
+                              <p className="text-[10px] text-gray-600 leading-snug mt-0.5">{item.value}</p>
                             </div>
                           ))}
                         </div>
@@ -655,7 +727,7 @@ export default function EmbryoComparePage() {
                   </div>
                 );
 
-                const emb = LEADERBOARD_EMBRYOS.find(e => e.id === eid)!;
+                const emb = embryos.find(e => e.id === eid)!;
                 const hex = SLOT_COLORS[idx].hex;
                 const gc = gradeCls(emb.grade);
                 const m = emb.morphology;
@@ -717,9 +789,7 @@ export default function EmbryoComparePage() {
                         </div>
                         <div className="divide-y divide-gray-50 bg-white">
                           {([
-                            { label: 'Hatching',        value: m.hatching        },
-                            { label: 'Vacuolization',   value: m.vacuolization   },
-                            { label: 'Multinucleation', value: m.multinucleation },
+                            { label: 'Hatching', value: m.hatching },
                           ]).map(item => {
                             const s = criticalStyle(item.value);
                             return (
@@ -742,16 +812,31 @@ export default function EmbryoComparePage() {
                         </div>
                         <div className="divide-y divide-gray-50 bg-white">
                           {([
-                            { label: 'Fragmentation',  value: m.fragmentation          },
-                            { label: 'Symmetry',       value: m.symmetry               },
-                            { label: 'Zona Pellucida', value: m.zonaPellucida          },
-                            { label: 'Blastocoel',     value: m.blastocoelQuality      },
-                            { label: 'Cyto. Gran.',    value: m.cytoplasmicGranularity },
-                            { label: 'Bridge',         value: m.bridge                 },
+                            { label: 'Zona Pellucida', value: m.zonaPellucida     },
+                            { label: 'Blastocoel',     value: m.blastocoelQuality },
                           ]).map(item => (
                             <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
                               <span className="text-[10px] font-medium text-gray-400 leading-tight">{item.label}</span>
                               <span className="text-[10px] font-bold text-gray-700 shrink-0">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 rounded-xl overflow-hidden" style={{ border: '1px solid #e8d5f0' }}>
+                        <div className="flex items-center gap-2 px-3 py-2" style={{ background: '#faf4ff' }}>
+                          <Sparkles size={11} className="text-primary" />
+                          <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#6b1176' }}>AI Inference</span>
+                        </div>
+                        <div className="divide-y divide-gray-50 bg-white">
+                          {([
+                            { label: 'Expansion', value: m.expInference },
+                            { label: 'ICM',       value: m.icmInference },
+                            { label: 'TE',        value: m.teInference  },
+                          ]).map(item => (
+                            <div key={item.label} className="px-3 py-2.5">
+                              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">{item.label}</span>
+                              <p className="text-[10px] text-gray-600 leading-snug mt-0.5">{item.value}</p>
                             </div>
                           ))}
                         </div>
