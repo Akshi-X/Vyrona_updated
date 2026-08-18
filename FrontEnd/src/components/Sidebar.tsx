@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ChevronRight, Download, Users } from "lucide-react";
+import { ChevronRight, ChevronDown, ChevronUp, Download, Users } from "lucide-react";
 import RefillIcon from "./RefillIcon";
 
 import { useSidebar } from "../contexts/SidebarContext";
 import { useOnboardingMode } from "../contexts/OnboardingModeContext";
+import { useHasVariant } from "./VariantRoute";
 import { useAuth } from "../contexts/AuthContext";
 import { userService } from "../services/userService";
 import { InstallPromptCard } from "./InstallPromptCard";
@@ -110,10 +111,15 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const { isMobileOpen, closeMobile } = useSidebar();
     const isOnboardingCtx = useOnboardingMode();
     const isOnboarding = isOnboardingCtx || location.pathname.startsWith("/onboarding");
+    const embryoGradingEnabled = useHasVariant("/embryo-console#enabled");
+    const incubatorTrackingEnabled = useHasVariant("/incubator-tracking#enabled");
 
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [dashboardOpen, setDashboardOpen] = useState(false);
     const [alertConfigOpen, setAlertConfigOpen] = useState(false);
+    const [showTopHint, setShowTopHint] = useState(false);
+    const [showBottomHint, setShowBottomHint] = useState(false);
+    const navRef = useRef<HTMLElement>(null);
     const [userDepartment, setUserDepartment] = useState<string | null>(() => {
         const dept = localStorage.getItem("department");
         return dept ? dept.toUpperCase() : null;
@@ -175,12 +181,37 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             const filtered = item.children.filter((child) => {
                 if (child.path === "/cryocan-tracking") return isIVF;
                 if (child.path === "/refrigerator-tracking") return isIVF;
+                if (child.path === "/embryo-console") return isOnboarding || embryoGradingEnabled;
+                if (child.path === "/incubator-tracking") return isOnboarding || incubatorTrackingEnabled;
                 return true;
             });
             return { ...item, children: filtered };
         }
         return item;
     });
+
+    // ── Scroll hint (nav list overflow) ─────────────────────────────────────────
+
+    useEffect(() => {
+        const el = navRef.current;
+        if (!el) return;
+
+        const checkScrollable = () => {
+            const hasOverflow = el.scrollHeight > el.clientHeight + 1;
+            const atTop = el.scrollTop < 4;
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+            setShowTopHint(hasOverflow && !atTop);
+            setShowBottomHint(hasOverflow && !atBottom);
+        };
+
+        checkScrollable();
+        el.addEventListener("scroll", checkScrollable);
+        window.addEventListener("resize", checkScrollable);
+        return () => {
+            el.removeEventListener("scroll", checkScrollable);
+            window.removeEventListener("resize", checkScrollable);
+        };
+    }, [navigationItems, dashboardOpen, alertConfigOpen]);
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -236,7 +267,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 </header>
 
                 {/* Navigation */}
-                <nav className="flex flex-col gap-[18px] px-6 pb-2 flex-1 overflow-y-auto relative z-10 scrollbar-none">
+                <div className="relative flex-1 min-h-0 z-10">
+                    <nav
+                        ref={navRef}
+                        className="flex flex-col gap-[18px] px-6 pb-12 h-full overflow-y-auto scrollbar-none"
+                    >
                     {navigationItems.map((item, index) => {
                         if (isDropdown(item)) {
                             const isDashboard = item.label === "Dashboard";
@@ -379,7 +414,32 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                             </button>
                         );
                     })}
-                </nav>
+                    </nav>
+
+                    {/* Top scroll hint — inset shadow + chevron when scrolled down */}
+                    <div
+                        className={`absolute top-0 left-0 right-0 h-18 flex items-start justify-center pt-1 pointer-events-none transition-opacity duration-200 ${
+                            showTopHint ? "opacity-100" : "opacity-0"
+                        }`}
+                        style={{
+                            boxShadow: "inset 0 20px 24px -12px rgba(0,0,0,0.35)",
+                        }}
+                    >
+                        <ChevronUp className="w-4 h-4 text-white/80 animate-bounce" strokeWidth={2.5} />
+                    </div>
+
+                    {/* Bottom scroll hint — inset shadow + chevron when list overflows */}
+                    <div
+                        className={`absolute bottom-0 left-0 right-0 h-18 flex items-end justify-center pb-1 pointer-events-none transition-opacity duration-200 ${
+                            showBottomHint ? "opacity-100" : "opacity-0"
+                        }`}
+                        style={{
+                            boxShadow: "inset 0 -20px 24px -12px rgba(0,0,0,0.35)",
+                        }}
+                    >
+                        <ChevronDown className="w-4 h-4 text-white/80 animate-bounce" strokeWidth={2.5} />
+                    </div>
+                </div>
 
                 <InstallPromptCard />
                 <IOSInstallGuideDialog />
