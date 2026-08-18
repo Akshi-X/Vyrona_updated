@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     SEG_MODEL_PATH: str = "models/segment_model.pth"
     GRADING_MODEL_PATH: str = "models/grading_model.pth"
 
+    # Embryo detection gate — structural sanity check on the segmentation output.
+    # Tunable per deployment; the model was never trained to reject non-embryos.
+    DETECT_ENABLED: bool = True
+    DETECT_MIN_AREA: float = 0.06
+    DETECT_MAX_AREA: float = 0.92
+    DETECT_MIN_BLOB_SHARE: float = 0.70
+    DETECT_MIN_CIRCULARITY: float = 0.55
+    DETECT_MIN_SEG_CONF: float = 0.80
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

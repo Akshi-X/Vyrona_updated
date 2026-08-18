@@ -147,6 +147,18 @@ def run_job(job_id: int) -> None:
             # pass — one job produces both, so the pipeline never depends on
             # a second trigger to finish grading an image.
             result = ml_models.analyse(image_bytes)
+            if result["grading"] is None:
+                detection = result["detection"]
+                message = "No embryo detected in this image"
+                _update_job(session, job_id, status="failed", progress=100,
+                            error=message, output=json.dumps({"detection": detection}))
+                session.commit()
+                publish_job_event(job_id, {
+                    "status": "failed", "error": message,
+                    "code": "no_embryo", "detection": detection,
+                })
+                logger.info(f"run_job: job {job_id} rejected — {detection['reasons']}")
+                return
             _emit(session, job_id, 90)
             prefix = os.path.dirname(storage.resolve_blob_path(input_image_id)) or "ivf/oocytes"
             output = dict(result["grading"])
