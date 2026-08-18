@@ -1,25 +1,13 @@
-import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useParams } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import EmbryoTabBar from './EmbryoTabBar';
 import FeedbackButton from '../../components/FeedbackButton';
-import { ivfService } from '../../services/ivfService';
 
 export default function EmbryoShell() {
   const { his = '' } = useParams<{ his: string }>();
   const { pathname } = useLocation();
 
-  const [patientName, setPatientName] = useState('');
-
-  useEffect(() => {
-    if (!his) return;
-    ivfService.listCycles({ his_id: his.toUpperCase() }).then(cycles => {
-      const matched = cycles.find(c => c.his_id.toUpperCase() === his.toUpperCase());
-      if (matched?.patient_name) setPatientName(matched.patient_name);
-    }).catch(() => {});
-  }, [his]);
-
-  const hisPart = `HIS: ${his.toUpperCase()}${patientName ? ` (${patientName})` : ''}`;
+  const hisPart = `HIS: ${his.toUpperCase()}`;
 
   const isAdvanced = pathname.endsWith('/ai-grading');
   const isCompare  = pathname.endsWith('/compare');

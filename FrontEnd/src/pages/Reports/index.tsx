@@ -414,7 +414,6 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
     }
 
     if (action.startsWith("ivf_cycle.")) {
-        if (metadata.patient_name) lines.push(`Patient: ${metadata.patient_name}`);
         if (metadata.his_id) lines.push(`HIS ID: ${metadata.his_id}`);
 
         if (action === "ivf_cycle.created") {

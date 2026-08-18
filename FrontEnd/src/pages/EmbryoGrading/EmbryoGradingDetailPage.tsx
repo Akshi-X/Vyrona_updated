@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { History, FlaskConical, Activity, Sun, Tag, Server, Star } from 'lucide-react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Modal from '../../components/Modal';
@@ -6,6 +6,9 @@ import { ivfService, type IvfCycle, type IvfCycleLog, type IvfCycleWithLogs, typ
 import { activityLogService, type ActivityLogRecord } from '../../services/activityLogService';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Tooltip from '../../components/Tooltip';
+import { bestGrade as pickBestGrade } from '../../utils/embryoGrades';
+
+const HEADER_GRADIENT = 'linear-gradient(180deg, #F3E6FC 0%, #E4C9F5 100%)';
 
 interface EmbryoGradingDetail {
   grade: string;
@@ -58,6 +61,14 @@ export default function EmbryoGradingDetailPage() {
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [chamberHealth, setChamberHealth] = useState<ChamberLatestItem[]>([]);
   const [chamberHealthLoading, setChamberHealthLoading] = useState(false);
+  const logScrollRef = useRef<HTMLDivElement>(null);
+  const actionsThRef = useRef<HTMLTableCellElement>(null);
+  const [showScrollHint, setShowScrollHint] = useState(false);
+  const [actionsColWidth, setActionsColWidth] = useState(0);
+  const [bestImages, setBestImages] = useState<Record<number, string>>({});
+  const stepRowRef = useRef<HTMLDivElement>(null);
+  const stepBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [stepCaret, setStepCaret] = useState<{ x: number; rowWidth: number } | null>(null);
   const [isAddLogFormOpen, setIsAddLogFormOpen] = useState(false);
   const [logSaving, setLogSaving] = useState(false);
   const [oocyteNoError, setOocyteNoError] = useState<string | null>(null);
@@ -196,6 +207,17 @@ export default function EmbryoGradingDetailPage() {
     setLogForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Only one day can ever be 'Blastocyst' — picking it for one clears the
+  // other's stage and grade fields immediately, not just at save time.
+  const handleStageChange = (day: 'day5' | 'day6', value: string) => {
+    setLogForm((prev) => {
+      if (value !== 'Blastocyst') return { ...prev, [day === 'day5' ? 'day5Stage' : 'day6Stage']: value };
+      return day === 'day5'
+        ? { ...prev, day5Stage: value, day6Stage: '', day6ExpansionGrade: '', day6IcmGrade: '', day6TeGrade: '' }
+        : { ...prev, day6Stage: value, day5Stage: '', day5ExpansionGrade: '', day5IcmGrade: '', day5TeGrade: '' };
+    });
+  };
+
   const generateDay3Label = (cellCount: string, fragmentation: string): string => {
     if (!cellCount || !fragmentation) return '—';
     return `${cellCount}C${fragmentation}`;
@@ -246,8 +268,9 @@ export default function EmbryoGradingDetailPage() {
 
   const openEditLog = (log: IvfCycleLog, step: number) => {
     const d3 = parseD3Grade(log.d3_grade);
-    const d5 = parseBlastGrade(log.d5_grade);
-    const d6 = parseBlastGrade(log.d6_grade);
+    // One shared blast_grade column — it belongs to whichever day's stage is 'Blastocyst'.
+    const d5 = parseBlastGrade(log.d5_stage === 'Blastocyst' ? log.blast_grade : null);
+    const d6 = parseBlastGrade(log.d6_stage === 'Blastocyst' ? log.blast_grade : null);
     setLogForm({
       oocyteNo: String(log.oocyte_no),
       oocyteComments: log.oocyte_comments || '',
@@ -313,6 +336,10 @@ export default function EmbryoGradingDetailPage() {
     if (logForm.day6Notes) meta.d6_notes = logForm.day6Notes;
     if (logForm.notes) meta.final_notes = logForm.notes;
 
+    // One shared blast_grade column, not separate d5/d6 grade columns —
+    // whichever day actually reached Blastocyst supplies it.
+    const blastGrade = d5Grade !== '—' ? d5Grade : d6Grade !== '—' ? d6Grade : null;
+
     const payload: IvfLogUpsert = {
       oocyte_no: parseInt(logForm.oocyteNo, 10) || 0,
       ...(logForm.oocyteComments && { oocyte_comments: logForm.oocyteComments }),
@@ -324,9 +351,16 @@ export default function EmbryoGradingDetailPage() {
       ...(day3Grade !== '—' && { d3_grade: day3Grade }),
       ...(logForm.day3Symmetry && { d3_symmetry: logForm.day3Symmetry }),
       ...(logForm.day5Stage && { d5_stage: logForm.day5Stage }),
-      ...(d5Grade !== '—' && { d5_grade: d5Grade }),
       ...(logForm.day6Stage && { d6_stage: logForm.day6Stage }),
-      ...(d6Grade !== '—' && { d6_grade: d6Grade }),
+      // Only one day can ever be 'Blastocyst' — recording it on one explicitly
+      // clears the other rather than leaving stale data behind. Day 5 wins if
+      // legacy data somehow has both set, matching the day6Locked UI rule below.
+      ...(logForm.day5Stage === 'Blastocyst'
+        ? { d6_stage: null }
+        : logForm.day6Stage === 'Blastocyst'
+        ? { d5_stage: null }
+        : {}),
+      ...(blastGrade && { blast_grade: blastGrade }),
       ...(logForm.day6Progression && { d6_progression: logForm.day6Progression }),
       ...(logForm.fate && { fate: logForm.fate }),
       ...(logForm.fzNo && { freeze_no: logForm.fzNo }),
@@ -361,13 +395,75 @@ export default function EmbryoGradingDetailPage() {
 
   const logs = selectedCycle?.logs ?? [];
 
-  const bestGrade = React.useMemo(() => {
-    for (const log of logs) { if (log.d5_grade) return log.d5_grade; }
-    for (const log of logs) { if (log.d6_grade) return log.d6_grade; }
-    return null;
-  }, [logs]);
+  // blast_grade only counts if it's actually tagged to a day — a log can carry
+  // a leftover blast_grade from an earlier approval whose stage was since
+  // cleared (e.g. by the Day5/Day6 exclusivity fix), and that shouldn't still
+  // show up as a graded blastocyst.
+  const hasBlast = (l: IvfCycleLog) => !!l.blast_grade && (l.d5_stage === 'Blastocyst' || l.d6_stage === 'Blastocyst');
+
+  const bestGrade = React.useMemo(
+    () => pickBestGrade(logs.filter(hasBlast).map(l => l.blast_grade)),
+    [logs],
+  );
 
   const primaryGradeDetails = bestGrade ? getEmbryoGradingDetails(bestGrade) : null;
+
+  // Points the form card's notch at whichever step circle is active. Step
+  // buttons size to their labels, so the centre has to be measured.
+  useEffect(() => {
+    if (!isAddLogFormOpen) { setStepCaret(null); return; }
+    const measure = () => {
+      const row = stepRowRef.current;
+      const btn = stepBtnRefs.current[logModalStep];
+      if (!row || !btn) { setStepCaret(null); return; }
+      setStepCaret({ x: btn.offsetLeft + btn.offsetWidth / 2, rowWidth: row.offsetWidth });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [isAddLogFormOpen, logModalStep]);
+
+  // Thumbnail per oocyte: the image behind its selected (or latest) grade.
+  useEffect(() => {
+    const cycleId = selectedCycle?.cycle_id;
+    if (cycleId == null) return;
+    const graded = logs.filter(l => (l.grade_count ?? 0) > 0);
+    if (graded.length === 0) { setBestImages({}); return; }
+    let cancelled = false;
+    Promise.all(graded.map(l =>
+      ivfService.listGrades(cycleId, l.log_id)
+        .then(gs => {
+          const active = gs.filter(g => g.is_active);
+          const best = active.find(g => g.is_best) ?? active[active.length - 1];
+          return [l.log_id, best?.images[0]?.upload_image_url ?? null] as const;
+        })
+        .catch(() => [l.log_id, null] as const)
+    )).then(entries => {
+      if (cancelled) return;
+      setBestImages(Object.fromEntries(entries.filter(([, url]) => url) as [number, string][]));
+    });
+    return () => { cancelled = true; };
+  }, [selectedCycle?.cycle_id, logs]);
+
+  // The log table scrolls sideways on narrow screens; fade the edge next to the
+  // pinned Actions column until the last column is reached.
+  useEffect(() => {
+    const el = logScrollRef.current;
+    if (!el) return;
+    const check = () => {
+      const hasOverflow = el.scrollWidth > el.clientWidth + 1;
+      const atEnd = el.scrollWidth - el.scrollLeft - el.clientWidth < 4;
+      setShowScrollHint(hasOverflow && !atEnd);
+      setActionsColWidth(actionsThRef.current?.offsetWidth ?? 0);
+    };
+    check();
+    el.addEventListener('scroll', check);
+    window.addEventListener('resize', check);
+    return () => {
+      el.removeEventListener('scroll', check);
+      window.removeEventListener('resize', check);
+    };
+  }, [logs]);
 
   const logSummary = React.useMemo(() => {
     const totalRows = logs.length;
@@ -377,10 +473,10 @@ export default function EmbryoGradingDetailPage() {
       const frag = parseD3Grade(l.d3_grade).frag;
       return frag === '1' || frag === '0';
     }).length;
-    const blastRows = logs.filter(l => l.d5_grade || l.d6_grade).length;
+    const blastRows = logs.filter(hasBlast).length;
     const blastGoodGrades = logs
-      .filter(l => l.d5_grade || l.d6_grade)
-      .map(l => l.d5_grade ? `D5×${l.d5_grade}` : `D6×${l.d6_grade}`)
+      .filter(hasBlast)
+      .map(l => l.blast_grade)
       .join(', ');
     const frozenRows = logs.filter(l => l.fate?.toLowerCase() === 'freeze').length;
     return { totalRows, fertilized, cleaved, day3GoodGrade, blastRows, blastGoodGrades, frozenRows };
@@ -405,14 +501,15 @@ export default function EmbryoGradingDetailPage() {
       <div className="flex flex-col min-w-0 w-full flex-1 min-h-0 overflow-y-auto">
 
             {selectedCycle ? (
-              <div className="flex flex-col gap-4">
-                <div className="flex gap-4 items-start">
-                <div className="flex-1 min-w-0">
+              // Below xl the panels stack: stats → log table → actions →
+              // Recent Activity, which is ordered last so it never splits the sheet.
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_18rem] gap-4">
+                <div className="min-w-0 rounded-2xl border border-gray-100 overflow-hidden xl:col-start-1 xl:row-start-1">
                 {/* Cycle Journey */}
                 {(() => {
                   const totalOocytes = (selectedCycle.oocyte_m2 ?? 0) + (selectedCycle.oocyte_m1 ?? 0) + (selectedCycle.oocyte_gv ?? 0) + (selectedCycle.oocyte_others ?? 0);
                   const injected = logSummary.totalRows;
-                  const pct = (n: number, of: number) => of > 0 ? Math.round((n / of) * 100) : 0;
+                  const pct = (n: number, of: number) => of > 0 ? Math.min(100, Math.round((n / of) * 100)) : 0;
                   const stages = [
                     { label: 'Oocytes',    value: totalOocytes,             base: totalOocytes,             bar: 'from-[#c084fc] to-[#a855f7]' },
                     { label: 'Injected',   value: injected,                 base: totalOocytes,             bar: 'from-[#d8b4fe] to-primary-muted' },
@@ -446,13 +543,13 @@ export default function EmbryoGradingDetailPage() {
                     : 'text-primary bg-primary-bg border-primary/20'
                     : '';
                   return (
-                    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
 
                       {/* ── Row 1: Oocyte breakdown header ── */}
-                      <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b border-primary/10">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 bg-primary/5 border-b border-primary/10">
                         <span className="text-[10px] font-bold text-primary uppercase tracking-widest shrink-0">Oocytes</span>
                         <span className="text-xl font-black text-primary">{totalOocytes}</span>
-                        <div className="flex items-center gap-2 ml-1">
+                        <div className="flex flex-wrap items-center gap-2 xl:ml-1">
                           {breakdown.map(b => (
                             <span key={b.label} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-primary/20 text-[10px] font-semibold text-gray-700">
                               <span className="font-black text-primary">{b.value}</span>
@@ -463,14 +560,16 @@ export default function EmbryoGradingDetailPage() {
                       </div>
 
                       {/* ── Row 2: Funnel stages ── */}
-                      <div className="flex items-stretch divide-x divide-gray-100 border-b border-gray-100">
+                      {/* gap-px over a gray backdrop draws the dividers in both
+                          the mobile grid and the xl flex row */}
+                      <div className="grid grid-cols-3 xl:flex xl:items-stretch gap-px bg-gray-100 border-b border-gray-100">
                         {stages.slice(1).map(s => {
                           const percent = pct(s.value, s.base);
                           const pctCls = percent >= 60 ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
                                        : percent >= 30 ? 'text-amber-600 bg-amber-50 border-amber-200'
                                        :                 'text-rose-500 bg-rose-50 border-rose-200';
                           return (
-                            <div key={s.label} className="flex-1 flex flex-col items-center gap-1 px-3 py-3">
+                            <div key={s.label} className="flex-1 flex flex-col items-center gap-1 px-3 py-3 bg-white">
                               <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{s.label}</span>
                               <span className="text-2xl font-black text-gray-900 leading-none tabular-nums">{s.value}</span>
                               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${pctCls}`}>{percent}%</span>
@@ -480,7 +579,7 @@ export default function EmbryoGradingDetailPage() {
                             </div>
                           );
                         })}
-                        <div className="flex-1 flex flex-col items-center justify-center gap-1 px-3 py-3 bg-primary/[0.03]">
+                        <div className="flex-1 flex flex-col items-center justify-center gap-1 px-3 py-3 bg-[#FAF8FB]">
                           <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Good Grade</span>
                           {logSummary.blastGoodGrades ? (
                             <div className="flex flex-wrap gap-1 justify-center mt-0.5">
@@ -495,7 +594,7 @@ export default function EmbryoGradingDetailPage() {
                       </div>
 
                       {/* ── Row 3: Cycle info cards ── */}
-                      <div className="grid grid-cols-4 gap-2 p-3 border-t border-gray-100 bg-gray-50/40">
+                      <div className="grid grid-cols-1 min-[460px]:grid-cols-2 xl:grid-cols-4 gap-2 p-3 border-t border-gray-100 bg-gray-50/40">
 
                         {/* Current Day */}
                         <div className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
@@ -564,8 +663,8 @@ export default function EmbryoGradingDetailPage() {
                           </div>
                         </div>
 
-                        {/* Chamber + Chamber Health (merged) */}
-                        <div className="col-span-2 rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                        {/* Chamber + Chamber Health (merged) — too wide to fit below xl */}
+                        <div className="hidden xl:flex xl:col-span-2 rounded-xl border border-gray-100 bg-white px-3 py-2.5 items-center gap-3">
                           <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
                             <Server size={13} />
                           </div>
@@ -616,7 +715,7 @@ export default function EmbryoGradingDetailPage() {
                 })()}
                 </div>
 
-                <div className="w-72 shrink-0 self-stretch flex flex-col rounded-lg border border-line bg-white overflow-hidden">
+                <div className="order-last xl:order-none xl:col-start-2 xl:row-start-1 min-w-0 flex flex-col rounded-lg border border-line bg-white overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-line-light bg-gradient-to-r from-surface to-white">
                     <div className="flex items-center gap-2">
                       <History size={14} className="text-[#8A7892]" />
@@ -693,7 +792,6 @@ export default function EmbryoGradingDetailPage() {
                     )}
                   </div>
                 </div>
-                </div>
 
                 {(() => {
                   const dayNum = parseInt(calculateDayInCycle().replace('Day ', ''), 10);
@@ -703,8 +801,8 @@ export default function EmbryoGradingDetailPage() {
                       case 0: return Boolean(log.d0_drop_no);
                       case 1: return Boolean(log.d1_pn);
                       case 2: return Boolean(log.d3_grade);
-                      case 3: return Boolean(log.d5_grade);
-                      case 4: return Boolean(log.d6_grade);
+                      case 3: return log.d5_stage === 'Blastocyst' && Boolean(log.blast_grade);
+                      case 4: return log.d6_stage === 'Blastocyst' && Boolean(log.blast_grade);
                       default: return true;
                     }
                   };
@@ -722,11 +820,38 @@ export default function EmbryoGradingDetailPage() {
                   };
                   const tdTitle = (col: number, log: IvfCycleLog) =>
                     col <= activeCol && !isFilled(col, log) ? fillPrompts[col] : undefined;
+                  const fateBadge = (log: IvfCycleLog) => (
+                    <div className="flex items-center gap-1.5">
+                      {log.fate === 'Freeze' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 text-sm font-semibold border border-sky-200">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 7l-5 5-5-5"/><path d="M17 17l-5-5-5 5"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M7 7l5 5 5-5"/><path d="M7 17l5-5 5 5"/></svg>
+                          Freeze
+                        </span>
+                      ) : log.fate === 'Transfer' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                          Transfer
+                        </span>
+                      ) : log.fate === 'Discard' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-sm font-semibold border border-red-200">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                          Discard
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                      {log.fate === 'Freeze' && log.freeze_no && (
+                        <span className="text-xs text-gray-400 font-medium">#{log.freeze_no}</span>
+                      )}
+                    </div>
+                  );
                   return (
-                    <div className="rounded-lg border border-line overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <table className="min-w-[1320px] w-full text-sm">
-                          <thead className="bg-[#E4C9F5] text-primary">
+                    <div className="relative rounded-lg border border-line overflow-hidden xl:col-start-1 xl:col-span-2 xl:row-start-2">
+                      <div ref={logScrollRef} className="overflow-x-auto">
+                        <table className="min-w-[760px] w-full text-sm">
+                          {/* Vertical gradient so the sticky Actions cell can
+                              repeat it and stay seamless at any scroll offset */}
+                          <thead className="text-primary" style={{ background: HEADER_GRADIENT }}>
                             <tr className="divide-x divide-line">
                               <th className={thCls()}>Oocyte</th>
                               <th className={thCls()}>Day 1 (PN)</th>
@@ -735,7 +860,7 @@ export default function EmbryoGradingDetailPage() {
                               <th className={thCls()}>Day 6</th>
                               <th className="px-2 py-2 text-left font-semibold">Fate</th>
                               <th className="px-2 py-2 text-left font-semibold">Notes</th>
-                              <th className="px-2 py-2 text-left font-semibold w-24 sticky right-0 z-10 bg-[#E4C9F5] border-l border-line">Actions</th>
+                              <th ref={actionsThRef} className="px-2 py-2 text-left font-semibold w-px whitespace-nowrap sticky right-0 z-10 border-l border-line" style={{ background: HEADER_GRADIENT }}>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -750,9 +875,20 @@ export default function EmbryoGradingDetailPage() {
                                 <tr key={log.log_id} className="border-t border-line divide-x divide-line">
                                   <td className={tdCls(0, log, 'whitespace-nowrap')} onClick={() => openEditLog(log, 0)}>
                                     <Tooltip text={tdTitle(0, log)}>
-                                      <div>
-                                        <div className="font-medium">#{log.oocyte_no}</div>
-                                        <div className="text-[10px] text-gray-400">{log.d0_maturity || '—'}{log.d0_drop_no ? ` · Drop ${log.d0_drop_no}` : ''}</div>
+                                      <div className="flex items-center gap-2">
+                                        {bestImages[log.log_id] ? (
+                                          <img
+                                            src={bestImages[log.log_id]}
+                                            alt={`Oocyte ${log.oocyte_no}`}
+                                            className="w-9 h-9 rounded-full object-cover ring-1 ring-primary/25 shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="w-9 h-9 rounded-full bg-gray-100 ring-1 ring-gray-200 shrink-0" />
+                                        )}
+                                        <div>
+                                          <div className="font-medium">#{log.oocyte_no}</div>
+                                          <div className="text-[10px] text-gray-400">{log.d0_maturity || '—'}{log.d0_drop_no ? ` · Drop ${log.d0_drop_no}` : ''}</div>
+                                        </div>
                                       </div>
                                     </Tooltip>
                                   </td>
@@ -767,46 +903,26 @@ export default function EmbryoGradingDetailPage() {
                                     </Tooltip>
                                   </td>
                                   <td className={`${tdCls(3, log)} text-center`} onClick={() => openEditLog(log, 3)}>
-                                    <Tooltip text={tdTitle(3, log)}><span>{renderBlastBadge(log.d5_grade || '—')}</span></Tooltip>
+                                    <Tooltip text={tdTitle(3, log)}><span>{renderBlastBadge((log.d5_stage === 'Blastocyst' && log.blast_grade) || '—')}</span></Tooltip>
                                   </td>
                                   <td className={`${tdCls(4, log)} text-center`} onClick={() => openEditLog(log, 4)}>
-                                    <Tooltip text={tdTitle(4, log)}><span>{renderBlastBadge(log.d6_grade || '—')}</span></Tooltip>
+                                    <Tooltip text={tdTitle(4, log)}><span>{renderBlastBadge((log.d6_stage === 'Blastocyst' && log.blast_grade) || '—')}</span></Tooltip>
                                   </td>
                                   <td className="px-2 py-2 cursor-pointer hover:bg-primary-bg/60 transition-colors" onClick={() => openEditLog(log, 4)}>
-                                    <div className="flex items-center gap-1.5">
-                                      {log.fate === 'Freeze' ? (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 text-sm font-semibold border border-sky-200">
-                                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 7l-5 5-5-5"/><path d="M17 17l-5-5-5 5"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M7 7l5 5 5-5"/><path d="M7 17l5-5 5 5"/></svg>
-                                          Freeze
-                                        </span>
-                                      ) : log.fate === 'Transfer' ? (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200">
-                                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-                                          Transfer
-                                        </span>
-                                      ) : log.fate === 'Discard' ? (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-sm font-semibold border border-red-200">
-                                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                                          Discard
-                                        </span>
-                                      ) : (
-                                        <span className="text-gray-400">—</span>
-                                      )}
-                                      {log.fate === 'Freeze' && log.freeze_no && (
-                                        <span className="text-xs text-gray-400 font-medium">#{log.freeze_no}</span>
-                                      )}
-                                    </div>
+                                    {fateBadge(log)}
                                   </td>
                                   <td className="px-2 py-2 text-xs text-gray-500">{log.meta?.final_notes || '—'}</td>
-                                  <td className="px-2 py-2 flex gap-1 sticky right-0 z-10 bg-white border-l border-line">
-                                    <button
-                                      type="button"
-                                      onClick={() => openEditLog(log, 0)}
-                                      className="px-2 py-1 text-xs border border-primary/30 text-primary rounded font-medium hover:bg-primary/5 transition-colors"
-                                      title="Update entry"
-                                    >
-                                      Update
-                                    </button>
+                                  <td className="px-2 py-2 sticky right-0 z-10 bg-white border-l border-line">
+                                    <div className="flex gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditLog(log, 0)}
+                                        className="px-2 py-1 text-xs border border-primary/30 text-primary rounded font-medium hover:bg-primary/5 transition-colors"
+                                        title="Update entry"
+                                      >
+                                        Update
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))
@@ -814,11 +930,24 @@ export default function EmbryoGradingDetailPage() {
                           </tbody>
                         </table>
                       </div>
+
+                      {/* Scroll hint — sits left of the pinned Actions column so
+                          it never covers the Update button */}
+                      <div
+                        aria-hidden
+                        className={`absolute top-0 bottom-0 w-12 pointer-events-none transition-opacity duration-200 ${
+                          showScrollHint ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        style={{
+                          right: actionsColWidth,
+                          background: 'linear-gradient(to right, rgba(59,7,100,0), rgba(59,7,100,0.16))',
+                        }}
+                      />
                     </div>
                   );
                 })()}
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between xl:col-start-1 xl:col-span-2 xl:row-start-3">
                   <button
                     type="button"
                     onClick={() => { setEditingLogId(null); resetLogForm(); setIsAddLogFormOpen(true); }}
@@ -837,8 +966,71 @@ export default function EmbryoGradingDetailPage() {
                 </div>
               </div>
             ) : (
-              <div className="text-center text-gray-500 py-8">
-                <p>Loading cycle…</p>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col xl:flex-row gap-4 xl:items-start">
+                  <div className="flex-1 min-w-0 flex flex-col gap-4">
+                    {/* Cycle Journey skeleton */}
+                    <div className="rounded-2xl border border-gray-100 bg-gray-50/40 overflow-hidden">
+                      <div className="flex divide-x divide-gray-100">
+                        {[1, 2, 3, 4, 5, 6].map(i => (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1 px-3 py-3">
+                            <div className="ivf-shimmer h-2.5 w-14 rounded" />
+                            <div className="ivf-shimmer h-6 w-8 rounded mt-1" />
+                            <div className="ivf-shimmer h-3.5 w-9 rounded" />
+                            <div className="ivf-shimmer h-1 w-full rounded-full mt-1" />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 p-3 border-t border-gray-100">
+                        {[1, 2, 3, 4].map(i => (
+                          <div key={i} className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 flex items-center gap-3">
+                            <div className="ivf-shimmer w-7 h-7 rounded-full shrink-0" />
+                            <div className="flex flex-col gap-1 flex-1">
+                              <div className="ivf-shimmer h-2 w-16 rounded" />
+                              <div className="ivf-shimmer h-3 w-12 rounded" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Recent Activity skeleton */}
+                  <div className="w-full xl:w-72 shrink-0 self-stretch flex flex-col gap-2 rounded-lg border border-line bg-white p-3">
+                    <div className="ivf-shimmer h-3.5 w-24 rounded" />
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="flex flex-col gap-1.5 py-2 border-t border-gray-50">
+                        <div className="ivf-shimmer h-2.5 w-32 rounded" />
+                        <div className="ivf-shimmer h-2 w-20 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Table skeleton */}
+                <div className="rounded-lg border border-line overflow-hidden">
+                  <div className="grid grid-cols-7 gap-2 px-4 py-2.5 bg-primary-bg/60">
+                    {[1, 2, 3, 4, 5, 6, 7].map(i => <div key={i} className="ivf-shimmer h-3 rounded" />)}
+                  </div>
+                  {[1, 2, 3, 4, 5].map(row => (
+                    <div key={row} className="grid grid-cols-7 gap-2 px-4 py-3.5 border-t border-gray-100">
+                      {[1, 2, 3, 4, 5, 6, 7].map(col => <div key={col} className="ivf-shimmer h-4 rounded" />)}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="ivf-shimmer h-8 w-28 rounded" />
+                  <div className="ivf-shimmer h-8 w-32 rounded" />
+                </div>
+
+                <style>{`
+                  .ivf-shimmer {
+                    background: linear-gradient(90deg, #f3f4f6 25%, #e9ebee 37%, #f3f4f6 63%);
+                    background-size: 400% 100%;
+                    animation: ivf-shimmer-sweep 1.4s ease-in-out infinite;
+                  }
+                  @keyframes ivf-shimmer-sweep { 0% { background-position: 100% 50% } 100% { background-position: 0% 50% } }
+                `}</style>
               </div>
             )}
       </div>
@@ -858,7 +1050,7 @@ export default function EmbryoGradingDetailPage() {
           const blastGradeFields5 = logForm.day5ExpansionGrade && logForm.day5IcmGrade && logForm.day5TeGrade;
           const blastGradeFields6 = logForm.day6ExpansionGrade && logForm.day6IcmGrade && logForm.day6TeGrade;
 
-          const STEP_BASE = { activeBg: 'bg-primary', doneBg: 'bg-primary-muted', ring: 'ring-primary-muted', lineActive: 'bg-primary-ring', textActive: 'text-primary', border: 'border-line', headerBg: 'bg-gradient-to-r from-[#3b0764] to-primary', chipCls: 'bg-primary-bg border-[#c084fc]/40 text-primary' };
+          const STEP_BASE = { activeBg: 'bg-primary', doneBg: 'bg-primary-muted', ring: 'ring-primary-muted', lineActive: 'bg-primary-ring', textActive: 'text-primary', border: 'border-line', headerBg: 'bg-gradient-to-r from-[#3b0764] to-primary' };
           const STEPS = [
             { dayKey: 'D0', label: 'Day 0', sub: 'Fertilization',                   ...STEP_BASE },
             { dayKey: 'D1', label: 'Day 1', sub: 'PN Check',                        ...STEP_BASE },
@@ -866,15 +1058,6 @@ export default function EmbryoGradingDetailPage() {
             { dayKey: 'D5', label: 'Day 5', sub: 'Blastocyst',                      ...STEP_BASE },
             { dayKey: 'D6', label: 'Day 6', sub: day6Locked ? 'N/A' : 'Late Blast', ...STEP_BASE, activeBg: day6Locked ? 'bg-gray-400' : 'bg-primary', headerBg: day6Locked ? 'bg-gray-400' : 'bg-gradient-to-r from-[#3b0764] to-primary' },
           ];
-
-          const stepSummary = (i: number): string => {
-            if (i === 0) { const p: string[] = []; if (logForm.d0Maturity) p.push(logForm.d0Maturity); if (logForm.d0DropNo) p.push(`Drop ${logForm.d0DropNo}`); return p.join(' · ') || '—'; }
-            if (i === 1) { return logForm.d1Pn || '—'; }
-            if (i === 2) { const l = generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation); return l !== '—' ? l : (logForm.day3CellCount ? `${logForm.day3CellCount}C` : '—'); }
-            if (i === 3) { if (logForm.day5Stage === 'Blastocyst' && blastGradeFields5) return generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade); return logForm.day5Stage || '—'; }
-            if (i === 4) { if (day6Locked) return 'N/A'; if (logForm.day6Stage === 'Blastocyst' && blastGradeFields6) return generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade); return logForm.day6Stage || '—'; }
-            return logForm.fate || '—';
-          };
 
           const s = STEPS[Math.min(logModalStep, STEPS.length - 1)];
 
@@ -885,7 +1068,6 @@ export default function EmbryoGradingDetailPage() {
                 <div>
                   <span className="text-[9px] font-bold uppercase tracking-widest text-primary-ring/60">HIS</span>
                   <p className="text-white font-bold text-sm leading-tight">{selectedCycle?.his_id || '—'}</p>
-                  <p className="text-primary-ring/70 text-xs mt-0.5">{selectedCycle?.patient_name || '—'}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col items-center">
@@ -904,11 +1086,12 @@ export default function EmbryoGradingDetailPage() {
               </div>
 
               {/* Step indicator */}
-              <div className="flex items-start">
+              <div ref={stepRowRef} className="relative flex items-start">
                 {STEPS.map((step, i) => (
                   <React.Fragment key={step.label}>
                     <button
                       type="button"
+                      ref={el => { stepBtnRefs.current[i] = el; }}
                       className="flex flex-col items-center gap-1 min-w-[52px] focus:outline-none group"
                       onClick={() => setLogModalStep(i)}
                     >
@@ -933,25 +1116,31 @@ export default function EmbryoGradingDetailPage() {
                     )}
                   </React.Fragment>
                 ))}
-              </div>
 
-              {/* Completed step chips */}
-              {logModalStep > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {STEPS.slice(0, logModalStep).map((step, i) => (
-                    <button
-                      key={step.label}
-                      type="button"
-                      onClick={() => setLogModalStep(i)}
-                      className={`flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-all hover:scale-105 ${step.chipCls}`}
-                    >
-                      <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5l2.5 2.5 3.5-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      <span className="opacity-60 uppercase tracking-wide">{step.label}</span>
-                      <span className="font-black">{stepSummary(i)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                {/* Notch bridging the active circle and the form card below.
+                    The gradient is offset by the notch position so it lines up
+                    with the same point of the card header's gradient. */}
+                {stepCaret && (
+                  <div
+                    aria-hidden
+                    className="absolute transition-[left] duration-200"
+                    style={{
+                      left: stepCaret.x - 8,
+                      bottom: -16,
+                      width: 16,
+                      height: 8,
+                      clipPath: 'polygon(50% 0, 100% 100%, 0 100%)',
+                      ...(logModalStep === 4 && day6Locked
+                        ? { background: '#9ca3af' }
+                        : {
+                            backgroundImage: 'linear-gradient(to right, #3b0764, #6b1176)',
+                            backgroundSize: `${stepCaret.rowWidth}px 100%`,
+                            backgroundPosition: `-${stepCaret.x - 8}px 0`,
+                          }),
+                    }}
+                  />
+                )}
+              </div>
 
               {/* Active step form */}
               <div className={`rounded-xl border ${s.border} overflow-hidden shadow-sm`}>
@@ -1055,7 +1244,7 @@ export default function EmbryoGradingDetailPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="col-span-2">
                         <label className={lbl}>Stage</label>
-                        <select className={sel} value={logForm.day5Stage} onChange={(e) => handleLogFieldChange('day5Stage', e.target.value)}>
+                        <select className={sel} value={logForm.day5Stage} onChange={(e) => handleStageChange('day5', e.target.value)}>
                           <option value="">—</option>
                           <option value="Cleavage">Cleavage</option>
                           <option value="Morula">Morula</option>
@@ -1097,7 +1286,7 @@ export default function EmbryoGradingDetailPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
                           <label className={lbl}>Stage</label>
-                          <select className={sel} value={logForm.day6Stage} onChange={(e) => handleLogFieldChange('day6Stage', e.target.value)}>
+                          <select className={sel} value={logForm.day6Stage} onChange={(e) => handleStageChange('day6', e.target.value)}>
                             <option value="">—</option>
                             <option value="Cleavage">Cleavage</option>
                             <option value="Morula">Morula</option>
@@ -1105,37 +1294,47 @@ export default function EmbryoGradingDetailPage() {
                             <option value="Blastocyst">Blastocyst</option>
                           </select>
                         </div>
-                        {logForm.day6Stage === 'Blastocyst' && (<>
-                          <div>
-                            <label className={lbl}>Expansion Grade</label>
-                            <select className={sel} value={logForm.day6ExpansionGrade} onChange={(e) => handleLogFieldChange('day6ExpansionGrade', e.target.value)}>
-                              <option value="">—</option>
-                              {['1','2','3','4','5','6'].map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className={lbl}>ICM Grade</label>
-                            <select className={sel} value={logForm.day6IcmGrade} onChange={(e) => handleLogFieldChange('day6IcmGrade', e.target.value)}>
-                              <option value="">—</option>
-                              {['A','B','C'].map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className={lbl}>TE Grade</label>
-                            <select className={sel} value={logForm.day6TeGrade} onChange={(e) => handleLogFieldChange('day6TeGrade', e.target.value)}>
-                              <option value="">—</option>
-                              {['A','B','C'].map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
-                          </div>
-                          {blastGradeFields6 && (
+                        {logForm.day6Stage === 'Blastocyst' && (
+                          blastGradeFields6 ? (<>
+                            <div>
+                              <label className={lbl}>Expansion Grade</label>
+                              <select className={sel} value={logForm.day6ExpansionGrade} onChange={(e) => handleLogFieldChange('day6ExpansionGrade', e.target.value)}>
+                                <option value="">—</option>
+                                {['1','2','3','4','5','6'].map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className={lbl}>ICM Grade</label>
+                              <select className={sel} value={logForm.day6IcmGrade} onChange={(e) => handleLogFieldChange('day6IcmGrade', e.target.value)}>
+                                <option value="">—</option>
+                                {['A','B','C'].map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className={lbl}>TE Grade</label>
+                              <select className={sel} value={logForm.day6TeGrade} onChange={(e) => handleLogFieldChange('day6TeGrade', e.target.value)}>
+                                <option value="">—</option>
+                                {['A','B','C'].map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            </div>
                             <div className="flex items-end">
                               <div className="w-full rounded-xl bg-primary-bg border border-[#c084fc]/40 px-3 py-2.5 text-center">
                                 <span className="text-[10px] text-primary-muted uppercase tracking-wide block mb-0.5">D6 Grade</span>
                                 <span className={`text-2xl font-black ${getGradeColor(generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade))}`}>{generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade)}</span>
                               </div>
                             </div>
-                          )}
-                        </>)}
+                          </>) : (
+                            <div className="col-span-2">
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/embryo-console/${his}/ai-grading`, { state: { savedLogForm: logForm, savedEditingLogId: editingLogId } })}
+                                className="w-full px-4 py-3 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-primary transition-colors"
+                              >
+                                Start AI Grading
+                              </button>
+                            </div>
+                          )
+                        )}
                         {logForm.day6Stage && (
                           <div className="col-span-2">
                             <label className={lbl}>Progression vs Day 5</label>

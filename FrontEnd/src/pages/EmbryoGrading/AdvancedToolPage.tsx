@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
-  Brain, ChevronDown, ArrowLeft, ArrowRight, Check, CheckCircle2,
+  Brain, ChevronDown, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Check, CheckCircle2,
   UploadCloud, Trash2, Sun, Contrast, Monitor, FileText, Sparkles,
   RefreshCw, User, ImageIcon, X, Sparkle, ZoomIn, ZoomOut, Maximize2, Move,
   Droplet, ClipboardCheck, Grid2x2, Percent, Shield,
@@ -607,12 +607,31 @@ export default function AdvancedEmbryoGradingPage() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const handleApprove = async () => {
+  const handleApprove = async (opts: { day: 'Day 5' | 'Day 6'; fate?: string; freezeId?: string; notes?: string }) => {
     if (!resultGrade || cycleId == null || !selectedLog) { navigate(his ? `/embryo-console/${his}` : '/embryo-console'); return; }
     setSaving(true);
     try {
       await ivfService.selectBestGrade(cycleId, selectedLog.log_id, resultGrade.grade_id);
       await ivfService.updateGrade(cycleId, resultGrade.grade_id, { is_completed: true, stage: 3 });
+      if (resultGrade.grade) {
+        // meta is replaced wholesale server-side, so any existing notes (day-by-day
+        // comments logged from the Development Tracker) have to be carried forward.
+        const mergedMeta = { ...(selectedLog.meta || {}), ...(opts.notes ? { final_notes: opts.notes } : {}) };
+        await ivfService.upsertLog(cycleId, {
+          oocyte_no: selectedLog.oocyte_no,
+          // There's one shared blast_grade column (no separate d5/d6 grade
+          // columns) — d5_stage/d6_stage just say which day it belongs to.
+          // Only one day can ever be 'Blastocyst', so recording it on one
+          // explicitly clears the other rather than leaving stale data.
+          ...(opts.day === 'Day 6'
+            ? { d6_stage: 'Blastocyst', d5_stage: null }
+            : { d5_stage: 'Blastocyst', d6_stage: null }),
+          blast_grade: resultGrade.grade,
+          ...(opts.fate && { fate: opts.fate }),
+          ...(opts.freezeId && { freeze_no: opts.freezeId }),
+          ...(Object.keys(mergedMeta).length > 0 && { meta: mergedMeta }),
+        });
+      }
     } catch { /* non-blocking */ }
     finally { setSaving(false); }
     navigate(his ? `/embryo-console/${his}` : '/embryo-console');
@@ -739,10 +758,14 @@ export default function AdvancedEmbryoGradingPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    // Every other step wants min-h-0 unconditionally (bounded card, own
+    // internal scroll). The result step's panels now size to their own
+    // content below xl, so this wrapper has to be allowed to grow with them
+    // instead of clamping to the viewport — otherwise they end up clipped.
+    <div className={`flex flex-col flex-1 ${step === 'result' ? 'xl:min-h-0' : 'min-h-0'}`}>
       {step === 'select' && (
         <SelectScreen
-          cycle={cycle} his={his} logs={logs} loading={logsLoading} bestImages={bestImages}
+          his={his} logs={logs} loading={logsLoading} bestImages={bestImages}
           selectedOocyteNo={selectedOocyteNo} onSelect={setSelectedOocyteNo}
           onBack={() => navigate(`/embryo-console/${his}`)}
           onContinue={() => selectedOocyteNo != null && goUpload(selectedOocyteNo)}
@@ -751,7 +774,7 @@ export default function AdvancedEmbryoGradingPage() {
 
       {step === 'upload' && selectedLog && (
         <UploadScreen
-          log={selectedLog} index={logs.findIndex(l => l.log_id === selectedLog.log_id)} cycleId={cycleId}
+          log={selectedLog} cycleId={cycleId}
           bestImageUrl={bestImages[selectedLog.log_id] ?? null}
           imageSlots={imageSlots} onAdd={addImageSlot} onRemove={removeImageSlot} onRemoveAll={removeAllSlots}
           uploading={uploading} onCancel={cancelUpload} onStart={runGrading} onSkip={skipToResult}
@@ -870,12 +893,32 @@ function WorkflowRail() {
   );
 }
 
-function SelectScreen({ cycle, his, logs, loading, bestImages, selectedOocyteNo, onSelect, onBack, onContinue }: {
-  cycle: IvfCycle | null; his?: string; logs: IvfCycleLog[]; loading: boolean;
+function SelectScreen({ his, logs, loading, bestImages, selectedOocyteNo, onSelect, onBack, onContinue }: {
+  his?: string; logs: IvfCycleLog[]; loading: boolean;
   bestImages: Record<number, string>;
   selectedOocyteNo: number | null; onSelect: (no: number) => void;
   onBack: () => void; onContinue: () => void;
 }) {
+  const navigate = useNavigate();
+  const [patientOpen, setPatientOpen] = useState(false);
+  const [allCycles, setAllCycles] = useState<IvfCycle[] | null>(null);
+  const patientRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (patientRef.current && !patientRef.current.contains(e.target as Node)) setPatientOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Fetched once, the first time the switcher is opened.
+  useEffect(() => {
+    if (!patientOpen || allCycles) return;
+    ivfService.listCycles().then(setAllCycles).catch(() => setAllCycles([]));
+  }, [patientOpen, allCycles]);
+
+  const otherCycles = (allCycles ?? []).filter(c => c.his_id.toUpperCase() !== his?.toUpperCase());
+
   return (
     <div className="flex gap-4 flex-1 min-h-0">
       <WorkflowRail />
@@ -894,12 +937,35 @@ function SelectScreen({ cycle, his, logs, loading, bestImages, selectedOocyteNo,
               <p className="text-xs text-gray-400 mt-0.5">Select an oocyte to start the AI-assisted embryo grading process.</p>
             </div>
           </div>
-          <div className="inline-flex items-center gap-2 max-w-full px-4 py-2 rounded-xl border border-line bg-surface text-xs font-semibold text-gray-700 shrink-0">
-            <User size={13} className="text-primary shrink-0" />
-            <span className="truncate">
-              Patient : {cycle?.patient_name || '—'} {his && <span className="text-gray-400">(ID: {his.toUpperCase()})</span>}
-            </span>
-            <ChevronDown size={13} className="text-gray-400 ml-1 shrink-0" />
+          <div className="relative shrink-0" ref={patientRef}>
+            <button type="button" onClick={() => setPatientOpen(v => !v)}
+              className="inline-flex items-center gap-2 max-w-full px-4 py-2 rounded-xl border border-line bg-surface text-xs font-semibold text-gray-700 hover:bg-surface/70 transition-colors">
+              <User size={13} className="text-primary shrink-0" />
+              <span className="truncate">
+                Patient ID : {his ? his.toUpperCase() : '—'}
+              </span>
+              <ChevronDown size={13} className={`text-gray-400 ml-1 shrink-0 transition-transform ${patientOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {patientOpen && (
+              <div className="absolute right-0 top-full mt-1.5 z-20 w-52 rounded-xl border border-line bg-white shadow-lg overflow-hidden flex flex-col">
+                <div className="max-h-64 overflow-y-auto">
+                  {allCycles === null ? (
+                    <p className="px-3.5 py-4 text-[11px] text-gray-400 text-center">Loading cycles…</p>
+                  ) : otherCycles.length === 0 ? (
+                    <p className="px-3.5 py-4 text-[11px] text-gray-400 text-center">No other HIS found.</p>
+                  ) : otherCycles.map(c => (
+                    <button key={c.cycle_id} type="button"
+                      onClick={() => { setPatientOpen(false); navigate(`/embryo-console/${c.his_id}/ai-grading`); }}
+                      className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left hover:bg-primary/10 transition-colors">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-800 truncate">{c.his_id.toUpperCase()}</p>
+                      </div>
+                      <ChevronDown size={12} className="text-gray-300 -rotate-90 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -917,8 +983,8 @@ function SelectScreen({ cycle, his, logs, loading, bestImages, selectedOocyteNo,
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
-              {logs.map((log, i) => (
-                <OocyteCard key={log.log_id} log={log} index={i} bestImageUrl={bestImages[log.log_id] ?? null}
+              {logs.map((log) => (
+                <OocyteCard key={log.log_id} log={log} bestImageUrl={bestImages[log.log_id] ?? null}
                   selected={selectedOocyteNo === log.oocyte_no} onSelect={() => onSelect(log.oocyte_no)} />
               ))}
             </div>
@@ -985,12 +1051,12 @@ function OocyteCardSkeleton() {
   );
 }
 
-function OocyteCard({ log, index, bestImageUrl, selected, onSelect }: {
-  log: IvfCycleLog; index: number; bestImageUrl: string | null; selected: boolean; onSelect: () => void;
+function OocyteCard({ log, bestImageUrl, selected, onSelect }: {
+  log: IvfCycleLog; bestImageUrl: string | null; selected: boolean; onSelect: () => void;
 }) {
   const state = ooState(log);
   const dropNo = log.d3_drop_no || log.d0_drop_no || '—';
-  const num = String(index + 1).padStart(2, '0');
+  const num = String(log.oocyte_no).padStart(2, '0');
 
   return (
     <button type="button" onClick={onSelect}
@@ -1057,15 +1123,15 @@ function OocyteCard({ log, index, bestImageUrl, selected, onSelect }: {
           </p>
         </div>
       ) : (() => {
-        const hasBlast = !!(log.blast_grade || log.d5_grade || log.d6_grade);
+        const hasBlast = !!log.blast_grade;
         return (
         <div className={`rounded-xl px-3 py-2.5 border ${state === 'final' ? 'bg-emerald-50/60 border-emerald-100' : 'bg-primary/[0.04] border-primary/10'}`}>
           <p className={`text-[9px] font-bold mb-1 ${state === 'final' ? 'text-emerald-600' : 'text-primary/70'}`}>
             {state === 'final' ? 'Final Blast Grade' : hasBlast ? 'Suggested Blast Grade' : 'Day 3 Grade'}
           </p>
           <div className="flex items-end justify-between">
-            <span className={`text-xl font-black leading-none ${gradeTextCls(log.blast_grade || log.d5_grade || '')}`}>
-              {hasBlast ? (log.blast_grade || log.d5_grade || log.d6_grade) : (log.d3_grade || '—')}
+            <span className={`text-xl font-black leading-none ${gradeTextCls(log.blast_grade || '')}`}>
+              {hasBlast ? log.blast_grade : (log.d3_grade || '—')}
             </span>
             <div className="flex items-center gap-1 text-[9px] text-gray-600">
               <ImageIcon size={10} className="text-gray-500" />
@@ -1097,8 +1163,8 @@ function OocyteCard({ log, index, bestImageUrl, selected, onSelect }: {
 
 // ── Screen 2: Upload ───────────────────────────────────────────────────────────
 
-function UploadScreen({ log, index, cycleId, bestImageUrl, imageSlots, onAdd, onRemove, onRemoveAll, uploading, onCancel, onStart, onSkip, error }: {
-  log: IvfCycleLog; index: number; cycleId: number | null; bestImageUrl: string | null; imageSlots: ImageSlot[];
+function UploadScreen({ log, cycleId, bestImageUrl, imageSlots, onAdd, onRemove, onRemoveAll, uploading, onCancel, onStart, onSkip, error }: {
+  log: IvfCycleLog; cycleId: number | null; bestImageUrl: string | null; imageSlots: ImageSlot[];
   onAdd: (f: File) => void; onRemove: (i: number) => void; onRemoveAll: () => void;
   uploading: boolean; onCancel: () => void; onStart: () => void; onSkip: () => void;
   error?: string | null;
@@ -1107,7 +1173,7 @@ function UploadScreen({ log, index, cycleId, bestImageUrl, imageSlots, onAdd, on
   const [cameraOpen, setCameraOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const d3 = parseDay3(log.d3_grade);
-  const num = String(index + 1).padStart(2, '0');
+  const num = String(log.oocyte_no).padStart(2, '0');
   const state = ooState(log);
 
   // Prior attempts at this oocyte, shown read-only above the requirements so
@@ -1137,35 +1203,36 @@ function UploadScreen({ log, index, cycleId, bestImageUrl, imageSlots, onAdd, on
     Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).forEach(onAdd);
   };
 
-  // Stacked in portrait; a short landscape viewport gets the side-by-side split
-  // instead, so the upload panel keeps usable height.
+  // The screen fills the viewport at every width so the action bar is always on
+  // screen; only the upload list scrolls.
   return (
-    <div className="grid grid-cols-1 max-xl:landscape:grid-cols-[240px_1fr] xl:grid-cols-[300px_1fr] auto-rows-[minmax(360px,65vh)] max-xl:landscape:auto-rows-auto xl:auto-rows-auto gap-5 max-xl:landscape:gap-3 flex-1 min-h-0">
+    <div className="grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] xl:grid-cols-[300px_1fr] xl:grid-rows-1 gap-3 xl:gap-5 flex-1 min-h-0">
       {/* LEFT: selected oocyte */}
       <div className="flex flex-col min-h-0 w-full xl:w-[300px]">
         {/* Decorative only — stretched full width below xl it dwarfs the panel. */}
         <div className="hidden xl:block rounded-t-2xl overflow-hidden shrink-0">
           <img src="/emb_select_oocyte.png" alt="" className="w-full h-auto block" />
         </div>
-        <div className="relative z-10 xl:-mt-6 flex-1 flex flex-col min-h-0 rounded-2xl border border-line bg-white p-3 shadow-sm">
-        <p className="text-sm font-black text-gray-800">Select Oocyte</p>
-        <p className="text-[11px] text-gray-400 mb-2">1 oocyte selected</p>
+        <div className="relative z-10 xl:-mt-6 flex-1 flex flex-col min-h-0 rounded-2xl border border-line bg-white p-4 xl:p-3 shadow-sm">
+        <p className="text-sm font-black text-gray-800 mb-3 xl:mb-0">Select Oocyte</p>
+        <p className="hidden xl:block text-[11px] text-gray-400 mb-2">1 oocyte selected</p>
 
         <div className="rounded-2xl overflow-hidden flex flex-col min-h-0 bg-[#F3EAF5]">
-          {/* header */}
-          <div className="p-3 flex items-start justify-between text-primary">
-            <div className="flex flex-col gap-2">
+          {/* Stacked full width below xl, so the fields spread across the bar
+              instead of stacking in a column against a wall of empty space. */}
+          <div className="p-4 xl:p-3 flex items-center xl:items-start gap-5 xl:gap-2 text-primary">
+            <div className="order-2 xl:order-none flex-1 min-w-0 flex flex-wrap items-center gap-x-10 gap-y-3 xl:flex-col xl:flex-nowrap xl:items-start xl:gap-2">
               <span className="text-base font-black">Oocyte {num}</span>
               <div className="flex items-center gap-2 text-[11px]">
                 <span className="text-primary/60">Drop No.</span>
-                <span className="font-bold bg-white text-primary rounded-md px-1.5 py-0.5">{log.d3_drop_no || log.d0_drop_no || '—'}</span>
+                <span className="font-bold bg-white text-primary rounded-md px-2 py-1 xl:px-1.5 xl:py-0.5">{log.d3_drop_no || log.d0_drop_no || '—'}</span>
               </div>
               <div>
                 <p className="text-[11px] text-primary/60">Final Grade</p>
-                <p className="text-xl font-black">{log.blast_grade || '—'}</p>
+                <p className="text-xl font-black leading-tight">{log.blast_grade || '—'}</p>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-2">
+            <div className="order-1 xl:order-none flex flex-col items-center xl:items-end gap-2 shrink-0">
               {bestImageUrl ? (
                 <div className={`w-14 h-14 rounded-full shrink-0 border-2 overflow-hidden flex items-center justify-center bg-gray-900 ${
                   state === 'final' ? 'border-emerald-300' : 'border-primary/30'
@@ -1182,9 +1249,11 @@ function UploadScreen({ log, index, cycleId, bestImageUrl, imageSlots, onAdd, on
                 {state === 'final' ? 'Graded' : state === 'ai' ? (bestImageUrl ? 'AI Graded' : 'Best image pending') : 'Not Graded'}
               </div>
             </div>
+
+            <SwitchOocyteButton onClick={onCancel} className="order-3 inline-flex xl:hidden bg-white/70 px-3.5 py-2" />
           </div>
           {/* white inner detail */}
-          <div className="bg-white m-1.5 rounded-xl p-3 flex flex-col gap-3 overflow-y-auto">
+          <div className="hidden xl:flex bg-white m-1.5 rounded-xl p-3 flex-col gap-3 overflow-y-auto">
             <DetailBlock title="Day 1 – PN Check" rows={[
               { label: 'PN Status', value: log.d1_pn || '—', ok: !!log.d1_pn },
               { label: 'Zygote Status', value: log.d1_zygote_status || '—' },
@@ -1197,10 +1266,7 @@ function UploadScreen({ log, index, cycleId, bestImageUrl, imageSlots, onAdd, on
           </div>
         </div>
 
-        <button type="button" onClick={onCancel}
-          className="mt-2 w-auto self-center shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-primary/30 text-primary text-[11px] font-bold hover:bg-primary/5 transition-colors">
-          <RefreshCw size={13} /> Switch Oocyte
-        </button>
+        <SwitchOocyteButton onClick={onCancel} className="hidden xl:inline-flex mt-2 self-center px-3 py-1.5" />
         </div>
       </div>
 
@@ -1216,13 +1282,13 @@ function UploadScreen({ log, index, cycleId, bestImageUrl, imageSlots, onAdd, on
           )}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto mt-4 flex flex-col gap-4 px-5">
+        <div className="mt-4 flex flex-col gap-4 px-5 flex-1 min-h-0 overflow-y-auto">
           {/* drop zone */}
           <div
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={onDrop}
-            className={`rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-3 py-12 transition-all ${
+            className={`shrink-0 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-3 py-8 transition-all ${
               dragOver ? 'border-primary' : 'border-primary/20'
             }`}
             style={{
@@ -1351,20 +1417,20 @@ function UploadScreen({ log, index, cycleId, bestImageUrl, imageSlots, onAdd, on
         </div>
 
         {/* footer */}
-        <div className="mt-4 px-5 py-4 border-t border-line flex items-center justify-between shrink-0 bg-surface/40">
+        <div className="mt-2 px-3 py-2 border-t border-line flex items-center justify-between shrink-0 bg-surface/40">
           <button type="button" onClick={onCancel}
-            className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors">
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors">
             Cancel
           </button>
           <div className="flex items-center gap-2">
             {(log.grade_count ?? 0) > 0 && (
               <button type="button" onClick={onSkip} disabled={uploading}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-primary border border-primary/30 hover:bg-primary/5 transition-colors disabled:opacity-40">
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-primary border border-primary/30 hover:bg-primary/5 transition-colors disabled:opacity-40">
                 Skip <ArrowRight size={14} />
               </button>
             )}
             <button type="button" onClick={onStart} disabled={imageSlots.length === 0 || uploading}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: 'var(--gradient-primary)' }}>
               {uploading ? 'Uploading…' : <>Start Grading <ArrowRight size={14} /></>}
             </button>
@@ -1640,6 +1706,17 @@ function Donut({ percent }: { percent: number }) {
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 6;
 
+// Rendered twice — inside the header row when it is a wide bar, below the card
+// in the narrow desktop column — with only one visible per breakpoint.
+function SwitchOocyteButton({ onClick, className }: { onClick: () => void; className: string }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`shrink-0 w-auto items-center justify-center gap-1.5 rounded-xl border border-primary/30 text-primary text-[11px] font-bold hover:bg-primary/5 transition-colors ${className}`}>
+      <RefreshCw size={13} /> Switch Oocyte
+    </button>
+  );
+}
+
 function AnnotThumb({ src, label }: { src: string | null | undefined; label: string }) {
   const imgRef = useRef<HTMLImageElement>(null);
   const [loaded, setLoaded] = useState(true);
@@ -1767,7 +1844,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
   log: IvfCycleLog; cycle?: IvfCycle | null;
   grades: IvfGrade[]; selectedIdx: number; onSelectIdx: (i: number) => void; newGradeIds: number[];
   grade: IvfGrade | null;
-  saving: boolean; onBack: () => void; onApprove: () => void;
+  saving: boolean; onBack: () => void; onApprove: (opts: { day: 'Day 5' | 'Day 6'; fate?: string; freezeId?: string; notes?: string }) => void;
   onOverride: (gradeId: number, fields: Record<string, string>) => Promise<void>;
   /** Live state for a grade still being processed, if the selected one is. */
   pending?: { running: boolean; progress: number; stage: string } | null;
@@ -1778,6 +1855,40 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
   // lands when the model returns, so this is what "still working" looks like.
   const incomplete = !!grade && grade.grade == null;
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [approveStep, setApproveStep] = useState<0 | 1>(0);
+  const [blastDay, setBlastDay] = useState<'Day 5' | 'Day 6'>('Day 5');
+  const [fateValue, setFateValue] = useState('');
+  const [freezeId, setFreezeId] = useState('');
+  const [fateNotes, setFateNotes] = useState('');
+
+  // Days elapsed since retrieval decide which day this grade is being logged
+  // against — mirrors the "Current Day" card on the Development Tracker.
+  const dayInCycle = (() => {
+    const base = cycle?.opu_date || cycle?.created_at;
+    if (!base) return 0;
+    const days = Math.floor((Date.now() - parseUtc(base).getTime()) / 86_400_000);
+    return days > 0 ? days : 0;
+  })();
+  const defaultBlastDay: 'Day 5' | 'Day 6' = dayInCycle >= 6 ? 'Day 6' : 'Day 5';
+
+  const openApproveModal = () => {
+    setApproveStep(0);
+    setBlastDay(defaultBlastDay);
+    // Pre-fill from whatever's already on the log, so re-opening this after a
+    // fate was already recorded doesn't reset back to "— Select fate —".
+    setFateValue(log.fate || '');
+    setFreezeId(log.freeze_no || '');
+    setFateNotes(log.meta?.final_notes || '');
+    setConfirmOpen(true);
+  };
+
+  // Below xl the graded strip is a single horizontally-scrolling row (no room
+  // to wrap), so it gets arrow buttons instead of the xl+ wrapping grid.
+  const gradedStripRef = useRef<HTMLDivElement>(null);
+  const scrollGradedStrip = (dir: 1 | -1) => {
+    gradedStripRef.current?.scrollBy({ left: dir * 200, behavior: 'smooth' });
+  };
+
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [overriding, setOverriding] = useState(false);
@@ -1820,38 +1931,37 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
   ].filter(Boolean) as { t: string; d: string }[];
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(440px,1fr)_360px] auto-rows-[minmax(420px,55vh)] xl:auto-rows-auto gap-5 flex-1 min-h-0">
+    <div className="flex flex-col flex-1 xl:min-h-0">
+      {/* 320/440/360 (+ gaps, the tab rail, and page padding) needs ~1276px to
+          avoid clipping, which a maximized 1280–1366px laptop window doesn't
+          reliably have — so xl starts narrower and only widens back out to
+          the full column sizes once 2xl (1536px+) guarantees the room. */}
+      {/* Row heights are set explicitly (not via auto-rows) because LEFT and
+          RIGHT are plain stacked content with no min-height needs of their
+          own — a shared floor just left dead space under their shorter
+          content. Only CENTER's image viewer genuinely needs one, since its
+          flex-1 layout has nothing to size against without it. */}
+      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(340px,1fr)_300px] 2xl:grid-cols-[320px_minmax(440px,1fr)_360px] grid-rows-[auto_minmax(420px,55vh)_auto] xl:grid-rows-none gap-5 flex-1 xl:min-h-0">
 
         {/* LEFT */}
-        <div className="rounded-2xl border border-line bg-white flex flex-col min-h-0 overflow-hidden">
-        <div className="flex flex-col gap-4 min-h-0 overflow-y-auto p-4">
-          <div>
-            <p className="text-sm font-black text-gray-800">Selected Oocyte &amp; Graded Images</p>
-          </div>
+        <div className="rounded-2xl border border-line bg-white flex flex-col overflow-hidden">
+          <div className="flex flex-col gap-4 p-4">
+            <div>
+          <p className="text-xs font-black text-gray-800 mb-2">Selected Oocyte</p>
 
           <div className="rounded-2xl border border-line bg-white p-4">
-            {/* top: image + identity */}
-            <div className="flex items-center gap-3">
-              <div className="relative shrink-0 rounded-full p-1" style={{ background: 'radial-gradient(circle, rgba(107,17,118,0.10) 0%, rgba(107,17,118,0) 70%)' }}>
-                <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-primary/40 bg-gray-900" style={{ boxShadow: '0 0 0 4px rgba(107,17,118,0.06)' }}>
-                  {img?.upload_image_url ? <img src={img.upload_image_url} alt="oocyte" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={22} className="text-gray-600" /></div>}
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-base font-black text-gray-800 mb-2 truncate">Oocyte {num}</p>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1 min-w-0">
-                    <Droplet size={12} className="text-primary shrink-0" />
-                    <span className="text-[10px] font-semibold text-gray-500 leading-tight">Drop No.</span>
-                  </div>
-                  <span className="inline-block text-[11px] font-bold text-primary bg-primary/5 rounded-lg px-2.5 py-0.5 shrink-0">{log.d3_drop_no || '—'}</span>
-                </div>
+            {/* identity — no image, kept to a single compact row */}
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-base font-black text-gray-800 truncate">Oocyte {num}</p>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Droplet size={12} className="text-primary shrink-0" />
+                <span className="text-[10px] font-semibold text-gray-500 leading-tight whitespace-nowrap">Drop No.</span>
+                <span className="text-[11px] font-bold text-primary bg-primary/5 rounded-lg px-2.5 py-0.5">{log.d3_drop_no || '—'}</span>
               </div>
             </div>
 
-            {/* bottom: PN + cleavage metrics, two per row */}
-            <div className="border-t border-line mt-1 pt-1 grid grid-cols-2">
+            {/* bottom: PN + cleavage metrics, two per row — dropped on smaller screens to save space */}
+            <div className="hidden xl:grid border-t border-line mt-1 pt-1 grid-cols-2">
               {[
                 { Icon: ClipboardCheck, label: 'PN Status', value: log.d1_pn || '—', sub: '', check: !!log.d1_pn },
                 { Icon: Grid2x2, label: 'Cell Count', value: cellNum, sub: 'cells', check: false },
@@ -1876,14 +1986,24 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                 </div>
               ))}
             </div>
-          </div>
+              </div>
+            </div>
 
           {/* graded strip */}
           <div>
             {/* pt-2 on the scroll area reserves room for the Best/Just graded badges,
                 which poke above the card via -top-2 — without it the clip cuts them in half */}
             <p className="text-xs font-black text-gray-800 mb-0">Graded Images ({grades.length})</p>
-            <div className="flex items-start gap-2 flex-wrap h-[230px] overflow-y-auto pt-2">
+            <div className="relative">
+              {/* below xl this is a single scrolling row instead of a wrapping
+                  grid, so it needs its own scroll affordance */}
+              <button type="button" onClick={() => scrollGradedStrip(-1)}
+                className="xl:hidden absolute left-0.5 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-white border border-line shadow-sm flex items-center justify-center text-gray-500 hover:text-primary transition-colors">
+                <ChevronLeft size={14} />
+              </button>
+              <div ref={gradedStripRef}
+                className="flex xl:grid content-start gap-2 h-auto xl:h-[230px] overflow-x-auto xl:overflow-x-visible overflow-y-hidden xl:overflow-y-auto pt-2 px-8 xl:px-0 scroll-smooth"
+                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))' }}>
               {grades.map((g, i) => {
                 const isNew = newGradeIds.includes(g.grade_id);
                 const isBest = g.grade_id === bestGradeId;
@@ -1893,7 +2013,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                 <div key={g.grade_id} role="button" tabIndex={0}
                   onClick={() => onSelectIdx(i)}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectIdx(i); } }}
-                  className={`relative w-[88px] flex flex-col gap-1 rounded-xl border-2 p-1.5 transition-all cursor-pointer ${
+                  className={`relative flex flex-col gap-1 rounded-xl border-2 p-1.5 transition-all cursor-pointer w-[88px] shrink-0 xl:w-auto ${
                     i === selectedIdx ? 'border-primary bg-primary/[0.06] ring-2 ring-primary/25 shadow-md shadow-primary/15 -translate-y-0.5'
                     : isNew ? 'border-gray-300 bg-gray-50'
                     : 'border-line hover:border-primary/30'
@@ -1933,7 +2053,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
               {/* pad the strip out to a full row of 6 so it never looks sparsely populated */}
               {Array.from({ length: Math.max(0, 6 - grades.length) }).map((_, i) => (
                 <div key={`empty-${i}`}
-                  className="w-[88px] flex flex-col gap-1 rounded-xl border-2 border-dashed border-gray-200 p-1.5">
+                  className="flex flex-col gap-1 rounded-xl border-2 border-dashed border-gray-200 p-1.5 w-[88px] shrink-0 xl:w-auto">
                   <div className="flex items-center px-0.5 min-h-4">
                     <span className="text-[9px] font-bold text-gray-300">Image #{grades.length + i + 1}</span>
                   </div>
@@ -1943,11 +2063,17 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                   <span className="text-[10px] font-black text-center leading-none text-gray-200">—</span>
                 </div>
               ))}
+              </div>
+              <button type="button" onClick={() => scrollGradedStrip(1)}
+                className="xl:hidden absolute right-0.5 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-white border border-line shadow-sm flex items-center justify-center text-gray-500 hover:text-primary transition-colors">
+                <ChevronRight size={14} />
+              </button>
             </div>
           </div>
 
-          {/* cycle info */}
-          <div className="rounded-2xl border border-primary/10 bg-primary/[0.03] p-2.5">
+          {/* cycle info — dropped on smaller screens to save space; the left
+              panel is already tight below xl once the layout stacks */}
+          <div className="hidden xl:block rounded-2xl border border-primary/10 bg-primary/[0.03] p-2.5">
             <p className="text-[11px] font-black text-primary uppercase tracking-wide mb-2">Cycle Information</p>
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -2022,8 +2148,8 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
         </div>
 
         {/* RIGHT */}
-        <div className="rounded-2xl border border-line flex flex-col min-h-0 overflow-hidden ">
-        <div className="flex flex-col gap-4 min-h-0 overflow-y-auto p-4 [&>*]:shrink-0">
+        <div className="rounded-2xl border border-line flex flex-col overflow-hidden ">
+        <div className="flex flex-col gap-4 p-4 [&>*]:shrink-0">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-sm font-black text-gray-800">AI Grading Result &amp; Details</p>
@@ -2148,7 +2274,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors">
           <ArrowLeft size={14} /> Back to Oocytes
         </button>
-        <button type="button" onClick={() => setConfirmOpen(true)} disabled={saving || !grade || incomplete}
+        <button type="button" onClick={openApproveModal} disabled={saving || !grade || incomplete}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40"
           style={{ background: 'var(--gradient-primary)' }}>
           <CheckCircle2 size={14} /> {saving ? 'Saving…' : 'Approve & Save'}
@@ -2165,20 +2291,26 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                 <Award size={20} className="text-primary" />
               </div>
               <div className="flex-1">
-                <p className="text-lg font-black text-gray-800 leading-tight">Approve Grading</p>
-                <p className="text-xs text-gray-400">Confirm the best grade for this oocyte</p>
+                <p className="text-lg font-black text-gray-800 leading-tight">
+                  {approveStep === 0 ? 'Approve Grading' : 'Embryo Fate'}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {approveStep === 0 ? 'Confirm the best grade for this oocyte' : 'Optional — record what happens to this embryo next'}
+                </p>
               </div>
+              <span className="text-[10px] font-bold text-gray-400 shrink-0">Step {approveStep + 1} of 2</span>
               <button type="button" onClick={() => { if (!saving) setConfirmOpen(false); }}
                 className="w-9 h-9 rounded-xl border border-line flex items-center justify-center text-gray-400 hover:bg-gray-50 hover:text-gray-700 transition-colors shrink-0">
                 <X size={16} />
               </button>
             </div>
 
-            <div className="p-6 flex flex-col gap-5 overflow-y-auto">
+            {approveStep === 0 ? (
+            <div className="p-6 flex flex-col gap-5 overflow-y-auto min-h-0 [&>*]:shrink-0">
               {/* graded images + summary */}
               <div>
                 <p className="text-[11px] font-black text-primary uppercase tracking-widest mb-2">Graded Images ({grades.length})</p>
-                <div className="flex gap-4 items-stretch flex-col lg:flex-row">
+                <div className="flex gap-4 items-start flex-col lg:flex-row">
                   <div className="flex-1 grid gap-2.5 content-start max-h-[280px] overflow-y-auto pr-1"
                     style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${grades.length <= 2 ? 150 : grades.length <= 6 ? 116 : 92}px, 1fr))` }}>
                     {grades.map((g, i) => {
@@ -2198,62 +2330,75 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                     })}
                   </div>
 
-                  <div className="lg:w-[280px] shrink-0 rounded-xl bg-surface/60 border border-line-light p-4 flex flex-col gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><Info size={14} className="text-primary" /></div>
-                      <p className="text-[11px] font-black text-primary uppercase tracking-widest">Summary</p>
+                  <div className="lg:w-[280px] shrink-0 rounded-xl overflow-hidden border border-line-light flex flex-col">
+                    {/* grade header, merged in from the old standalone "Selected Grade" card */}
+                    <div className="p-4 flex flex-col gap-3" style={{ background: 'var(--gradient-primary)' }}>
+                      <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Selected Grade</span>
+                      <span className="text-4xl font-black leading-none text-white">{grade?.grade || '—'}</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { label: 'Image', value: `#${selectedIdx + 1}` },
+                          { label: 'AI Score', value: `${score != null ? score.toFixed(1) : '—'}/10` },
+                          { label: 'Confidence', value: `${confidence}%` },
+                        ].map(s => (
+                          <div key={s.label} className="rounded-lg bg-white/15 px-2 py-1.5 text-center">
+                            <p className="text-[8px] font-bold text-white/60 uppercase tracking-widest">{s.label}</p>
+                            <p className="text-xs font-black text-white leading-tight">{s.value}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="text-[13px] text-gray-600 leading-relaxed flex flex-col gap-2.5">
-                      <p>You have selected <span className="font-bold text-gray-800">Image #{selectedIdx + 1}</span> for <span className="font-bold text-primary">Oocyte {num}</span>.</p>
-                      <p>It will be marked as the <span className="font-bold text-primary">best grade</span> and saved to the clinical record.</p>
-                      {grades.length > 1 && <p className="text-gray-400">The other {grades.length - 1} graded image{grades.length - 1 > 1 ? 's' : ''} will be kept as alternatives.</p>}
+                    <div className="p-4 bg-surface/60 flex flex-col gap-3 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><Info size={14} className="text-primary" /></div>
+                        <p className="text-[11px] font-black text-primary uppercase tracking-widest">Summary</p>
+                      </div>
+                      <p className="text-[13px] text-gray-600 leading-relaxed">
+                        <span className="font-bold text-gray-800">Image #{selectedIdx + 1}</span> will be saved as the <span className="font-bold text-primary">best grade</span> for <span className="font-bold text-primary">Oocyte {num}</span>
+                        {grades.length > 1 && <span className="text-gray-400"> — the other {grades.length - 1} kept as alternatives</span>}.
+                      </p>
                     </div>
                   </div>
-                </div>
-              </div>
-
-              {/* selected grade */}
-              <div className="rounded-2xl border-2 border-primary/30 bg-primary/[0.03] p-5 flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="text-[11px] font-black text-primary/60 uppercase tracking-widest">Selected Grade</p>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className={`text-4xl font-black leading-none ${gradeTextCls(grade?.grade || '')}`}>{grade?.grade || '—'}</span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-line text-[11px] font-bold text-gray-700">
-                      <Sparkle size={12} className="text-primary" /> {gradeQuality(grade?.grade || '')}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  {[
-                    { label: 'Image', value: `#${selectedIdx + 1}` },
-                    { label: 'AI Score', value: `${score != null ? score.toFixed(1) : '—'}/10` },
-                    { label: 'Confidence', value: `${confidence}%` },
-                  ].map(s => (
-                    <div key={s.label} className="rounded-xl bg-white/70 border border-line px-4 py-2 text-center min-w-[86px]">
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{s.label}</p>
-                      <p className="text-base font-black text-gray-800 leading-tight">{s.value}</p>
-                    </div>
-                  ))}
                 </div>
               </div>
 
               {/* quality flags */}
               <div>
-                <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-2">Quality Flags</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {[
                     { Icon: CircleDashed, label: 'Hatching', val: grade?.hatching },
                     { Icon: Shield, label: 'Zona Pellucida', val: grade?.zona_pellucida },
                     { Icon: CircleDot, label: 'Blastocoel', val: grade?.blastocoel },
                   ].map(({ Icon, label, val }) => (
-                    <div key={label} className="rounded-lg border border-line bg-surface/40 px-3 py-2 flex items-center justify-between gap-2">
+                    <div key={label} className="rounded-lg border border-line bg-surface/40 px-3 py-2 flex flex-col gap-1.5">
                       <div className="flex items-center gap-2 min-w-0">
                         <Icon size={13} className="text-primary/60 shrink-0" />
                         <span className="text-xs text-gray-700 truncate">{label}</span>
                       </div>
-                      {val ? <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${flagBadgeCls(val)}`}>{val}</span> : <span className="text-[11px] text-gray-300">—</span>}
+                      {/* AI descriptions can run long, so this wraps instead of a
+                          single-line pill that would overflow the card. */}
+                      {val ? <span className={`text-[10px] font-semibold px-2 py-1 rounded-md self-start break-words ${flagBadgeCls(val)}`}>{val}</span> : <span className="text-[11px] text-gray-300">—</span>}
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* development day */}
+              <div className="rounded-xl border border-line bg-surface overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-line flex items-center justify-between">
+                  <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Development Day</p>
+                </div>
+                <div className="px-4 py-3">
+                  <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">This grade was assessed on</label>
+                  <select
+                    className="w-full h-9 rounded-lg border border-gray-200 px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-muted/30 focus:border-primary-muted bg-white"
+                    value={blastDay} onChange={e => setBlastDay(e.target.value as 'Day 5' | 'Day 6')}>
+                    <option value="Day 5">Day 5</option>
+                    <option value="Day 6">Day 6</option>
+                  </select>
+                  <p className="text-[10px] text-gray-400 mt-1.5">
+                    Defaulted to {defaultBlastDay} — this cycle is on day {dayInCycle}.
+                  </p>
                 </div>
               </div>
 
@@ -2266,18 +2411,89 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                 </div>
               </div>
             </div>
+            ) : (
+            <div className="p-6 flex flex-col gap-5 overflow-y-auto min-h-0 [&>*]:shrink-0">
+              <div className="rounded-xl border border-line bg-surface overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-line flex items-center justify-between">
+                  <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Fate</p>
+                  {fateValue && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${fateValue === 'Discard' ? 'bg-red-50 text-red-500 border border-red-200' : fateValue === 'Freeze' ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}`}>
+                      {fateValue}
+                    </span>
+                  )}
+                </div>
+                <div className="px-4 py-3 grid grid-cols-2 gap-3">
+                  <div className={fateValue === 'Freeze' ? '' : 'col-span-2'}>
+                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Embryo Fate</label>
+                    <select
+                      className="w-full h-9 rounded-lg border border-gray-200 px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-muted/30 focus:border-primary-muted bg-white"
+                      value={fateValue} onChange={e => setFateValue(e.target.value)}>
+                      <option value="">— Select fate —</option>
+                      <option value="Freeze">❄️ Freeze</option>
+                      <option value="Transfer">🧬 Transfer</option>
+                      <option value="Discard">❌ Discard</option>
+                    </select>
+                  </div>
+                  {fateValue === 'Freeze' && (
+                    <div>
+                      <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Freeze ID</label>
+                      <input
+                        className="w-full h-9 rounded-lg border border-gray-200 px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-muted/30 focus:border-primary-muted bg-white"
+                        placeholder="#1, #2…" value={freezeId} onChange={e => setFreezeId(e.target.value)} />
+                    </div>
+                  )}
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</label>
+                    <input
+                      className="w-full h-9 rounded-lg border border-gray-200 px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-muted/30 focus:border-primary-muted bg-white"
+                      placeholder="Add notes…" value={fateNotes} onChange={e => setFateNotes(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400">
+                Not ready yet? Skip this — the fate can be recorded later from the Development Tracker.
+              </p>
+            </div>
+            )}
 
             {/* footer */}
-            <div className="px-6 py-4 border-t border-line flex items-center justify-end gap-2 shrink-0">
-              <button type="button" onClick={() => setConfirmOpen(false)} disabled={saving}
-                className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors disabled:opacity-40">
-                Cancel
-              </button>
-              <button type="button" onClick={onApprove} disabled={saving}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40"
-                style={{ background: 'var(--gradient-primary)' }}>
-                <CheckCircle2 size={15} /> {saving ? 'Saving…' : 'Confirm & Save'}
-              </button>
+            <div className="px-6 py-4 border-t border-line flex items-center justify-between gap-2 shrink-0">
+              {approveStep === 0 ? (
+                <>
+                  <button type="button" onClick={() => setConfirmOpen(false)} disabled={saving}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors disabled:opacity-40">
+                    Cancel
+                  </button>
+                  <button type="button" onClick={() => setApproveStep(1)} disabled={saving}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+                    style={{ background: 'var(--gradient-primary)' }}>
+                    Next <ArrowRight size={14} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" onClick={() => setApproveStep(0)} disabled={saving}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors disabled:opacity-40">
+                    <ArrowLeft size={14} /> Back
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => onApprove({ day: blastDay })} disabled={saving}
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors disabled:opacity-40">
+                      Fill Later
+                    </button>
+                    <button type="button" onClick={() => onApprove({
+                      day: blastDay, fate: fateValue || undefined,
+                      freezeId: fateValue === 'Freeze' ? (freezeId || undefined) : undefined,
+                      notes: fateNotes || undefined,
+                    })}
+                      disabled={saving || !fateValue}
+                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+                      style={{ background: 'var(--gradient-primary)' }}>
+                      <CheckCircle2 size={15} /> {saving ? 'Saving…' : 'Confirm & Save'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>,
@@ -2298,7 +2514,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                 className="w-8 h-8 rounded-lg border border-line flex items-center justify-center text-gray-400 hover:bg-gray-50 hover:text-gray-700 transition-colors"><X size={15} /></button>
             </div>
 
-            <div className="p-5 flex flex-col gap-5 overflow-y-auto">
+            <div className="p-5 flex flex-col gap-5 overflow-y-auto min-h-0 [&>*]:shrink-0">
               <div className="flex items-center gap-4 p-4 rounded-2xl bg-primary/5 border border-primary/10">
                 <div className="flex-1">
                   <p className="text-[8px] font-bold uppercase tracking-widest text-primary/50 mb-1">Grade</p>

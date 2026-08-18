@@ -229,14 +229,14 @@ export default function EmbryoComparePage() {
   };
 
   return (
-    <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
+    <div className="flex flex-col xl:flex-row gap-4 flex-1 xl:min-h-0 xl:overflow-hidden">
 
       {/* ── Leaderboard ── */}
-      <div className="w-[300px] shrink-0 flex flex-col min-h-0 overflow-hidden">
-        <div className="rounded-t-2xl overflow-hidden shrink-0">
+      <div className="w-full xl:w-[300px] shrink-0 flex flex-col xl:min-h-0 xl:overflow-hidden">
+        <div className="hidden xl:block rounded-t-2xl overflow-hidden shrink-0">
           <img src="/emb_compare.png" alt="" className="w-full h-auto block" />
         </div>
-        <div className="relative z-10 -mt-6 flex-1 flex flex-col min-h-0 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
+        <div className="relative z-10 xl:-mt-6 flex-1 flex flex-col xl:min-h-0 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
 
         <div className="shrink-0 border-b border-gray-100" style={{ background: 'linear-gradient(135deg,#f9f4ff 0%,#ffffff 100%)' }}>
           <div className="px-4 py-3 flex items-center gap-2.5">
@@ -337,7 +337,7 @@ export default function EmbryoComparePage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto flex flex-col gap-1.5 p-2.5">
+        <div className="flex-1 overflow-y-auto flex flex-col gap-1.5 p-2.5 max-h-[45vh] xl:max-h-none">
           {loading ? (
             <>
               {Array.from({ length: 6 }).map((_, i) => (
@@ -469,10 +469,10 @@ export default function EmbryoComparePage() {
       </div>
 
       {/* ── Compare panel ── */}
-      <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden rounded-2xl p-4 border border-gray-200 bg-[#FAF8FF]">
+      <div className="flex-1 min-w-0 flex flex-col gap-3 xl:overflow-hidden rounded-2xl p-3 xl:p-4 border border-gray-200 bg-[#FAF8FF]">
 
         {/* Panel header */}
-        <div className="flex items-center justify-between shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-white border border-gray-100 flex items-center justify-center shrink-0 shadow-sm">
               {compareMode === 'images' ? <Star size={14} className="text-primary" /> : <GitCompare size={14} className="text-primary" />}
@@ -489,7 +489,7 @@ export default function EmbryoComparePage() {
             </div>
           </div>
           {compareMode === 'embryos' && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setSelectedEmbryoIds([])}
@@ -509,12 +509,12 @@ export default function EmbryoComparePage() {
           const oocyte = embryos.find(e => e.id === selectedOocyteId);
           const sorted = [...(oocyte?.images ?? [])].sort((a, b) => b.score - a.score);
           return (
-            <div className="flex-1 min-h-0 overflow-x-auto">
-              <div className="flex gap-3 h-full" style={{ width: 'fit-content', minWidth: '100%' }}>
+            <div className="xl:flex-1 xl:min-h-0 overflow-x-auto">
+              <div className="flex gap-3 xl:h-full" style={{ width: 'fit-content', minWidth: '100%' }}>
                 {sorted.map((img, idx) => {
                   const gc = gradeCls(img.grade);
                   return (
-                    <div key={idx} className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden w-[210px] shrink-0 min-h-0">
+                    <div key={idx} className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden w-[210px] shrink-0 xl:min-h-0">
                       {/* Fixed top: rank + image + grade + score */}
                       <div className="shrink-0">
                         <div className="px-3 pt-3 pb-2 flex items-center gap-2">
@@ -541,8 +541,8 @@ export default function EmbryoComparePage() {
                         </div>
                       </div>
 
-                      {/* Scrollable detail */}
-                      <div className="flex-1 min-h-0 overflow-y-auto border-t border-gray-100">
+                      {/* Scrollable detail (full height below xl — page scrolls instead) */}
+                      <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto border-t border-gray-100">
                         {/* Quality Flags */}
                         <div className="px-3 py-2 text-[8px] font-black uppercase tracking-widest border-b border-gray-100" style={{ background: '#faf4ff', color: '#6b1176' }}>
                           Quality Flags
@@ -553,7 +553,7 @@ export default function EmbryoComparePage() {
                           ]).map(item => {
                             const s = criticalStyle(item.value);
                             return (
-                              <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                              <div key={item.label} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-2.5">
                                 <span className="text-[10px] font-medium text-gray-400 leading-tight">{item.label}</span>
                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 leading-none" style={s}>{item.value}</span>
                               </div>
@@ -569,9 +569,9 @@ export default function EmbryoComparePage() {
                             { label: 'Zona Pellucida', value: img.morphology.zonaPellucida     },
                             { label: 'Blastocoel',     value: img.morphology.blastocoelQuality },
                           ]).map(item => (
-                            <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
-                              <span className="text-[10px] font-medium text-gray-400 leading-tight">{item.label}</span>
-                              <span className="text-[10px] font-bold text-gray-700 shrink-0">{item.value}</span>
+                            <div key={item.label} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-2.5">
+                              <span className="text-[10px] font-medium text-gray-400 leading-tight shrink-0">{item.label}</span>
+                              <span className="text-[10px] font-bold text-gray-700 text-right leading-tight">{item.value}</span>
                             </div>
                           ))}
                         </div>
@@ -580,13 +580,13 @@ export default function EmbryoComparePage() {
                           <Sparkles size={10} />
                           AI Inference
                         </div>
-                        <div className="divide-y divide-gray-50">
+                        <div className="p-3 space-y-2.5">
                           {([
                             { label: 'Expansion', value: img.morphology.expInference },
                             { label: 'ICM',       value: img.morphology.icmInference },
                             { label: 'TE',        value: img.morphology.teInference  },
                           ]).map(item => (
-                            <div key={item.label} className="px-3 py-2.5">
+                            <div key={item.label}>
                               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">{item.label}</span>
                               <p className="text-[10px] text-gray-600 leading-snug mt-0.5">{item.value}</p>
                             </div>
@@ -600,20 +600,18 @@ export default function EmbryoComparePage() {
             </div>
           );
         })() : selectedEmbryoIds.length === 0 ? (
-          <div className="flex flex-col flex-1 gap-3 min-h-0">
+          <div className="flex flex-col xl:flex-1 gap-3 xl:min-h-0">
 
-            <div className="grid grid-cols-4 gap-3 flex-1 min-h-0">
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 xl:flex-1 xl:min-h-0">
               {[1, 2, 3, 4].map(i => (
                 <div
                   key={i}
-                  className="border border-dashed border-primary/20 rounded-2xl bg-primary/[0.02] flex flex-col items-center justify-center relative p-5"
+                  className="border border-dashed border-primary/20 rounded-2xl bg-primary/[0.02] flex flex-col items-center justify-center relative p-3 sm:p-5 min-h-[150px]"
                 >
                   <div className="absolute top-3 left-3 w-6 h-6 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
                     <span className="text-[10px] font-bold text-gray-500">{i}</span>
                   </div>
-                  <div className="w-11 h-11 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
-                    <span className="text-xl font-light text-gray-300 leading-none">+</span>
-                  </div>
+                  <img src="/add_icon.png" alt="" className="w-28 h-28 sm:w-36 sm:h-36 object-contain mb-2" />
                   <p className="text-sm font-medium text-gray-400 text-center">Select embryo</p>
                   <p className="text-[11px] text-gray-300 mt-1 text-center">Choose from leaderboard</p>
                 </div>
@@ -630,7 +628,7 @@ export default function EmbryoComparePage() {
                 </div>
                 <p className="text-[11px] text-gray-400">Choose up to 4 embryos from the leaderboard to compare their grades and metrics side by side.</p>
               </div>
-              <div className="flex gap-1.5 shrink-0 opacity-40">
+              <div className="hidden sm:flex gap-1.5 shrink-0 opacity-40">
                 {[1, 2, 3].map(i => (
                   <div key={i} className="w-14 h-16 rounded-lg flex flex-col gap-1 p-1.5" style={{ border: '1px solid #e8d5f0', background: 'linear-gradient(160deg, #faf4ff 0%, #f3e8ff 100%)' }}>
                     <div className="h-2 rounded w-full" style={{ background: '#e8d5f0' }} />
@@ -642,15 +640,15 @@ export default function EmbryoComparePage() {
             </div>
 
             {/* Reading guide strip */}
-            <div className="rounded-xl overflow-hidden w-full flex items-stretch" style={{ border: '1px solid #e8d5f0', background: 'linear-gradient(135deg, #faf4ff 0%, #f5eeff 100%)' }}>
+            <div className="rounded-xl overflow-hidden w-full flex flex-wrap items-stretch" style={{ border: '1px solid #e8d5f0', background: 'linear-gradient(135deg, #faf4ff 0%, #f5eeff 100%)' }}>
               {/* Label */}
-              <div className="flex items-center gap-1.5 px-3 py-2.5 shrink-0 border-r" style={{ borderColor: '#e8d5f0' }}>
+              <div className="flex items-center gap-1.5 px-3 py-2.5 w-full xl:w-auto shrink-0 border-b xl:border-b-0 xl:border-r" style={{ borderColor: '#e8d5f0' }}>
                 <Info size={11} className="text-primary shrink-0" />
                 <p className="text-[9px] font-black text-primary uppercase tracking-widest whitespace-nowrap">How to read</p>
               </div>
 
               {/* AI Score */}
-              <div className="flex flex-1 items-center gap-2 px-3 py-2 border-r" style={{ borderColor: '#e8d5f0' }}>
+              <div className="flex flex-1 min-w-[180px] items-center gap-2 px-3 py-2 border-r" style={{ borderColor: '#e8d5f0' }}>
                 <div className="relative w-7 h-7 shrink-0">
                   <svg viewBox="0 0 32 32" width="28" height="28" style={{ transform: 'rotate(-90deg)' }}>
                     <circle cx="16" cy="16" r="11" fill="none" stroke="#e8d5f0" strokeWidth="4" />
@@ -668,7 +666,7 @@ export default function EmbryoComparePage() {
               </div>
 
               {/* Gardner Grade */}
-              <div className="flex flex-1 items-center gap-2 px-3 py-2 border-r" style={{ borderColor: '#e8d5f0' }}>
+              <div className="flex flex-1 min-w-[180px] items-center gap-2 px-3 py-2 border-r" style={{ borderColor: '#e8d5f0' }}>
                 <span className="text-lg font-black text-emerald-600 leading-none shrink-0">5AA</span>
                 <div>
                   <p className="text-[9px] font-bold text-[#3b0764] leading-none">Gardner Grade</p>
@@ -677,7 +675,7 @@ export default function EmbryoComparePage() {
               </div>
 
               {/* Quality flags */}
-              <div className="flex flex-1 items-center gap-2 px-3 py-2 border-r" style={{ borderColor: '#e8d5f0' }}>
+              <div className="flex flex-1 min-w-[180px] items-center gap-2 px-3 py-2 border-r" style={{ borderColor: '#e8d5f0' }}>
                 <div className="flex flex-col gap-0.5 shrink-0">
                   <span className="text-[7px] px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold leading-none">None</span>
                   <span className="text-[7px] px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 font-bold leading-none">Minimal</span>
@@ -689,7 +687,7 @@ export default function EmbryoComparePage() {
               </div>
 
               {/* Score color guide */}
-              <div className="flex flex-1 items-center gap-2 px-3 py-2">
+              <div className="flex flex-1 min-w-[180px] items-center gap-2 px-3 py-2">
                 <div className="flex flex-col gap-0.5 shrink-0">
                   {([['bg-emerald-500', '≥ 8.0 High'], ['bg-orange-500', '≥ 6.0 Good'], ['bg-rose-500', '< 6.0 Low']] as const).map(([cls, label]) => (
                     <div key={label} className="flex items-center gap-1.5">
@@ -707,21 +705,16 @@ export default function EmbryoComparePage() {
 
           </div>
         ) : (
-          <div className="flex-1 min-h-0 overflow-x-auto">
-            <div
-              className="grid gap-3 h-full"
-              style={{ gridTemplateColumns: `repeat(4, minmax(170px, 240px))` }}
-            >
+          <div className="xl:flex-1 xl:min-h-0 overflow-x-auto">
+            <div className="flex gap-3 w-max xl:w-full xl:h-full">
               {[0, 1, 2, 3].map(idx => {
                 const eid = selectedEmbryoIds[idx];
                 if (!eid) return (
-                  <div key={idx} className="border border-dashed border-primary/20 rounded-2xl bg-primary/[0.02] flex flex-col items-center justify-center relative p-5">
+                  <div key={idx} className="hidden xl:flex w-[240px] shrink-0 xl:w-auto xl:flex-1 xl:shrink xl:min-w-[170px] xl:max-w-[240px] border border-dashed border-primary/20 rounded-2xl bg-primary/[0.02] flex-col items-center justify-center relative p-5">
                     <div className="absolute top-3 left-3 w-6 h-6 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
                       <span className="text-[10px] font-bold text-gray-400">{idx + 1}</span>
                     </div>
-                    <div className="w-11 h-11 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
-                      <span className="text-xl font-light text-gray-300 leading-none">+</span>
-                    </div>
+                    <img src="/add_icon.png" alt="" className="w-28 h-28 object-contain mb-2" />
                     <p className="text-sm font-medium text-gray-400">Select embryo</p>
                     <p className="text-[11px] text-gray-300 mt-1">Choose from leaderboard</p>
                   </div>
@@ -733,7 +726,7 @@ export default function EmbryoComparePage() {
                 const m = emb.morphology;
 
                 return (
-                  <div key={idx} className="flex flex-col min-h-0">
+                  <div key={idx} className="flex flex-col xl:min-h-0 w-[240px] shrink-0 xl:w-auto xl:flex-1 xl:shrink xl:min-w-[170px] xl:max-w-[240px]">
 
                     <div className="shrink-0 flex flex-col gap-2">
 
@@ -777,7 +770,7 @@ export default function EmbryoComparePage() {
 
                     </div>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 pt-2 pb-1">
+                    <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto flex flex-col gap-2 pt-2 pb-1">
 
                       <div className="shrink-0 rounded-xl overflow-hidden" style={{ border: '1px solid #e8d5f0' }}>
                         <div className="flex items-center gap-2 px-3 py-2" style={{ background: '#faf4ff' }}>
@@ -793,7 +786,7 @@ export default function EmbryoComparePage() {
                           ]).map(item => {
                             const s = criticalStyle(item.value);
                             return (
-                              <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                              <div key={item.label} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-2.5">
                                 <span className="text-[10px] font-medium text-gray-500 leading-tight">{item.label}</span>
                                 <span className="text-[9px] font-bold rounded-md px-2 py-0.5 shrink-0"
                                   style={{ color: s.color, background: s.background }}>{item.value}</span>
@@ -815,9 +808,9 @@ export default function EmbryoComparePage() {
                             { label: 'Zona Pellucida', value: m.zonaPellucida     },
                             { label: 'Blastocoel',     value: m.blastocoelQuality },
                           ]).map(item => (
-                            <div key={item.label} className="flex items-center justify-between gap-2 px-3 py-2.5">
-                              <span className="text-[10px] font-medium text-gray-400 leading-tight">{item.label}</span>
-                              <span className="text-[10px] font-bold text-gray-700 shrink-0">{item.value}</span>
+                            <div key={item.label} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-2.5">
+                              <span className="text-[10px] font-medium text-gray-400 leading-tight shrink-0">{item.label}</span>
+                              <span className="text-[10px] font-bold text-gray-700 text-right leading-tight">{item.value}</span>
                             </div>
                           ))}
                         </div>
@@ -828,13 +821,13 @@ export default function EmbryoComparePage() {
                           <Sparkles size={11} className="text-primary" />
                           <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#6b1176' }}>AI Inference</span>
                         </div>
-                        <div className="divide-y divide-gray-50 bg-white">
+                        <div className="bg-white p-3 space-y-2.5">
                           {([
                             { label: 'Expansion', value: m.expInference },
                             { label: 'ICM',       value: m.icmInference },
                             { label: 'TE',        value: m.teInference  },
                           ]).map(item => (
-                            <div key={item.label} className="px-3 py-2.5">
+                            <div key={item.label}>
                               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">{item.label}</span>
                               <p className="text-[10px] text-gray-600 leading-snug mt-0.5">{item.value}</p>
                             </div>
