@@ -374,13 +374,20 @@ def run_scorecam(grading_model, img_4ch_tensor, feats_tensor, img_bgr_orig,
 
     weights = torch.softmax(scores, dim=0).to(DEVICE)
     cam = F.relu((weights.view(-1, 1, 1) * norm_maps).sum(dim=0)).cpu().numpy()
-    if cam.max() > 1e-6:
-        cam = cam / cam.max()
+    cam_min, cam_max = cam.min(), cam.max()
+    if cam_max - cam_min > 1e-6:
+        cam = (cam - cam_min) / (cam_max - cam_min)
+    else:
+        cam = np.zeros_like(cam)
 
     img_rgb = cv2.resize(cv2.cvtColor(img_bgr_orig, cv2.COLOR_BGR2RGB), (IMG_SIZE, IMG_SIZE)).astype(np.float32) / 255.0
     heatmap = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
     heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
-    return np.uint8(255 * np.clip(0.55 * img_rgb + 0.45 * heatmap, 0, 1))
+
+    image_weight = 0.5
+    blended = (1 - image_weight) * heatmap + image_weight * img_rgb
+    blended = blended / blended.max()
+    return np.uint8(255 * blended)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -393,10 +400,17 @@ def _encode_png(img_rgb_uint8: np.ndarray) -> bytes:
 
 
 def describe_hatching(exp_grade: str) -> str:
-    """Gardner expansion stage 6 is a hatched blastocyst; anything below is still
-    enclosed by the zona."""
+    """Gardner expansion stage 5 is hatching and 6 is hatched; below 5 is enclosed."""
     try:
-        return "Hatching" if int(exp_grade) >= 6 else "Not Hatching"
+        stage = int(exp_grade)
+        result = "Not Hatching"
+
+        if stage == 5:
+            result = "Hatching"
+        elif stage >= 6:
+            result = "Hatched"
+        return result
+    
     except (TypeError, ValueError):
         return "Not Hatching"
 
@@ -420,7 +434,7 @@ def describe_blastocoel(blast_mask: np.ndarray, embryo_area_px: int, exp_grade: 
     if embryo_area_px <= 0:
         return "not assessable — no embryo area detected"
     pct = 100.0 * blast_mask.sum() / embryo_area_px
-    stage = {"3": "early expansion", "4": "fully expanded", "5": "over-expanded / thinning zona"}
+    stage = {"3": "early expansion", "4": "fully expanded", "5": "over-expanded"}
     return f"{stage.get(exp_grade, 'expansion stage undetermined')} ({pct:.1f}% of embryo area)"
 
 
