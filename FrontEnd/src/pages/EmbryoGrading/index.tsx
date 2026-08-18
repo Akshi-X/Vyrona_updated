@@ -451,10 +451,10 @@ export default function EmbryoGradingPage() {
       title="Embryo Console"
       description="Monitor and manage all embryo development cycles across your lab"
       icon={EmbryosIcon}
+      titleBadge="Beta"
       actions={
         <>
           <FeedbackButton
-            variant="text"
             feedbackType="ux_workflow_improvement"
             module="embryo_grading"
             priority="high"
