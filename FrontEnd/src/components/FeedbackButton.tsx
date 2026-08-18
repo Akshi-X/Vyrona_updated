@@ -29,8 +29,8 @@ const GLOW_MS = 3000;
 const COLLAPSE_START_MS = 5000;
 // Exit animation is sequential: text opacity fades out first, then the
 // button/text width shrinks down to the icon-only shape.
-const FADE_DURATION_MS = 1000;
-const SHRINK_DURATION_MS = 2000;
+const FADE_DURATION_MS = 300;
+const SHRINK_DURATION_MS = 700;
 
 /** Deep-links into the Support form with prefill values carried as URL params. */
 const FeedbackButton = ({
@@ -85,10 +85,11 @@ const FeedbackButton = ({
                 onClick={goToFeedback}
                 title="Share feedback"
                 aria-label="Share feedback"
-                className={`relative z-10 flex items-center h-9 rounded-full border border-primary/20 bg-primary/5 text-primary shrink-0 overflow-hidden ease-in-out hover:bg-primary/10 ${
-                    showText ? "gap-2 px-4" : "w-9 justify-center px-0"
+                className={`relative z-10 flex items-center justify-center h-9 rounded-full border border-primary/20 bg-primary/5 text-primary shrink-0 overflow-hidden ease-in-out hover:bg-primary/10 ${
+                    showText ? "gap-2 px-4" : "gap-0 px-0"
                 } ${className}`}
                 style={{
+                    minWidth: "2.25rem",
                     transitionProperty: "padding, gap, background-color",
                     transitionTimingFunction: "ease-in-out",
                     transitionDuration: showText ? "300ms" : `${SHRINK_DURATION_MS}ms`,

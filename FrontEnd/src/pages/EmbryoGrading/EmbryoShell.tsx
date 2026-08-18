@@ -25,13 +25,15 @@ export default function EmbryoShell() {
   const isCompare  = pathname.endsWith('/compare');
   const isReports  = pathname.endsWith('/reports');
 
-  const title = isAdvanced
-    ? `AI Grading | ${hisPart}`
+  const titleLabel = isAdvanced
+    ? 'AI Grading'
     : isCompare
-    ? `Compare | ${hisPart}`
+    ? 'Compare'
     : isReports
-    ? `Embryo Reports | ${hisPart}`
-    : `Development Tracker | ${hisPart}`;
+    ? 'Embryo Reports'
+    : 'Development Tracker';
+
+  const titleSuffix = hisPart;
 
   const description = isAdvanced
     ? 'AI-powered embryo image analysis and morphology grading'
@@ -48,8 +50,10 @@ export default function EmbryoShell() {
           pushes the bottom nav off the viewport on mobile. */}
       <div className="flex-1 min-w-0 min-h-0 [&>main]:h-full">
         <PageLayout
-          title={title}
+          title={titleLabel}
+          titleSuffix={titleSuffix}
           description={description}
+          titleBadge="Beta"
           actions={
             <FeedbackButton
               feedbackType="ux_workflow_improvement"
@@ -57,6 +61,7 @@ export default function EmbryoShell() {
               priority="high"
               title="Embryo Console Feedback"
               focusField="description"
+              variant='auto'
             />
           }
         >
