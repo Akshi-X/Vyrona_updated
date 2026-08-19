@@ -227,7 +227,14 @@ class IvfCycleService:
         record = self.get_grade_by_id(grade_id, cycle_id)
         if not record:
             return None
-        for field, value in data.model_dump(exclude_unset=True).items():
+        payload = data.model_dump(exclude_unset=True)
+        # The AI grading worker writes `grade` directly via raw SQL, bypassing
+        # this service entirely, so it never sets `ai_grade`. Capture it here
+        # instead, on the first human override: `record.grade` at this point
+        # is still the AI's original value, about to be replaced by `payload`.
+        if record.ai_grade is None and record.grade and 'grade' in payload:
+            record.ai_grade = record.grade
+        for field, value in payload.items():
             setattr(record, field, value)
         record.graded_by = user_id
         if record.is_best and record.grade:

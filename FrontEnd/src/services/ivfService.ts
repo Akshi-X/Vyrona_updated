@@ -1609,7 +1609,10 @@ export class IvfService extends BaseApiService {
                     let event: MlJobEvent;
                     try { event = JSON.parse(data); } catch { continue; }
                     onEvent?.(event);
-                    if (event.status === 'failed') throw new Error(event.error || `${label} job failed`);
+                    if (event.status === 'failed') {
+                        if (event.code === 'no_embryo') throw new MlNoEmbryoError(event.error, event.detection?.reasons);
+                        throw new Error(event.error || `${label} job failed`);
+                    }
                     if (event.status === 'complete') return event;
                 }
             }
@@ -1728,10 +1731,10 @@ export interface IvfCycleLog {
     d3_grade: string | null;
     d3_symmetry: string | null;
     d5_stage: string | null;
-    d5_grade: string | null;
     d6_stage: string | null;
-    d6_grade: string | null;
     d6_progression: string | null;
+    // The backend has one shared blast_grade column, not separate d5/d6 grade
+    // columns — d5_stage/d6_stage === 'Blastocyst' says which day it belongs to.
     blast_grade: string | null;
     fate: string | null;
     freeze_no: string | null;
@@ -1766,6 +1769,9 @@ export interface IvfGrade {
     is_best: boolean;
     is_completed: boolean;
     grade: string | null;
+    // Set once by the server the first time the AI writes a grade; never
+    // overwritten afterward, even if `grade` is later overridden.
+    ai_grade: string | null;
     ai_score: number | null;
     hatching: string | null;
     vacuolization: string | null;
@@ -1778,6 +1784,7 @@ export interface IvfGrade {
     icm_inference: string | null;
     te_inference: string | null;
     exp_inference: string | null;
+    override_reason: string | null;
     images: IvfImage[];
     graded_by: string | null;
     created_at: string;
@@ -1797,6 +1804,12 @@ export interface GradeUploadResult {
     file_size: number | null;
 }
 
+/** Why the detector turned an image down; present when `code` is 'no_embryo'. */
+export interface MlDetectionReport {
+    reasons: string[];
+    metrics?: Record<string, number>;
+}
+
 /** One SSE frame from /api/ivf/ml/analysis/stream. */
 export interface MlJobEvent {
     status: 'queued' | 'running' | 'complete' | 'failed';
@@ -1806,6 +1819,7 @@ export interface MlJobEvent {
     output?: Record<string, string | number>;
     error?: string;
     code?: string;
+    detection?: MlDetectionReport;
 }
 
 /** The job id we tried to re-attach to no longer exists server-side. */
@@ -1815,6 +1829,16 @@ export class MlJobGoneError extends Error {
         super(`ML job ${jobId} no longer exists`);
         this.jobId = jobId;
         this.name = 'MlJobGoneError';
+    }
+}
+
+/** The detector found nothing embryo-shaped in the image, so it was never graded. */
+export class MlNoEmbryoError extends Error {
+    reasons: string[];
+    constructor(message?: string, reasons: string[] = []) {
+        super(message || 'No embryo detected in this image');
+        this.reasons = reasons;
+        this.name = 'MlNoEmbryoError';
     }
 }
 
@@ -1866,8 +1890,10 @@ export interface IvfLogUpsert {
     d3_drop_no?: string;
     d3_grade?: string;
     d3_symmetry?: string;
-    d5_stage?: string;
-    d6_stage?: string;
+    // null (not just omitted) explicitly clears the column server-side —
+    // needed to enforce that only one of the two can be 'Blastocyst'.
+    d5_stage?: string | null;
+    d6_stage?: string | null;
     d6_progression?: string;
     blast_grade?: string;
     fate?: string;

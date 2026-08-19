@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { COLORS } from "../../constants/colors";
 import { feedbackApi, type FeedbackSubmission } from "../../api/feedbackApi";
 import { userService } from "../../services/userService";
@@ -15,29 +15,38 @@ const MODULES_BY_ROLE: Record<SupportRole, string[]> = {
     User: [
         "Dashboard",
         "Cryocan Quality tracking",
+        "Refrigerator Quality tracking",
+        "Embryo Grading / Embryo Console",
+        "Alert configuration",
         "User profile",
         "Ticketing",
-        "Sign in",
-        "Sign up",
+        "Login",
+        "Reports"
     ],
     Manager: [
         "Dashboard",
         "Cryocan Quality tracking",
+        "Refrigerator Quality tracking",
+        "Embryo Grading / Embryo Console",
         "User profile",
         "Ticketing",
         "Control tower",
-        "Sign in",
-        "Sign up",
+        "Login",
+        "User Management",
+        "Alert configuration",
     ],
     Admin: [
         "Dashboard",
         "Cryocan Quality tracking",
+        "Refrigerator Quality tracking",
+        "Embryo Grading / Embryo Console",
         "User profile",
         "Ticketing",
         "Control tower",
-        "Sign in",
-        "Sign up",
         "Alert configuration",
+        "Login",
+        "User Management",
+        "Reports"
     ],
 };
 
@@ -51,6 +60,10 @@ const UI_MODULE_TO_BACKEND: Record<string, string> = {
     "Sign in": "sign_in",
     "Sign up": "signup",
     "Alert configuration": "alert_configuration",
+    "Refrigerator Quality tracking": "refrigerator_quality_tracking",
+    "Embryo Grading / Embryo Console": "embryo_grading",
+    Reports: "reports",
+    "User Management": "user_management",
 };
 
 /** Backend value -> UI label (for loading existing tickets; includes legacy) */
@@ -90,6 +103,7 @@ const NAME_REGEX = /^[A-Za-z ,.'-]{2,80}$/;
 const Support: React.FC = () => {
     const location = useLocation() as { state?: any };
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const isOnboarding = useOnboardingMode();
     const { isEmailNotificationsEnabled, userRole } = useAuth();
     const supportRole = supportRoleFromAuth(userRole);
@@ -128,6 +142,7 @@ const Support: React.FC = () => {
     const [submitMessage, setSubmitMessage] = useState<string | null>(null);
     const dropRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 
     // Comments
     const [newComment, setNewComment] = useState("");
@@ -152,6 +167,38 @@ const Support: React.FC = () => {
         handlers.forEach(([event, fn]) => document.addEventListener(event, fn));
         return () => { handlers.forEach(([event, fn]) => document.removeEventListener(event, fn)); };
     }, []);
+
+    // Prefill from URL params (e.g. deep-linked from a page's Feedback button)
+    useEffect(() => {
+        if (searchParams.size === 0) return;
+
+        const typeParam = searchParams.get("type");
+        const priorityParam = searchParams.get("priority");
+        const titleParam = searchParams.get("title");
+        const moduleParam = searchParams.get("module");
+        const focusParam = searchParams.get("focus");
+
+        if (typeParam) setFeedbackType(typeParam);
+        if (priorityParam) setPriority(priorityParam);
+        if (titleParam) setSubject(titleParam);
+
+        if (moduleParam) {
+            const uiLabel = BACKEND_TO_UI_MODULE[moduleParam];
+            if (uiLabel) {
+                const roleModules = MODULES_BY_ROLE[supportRoleFromAuth(userRole)];
+                const index = roleModules.indexOf(uiLabel);
+                if (index !== -1) {
+                    setSelectedModuleIndices((prev) =>
+                        prev.includes(index) ? prev : [...prev, index],
+                    );
+                }
+            }
+        }
+
+        if (focusParam === "description") {
+            requestAnimationFrame(() => descriptionRef.current?.focus());
+        }
+    }, [searchParams, userRole]);
 
     // Fetch user profile data if not provided via prefill
     useEffect(() => {
@@ -515,6 +562,10 @@ const Support: React.FC = () => {
                 "sign_in",
                 "signup",
                 "alert_configuration",
+                "refrigerator_quality_tracking",
+                "embryo_grading",
+                "reports",
+                "user_management",
                 "other",
             ];
             const affectedModules = selectedModules
@@ -727,6 +778,7 @@ const Support: React.FC = () => {
                                     <span className="text-red-500"> *</span>
                                 </label>
                                 <textarea
+                                    ref={descriptionRef}
                                     rows={5}
                                     value={description}
                                     onChange={(e) =>
