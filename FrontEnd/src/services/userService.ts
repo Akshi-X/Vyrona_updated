@@ -26,6 +26,12 @@ export interface UserProfileDto {
   onboarding_completed: boolean;
 }
 
+export interface HospitalBranding {
+  hospital_id: number;
+  hospital_name: string;
+  logo_url: string | null;
+}
+
 export interface UserListItem {
   user_id: string;
   first_name: string;
@@ -212,6 +218,20 @@ export class UserService extends BaseApiService {
   async getHospitalUsers(): Promise<HospitalUserListResponse> {
     return await this.request<HospitalUserListResponse>('/api/hospital/users', {
       method: 'GET',
+    });
+  }
+
+  async getHospitalBranding(): Promise<HospitalBranding> {
+    return await this.request<HospitalBranding>('/api/hospital/branding', {
+      method: 'GET',
+    });
+  }
+
+  async uploadHospitalLogo(file: File): Promise<HospitalBranding> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return await this.requestFormData<HospitalBranding>('/api/hospital/logo', formData, {
+      method: 'POST',
     });
   }
 
