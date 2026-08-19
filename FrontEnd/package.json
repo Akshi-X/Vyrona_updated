@@ -27,7 +27,7 @@
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "deck.gl": "^9.3.4",
-    "html2canvas": "^1.4.1",
+    "html2canvas-pro": "^2.3.9",
     "js-cookie": "^3.0.5",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.552.0",

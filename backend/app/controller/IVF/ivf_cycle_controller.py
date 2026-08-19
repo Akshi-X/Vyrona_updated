@@ -397,6 +397,13 @@ def _grade_with_read_sas(grade) -> GradeResponse:
     return r
 
 
+def _report_with_read_sas(report) -> ReportResponse:
+    r = ReportResponse.model_validate(report)
+    if r.file_url:
+        r.file_url = ivf_blob.generate_read_sas_url(r.file_url)
+    return r
+
+
 # ── Image endpoints ───────────────────────────────────────────────────────────
 
 @router.get("/cycles/{cycle_id}/grades/{grade_id}/images/presign", response_model=ImagePresignResponse)
@@ -543,7 +550,7 @@ def upload_report(
         logger.exception("Blob upload failed for report cycle=%s", cycle_id)
         raise HTTPException(status_code=500, detail=f"Storage error: {e}")
 
-    return svc.add_report(
+    report = svc.add_report(
         cycle_id=cycle_id,
         file_url=file_url,
         file_name=file.filename,
@@ -551,6 +558,7 @@ def upload_report(
         report_type=report_type,
         user_id=str(user.user_id),
     )
+    return _report_with_read_sas(report)
 
 
 @router.get("/cycles/{cycle_id}/reports", response_model=List[ReportResponse])
@@ -564,7 +572,7 @@ def list_reports(
     svc = IvfCycleService(db)
     if not svc.get_cycle(cycle_id, hospital_id):
         raise HTTPException(status_code=404, detail="Cycle not found")
-    return svc.list_reports(cycle_id)
+    return [_report_with_read_sas(r) for r in svc.list_reports(cycle_id)]
 
 
 @router.delete("/cycles/{cycle_id}/reports/{report_id}", status_code=204)

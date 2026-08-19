@@ -1669,6 +1669,27 @@ export class IvfService extends BaseApiService {
         return this.request<void>(`/api/ivf/cycles/${cycleId}/logs/${logId}`, { method: 'DELETE' });
     }
 
+    /** Upload a generated report PDF and record it against the cycle. */
+    async uploadCycleReport(cycleId: number, blob: Blob, fileName: string, reportType?: string): Promise<IvfCycleReport> {
+        const form = new FormData();
+        form.append('file', blob, fileName);
+        if (reportType) form.append('report_type', reportType);
+        const res = await fetch(
+            `${this.baseUrl}/api/ivf/cycles/${cycleId}/reports`,
+            { method: 'POST', headers: this.getAuthHeaders(), body: form },
+        );
+        if (!res.ok) throw new Error(`Failed to upload report (${res.status})`);
+        return res.json();
+    }
+
+    async listCycleReports(cycleId: number): Promise<IvfCycleReport[]> {
+        return this.request<IvfCycleReport[]>(`/api/ivf/cycles/${cycleId}/reports`);
+    }
+
+    async deleteCycleReport(cycleId: number, reportId: number): Promise<void> {
+        return this.request<void>(`/api/ivf/cycles/${cycleId}/reports/${reportId}`, { method: 'DELETE' });
+    }
+
     async getRefrigeratorDeviationsByCategory(fromTs: number, toTs: number): Promise<{
         total: number;
         categories: { kpi_name: string; label: string; count: number }[];
@@ -1793,6 +1814,18 @@ export interface IvfGrade {
 
 export interface IvfCycleWithLogs extends IvfCycle {
     logs: IvfCycleLog[];
+}
+
+/** A saved, stored PDF report for a cycle. */
+export interface IvfCycleReport {
+    report_id: number;
+    cycle_id: number;
+    report_type: string | null;
+    file_url: string;
+    file_name: string | null;
+    file_size: number | null;
+    generated_by: string | null;
+    created_at: string;
 }
 
 /** Result of creating a grade and uploading its image in one request. */
