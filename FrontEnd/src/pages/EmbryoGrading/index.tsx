@@ -545,10 +545,10 @@ export default function EmbryoGradingPage() {
         </div>
 
         {/* ── 2-col layout: Active Cycles left, everything else right ── */}
-        <div className="grid grid-cols-1 xl:grid-cols-[min(340px,26%)_1fr] gap-4 xl:items-stretch xl:flex-1 min-h-0">
+        <div className="grid grid-cols-1 xl:grid-cols-[min(340px,26%)_1fr] gap-4 xl:items-stretch xl:flex-1 xl:min-h-0">
 
           {/* Left — Active Cycles */}
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col max-h-80 xl:max-h-none xl:flex-1">
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col max-h-[60vh] xl:max-h-none xl:flex-1">
             {/* Header */}
             <div className="px-4 py-3.5 flex flex-col border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2">
@@ -618,7 +618,9 @@ export default function EmbryoGradingPage() {
           </div>
 
           {/* Right — Grading + Needs Attention on top, Recent Activity below */}
-          <div className="flex flex-col gap-4 min-h-0">
+          {/* At xl the column owns the scroll: the cards above keep their
+              natural height and Completed Cycles never gets squeezed out. */}
+          <div className="flex flex-col gap-4 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
 
             {/* Top row: Grading Overview + Needs Attention */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
@@ -783,7 +785,7 @@ export default function EmbryoGradingPage() {
             </div>
 
             {/* Bottom — Recent Cycle Activity (fills remaining height) */}
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col max-h-[70vh] xl:max-h-none xl:flex-1 xl:shrink-0 xl:min-h-[340px]">
               <div className="px-5 py-3.5 flex items-center justify-between border-b border-gray-100 shrink-0">
                 <div className="flex items-center gap-2 shrink-0">
                   <p className="text-sm font-bold text-gray-900">Completed Cycles</p>

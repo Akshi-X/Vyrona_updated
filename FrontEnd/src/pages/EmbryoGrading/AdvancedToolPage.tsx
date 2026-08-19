@@ -992,13 +992,13 @@ function SelectScreen({ his, logs, loading, bestImages, selectedOocyteNo, onSele
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-line flex items-center justify-between shrink-0 bg-surface/40">
+        <div className="mt-2 px-3 py-2 xl:mt-0 xl:px-4 xl:py-3 border-t border-line flex items-center justify-between shrink-0 bg-surface/40">
           <button type="button" onClick={onBack}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors">
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 xl:gap-2 xl:px-4 xl:py-2 rounded-xl text-xs xl:text-[13px] font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors">
             <ArrowLeft size={14} /> Go back
           </button>
           <button type="button" onClick={onContinue} disabled={selectedOocyteNo == null}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-1.5 xl:px-5 xl:py-2 rounded-xl text-xs xl:text-[13px] font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: 'var(--gradient-primary)' }}>
             Continue <ArrowRight size={14} />
           </button>
@@ -1417,20 +1417,20 @@ function UploadScreen({ log, cycleId, bestImageUrl, imageSlots, onAdd, onRemove,
         </div>
 
         {/* footer */}
-        <div className="mt-2 px-3 py-2 border-t border-line flex items-center justify-between shrink-0 bg-surface/40">
+        <div className="mt-2 px-3 py-2 xl:mt-0 xl:px-4 xl:py-3 border-t border-line flex items-center justify-between shrink-0 bg-surface/40">
           <button type="button" onClick={onCancel}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors">
+            className="px-3.5 py-1.5 xl:px-4 xl:py-2 rounded-xl text-xs xl:text-[13px] font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors">
             Cancel
           </button>
           <div className="flex items-center gap-2">
             {(log.grade_count ?? 0) > 0 && (
               <button type="button" onClick={onSkip} disabled={uploading}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-primary border border-primary/30 hover:bg-primary/5 transition-colors disabled:opacity-40">
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 xl:gap-2 xl:px-4 xl:py-2 rounded-xl text-xs xl:text-[13px] font-bold text-primary border border-primary/30 hover:bg-primary/5 transition-colors disabled:opacity-40">
                 Skip <ArrowRight size={14} />
               </button>
             )}
             <button type="button" onClick={onStart} disabled={imageSlots.length === 0 || uploading}
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-4 py-1.5 xl:px-5 xl:py-2 rounded-xl text-xs xl:text-[13px] font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: 'var(--gradient-primary)' }}>
               {uploading ? 'Uploading…' : <>Start Grading <ArrowRight size={14} /></>}
             </button>
@@ -1658,16 +1658,11 @@ function Gauge({ score }: { score: number | null }) {
     const a = (deg * Math.PI) / 180; return [GX + r * Math.cos(a), GY - r * Math.sin(a)];
   };
   const needleDeg = 180 - f * 180;
-  const [nx1, ny1] = polar(GR - 26, needleDeg);
+  const [nx1, ny1] = polar(GR - 13, needleDeg);
   const [nx2, ny2] = polar(GR + 2, needleDeg);
-  const status = score == null ? { t: '—', s: '' }
-    : score >= 8.5 ? { t: 'Excellent state', s: 'Top-tier morphology' }
-    : score >= 7 ? { t: 'Stable state', s: 'On track' }
-    : score >= 5 ? { t: 'Fair state', s: 'Watch closely' }
-    : { t: 'Low state', s: 'Needs review' };
   return (
     <div className="relative">
-      <svg viewBox="0 0 220 130" className="w-full block">
+      <svg viewBox="0 12 220 118" className="w-full block">
         <defs>
           <linearGradient id="gauge-fill-r" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor="#cdb4e6" /><stop offset="100%" stopColor="#6b1176" />
@@ -1681,10 +1676,9 @@ function Gauge({ score }: { score: number | null }) {
         })}
         {score != null && <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="#3f3550" strokeWidth="3" strokeLinecap="round" />}
       </svg>
-      <div className="absolute inset-x-0 top-[50%] flex flex-col items-center gap-0.5 text-center">
+      <div className="absolute inset-x-0 top-[50%] flex flex-col items-center gap-1 text-center">
         <span className="text-3xl font-black leading-none text-gray-800">{score != null ? score.toFixed(1) : '—'}</span>
-        <span className="text-[11px] font-bold text-gray-700 leading-none">{status.t}</span>
-        <span className="text-[9px] text-gray-400">{status.s}</span>
+        <span className="text-sm font-bold text-gray-700 leading-none">AI Score</span>
       </div>
     </div>
   );
@@ -1890,9 +1884,11 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
   };
 
   const [overrideOpen, setOverrideOpen] = useState(false);
+  const [showOriginalGrade, setShowOriginalGrade] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [overriding, setOverriding] = useState(false);
   const [ov, setOv] = useState({ grade: '', hatching: '', vacuolization: '', multinucleation: '', zona_pellucida: '', blastocoel: '', cytoplasmic_granularity: '', bridge: '' });
+  const [reason, setReason] = useState('');
   useEffect(() => {
     if (!grade) return;
     setOv({
@@ -1900,6 +1896,8 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
       multinucleation: grade.multinucleation ?? '', zona_pellucida: grade.zona_pellucida ?? '',
       blastocoel: grade.blastocoel ?? '', cytoplasmic_granularity: grade.cytoplasmic_granularity ?? '', bridge: grade.bridge ?? '',
     });
+    setReason(grade.override_reason ?? '');
+    setShowOriginalGrade(false);
   }, [grade]);
   const img = grade?.images[0];
   const score = grade?.ai_score ?? null;
@@ -1944,12 +1942,17 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
       <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(340px,1fr)_300px] 2xl:grid-cols-[320px_minmax(440px,1fr)_360px] grid-rows-[auto_minmax(420px,55vh)_auto] xl:grid-rows-none gap-5 flex-1 xl:min-h-0">
 
         {/* LEFT */}
-        <div className="rounded-2xl border border-line bg-white flex flex-col overflow-hidden">
-          <div className="flex flex-col gap-4 p-4">
+        <div className="rounded-2xl border border-line bg-white flex flex-col xl:min-h-0 overflow-hidden">
+          <div className="flex flex-col gap-4 p-4 xl:min-h-0 xl:overflow-y-auto">
             <div>
           <p className="text-xs font-black text-gray-800 mb-2">Selected Oocyte</p>
 
-          <div className="rounded-2xl border border-line bg-white p-4">
+          <div className="rounded-2xl border border-line-light p-4"
+            style={{
+              background:
+                'radial-gradient(120% 140% at 85% 20%, rgba(216,148,241,0.08) 0%, rgba(216,148,241,0) 60%), ' +
+                'linear-gradient(115deg, #fcfcfe 0%, #fdfbfd 45%, #fcfafd 100%)',
+            }}>
             {/* identity — no image, kept to a single compact row */}
             <div className="flex items-center justify-between gap-3">
               <p className="text-base font-black text-gray-800 truncate">Oocyte {num}</p>
@@ -1961,7 +1964,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
             </div>
 
             {/* bottom: PN + cleavage metrics, two per row — dropped on smaller screens to save space */}
-            <div className="hidden xl:grid border-t border-line mt-1 pt-1 grid-cols-2">
+            <div className="hidden xl:grid border-t border-primary/25 mt-1 pt-1 grid-cols-2">
               {[
                 { Icon: ClipboardCheck, label: 'PN Status', value: log.d1_pn || '—', sub: '', check: !!log.d1_pn },
                 { Icon: Grid2x2, label: 'Cell Count', value: cellNum, sub: 'cells', check: false },
@@ -1969,12 +1972,12 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                 { Icon: Shield, label: 'Symmetry', value: log.d3_symmetry || '—', sub: '', check: false },
               ].map(({ Icon, label, value, sub, check }, i) => (
                 <div key={label}
-                  className={`min-w-0 flex items-center gap-2 py-2.5 ${i % 2 === 1 ? 'pl-2 border-l border-line' : 'pr-2'} ${i >= 2 ? 'border-t border-line' : ''}`}>
+                  className={`min-w-0 flex items-center gap-2 py-2.5 ${i % 2 === 1 ? 'pl-2 border-l border-primary/25' : 'pr-2'} ${i >= 2 ? 'border-t border-primary/25' : ''}`}>
                   <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
                     <Icon size={13} />
                   </div>
                   <div className="min-w-0 flex flex-col gap-0.5">
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide leading-tight whitespace-nowrap">{label}</span>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide leading-tight truncate">{label}</span>
                     <div className="flex items-baseline flex-wrap gap-x-1">
                       <span className="text-sm font-black text-gray-800 leading-none break-words">{value}</span>
                       {sub && <span className="text-[9px] text-gray-400 leading-tight break-words">{sub}</span>}
@@ -2148,8 +2151,8 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
         </div>
 
         {/* RIGHT */}
-        <div className="rounded-2xl border border-line flex flex-col overflow-hidden ">
-        <div className="flex flex-col gap-4 p-4 [&>*]:shrink-0">
+        <div className="rounded-2xl border border-line flex flex-col xl:min-h-0 overflow-hidden ">
+        <div className="flex flex-col gap-4 p-4 xl:min-h-0 xl:overflow-y-auto [&>*]:shrink-0">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-sm font-black text-gray-800">AI Grading Result &amp; Details</p>
@@ -2159,10 +2162,12 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                   : `Grading completed ${fmtTime(grade?.created_at)}`}
               </p>
             </div>
-            <button type="button" onClick={() => grade && setOverrideOpen(true)} disabled={!grade || incomplete}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/5 transition-colors shrink-0 disabled:opacity-40">
-              <Pencil size={11} /> Override
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button type="button" onClick={() => grade && setOverrideOpen(true)} disabled={!grade || incomplete}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/5 transition-colors disabled:opacity-40">
+                <Pencil size={11} /> Override
+              </button>
+            </div>
           </div>
 
           {incomplete ? (
@@ -2200,9 +2205,8 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                 </>
               )}
             </div>
-          ) : (
-          /* grade + confidence */
-          <div className="relative rounded-2xl border border-line-light p-4 flex items-center justify-between overflow-hidden"
+            ) : (
+              <div className="relative rounded-2xl border border-line-light p-4 flex items-center justify-between overflow-hidden"
             style={{
               background:
                 'radial-gradient(120% 140% at 85% 20%, rgba(216,148,241,0.35) 0%, rgba(216,148,241,0) 60%), ' +
@@ -2212,11 +2216,17 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
               <div className="relative w-[68px] h-[68px] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/25 shrink-0"
                 style={{ background: 'var(--gradient-primary)' }}>
                 <Sparkle size={13} className="absolute top-1.5 right-1.5 text-white/70" />
-                <span className="text-[26px] font-black leading-none tracking-tight">{grade?.grade || '—'}</span>
+                <span className="text-[26px] font-black leading-none tracking-tight">
+                  {(showOriginalGrade && grade?.ai_grade ? grade.ai_grade : grade?.grade) || '—'}
+                </span>
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-primary/50">AI Grade</span>
-                <span className="text-sm font-black text-gray-800 leading-tight">{gradeQuality(grade?.grade || '')}</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-primary/50">
+                  {showOriginalGrade && grade?.ai_grade ? 'Original AI Grade' : 'AI Grade'}
+                </span>
+                <span className="text-sm font-black text-gray-800 leading-tight">
+                  {gradeQuality((showOriginalGrade && grade?.ai_grade ? grade.ai_grade : grade?.grade) || '')}
+                </span>
                 <span className="text-[10px] text-gray-400">AI-assisted morphology grade</span>
               </div>
             </div>
@@ -2225,6 +2235,15 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
               <span className="text-[9px] font-semibold text-gray-400">Confidence</span>
             </div>
           </div>
+          )}
+
+          {grade?.ai_grade && grade.ai_grade !== grade.grade && (
+            <div className="flex justify-center -mt-2">
+              <button type="button" onClick={() => setShowOriginalGrade(v => !v)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line text-gray-600 text-[10px] font-bold hover:bg-gray-50 transition-colors">
+                <RefreshCw size={11} /> {showOriginalGrade ? 'Show current grade' : 'Show original AI grade'}
+              </button>
+            </div>
           )}
 
           {/* gauge */}
@@ -2271,11 +2290,11 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
       {/* footer */}
       <div className="mt-4 pt-4 border-t border-line flex items-center justify-between shrink-0">
         <button type="button" onClick={onBack}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors">
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 xl:gap-2 xl:px-4 xl:py-2 rounded-xl text-xs xl:text-[13px] font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors">
           <ArrowLeft size={14} /> Back to Oocytes
         </button>
         <button type="button" onClick={openApproveModal} disabled={saving || !grade || incomplete}
-          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+          className="inline-flex items-center gap-2 px-4 py-1.5 xl:px-5 xl:py-2 rounded-xl text-xs xl:text-[13px] font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40"
           style={{ background: 'var(--gradient-primary)' }}>
           <CheckCircle2 size={14} /> {saving ? 'Saving…' : 'Approve & Save'}
         </button>
@@ -2311,26 +2330,47 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
               <div>
                 <p className="text-[11px] font-black text-primary uppercase tracking-widest mb-2">Graded Images ({grades.length})</p>
                 <div className="flex gap-4 items-start flex-col lg:flex-row">
-                  <div className="flex-1 grid gap-2.5 content-start max-h-[280px] overflow-y-auto pr-1"
-                    style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${grades.length <= 2 ? 150 : grades.length <= 6 ? 116 : 92}px, 1fr))` }}>
-                    {grades.map((g, i) => {
-                      const sel = i === selectedIdx;
-                      const compact = grades.length > 6;
-                      return (
-                        <div key={g.grade_id}
-                          className={`rounded-xl border-2 p-1.5 flex flex-col gap-1.5 transition-all ${sel ? 'border-primary shadow-md shadow-primary/10' : 'border-line'}`}>
-                          <div className="relative rounded-lg overflow-hidden bg-gray-100 aspect-[4/3]">
-                            {g.images[0]?.upload_image_url ? <img src={g.images[0].upload_image_url} alt={`#${i + 1}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={18} className="text-gray-300" /></div>}
-                            <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold ${sel ? 'bg-primary text-white' : 'bg-white/90 text-gray-600'}`}>#{i + 1}</span>
-                            {sel && <span className={`absolute top-1.5 right-1.5 rounded-full bg-primary flex items-center justify-center shadow ${compact ? 'w-5 h-5' : 'w-6 h-6'}`}><Check size={compact ? 11 : 13} strokeWidth={3} className="text-white" /></span>}
+                  <div className="flex-1 rounded-xl border border-line p-3 max-h-[280px] overflow-y-auto">
+                    {grades.length === 0 ? (
+                      <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+                        {Array.from({ length: 2 }).map((_, i) => (
+                          <div key={`grade-skeleton-${i}`} className="rounded-xl border-2 border-line p-1.5 flex flex-col gap-1.5" style={{ maxWidth: 150 }}>
+                            <div className="rounded-lg aspect-[4/3] ivf-shimmer" />
+                            <div className="h-4 w-10 mx-auto rounded-full ivf-shimmer" />
                           </div>
-                          <span className={`${compact ? 'text-sm' : 'text-lg'} font-black text-center leading-none ${g.grade ? gradeTextCls(g.grade) : 'text-gray-300'}`}>{g.grade || '—'}</span>
-                        </div>
-                      );
-                    })}
+                        ))}
+                      </div>
+                    ) : (
+                    <div className="grid gap-2.5 content-start pr-1"
+                      style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${grades.length <= 2 ? 150 : grades.length <= 6 ? 116 : 92}px, 1fr))` }}>
+                      {grades.map((g, i) => {
+                        const sel = i === selectedIdx;
+                        const compact = grades.length > 6;
+                        return (
+                          <div key={g.grade_id} style={{ maxWidth: grades.length <= 2 ? 150 : grades.length <= 6 ? 116 : 92 }}
+                            className={`rounded-xl border-2 p-1.5 flex flex-col gap-1.5 transition-all ${sel ? 'border-primary shadow-md shadow-primary/10' : 'border-line'}`}>
+                            <div className="relative rounded-lg overflow-hidden bg-gray-100 aspect-[4/3]">
+                              {g.images[0]?.upload_image_url ? <img src={g.images[0].upload_image_url} alt={`#${i + 1}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={18} className="text-gray-300" /></div>}
+                              <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold ${sel ? 'bg-primary text-white' : 'bg-white/90 text-gray-600'}`}>#{i + 1}</span>
+                              {sel && <span className={`absolute top-1.5 right-1.5 rounded-full bg-primary flex items-center justify-center shadow ${compact ? 'w-5 h-5' : 'w-6 h-6'}`}><Check size={compact ? 11 : 13} strokeWidth={3} className="text-white" /></span>}
+                            </div>
+                            <span className={`${compact ? 'text-sm' : 'text-lg'} font-black text-center leading-none ${g.grade ? gradeTextCls(g.grade) : 'text-gray-300'}`}>{g.grade || '—'}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    )}
+                    <style>{`
+                      .ivf-shimmer {
+                        background: linear-gradient(90deg, #f3f4f6 25%, #e9ebee 37%, #f3f4f6 63%);
+                        background-size: 400% 100%;
+                        animation: ivf-shimmer-sweep 1.4s ease-in-out infinite;
+                      }
+                      @keyframes ivf-shimmer-sweep { 0% { background-position: 100% 50% } 100% { background-position: 0% 50% } }
+                    `}</style>
                   </div>
 
-                  <div className="lg:w-[280px] shrink-0 rounded-xl overflow-hidden border border-line-light flex flex-col">
+                  <div className="w-full lg:w-[280px] shrink-0 rounded-xl overflow-hidden border border-line-light flex flex-col">
                     {/* grade header, merged in from the old standalone "Selected Grade" card */}
                     <div className="p-4 flex flex-col gap-3" style={{ background: 'var(--gradient-primary)' }}>
                       <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Selected Grade</span>
@@ -2341,8 +2381,8 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                           { label: 'AI Score', value: `${score != null ? score.toFixed(1) : '—'}/10` },
                           { label: 'Confidence', value: `${confidence}%` },
                         ].map(s => (
-                          <div key={s.label} className="rounded-lg bg-white/15 px-2 py-1.5 text-center">
-                            <p className="text-[8px] font-bold text-white/60 uppercase tracking-widest">{s.label}</p>
+                          <div key={s.label} className="rounded-lg bg-white/20 px-2 py-1.5 text-center">
+                            <p className="text-[8px] font-bold text-white/85 uppercase tracking-widest">{s.label}</p>
                             <p className="text-xs font-black text-white leading-tight">{s.value}</p>
                           </div>
                         ))}
@@ -2384,9 +2424,9 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
               </div>
 
               {/* development day */}
-              <div className="rounded-xl border border-line bg-surface overflow-hidden">
-                <div className="px-4 py-2.5 border-b border-line flex items-center justify-between">
-                  <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Development Day</p>
+              <div className="rounded-xl border border-primary/20 bg-primary/[0.03] overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-primary/10 bg-primary/5 flex items-center justify-between">
+                  <p className="text-[10px] font-semibold tracking-widest text-primary/70 uppercase">Development Day</p>
                 </div>
                 <div className="px-4 py-3">
                   <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">This grade was assessed on</label>
@@ -2515,13 +2555,37 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
             </div>
 
             <div className="p-5 flex flex-col gap-5 overflow-y-auto min-h-0 [&>*]:shrink-0">
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-primary/5 border border-primary/10">
-                <div className="flex-1">
-                  <p className="text-[8px] font-bold uppercase tracking-widest text-primary/50 mb-1">Grade</p>
-                  <input value={ov.grade} onChange={e => setOv(v => ({ ...v, grade: e.target.value }))}
-                    className="text-2xl font-black text-primary bg-transparent outline-none border-b-2 border-primary w-24" placeholder="e.g. 4AA" />
+              <div className="rounded-2xl border border-primary/10 overflow-hidden">
+                <div className="px-4 py-3 bg-primary/5 border-b border-primary/10">
+                  <p className="text-[8px] font-bold uppercase tracking-widest text-primary/50 mb-0.5">Grade</p>
+                  <p className="text-[10px] text-gray-400">Enter a new grade value</p>
                 </div>
-                <span className={`text-4xl font-black leading-none ${gradeTextCls(ov.grade)}`}>{ov.grade || '—'}</span>
+                <div className="p-4">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">AI Original</span>
+                      <span className="text-2xl font-black text-gray-400 leading-none">{grade.ai_grade || grade.grade || '—'}</span>
+                    </div>
+                    <ArrowRight size={16} className="text-gray-300 shrink-0 self-end mb-1.5" />
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-primary/50">New Grade</span>
+                      <input value={ov.grade} onChange={e => setOv(v => ({ ...v, grade: e.target.value }))} autoFocus
+                        className="text-2xl font-black text-primary bg-transparent outline-none border-b-2 border-primary w-24" placeholder="e.g. 4AA" />
+                    </div>
+                    <div className="flex flex-col items-end gap-1 ml-auto">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Final Grade</span>
+                      <span className="text-4xl font-black leading-none text-white rounded-xl px-4 py-1.5"
+                        style={{ background: 'var(--gradient-primary)' }}>{ov.grade || '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Reason for override</label>
+                <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2}
+                  className="w-full rounded-lg border border-gray-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary-muted/30 focus:border-primary-muted"
+                  placeholder="Why are you changing the AI's grade?" />
               </div>
 
               <div>
@@ -2548,10 +2612,13 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
             <div className="px-5 py-4 border-t border-line flex items-center justify-end gap-2 shrink-0">
               <button type="button" onClick={() => setOverrideOpen(false)} disabled={overriding}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 border border-line hover:bg-gray-50 transition-colors disabled:opacity-40">Cancel</button>
-              <button type="button" disabled={overriding || !ov.grade.trim()}
+              <button type="button" disabled={overriding || !ov.grade.trim() || !reason.trim()}
                 onClick={async () => {
                   setOverriding(true);
-                  try { await onOverride(grade.grade_id, ov); setOverrideOpen(false); }
+                  try {
+                    await onOverride(grade.grade_id, { ...ov, override_reason: reason });
+                    setOverrideOpen(false);
+                  }
                   finally { setOverriding(false); }
                 }}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40"

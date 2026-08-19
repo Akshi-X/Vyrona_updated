@@ -543,7 +543,7 @@ export default function EmbryoGradingDetailPage() {
                     : 'text-primary bg-primary-bg border-primary/20'
                     : '';
                   return (
-                    <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-2xl bg-white shadow-lg border-[0.1px]   border-gray-200   overflow-hidden">
 
                       {/* ── Row 1: Oocyte breakdown header ── */}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 bg-primary/5 border-b border-primary/10">

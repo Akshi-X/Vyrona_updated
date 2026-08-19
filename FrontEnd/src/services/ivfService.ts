@@ -1769,6 +1769,9 @@ export interface IvfGrade {
     is_best: boolean;
     is_completed: boolean;
     grade: string | null;
+    // Set once by the server the first time the AI writes a grade; never
+    // overwritten afterward, even if `grade` is later overridden.
+    ai_grade: string | null;
     ai_score: number | null;
     hatching: string | null;
     vacuolization: string | null;
@@ -1781,6 +1784,7 @@ export interface IvfGrade {
     icm_inference: string | null;
     te_inference: string | null;
     exp_inference: string | null;
+    override_reason: string | null;
     images: IvfImage[];
     graded_by: string | null;
     created_at: string;
