@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from ...config.database import Base
@@ -18,6 +18,7 @@ class Hospital(Base):
     hospital_type = Column(String(255), nullable=True)
     hospital_head_email = Column(String(255), nullable=True)
     is_push_notify = Column(Boolean, nullable=False, default=False)
+    logo_url = Column(Text, nullable=True)
 
     # Relationships
     branches = relationship(
