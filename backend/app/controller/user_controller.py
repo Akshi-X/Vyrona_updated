@@ -3,7 +3,7 @@ import logging
 import traceback
 from app.config.config import settings
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, ValidationError
 from starlette.responses import FileResponse
@@ -11,6 +11,9 @@ from starlette.responses import FileResponse
 from app.config import database
 from app.models import user_model
 from app.models.IVF.hospital_branch_model import HospitalBranch
+from app.models.IVF.hospital_model import Hospital
+from app.utils import ivf_blob
+from app.constants import app_constants
 from app.service import user_service
 from app.service.login_service import handle_login
 from app.service.otp_service import verify_otp_and_create_token, resend_otp_to_user
@@ -379,6 +382,86 @@ def get_hospital_users(
     Returns hospital-specific fields: user_id, name, email, role, branch_id, department.
     """
     return user_service.get_hospital_users(db=db, current_user=current_user)
+
+
+def _current_hospital(current_user: user_model.User, db: Session) -> Hospital:
+    """Resolve the Hospital row for the current user, via hospital_id or their branch."""
+    hospital_id = current_user.hospital_id
+    if not hospital_id and current_user.branch_id:
+        branch = db.query(HospitalBranch).filter(
+            HospitalBranch.branch_id == current_user.branch_id
+        ).first()
+        if branch:
+            hospital_id = branch.hospital_id
+    if not hospital_id:
+        raise HTTPException(status_code=400, detail="Unable to determine hospital for this user")
+    hospital = db.query(Hospital).filter(Hospital.hospital_id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return hospital
+
+
+# ---------------------------
+# Hospital branding (name + logo) for report generation
+# ---------------------------
+@router.get("/hospital/branding", response_model=user_schema.HospitalBrandingResponse)
+def get_hospital_branding(
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Hospital name + logo used to brand generated reports (embryo console, etc.)."""
+    hospital = _current_hospital(current_user, db)
+    logo_url = ivf_blob.generate_read_sas_url(hospital.logo_url) if hospital.logo_url else None
+    return user_schema.HospitalBrandingResponse(
+        hospital_id=hospital.hospital_id,
+        hospital_name=hospital.hospital_name,
+        logo_url=logo_url,
+    )
+
+
+@router.post("/hospital/logo", response_model=user_schema.HospitalBrandingResponse)
+def upload_hospital_logo(
+    file: UploadFile = File(...),
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Upload/replace the hospital's report logo. Admin/Manager only."""
+    _require_admin_or_manager(current_user)
+    hospital = _current_hospital(current_user, db)
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in app_constants.ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Allowed: {', '.join(app_constants.ALLOWED_IMAGE_EXTENSIONS)}",
+        )
+
+    data = file.file.read()
+    if len(data) > app_constants.MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Max {app_constants.MAX_FILE_SIZE_MB}MB",
+        )
+
+    try:
+        blob_path = ivf_blob.make_blob_path(f"hospital/{hospital.hospital_id}", file.filename or "", "logo")
+        file_url = ivf_blob.upload_bytes(data, blob_path, file.content_type or "application/octet-stream")
+    except Exception as e:
+        logger.exception("Blob upload failed for hospital logo hospital=%s", hospital.hospital_id)
+        raise HTTPException(status_code=500, detail=f"Storage error: {e}")
+
+    old_logo_url = hospital.logo_url
+    hospital.logo_url = file_url
+    db.commit()
+    db.refresh(hospital)
+    if old_logo_url:
+        ivf_blob.delete_blob_by_url(old_logo_url)
+
+    return user_schema.HospitalBrandingResponse(
+        hospital_id=hospital.hospital_id,
+        hospital_name=hospital.hospital_name,
+        logo_url=ivf_blob.generate_read_sas_url(file_url),
+    )
 
 
 @router.post("/hospital/users/invite")

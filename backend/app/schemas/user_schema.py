@@ -246,3 +246,10 @@ class HospitalInfoByEmailResponse(BaseModel):
     hospital_type: Optional[str] = None  # e.g., "IVF", "Oncology"
     departments: List[str] = []  # Available departments based on hospital_type
     branches: List[dict] = []  # List of branches with branch_id and branch_name
+
+
+class HospitalBrandingResponse(BaseModel):
+    """Hospital name + logo, used to brand generated reports."""
+    hospital_id: int
+    hospital_name: str
+    logo_url: Optional[str] = None

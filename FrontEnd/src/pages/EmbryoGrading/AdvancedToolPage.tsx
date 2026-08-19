@@ -639,8 +639,8 @@ export default function AdvancedEmbryoGradingPage() {
 
   const handleOverride = useCallback(async (gradeId: number, fields: Record<string, string>) => {
     if (cycleId == null) return;
-    await ivfService.updateGrade(cycleId, gradeId, fields);
-    setExistingGrades(prev => prev.map(g => g.grade_id === gradeId ? { ...g, ...fields } : g));
+    const updated = await ivfService.updateGrade(cycleId, gradeId, fields);
+    setExistingGrades(prev => prev.map(g => g.grade_id === gradeId ? updated : g));
   }, [cycleId]);
 
   /** Soft-delete: retire the row so it drops out of isUsableGrade, then land on a valid index. */
@@ -1911,19 +1911,26 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
   const fragPct = d3m ? (FRAG_PCT[d3m[2]] ?? '—') : '—';
 
   // Gardner grade splits into expansion / ICM / TE, each with its own model note.
-  const gardner = (grade?.grade || '').match(/^(\d)([A-C])([A-C])$/i);
+  // Parsed from the AI's original grade, not the (possibly overridden) current grade,
+  // since these letters label the AI's own justification below.
+  const gardner = (grade?.ai_grade || grade?.grade || '').match(/^(\d)([A-C])([A-C])$/i);
 
   // Only badge a grade "Best" once the embryologist has actually picked one —
   // no ai_score fallback, so nothing gets badged best by default.
   const bestGradeId = grades.find(g => g.is_best)?.grade_id ?? null;
 
-  const justifications = [
+  // AI's own reasoning for the grade it assigned — not meaningful while viewing a human override.
+  const aiGradeJustifications = [
     grade?.exp_inference && { t: `Expansion${gardner ? `: ${gardner[1]}` : ''}`, d: grade.exp_inference },
     grade?.hatching && { t: `Hatching: ${grade.hatching}`, d: grade.hatching === 'Hatching'
       ? 'The blastocyst has begun breaching the zona pellucida.'
       : 'The blastocyst remains fully enclosed within the zona pellucida.' },
     grade?.icm_inference && { t: `Inner cell mass${gardner ? `: ${gardner[2].toUpperCase()}` : ''}`, d: grade.icm_inference },
     grade?.te_inference && { t: `Trophectoderm${gardner ? `: ${gardner[3].toUpperCase()}` : ''}`, d: grade.te_inference },
+  ].filter(Boolean) as { t: string; d: string }[];
+
+  // Direct morphology observations from the image — valid regardless of any override.
+  const morphologyJustifications = [
     grade?.zona_pellucida && { t: `Zona pellucida: ${grade.zona_pellucida}`, d: 'The zona pellucida appearance supports normal embryo integrity.' },
     grade?.blastocoel && { t: `Blastocoel: ${grade.blastocoel}`, d: 'Blastocoel expansion is consistent with healthy development.' },
   ].filter(Boolean) as { t: string; d: string }[];
@@ -1977,7 +1984,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                     <Icon size={13} />
                   </div>
                   <div className="min-w-0 flex flex-col gap-0.5">
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide leading-tight truncate">{label}</span>
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide leading-tight truncate">{label}</span>
                     <div className="flex items-baseline flex-wrap gap-x-1">
                       <span className="text-sm font-black text-gray-800 leading-none break-words">{value}</span>
                       {sub && <span className="text-[9px] text-gray-400 leading-tight break-words">{sub}</span>}
@@ -2036,7 +2043,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                     </button>
                   )}
                   <div className="flex items-center px-0.5 min-h-4">
-                    <span className={`text-[9px] font-bold ${i === selectedIdx ? 'text-primary' : 'text-gray-500'}`}>Image #{i + 1}</span>
+                    <span className={`text-[9px] font-bold ${i === selectedIdx ? 'text-primary' : 'text-gray-600'}`}>Image #{i + 1}</span>
                   </div>
                   <div className="w-full h-14 rounded-lg overflow-hidden bg-gray-100">
                     {g.images[0]?.upload_image_url ? <img src={g.images[0].upload_image_url} alt={`#${i + 1}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={14} className="text-gray-300" /></div>}
@@ -2090,7 +2097,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                     <Icon size={11} />
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{label}</span>
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">{label}</span>
                     <span className="text-xs font-bold text-gray-800">{value}</span>
                   </div>
                 </div>
@@ -2221,13 +2228,15 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                 </span>
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-primary/50">
-                  {showOriginalGrade && grade?.ai_grade ? 'Original AI Grade' : 'AI Grade'}
+                <span className={`text-[9px] font-black uppercase tracking-[0.15em] ${!showOriginalGrade && grade?.ai_grade && grade.ai_grade !== grade.grade ? 'text-primary/80' : 'text-primary/50'}`}>
+                  {showOriginalGrade && grade?.ai_grade
+                    ? 'Original AI Grade'
+                    : grade?.ai_grade && grade.ai_grade !== grade.grade ? 'Overridden Grade' : 'AI Grade'}
                 </span>
                 <span className="text-sm font-black text-gray-800 leading-tight">
                   {gradeQuality((showOriginalGrade && grade?.ai_grade ? grade.ai_grade : grade?.grade) || '')}
                 </span>
-                <span className="text-[10px] text-gray-400">AI-assisted morphology grade</span>
+                <span className="text-[10px] text-gray-400">AI embryo grading</span>
               </div>
             </div>
             <div className="relative flex flex-col items-center gap-1 shrink-0">
@@ -2253,13 +2262,17 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
             </div>
           </div>
 
-          {/* justification */}
+          {/* justification — AI's own grade reasoning is hidden while showing the human-overridden grade; morphology observations always stand */}
+          {(() => {
+            const isShowingOverride = !!(grade?.ai_grade && grade.ai_grade !== grade.grade && !showOriginalGrade);
+            const visibleJustifications = isShowingOverride ? morphologyJustifications : [...aiGradeJustifications, ...morphologyJustifications];
+            return (
           <div className="rounded-2xl border border-white/60 bg-white/85 backdrop-blur-md p-4">
             <p className="text-xs font-black text-gray-800 mb-3">AI Justification</p>
             <div className="flex flex-col gap-3">
-              {justifications.length === 0 ? (
+              {visibleJustifications.length === 0 ? (
                 <p className="text-[11px] text-gray-400">No morphology data available for this grade.</p>
-              ) : justifications.map(j => (
+              ) : visibleJustifications.map(j => (
                 <div key={j.t} className="flex gap-2.5">
                   <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5"><Sparkle size={12} className="text-primary" /></div>
                   <div>
@@ -2270,6 +2283,8 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
               ))}
             </div>
           </div>
+            );
+          })()}
 
           {/* guideline / disclaimer */}
           <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-4 flex gap-2.5">
