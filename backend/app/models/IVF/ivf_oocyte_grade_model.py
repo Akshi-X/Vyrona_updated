@@ -16,6 +16,10 @@ class IvfOocyteGrade(Base):
     is_best = Column(Boolean, default=False, nullable=False)
     is_completed = Column(Boolean, default=False, nullable=False)
     grade = Column(String(10), nullable=True)
+    # Backfilled once, on the first human override (see IvfCycleService.update_grade) —
+    # `grade` itself gets overwritten on override, this is the permanent record
+    # of what the AI originally said.
+    ai_grade = Column(String(10), nullable=True)
     ai_score = Column(Float, nullable=True)
     hatching = Column(String(50), nullable=True)
     vacuolization = Column(String(50), nullable=True)
@@ -26,6 +30,7 @@ class IvfOocyteGrade(Base):
     cytoplasmic_granularity = Column(String(50), nullable=True)
     bridge = Column(String(50), nullable=True)
     note = Column(Text, nullable=True)
+    override_reason = Column(Text, nullable=True)  # why a human changed the AI-generated grade
     # Per-region clinical descriptions returned by the grading service
     icm_inference = Column(Text, nullable=True)
     te_inference = Column(Text, nullable=True)

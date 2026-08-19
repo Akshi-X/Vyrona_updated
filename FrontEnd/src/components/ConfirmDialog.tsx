@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ConfirmDialogProps {
   title: string;
@@ -28,8 +29,12 @@ export default function ConfirmDialog({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+  // Portaled to <body> so the backdrop always covers the full viewport
+  // (including the sidebar) — rendered in place, a `fixed` element only
+  // escapes the sidebar if none of its ancestors create a containing block
+  // (transform/filter/etc), which isn't guaranteed from every call site.
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 px-4">
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
         <h2 className="text-base font-semibold text-gray-800 mb-2">{title}</h2>
         <p className="text-sm text-gray-500 mb-6">{message}</p>
@@ -57,6 +62,7 @@ export default function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

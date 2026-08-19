@@ -176,6 +176,7 @@ class GradeUpsert(BaseModel):
     icm_inference: Optional[str] = None
     te_inference: Optional[str] = None
     exp_inference: Optional[str] = None
+    override_reason: Optional[str] = None
 
 
 class GradeUploadResponse(BaseModel):
@@ -196,6 +197,7 @@ class GradeResponse(BaseModel):
     is_best: bool
     is_completed: bool
     grade: Optional[str]
+    ai_grade: Optional[str] = None
     ai_score: Optional[float]
     hatching: Optional[str]
     vacuolization: Optional[str]
@@ -208,6 +210,7 @@ class GradeResponse(BaseModel):
     icm_inference: Optional[str] = None
     te_inference: Optional[str] = None
     exp_inference: Optional[str] = None
+    override_reason: Optional[str] = None
     images: List[ImageResponse] = []
     graded_by: Optional[str]
     created_at: datetime

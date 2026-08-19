@@ -403,7 +403,6 @@ function getActivityMetadataLines(action: string, metadata?: Record<string, any>
   }
   if (action.startsWith("ivf_cycle.")) {
     if (val(metadata.his_id)) lines.push(`HIS: ${metadata.his_id}`);
-    if (val(metadata.patient_name)) lines.push(`Patient: ${metadata.patient_name}`);
     return lines;
   }
   return [];

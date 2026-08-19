@@ -338,9 +338,28 @@ def update_grade(
     user = _ivf_user(request)
     hospital_id = _hospital_id(request, db, user)
     svc = IvfCycleService(db)
+    existing = svc.get_grade_by_id(grade_id, cycle_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Grade not found")
+    old_grade = existing.grade
     record = svc.update_grade(grade_id, cycle_id, payload, user_id=str(user.user_id))
     if not record:
         raise HTTPException(status_code=404, detail="Grade not found")
+    # Only a genuine override (a stated reason) is worth an audit-log entry —
+    # unrelated partial updates like soft-deleting via is_active shouldn't log as one.
+    if payload.override_reason:
+        ActivityLogService(db).log_activity(
+            action="ivf_cycle.grade.overridden",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("ivf_cycle", str(cycle_id), None, hospital_id),
+            metadata={
+                "cycle_id": cycle_id, "grade_id": grade_id,
+                "old_grade": old_grade, "new_grade": record.grade,
+                "reason": payload.override_reason,
+            },
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
     return _grade_with_read_sas(record)
 
 

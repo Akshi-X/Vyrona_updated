@@ -257,21 +257,81 @@ def get_models():
 
 # ── Segmentation + feature extraction ─────────────────────────────────────────
 
-def get_masks(img_bgr: np.ndarray, seg_model) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Returns icm_mask, te_mask, blastocoel_mask, zp_mask, class_map."""
+def get_masks(img_bgr: np.ndarray, seg_model) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Returns icm_mask, te_mask, blastocoel_mask, zp_mask, class_map, conf_map."""
     h, w = img_bgr.shape[:2]
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     inp = _seg_transform(img_rgb).unsqueeze(0).to(DEVICE)
     with torch.no_grad():
-        pred = seg_model(inp).squeeze(0).cpu().numpy()
-    class_map = np.argmax(pred, axis=0).astype(np.uint8)
+        probs = torch.softmax(seg_model(inp).squeeze(0), dim=0).cpu().numpy()
+    class_map = np.argmax(probs, axis=0).astype(np.uint8)
+    conf_map = probs.max(axis=0)
     class_map = cv2.resize(class_map, (w, h), interpolation=cv2.INTER_NEAREST)
+    conf_map = cv2.resize(conf_map, (w, h), interpolation=cv2.INTER_LINEAR)
 
     zp_mask = (class_map == 1).astype(np.uint8)
     te_mask = (class_map == 2).astype(np.uint8)
     blast_mask = (class_map == 3).astype(np.uint8)
     icm_mask = (class_map == 4).astype(np.uint8)
-    return icm_mask, te_mask, blast_mask, zp_mask, class_map
+    return icm_mask, te_mask, blast_mask, zp_mask, class_map, conf_map
+
+
+def detect_embryo(class_map: np.ndarray, conf_map: np.ndarray,
+                  mi: np.ndarray, mt: np.ndarray, mb: np.ndarray, mz: np.ndarray) -> dict:
+    """Structural sanity check on the segmentation output.
+
+    The segmentation model has no reject class and was trained only on embryo
+    crops, so it confidently hallucinates structure on any input. A real
+    blastocyst segments as one large, round, dominant blob with ZP/TE/
+    blastocoel all present; junk input segments as scattered speckle. This
+    catches that without retraining anything.
+    """
+    if not config.DETECT_ENABLED:
+        return {"detected": True, "reasons": [], "metrics": {}}
+
+    total = class_map.size
+    fg = (class_map != 0).astype(np.uint8)
+    area_ratio = float(fg.sum()) / total
+    reasons = []
+
+    if not (config.DETECT_MIN_AREA <= area_ratio <= config.DETECT_MAX_AREA):
+        reasons.append(f"embryo area {area_ratio:.1%} outside plausible range")
+
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(fg, connectivity=8)
+    blob_share, circularity = 0.0, 0.0
+    if n > 1 and fg.sum() > 0:
+        idx = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+        blob_share = float(stats[idx, cv2.CC_STAT_AREA]) / float(fg.sum())
+        blob = (labels == idx).astype(np.uint8)
+        cnts, _ = cv2.findContours(blob, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if cnts:
+            c = max(cnts, key=cv2.contourArea)
+            a, p = cv2.contourArea(c), cv2.arcLength(c, True)
+            if p > 0:
+                circularity = (4 * np.pi * a) / (p * p)
+    if blob_share < config.DETECT_MIN_BLOB_SHARE:
+        reasons.append(f"segmentation fragmented (largest blob {blob_share:.1%})")
+    if circularity < config.DETECT_MIN_CIRCULARITY:
+        reasons.append(f"largest region not round (circularity {circularity:.2f})")
+
+    for name, m in (("zona pellucida", mz), ("trophectoderm", mt), ("blastocoel", mb)):
+        if m.sum() / total < 0.005:
+            reasons.append(f"{name} not found")
+
+    seg_confidence = float(conf_map[fg == 1].mean()) if fg.sum() else 0.0
+    if seg_confidence < config.DETECT_MIN_SEG_CONF:
+        reasons.append(f"low segmentation confidence ({seg_confidence:.2f})")
+
+    return {
+        "detected": not reasons,
+        "reasons": reasons,
+        "metrics": {
+            "area_ratio": round(area_ratio, 4),
+            "blob_share": round(blob_share, 4),
+            "circularity": round(circularity, 3),
+            "seg_confidence": round(seg_confidence, 4),
+        },
+    }
 
 
 def _region_stats(mask, gray):
@@ -374,13 +434,20 @@ def run_scorecam(grading_model, img_4ch_tensor, feats_tensor, img_bgr_orig,
 
     weights = torch.softmax(scores, dim=0).to(DEVICE)
     cam = F.relu((weights.view(-1, 1, 1) * norm_maps).sum(dim=0)).cpu().numpy()
-    if cam.max() > 1e-6:
-        cam = cam / cam.max()
+    cam_min, cam_max = cam.min(), cam.max()
+    if cam_max - cam_min > 1e-6:
+        cam = (cam - cam_min) / (cam_max - cam_min)
+    else:
+        cam = np.zeros_like(cam)
 
     img_rgb = cv2.resize(cv2.cvtColor(img_bgr_orig, cv2.COLOR_BGR2RGB), (IMG_SIZE, IMG_SIZE)).astype(np.float32) / 255.0
     heatmap = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
     heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
-    return np.uint8(255 * np.clip(0.55 * img_rgb + 0.45 * heatmap, 0, 1))
+
+    image_weight = 0.5
+    blended = (1 - image_weight) * heatmap + image_weight * img_rgb
+    blended = blended / blended.max()
+    return np.uint8(255 * blended)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -393,10 +460,17 @@ def _encode_png(img_rgb_uint8: np.ndarray) -> bytes:
 
 
 def describe_hatching(exp_grade: str) -> str:
-    """Gardner expansion stage 6 is a hatched blastocyst; anything below is still
-    enclosed by the zona."""
+    """Gardner expansion stage 5 is hatching and 6 is hatched; below 5 is enclosed."""
     try:
-        return "Hatching" if int(exp_grade) >= 6 else "Not Hatching"
+        stage = int(exp_grade)
+        result = "Not Hatching"
+
+        if stage == 5:
+            result = "Hatching"
+        elif stage >= 6:
+            result = "Hatched"
+        return result
+    
     except (TypeError, ValueError):
         return "Not Hatching"
 
@@ -420,7 +494,7 @@ def describe_blastocoel(blast_mask: np.ndarray, embryo_area_px: int, exp_grade: 
     if embryo_area_px <= 0:
         return "not assessable — no embryo area detected"
     pct = 100.0 * blast_mask.sum() / embryo_area_px
-    stage = {"3": "early expansion", "4": "fully expanded", "5": "over-expanded / thinning zona"}
+    stage = {"3": "early expansion", "4": "fully expanded", "5": "over-expanded"}
     return f"{stage.get(exp_grade, 'expansion stage undetermined')} ({pct:.1f}% of embryo area)"
 
 
@@ -459,7 +533,15 @@ def analyse(image_bytes: bytes) -> dict:
         raise ValueError("Could not decode input image")
     img_bgr = cv2.resize(img_bgr, (IMG_SIZE, IMG_SIZE))
 
-    mi, mt, mb, mz, class_map = get_masks(img_bgr, seg_model)
+    mi, mt, mb, mz, class_map, conf_map = get_masks(img_bgr, seg_model)
+    detection = detect_embryo(class_map, conf_map, mi, mt, mb, mz)
+    if not detection["detected"]:
+        result = {"detection": detection, "grading": None, "images": {}}
+        with _last_lock:
+            _last["digest"] = digest
+            _last["result"] = result
+        return result
+
     embryo_area_px = int((class_map != 0).sum())
 
     pil_4ch = build_4ch_input(img_bgr, mi, mt, mb)
@@ -489,6 +571,7 @@ def analyse(image_bytes: bytes) -> dict:
     annotated = np.uint8(0.5 * orig_rgb + 0.5 * seg_rgb)
 
     result = {
+        "detection": detection,
         "images": {
             "exp": _encode_png(exp_img),
             "icm": _encode_png(icm_img),

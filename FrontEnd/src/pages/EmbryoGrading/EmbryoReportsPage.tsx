@@ -161,8 +161,8 @@ export default function EmbryoReportsPage() {
     others:       cycle?.oocyte_others ?? 0,
     fertilised:   logs.filter(l => l.d1_pn && l.d1_pn !== '0PN').length,
     day3:         logs.filter(l => l.d3_grade).length,
-    day5:         logs.filter(l => l.d5_grade).length,
-    day6:         logs.filter(l => l.d6_grade).length,
+    day5:         logs.filter(l => l.d5_stage === 'Blastocyst' && l.blast_grade).length,
+    day6:         logs.filter(l => l.d6_stage === 'Blastocyst' && l.blast_grade).length,
     frozen:       logs.filter(l => l.fate === 'Frozen').length,
     transferred:  logs.filter(l => l.fate === 'Transferred').length,
     biopsied:     logs.filter(l => l.fate === 'Biopsied').length,
@@ -377,7 +377,6 @@ export default function EmbryoReportsPage() {
                   <div>
                     <p className="text-[9px] font-bold text-primary uppercase tracking-widest mb-2">Patient & Cycle Details</p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
-                      <Row label="Patient Name"     value={fmt(cycle.patient_name)} />
                       <Row label="Patient ID"       value={fmt(cycle.his_id)} />
                       <Row label="Cycle Type"       value={fmt(cycle.cycle_type)} />
                       <Row label="Injection Method" value={fmt(cycle.injection_method)} />
@@ -507,9 +506,9 @@ export default function EmbryoReportsPage() {
                               <Td>{fmt(log.d3_drop_no)}</Td>
                               <Td>{gradeChip(parseD3(log.d3_grade), 'd3')}</Td>
                               <Td>{fmt(log.d5_stage)}</Td>
-                              <Td>{gradeChip(log.d5_grade, 'd5')}</Td>
+                              <Td>{gradeChip(log.d5_stage === 'Blastocyst' ? log.blast_grade : null, 'd5')}</Td>
                               <Td>{fmt(log.d6_stage)}</Td>
-                              <Td>{gradeChip(log.d6_grade, 'd6')}</Td>
+                              <Td>{gradeChip(log.d6_stage === 'Blastocyst' ? log.blast_grade : null, 'd6')}</Td>
                               <Td>{fateChip(log.fate)}</Td>
                             </tr>
                           ))}
@@ -595,7 +594,7 @@ export default function EmbryoReportsPage() {
                               <Td>#{log.oocyte_no}</Td>
                               <Td>{fmt(log.d0_maturity)}</Td>
                               <Td>{gradeChip(parseD3(log.d3_grade), 'd3')}</Td>
-                              <Td>{gradeChip(log.d5_grade ?? log.d6_grade, log.d5_grade ? 'd5' : 'd6')}</Td>
+                              <Td>{gradeChip(log.blast_grade, log.d5_stage === 'Blastocyst' ? 'd5' : 'd6')}</Td>
                               <Td><span className="text-gray-600">{log.oocyte_comments}</span></Td>
                             </tr>
                           ))}
