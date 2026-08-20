@@ -1,10 +1,60 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { X, Trophy, GitCompare, Star, Info, ChevronDown, Check, Sparkles } from 'lucide-react';
-import { ivfService, type IvfCycleWithLogs } from '../../services/ivfService';
-import {
-  useEmbryoGrades, gradeCls, scoreBarGradient, scorePillStyle, criticalStyle,
-} from './useEmbryoGrades';
+import { ivfService, type IvfGrade } from '../../services/ivfService';
+
+interface EmbryoMorphology {
+  hatching: string;
+  zonaPellucida: string;
+  blastocoelQuality: string;
+  expInference: string;
+  icmInference: string;
+  teInference: string;
+}
+
+interface LeaderboardImage { url: string; grade: string; score: number; morphology: EmbryoMorphology }
+
+interface LeaderboardEmbryo {
+  id: string;
+  oocyteNo: number;
+  time: string;
+  aiScore: number;
+  grade: string;
+  quality: string;
+  rank: number;
+  src: string;
+  images: LeaderboardImage[];
+  morphology: EmbryoMorphology;
+}
+
+// Backend IVF timestamps are UTC stored in naive columns, so they serialize
+// without an offset — JS would otherwise parse them as local time.
+function parseUtc(iso?: string | null): Date | null {
+  if (!iso) return null;
+  return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
+}
+
+function toMorphology(g: IvfGrade): EmbryoMorphology {
+  const qf = g.quality_flags ?? {};
+  return {
+    hatching: qf.hatching ?? '—',
+    zonaPellucida: qf.zona_pellucida ?? '—',
+    blastocoelQuality: qf.blastocoel ?? '—',
+    expInference: g.exp_inference ?? 'No expansion inference recorded.',
+    icmInference: g.icm_inference ?? 'No ICM inference recorded.',
+    teInference: g.te_inference ?? 'No TE inference recorded.',
+  };
+}
+
+function qualityLabel(score: number): string {
+  if (score >= 8) return 'High Quality';
+  if (score >= 6) return 'Good Quality';
+  return 'Low Quality';
+}
+
+function isUsableGrade(g: IvfGrade): boolean {
+  return g.is_active !== false && g.grade != null && g.images.length > 0 && !!g.images[0].upload_image_url;
+}
 
 const SLOT_COLORS = [
   { hex: '#4f46e5' },

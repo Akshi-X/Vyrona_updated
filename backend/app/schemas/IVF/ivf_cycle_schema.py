@@ -165,13 +165,8 @@ class GradeUpsert(BaseModel):
     is_completed: Optional[bool] = None
     grade: Optional[str] = None
     ai_score: Optional[float] = None
-    hatching: Optional[str] = None
-    vacuolization: Optional[str] = None
-    multinucleation: Optional[str] = None
-    zona_pellucida: Optional[str] = None
-    blastocoel: Optional[str] = None
-    cytoplasmic_granularity: Optional[str] = None
-    bridge: Optional[str] = None
+    quality_flags: Optional[Dict[str, Optional[str]]] = None
+    quality_flag_reasons: Optional[Dict[str, Optional[str]]] = None
     note: Optional[str] = None
     icm_inference: Optional[str] = None
     te_inference: Optional[str] = None
@@ -199,13 +194,9 @@ class GradeResponse(BaseModel):
     grade: Optional[str]
     ai_grade: Optional[str] = None
     ai_score: Optional[float]
-    hatching: Optional[str]
-    vacuolization: Optional[str]
-    multinucleation: Optional[str]
-    zona_pellucida: Optional[str]
-    blastocoel: Optional[str]
-    cytoplasmic_granularity: Optional[str]
-    bridge: Optional[str]
+    quality_flags: Optional[Dict[str, Optional[str]]] = None
+    quality_flag_reasons: Optional[Dict[str, Optional[str]]] = None
+    ai_quality_flags: Optional[Dict[str, Optional[str]]] = None
     note: Optional[str]
     icm_inference: Optional[str] = None
     te_inference: Optional[str] = None

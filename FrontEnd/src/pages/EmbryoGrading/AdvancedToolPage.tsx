@@ -8,9 +8,11 @@ import {
   RefreshCw, User, ImageIcon, X, Sparkle, ZoomIn, ZoomOut, Maximize2, Move,
   Droplet, ClipboardCheck, Grid2x2, Percent, Shield,
   Award, Info, CircleDashed, CircleDot, Pencil, Camera, Syringe, Tag,
+  Link2, CircleAlert, Rocket,
 } from 'lucide-react';
 import type { IVFTreatment } from '../../types/ivf';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import FloatingSelect from '../../components/FloatingSelect';
 import {
   ivfService, MlNoEmbryoError,
   type IvfCycle, type IvfCycleLog, type IvfGrade, type IvfImage,
@@ -59,6 +61,9 @@ interface MlRunRecord {
   startedAt: number;
   images: MlRunImage[];
 }
+
+// Mirrors the allowlist the upload endpoint enforces.
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const ML_RUN_KEY = 'ivf_ml_run_v1';
 // sessionStorage dies with the tab; this only guards against session restore
@@ -193,7 +198,7 @@ const gradeQuality = (grade: string) => {
 
 const flagBadgeCls = (val: string) => {
   if (val === 'None') return 'bg-gray-100 border border-gray-300 text-gray-600';
-  if (['Not Hatching', 'Intact', 'Good', 'Fine', 'Excellent'].includes(val)) return 'bg-primary/10 border border-primary/20 text-primary';
+  if (['Not Hatched', 'Intact', 'Good', 'Fine', 'Excellent'].includes(val)) return 'bg-primary/10 border border-primary/20 text-primary';
   if (['Minimal', 'Mild'].includes(val)) return 'bg-amber-50 border border-amber-200 text-amber-700';
   return 'bg-gray-50 border border-gray-200 text-gray-600';
 };
@@ -617,15 +622,18 @@ export default function AdvancedEmbryoGradingPage() {
         // meta is replaced wholesale server-side, so any existing notes (day-by-day
         // comments logged from the Development Tracker) have to be carried forward.
         const mergedMeta = { ...(selectedLog.meta || {}), ...(opts.notes ? { final_notes: opts.notes } : {}) };
+        // A grade with an early_blast quality flag set records its stage as
+        // 'Early Blast' instead of 'Blastocyst' on whichever day is chosen.
+        const stageLabel = resultGrade.quality_flags?.early_blast ? 'Early Blast' : 'Blastocyst';
         await ivfService.upsertLog(cycleId, {
           oocyte_no: selectedLog.oocyte_no,
           // There's one shared blast_grade column (no separate d5/d6 grade
           // columns) — d5_stage/d6_stage just say which day it belongs to.
-          // Only one day can ever be 'Blastocyst', so recording it on one
-          // explicitly clears the other rather than leaving stale data.
+          // Only one day can ever be set, so recording it on one explicitly
+          // clears the other rather than leaving stale data.
           ...(opts.day === 'Day 6'
-            ? { d6_stage: 'Blastocyst', d5_stage: null }
-            : { d5_stage: 'Blastocyst', d6_stage: null }),
+            ? { d6_stage: stageLabel, d5_stage: null }
+            : { d5_stage: stageLabel, d6_stage: null }),
           blast_grade: resultGrade.grade,
           ...(opts.fate && { fate: opts.fate }),
           ...(opts.freezeId && { freeze_no: opts.freezeId }),
@@ -637,7 +645,7 @@ export default function AdvancedEmbryoGradingPage() {
     navigate(his ? `/embryo-console/${his}` : '/embryo-console');
   };
 
-  const handleOverride = useCallback(async (gradeId: number, fields: Record<string, string>) => {
+  const handleOverride = useCallback(async (gradeId: number, fields: Record<string, unknown>) => {
     if (cycleId == null) return;
     const updated = await ivfService.updateGrade(cycleId, gradeId, fields);
     setExistingGrades(prev => prev.map(g => g.grade_id === gradeId ? updated : g));
@@ -1200,7 +1208,7 @@ function UploadScreen({ log, cycleId, bestImageUrl, imageSlots, onAdd, onRemove,
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false);
-    Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).forEach(onAdd);
+    Array.from(e.dataTransfer.files).filter(f => ACCEPTED_IMAGE_TYPES.includes(f.type)).forEach(onAdd);
   };
 
   // The screen fills the viewport at every width so the action bar is always on
@@ -1310,8 +1318,8 @@ function UploadScreen({ log, cycleId, bestImageUrl, imageSlots, onAdd, onRemove,
                 <Camera size={14} /> Use Camera
               </button>
             </div>
-            <p className="text-[10px] text-gray-400">Supports JPG, PNG, TIFF • Max size 20MB per file</p>
-            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
+            <p className="text-[10px] text-gray-400">Supports JPG, PNG, WebP • Max size 20MB per file</p>
+            <input ref={fileInputRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(',')} multiple className="hidden"
               onChange={e => { Array.from(e.target.files ?? []).forEach(onAdd); e.target.value = ''; }} />
           </div>
 
@@ -1839,7 +1847,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
   grades: IvfGrade[]; selectedIdx: number; onSelectIdx: (i: number) => void; newGradeIds: number[];
   grade: IvfGrade | null;
   saving: boolean; onBack: () => void; onApprove: (opts: { day: 'Day 5' | 'Day 6'; fate?: string; freezeId?: string; notes?: string }) => void;
-  onOverride: (gradeId: number, fields: Record<string, string>) => Promise<void>;
+  onOverride: (gradeId: number, fields: Record<string, unknown>) => Promise<void>;
   /** Live state for a grade still being processed, if the selected one is. */
   pending?: { running: boolean; progress: number; stage: string } | null;
   onResumeGrade?: (gradeId: number) => void;
@@ -1887,14 +1895,21 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
   const [showOriginalGrade, setShowOriginalGrade] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [overriding, setOverriding] = useState(false);
-  const [ov, setOv] = useState({ grade: '', hatching: '', vacuolization: '', multinucleation: '', zona_pellucida: '', blastocoel: '', cytoplasmic_granularity: '', bridge: '' });
+  const [ov, setOv] = useState({ grade: '', hatching: '', zona_pellucida: '', blastocoel: '', bridge: '', blackspot: '', early_blast: '' });
+  const [ovReasons, setOvReasons] = useState({ hatching: '', zona_pellucida: '', blastocoel: '', bridge: '', blackspot: '', early_blast: '' });
   const [reason, setReason] = useState('');
   useEffect(() => {
     if (!grade) return;
+    const qf = grade.quality_flags ?? {};
+    const qfr = grade.quality_flag_reasons ?? {};
     setOv({
-      grade: grade.grade ?? '', hatching: grade.hatching ?? '', vacuolization: grade.vacuolization ?? '',
-      multinucleation: grade.multinucleation ?? '', zona_pellucida: grade.zona_pellucida ?? '',
-      blastocoel: grade.blastocoel ?? '', cytoplasmic_granularity: grade.cytoplasmic_granularity ?? '', bridge: grade.bridge ?? '',
+      grade: grade.grade ?? '', hatching: qf.hatching ?? '', zona_pellucida: qf.zona_pellucida ?? '',
+      blastocoel: qf.blastocoel ?? '', bridge: qf.bridge ?? '',
+      blackspot: qf.blackspot ?? '', early_blast: qf.early_blast ?? '',
+    });
+    setOvReasons({
+      hatching: qfr.hatching ?? '', zona_pellucida: qfr.zona_pellucida ?? '', blastocoel: qfr.blastocoel ?? '',
+      bridge: qfr.bridge ?? '', blackspot: qfr.blackspot ?? '', early_blast: qfr.early_blast ?? '',
     });
     setReason(grade.override_reason ?? '');
     setShowOriginalGrade(false);
@@ -1919,10 +1934,12 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
   // no ai_score fallback, so nothing gets badged best by default.
   const bestGradeId = grades.find(g => g.is_best)?.grade_id ?? null;
 
+  const qualityFlags = grade?.quality_flags ?? {};
+
   // AI's own reasoning for the grade it assigned — not meaningful while viewing a human override.
   const aiGradeJustifications = [
     grade?.exp_inference && { t: `Expansion${gardner ? `: ${gardner[1]}` : ''}`, d: grade.exp_inference },
-    grade?.hatching && { t: `Hatching: ${grade.hatching}`, d: grade.hatching === 'Hatching'
+    qualityFlags.hatching && { t: `Hatching: ${qualityFlags.hatching}`, d: qualityFlags.hatching === 'Hatching'
       ? 'The blastocyst has begun breaching the zona pellucida.'
       : 'The blastocyst remains fully enclosed within the zona pellucida.' },
     grade?.icm_inference && { t: `Inner cell mass${gardner ? `: ${gardner[2].toUpperCase()}` : ''}`, d: grade.icm_inference },
@@ -1931,8 +1948,8 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
 
   // Direct morphology observations from the image — valid regardless of any override.
   const morphologyJustifications = [
-    grade?.zona_pellucida && { t: `Zona pellucida: ${grade.zona_pellucida}`, d: 'The zona pellucida appearance supports normal embryo integrity.' },
-    grade?.blastocoel && { t: `Blastocoel: ${grade.blastocoel}`, d: 'Blastocoel expansion is consistent with healthy development.' },
+    qualityFlags.zona_pellucida && { t: `Zona pellucida: ${qualityFlags.zona_pellucida}`, d: 'The zona pellucida appearance supports normal embryo integrity.' },
+    qualityFlags.blastocoel && { t: `Blastocoel: ${qualityFlags.blastocoel}`, d: 'Blastocoel expansion is consistent with healthy development.' },
   ].filter(Boolean) as { t: string; d: string }[];
 
   return (
@@ -2421,9 +2438,12 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
               <div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {[
-                    { Icon: CircleDashed, label: 'Hatching', val: grade?.hatching },
-                    { Icon: Shield, label: 'Zona Pellucida', val: grade?.zona_pellucida },
-                    { Icon: CircleDot, label: 'Blastocoel', val: grade?.blastocoel },
+                    { Icon: CircleDashed, label: 'Hatching', val: qualityFlags.hatching },
+                    { Icon: Shield, label: 'Zona Pellucida', val: qualityFlags.zona_pellucida },
+                    { Icon: CircleDot, label: 'Blastocoel', val: qualityFlags.blastocoel },
+                    { Icon: Link2, label: 'Bridge', val: qualityFlags.bridge },
+                    { Icon: CircleAlert, label: 'Blackspot', val: qualityFlags.blackspot },
+                    { Icon: Rocket, label: 'Early Blast', val: qualityFlags.early_blast },
                   ].map(({ Icon, label, val }) => (
                     <div key={label} className="rounded-lg border border-line bg-surface/40 px-3 py-2 flex flex-col gap-1.5">
                       <div className="flex items-center gap-2 min-w-0">
@@ -2572,8 +2592,7 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
             <div className="p-5 flex flex-col gap-5 overflow-y-auto min-h-0 [&>*]:shrink-0">
               <div className="rounded-2xl border border-primary/10 overflow-hidden">
                 <div className="px-4 py-3 bg-primary/5 border-b border-primary/10">
-                  <p className="text-[8px] font-bold uppercase tracking-widest text-primary/50 mb-0.5">Grade</p>
-                  <p className="text-[10px] text-gray-400">Enter a new grade value</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-primary mb-0.5">Grade</p>
                 </div>
                 <div className="p-4">
                   <div className="flex items-center gap-3 flex-wrap">
@@ -2593,34 +2612,42 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                         style={{ background: 'var(--gradient-primary)' }}>{ov.grade || '—'}</span>
                     </div>
                   </div>
+                  <div className="mt-3">
+                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Reason for override</label>
+                    <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2}
+                      className="w-full rounded-lg border border-gray-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary-muted/30 focus:border-primary-muted"
+                      placeholder="Why are you changing the AI's grade?" />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Reason for override</label>
-                <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2}
-                  className="w-full rounded-lg border border-gray-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary-muted/30 focus:border-primary-muted"
-                  placeholder="Why are you changing the AI's grade?" />
-              </div>
-
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">Quality Flags</p>
-                <div className="flex flex-col gap-2">
-                  {([
-                    { label: 'Hatching', key: 'hatching', opts: ['Not Hatching', 'Hatching', 'Partially Hatching'] },
-                    { label: 'Zona Pellucida', key: 'zona_pellucida', opts: ['Intact', 'Good', 'Thinning'] },
-                    { label: 'Blastocoel', key: 'blastocoel', opts: ['Excellent', 'Good', 'Fair', 'Poor'] },
-                  ] as const).map(({ label, key, opts }) => (
-                    <div key={key} className="flex items-center justify-between py-1 border-b border-gray-50">
-                      <span className="text-xs text-gray-600 font-medium">{label}</span>
-                      <select value={ov[key]} onChange={e => setOv(v => ({ ...v, [key]: e.target.value }))}
-                        className="text-xs font-semibold border border-primary/20 rounded-lg px-2.5 py-1 outline-none text-primary bg-primary/[0.04]">
-                        <option value="">—</option>
-                        {opts.map(o => <option key={o} value={o}>{o}</option>)}
-                      </select>
+              <div className="flex flex-col gap-2">
+                {([
+                  { label: 'Hatching', key: 'hatching', opts: ['Not Hatched', 'Hatching', 'Hatched'] },
+                  { label: 'Zona Pellucida', key: 'zona_pellucida', opts: ['Split Formation', 'Intact', 'Thinning'] },
+                  { label: 'Blastocoel', key: 'blastocoel', opts: ['Early Expansion', 'Fully Expanded', 'Over-Expanded'] },
+                  { label: 'Bridge', key: 'bridge', opts: ['Absent', 'Present'] },
+                  { label: 'Blackspot', key: 'blackspot', opts: ['Absent', 'Present'] },
+                  { label: 'Early Blast', key: 'early_blast', opts: ['EB1', 'EB2', 'EB3'] },
+                ] as const).map(({ label, key, opts }) => {
+                  const aiValue = grade.ai_quality_flags?.[key];
+                  return (
+                  <div key={key} className="rounded-xl border border-primary/10 overflow-hidden">
+                    <div className="px-3 py-1.5 bg-primary/5 border-b border-primary/10 flex items-center justify-between gap-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-primary">{label}</p>
+                      <FloatingSelect value={ov[key]} onChange={v => setOv(prev => ({ ...prev, [key]: v }))} options={opts} />
                     </div>
-                  ))}
-                </div>
+                    <div className="px-3 py-1.5">
+                      {aiValue && aiValue !== ov[key] && (
+                        <span className="text-[9px] text-gray-400">AI: {aiValue}</span>
+                      )}
+                      <input value={ovReasons[key]} onChange={e => setOvReasons(v => ({ ...v, [key]: e.target.value }))}
+                        placeholder="Reason (optional)"
+                        className={`w-full rounded-md border border-gray-100 px-2 py-0.5 text-[10px] text-gray-600 outline-none focus:ring-1 focus:ring-primary-muted/30 focus:border-primary-muted ${aiValue && aiValue !== ov[key] ? 'mt-1' : ''}`} />
+                    </div>
+                  </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -2631,7 +2658,13 @@ function ResultScreen({ log, cycle, grades, selectedIdx, onSelectIdx, newGradeId
                 onClick={async () => {
                   setOverriding(true);
                   try {
-                    await onOverride(grade.grade_id, { ...ov, override_reason: reason });
+                    const { grade: newGrade, hatching, zona_pellucida, blastocoel, bridge, blackspot, early_blast } = ov;
+                    await onOverride(grade.grade_id, {
+                      grade: newGrade,
+                      quality_flags: { hatching, zona_pellucida, blastocoel, bridge, blackspot, early_blast },
+                      quality_flag_reasons: ovReasons,
+                      override_reason: reason,
+                    });
                     setOverrideOpen(false);
                   }
                   finally { setOverriding(false); }
