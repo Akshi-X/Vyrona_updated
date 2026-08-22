@@ -34,10 +34,11 @@ export function parseUtc(iso?: string | null): Date | null {
 }
 
 export function toMorphology(g: IvfGrade): EmbryoMorphology {
+  const qf = g.quality_flags ?? {};
   return {
-    hatching: g.hatching ?? '—',
-    zonaPellucida: g.zona_pellucida ?? '—',
-    blastocoelQuality: g.blastocoel ?? '—',
+    hatching: qf.hatching ?? '—',
+    zonaPellucida: qf.zona_pellucida ?? '—',
+    blastocoelQuality: qf.blastocoel ?? '—',
     expInference: g.exp_inference ?? 'No expansion inference recorded.',
     icmInference: g.icm_inference ?? 'No ICM inference recorded.',
     teInference: g.te_inference ?? 'No TE inference recorded.',
