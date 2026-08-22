@@ -485,7 +485,7 @@ def run_eigencam(grading_model, img_4ch_tensor, feats_tensor, img_bgr_orig,
             with torch.no_grad():
                 logits = wrapper(img_4ch_tensor.unsqueeze(0).to(DEVICE))
             pred_class = logits.argmax(1).item()
-        grayscale = cam(input_tensor=img_4ch_tensor.unsqueeze(0).to(DEVICE))[0]
+        grayscale = cam(input_tensor=img_4ch_tensor.unsqueeze(0).to(DEVICE), targets=None)[0]
 
     img_rgb  = cv2.cvtColor(img_bgr_orig, cv2.COLOR_BGR2RGB)
     img_rgb  = cv2.resize(img_rgb, (IMG_SIZE, IMG_SIZE))
