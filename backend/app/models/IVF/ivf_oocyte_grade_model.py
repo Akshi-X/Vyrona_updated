@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, DateTime, Float, Boolean, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from ...config.database import Base
@@ -21,14 +22,16 @@ class IvfOocyteGrade(Base):
     # of what the AI originally said.
     ai_grade = Column(String(10), nullable=True)
     ai_score = Column(Float, nullable=True)
-    hatching = Column(String(50), nullable=True)
-    vacuolization = Column(String(50), nullable=True)
-    multinucleation = Column(String(50), nullable=True)
-    # Free-text descriptions from the grading service, not short enum-ish labels
-    zona_pellucida = Column(Text, nullable=True)
-    blastocoel = Column(Text, nullable=True)
-    cytoplasmic_granularity = Column(String(50), nullable=True)
-    bridge = Column(String(50), nullable=True)
+    # {hatching, zona_pellucida, blastocoel, bridge, blackspot, early_blast}
+    # — see QUALITY_FLAG_FIELDS in IvfCycleService.
+    quality_flags = Column(JSONB, nullable=True)
+    # Optional, per-flag free-text reason: {hatching: "...", bridge: "...", ...}.
+    # Independent of override_reason (which is for the grade itself) — not required.
+    quality_flag_reasons = Column(JSONB, nullable=True)
+    # Snapshot of quality_flags taken once on the first human override — same
+    # rationale as ai_grade: the AI worker writes these directly via raw SQL,
+    # so this is the only place that captures the pre-override values.
+    ai_quality_flags = Column(JSONB, nullable=True)
     note = Column(Text, nullable=True)
     override_reason = Column(Text, nullable=True)  # why a human changed the AI-generated grade
     # Per-region clinical descriptions returned by the grading service

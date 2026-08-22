@@ -7,7 +7,7 @@ from typing import List, Optional
 from app.utils import ivf_blob
 
 from app.config.database import get_db
-from app.service.IVF.ivf_cycle_service import IvfCycleService
+from app.service.IVF.ivf_cycle_service import IvfCycleService, QUALITY_FLAG_FIELDS
 from app.schemas.IVF.ivf_cycle_schema import (
     CycleCreate,
     CycleUpdate,
@@ -40,6 +40,27 @@ router = APIRouter(prefix="/ivf", tags=["IVF Cycles"])
 
 # Matches the limit the upload UI advertises.
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+class UnsupportedImageError(Exception):
+    """Raised when the uploaded bytes aren't one of the accepted image formats."""
+
+# content_type is client-supplied, so the bytes get the final say.
+_IMAGE_MAGIC = (
+    (b"\xff\xd8\xff", "image/jpeg"),
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+)
+
+
+def _sniff_image_type(data: bytes) -> Optional[str]:
+    for magic, mime in _IMAGE_MAGIC:
+        if data.startswith(magic):
+            return mime
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 def _ivf_user(request: Request):
@@ -342,12 +363,18 @@ def update_grade(
     if not existing:
         raise HTTPException(status_code=404, detail="Grade not found")
     old_grade = existing.grade
+    old_flags = dict(existing.quality_flags or {})
     record = svc.update_grade(grade_id, cycle_id, payload, user_id=str(user.user_id))
     if not record:
         raise HTTPException(status_code=404, detail="Grade not found")
     # Only a genuine override (a stated reason) is worth an audit-log entry —
     # unrelated partial updates like soft-deleting via is_active shouldn't log as one.
     if payload.override_reason:
+        new_flags = record.quality_flags or {}
+        changed_flags = {
+            f: {"old": old_flags.get(f), "new": new_flags.get(f)}
+            for f in QUALITY_FLAG_FIELDS if old_flags.get(f) != new_flags.get(f)
+        }
         ActivityLogService(db).log_activity(
             action="ivf_cycle.grade.overridden",
             outcome=ActivityOutcome.SUCCESS.value,
@@ -356,6 +383,7 @@ def update_grade(
             metadata={
                 "cycle_id": cycle_id, "grade_id": grade_id,
                 "old_grade": old_grade, "new_grade": record.grade,
+                "changed_quality_flags": changed_flags,
                 "reason": payload.override_reason,
             },
             audit_log_disabled=is_audit_log_disabled_for_user(user),
@@ -457,12 +485,16 @@ def create_grade_with_image(
         raise HTTPException(status_code=404, detail="Cycle not found")
     if not svc.get_log(log_id, cycle_id):
         raise HTTPException(status_code=404, detail="Log entry not found")
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=415, detail="Only JPG, PNG and WebP images are accepted")
     grade = svc.create_grade(log_id, cycle_id, GradeUpsert(stage=stage), user_id=str(user.user_id))
 
     try:
         data = file.file.read()
         if len(data) > MAX_IMAGE_BYTES:
             raise ValueError(f"Image exceeds the {MAX_IMAGE_BYTES // (1024 * 1024)}MB limit")
+        if _sniff_image_type(data) is None:
+            raise UnsupportedImageError("Only JPG, PNG and WebP images are accepted")
         blob_path = ivf_blob.make_blob_path(
             f"ivf/oocytes/{cycle_id}/{grade.grade_id}", file.filename or "", "upload",
         )
@@ -475,6 +507,9 @@ def create_grade_with_image(
             file_size=len(data),
             user_id=str(user.user_id),
         )
+    except UnsupportedImageError as e:
+        svc.delete_grade(grade.grade_id, cycle_id)
+        raise HTTPException(status_code=415, detail=str(e))
     except ValueError as e:
         svc.delete_grade(grade.grade_id, cycle_id)
         raise HTTPException(status_code=413, detail=str(e))
