@@ -31,6 +31,8 @@ import segmentation_models_pytorch as smp
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 from PIL import Image
+from pytorch_grad_cam import EigenCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import config
@@ -192,7 +194,7 @@ class GradingModel(nn.Module):
 
 
 class HeadWrapper(nn.Module):
-    """Wraps GradingModel so ScoreCAM can target a single head's logits."""
+    """Wraps GradingModel so a CAM method can target a single head's logits."""
 
     def __init__(self, model, feats_tensor, head="exp"):
         super().__init__()
@@ -440,6 +442,17 @@ def run_scorecam(grading_model, img_4ch_tensor, feats_tensor, img_bgr_orig,
     else:
         cam = np.zeros_like(cam)
 
+    # This ScoreCAM variant scores a mask by how much the class score rises
+    # when that region is kept visible and the rest is zeroed out, so a raw
+    # cam value of 1 means "highest-scoring region," not "most important."
+    # Invert so the JET convention matches EigenCAM: red = most focused,
+    # fading to blue elsewhere.
+    cam = 1.0 - cam
+
+    # Gamma-compress so only the true hotspot stays red instead of most of
+    # the frame, matching EigenCAM's sparser look.
+    cam = cam ** 1.3
+
     img_rgb = cv2.resize(cv2.cvtColor(img_bgr_orig, cv2.COLOR_BGR2RGB), (IMG_SIZE, IMG_SIZE)).astype(np.float32) / 255.0
     heatmap = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
     heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
@@ -448,6 +461,37 @@ def run_scorecam(grading_model, img_4ch_tensor, feats_tensor, img_bgr_orig,
     blended = (1 - image_weight) * heatmap + image_weight * img_rgb
     blended = blended / blended.max()
     return np.uint8(255 * blended)
+
+
+# ── EigenCAM attention per head ───────────────────────────────────────────────
+
+def run_eigencam(grading_model, img_4ch_tensor, feats_tensor, img_bgr_orig,
+                 head="te", pred_class=None, use_backbone=False):
+    """Returns an RGB uint8 overlay showing where the model looked for this head."""
+    wrapper = HeadWrapper(grading_model, feats_tensor.unsqueeze(0), head).to(DEVICE)
+    target_layer = (
+        [wrapper.model.cnn.features.denseblock4.denselayer16.conv2]
+        if use_backbone else
+        {'exp': [wrapper.model.attn_exp],
+         'icm': [wrapper.model.attn_icm],
+         'te':  [wrapper.model.attn_te]}[head]
+    )
+
+    # EigenCAM needs no gradients and no class target — it's PCA on the
+    # activations at target_layer. pred_class is only computed here for
+    # display/logging purposes, it does not affect the CAM output at all.
+    with EigenCAM(model=wrapper, target_layers=target_layer) as cam:
+        if pred_class is None:
+            with torch.no_grad():
+                logits = wrapper(img_4ch_tensor.unsqueeze(0).to(DEVICE))
+            pred_class = logits.argmax(1).item()
+        grayscale = cam(input_tensor=img_4ch_tensor.unsqueeze(0).to(DEVICE))[0]
+
+    img_rgb  = cv2.cvtColor(img_bgr_orig, cv2.COLOR_BGR2RGB)
+    img_rgb  = cv2.resize(img_rgb, (IMG_SIZE, IMG_SIZE))
+    gray_3ch = img_rgb.astype(np.float32) / 255.0
+    overlay  = show_cam_on_image(gray_3ch, grayscale, use_rgb=True)
+    return overlay, grayscale, pred_class
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -563,8 +607,8 @@ def analyse(image_bytes: bytes) -> dict:
     conf_exp, conf_icm, conf_te = float(exp_probs[i_exp]), float(icm_probs[i_icm]), float(te_probs[i_te])
 
     exp_img = run_scorecam(grading_model, img_t, feats_t, img_bgr, head="exp", pred_class=i_exp)
-    icm_img = run_scorecam(grading_model, img_t, feats_t, img_bgr, head="icm", pred_class=i_icm)
-    te_img = run_scorecam(grading_model, img_t, feats_t, img_bgr, head="te", pred_class=i_te)
+    icm_img, _, _ = run_eigencam(grading_model, img_t, feats_t, img_bgr, head="icm", pred_class=i_icm)
+    te_img, _, _ = run_eigencam(grading_model, img_t, feats_t, img_bgr, head="te", pred_class=i_te)
 
     seg_rgb = SEG_PALETTE[class_map]
     orig_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)

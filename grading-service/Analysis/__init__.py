@@ -22,12 +22,16 @@ import azure.functions as func
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import config
 from shared.database import ensure_ml_jobs_table_exists
-from shared.job_handler import create_job, run_job
+from shared.job_handler import create_job, run_job, start_recovery_once
 
 logger = logging.getLogger(__name__)
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
+    # Jobs live in a thread, so anything in flight when the previous worker
+    # stopped is stranded in the table. Sweep once per process, off-thread.
+    start_recovery_once()
+
     if not config.validate():
         return func.HttpResponse("Service configuration error", status_code=500)
 
@@ -56,3 +60,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         status_code=202,
         mimetype="application/json",
     )
+
+
+# The worker imports this module as the host starts, so recovery begins then
+# rather than waiting for traffic; the call above covers the case where the
+# first sweep couldn't reach the database yet.
+start_recovery_once()

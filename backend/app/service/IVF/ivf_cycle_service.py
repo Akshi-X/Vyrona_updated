@@ -14,6 +14,11 @@ from ...schemas.IVF.ivf_cycle_schema import CycleCreate, CycleUpdate, LogUpsert
 
 logger = logging.getLogger(__name__)
 
+# Keys inside the quality_flags JSON column. The AI grading worker writes some
+# of these together, in one pass, via raw SQL — see IvfCycleService.update_grade
+# for how the pre-override values get snapshotted.
+QUALITY_FLAG_FIELDS = ["hatching", "zona_pellucida", "blastocoel", "bridge", "blackspot", "early_blast"]
+
 
 class IvfCycleService:
 
@@ -234,6 +239,16 @@ class IvfCycleService:
         # is still the AI's original value, about to be replaced by `payload`.
         if record.ai_grade is None and record.grade and 'grade' in payload:
             record.ai_grade = record.grade
+        # Same idea for quality_flags — snapshot it whole the first time it's
+        # touched here, then merge the incoming partial update into it (a plain
+        # setattr would otherwise blow away whichever keys the caller didn't send).
+        if 'quality_flags' in payload:
+            if record.ai_quality_flags is None and record.quality_flags:
+                record.ai_quality_flags = dict(record.quality_flags)
+            payload['quality_flags'] = {**(record.quality_flags or {}), **payload['quality_flags']}
+        # Per-flag reasons merge the same way — optional, never required.
+        if 'quality_flag_reasons' in payload:
+            payload['quality_flag_reasons'] = {**(record.quality_flag_reasons or {}), **payload['quality_flag_reasons']}
         for field, value in payload.items():
             setattr(record, field, value)
         record.graded_by = user_id

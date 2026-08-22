@@ -1794,13 +1794,13 @@ export interface IvfGrade {
     // overwritten afterward, even if `grade` is later overridden.
     ai_grade: string | null;
     ai_score: number | null;
-    hatching: string | null;
-    vacuolization: string | null;
-    multinucleation: string | null;
-    zona_pellucida: string | null;
-    blastocoel: string | null;
-    cytoplasmic_granularity: string | null;
-    bridge: string | null;
+    // {hatching, zona_pellucida, blastocoel, bridge, blackspot, early_blast}
+    quality_flags: Record<string, string | null> | null;
+    // Optional, per-flag free-text reason — independent of override_reason.
+    quality_flag_reasons: Record<string, string | null> | null;
+    // Set once by the server the first time a human overrides any quality flag;
+    // snapshots what quality_flags was before that change, never touched again.
+    ai_quality_flags: Record<string, string | null> | null;
     note: string | null;
     icm_inference: string | null;
     te_inference: string | null;
