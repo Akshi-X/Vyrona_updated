@@ -19,6 +19,8 @@ local.settings.json
 .env*
 
 # IDE
+resource_logs/
+others/
 .vscode/
 .idea/
 *.swp

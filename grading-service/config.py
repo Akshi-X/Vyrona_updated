@@ -43,6 +43,21 @@ class Settings(BaseSettings):
     SEG_MODEL_PATH: str = "models/segment_model.pth"
     GRADING_MODEL_PATH: str = "models/grading_model.pth"
 
+    # Caps how many ml_models.analyse() calls run at once, regardless of how
+    # many HTTP requests/jobs are in flight (Analysis/__init__.py fires an
+    # unbounded thread per request). Each concurrent call independently spins
+    # up its own PyTorch intra-op thread pool and holds a full set of model
+    # activations in memory, so leaving this uncapped oversubscribes both CPU
+    # and RAM under real concurrent load.
+    #
+    # ml_models.py splits cores evenly across this many slots (cores // this).
+    # Measured on a 10-core box: 4 slots (2 threads each) made each call take
+    # ~150s vs a ~15-22s solo baseline — ScoreCAM/EigenCAM need real intra-op
+    # width, so starving threads hurts far more than proportional contention
+    # would. Fewer slots with more threads each tests much closer to baseline.
+    # Tune per deployment's actual cores/RAM.
+    ML_MAX_CONCURRENT_INFERENCE: int = 2
+
     # Embryo detection gate — structural sanity check on the segmentation output.
     # Tunable per deployment; the model was never trained to reject non-embryos.
     DETECT_ENABLED: bool = True

@@ -50,6 +50,14 @@ TE_INV = {0: "A", 1: "B"}
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Each analyse() call otherwise defaults to a full-core-width intra-op thread
+# pool on its own; under job_handler.py's concurrency cap (ML_MAX_CONCURRENT_INFERENCE
+# concurrent calls), that means N calls each grabbing every core, massively
+# oversubscribing the machine. Split the cores evenly across the calls the
+# semaphore actually allows to run at once instead.
+if DEVICE.type == "cpu":
+    torch.set_num_threads(max(1, (os.cpu_count() or 1) // max(1, config.ML_MAX_CONCURRENT_INFERENCE)))
+
 # 0=bg 1=ZP 2=TE 3=Blastocoel 4=ICM
 SEG_PALETTE = np.array([
     [30, 30, 30],
