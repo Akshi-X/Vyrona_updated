@@ -25,6 +25,7 @@ from app.constants.kpi_constants import (
     AGG_BUCKET_MINUTES_1H,
     AGG_BUCKET_MINUTES_7D,
     AGG_BUCKET_MINUTES_24H,
+    RECENT_READING_WINDOW_DAYS,
 )
 from app.exceptions.patient_exceptions import PatientNotFoundException
 from app.exceptions.quality_exceptions import (
@@ -1167,11 +1168,17 @@ class QualityService:
             .subquery("kpi_cfg")
         )
 
+        # Bounded to RECENT_READING_WINDOW_DAYS so TimescaleDB can exclude old
+        # chunks at plan time instead of walking every chunk in the hypertable —
+        # cost otherwise grows with chunk count regardless of where the last_n
+        # rows actually sit.
+        recent_cutoff = datetime.now(timezone.utc) - timedelta(days=RECENT_READING_WINDOW_DAYS)
         last_n = (
             select(Readings.kpi_value, Readings.timestamp)
             .where(
                 Readings.tank_id == tank_id,
                 Readings.kpi_config_id == kpi_cfg.c.kpi_config_id,
+                Readings.timestamp > recent_cutoff,
             )
             .order_by(desc(Readings.timestamp))
             .limit(n)
@@ -1504,9 +1511,14 @@ class QualityService:
     def get_latest_tank_kpi_timestamp(self, tank_id: int) -> Optional[datetime]:
         """Return latest readings.timestamp for a tank (None when no data)."""
         try:
+            # Bounded to RECENT_READING_WINDOW_DAYS so TimescaleDB can exclude old
+            # chunks at plan time instead of costing an Append over every chunk in
+            # the hypertable — that alone was ~29s of planning time per call, and
+            # this runs on every 1H/24H/7D chart load.
+            recent_cutoff = datetime.now(timezone.utc) - timedelta(days=RECENT_READING_WINDOW_DAYS)
             latest_ts = (
                 self.db.query(func.max(Readings.timestamp))
-                .filter(Readings.tank_id == tank_id)
+                .filter(Readings.tank_id == tank_id, Readings.timestamp > recent_cutoff)
                 .scalar()
             )
             return latest_ts

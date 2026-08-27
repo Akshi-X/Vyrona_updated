@@ -16,7 +16,7 @@ const toDeviationCount = (value: unknown): number => {
 const deriveInboundStatus = (
     statusValue: unknown,
     deviationsValue: unknown,
-): "Safe" | "Risk" | "Critical" => {
+): "Safe" | "Risk" | "Critical" | "Offline" => {
     if (toDeviationCount(deviationsValue) > 0) return "Critical";
 
     const status = String(statusValue ?? "")
@@ -24,6 +24,7 @@ const deriveInboundStatus = (
         .toLowerCase();
     if (status === "critical") return "Critical";
     if (status === "risk") return "Risk";
+    if (status === "offline") return "Offline";
     return "Safe";
 };
 
@@ -1056,15 +1057,22 @@ const ControlTower = () => {
                                                                 toDeviationCount(
                                                                     canister.deviations,
                                                                 );
+                                                            const isOffline =
+                                                                canister.status ===
+                                                                "Offline";
                                                             const sensorLabel =
-                                                                formatSensorLabel(
-                                                                    deviationCount,
-                                                                );
+                                                                isOffline
+                                                                    ? "OFFLINE"
+                                                                    : formatSensorLabel(
+                                                                          deviationCount,
+                                                                      );
                                                             const pillClass =
-                                                                deviationCount >
-                                                                0
-                                                                    ? "border-[#FECACA] bg-[#FEF3F2] text-[#B42318]"
-                                                                    : "border-[#A6F4C5] bg-[#ECFDF3] text-[#027A48]";
+                                                                isOffline
+                                                                    ? "border-gray-300 bg-gray-100 text-gray-500"
+                                                                    : deviationCount >
+                                                                        0
+                                                                      ? "border-[#FECACA] bg-[#FEF3F2] text-[#B42318]"
+                                                                      : "border-[#A6F4C5] bg-[#ECFDF3] text-[#027A48]";
                                                             return (
                                                                 <div
                                                                     key={canister.id}
