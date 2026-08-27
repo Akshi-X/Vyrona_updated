@@ -78,6 +78,15 @@ AGG_BUCKET_MINUTES_24H = 20
 # 3-hour buckets (duration in minutes) → used for 7-day range (up to ~56 points)
 AGG_BUCKET_MINUTES_7D = 3 * 60  # 180
 
+# ---------------------------------------------------------------------------
+# How far back "latest reading" queries look (active_canisters status,
+# tracking-page chart). Bounding these lets TimescaleDB exclude old chunks
+# from the readings hypertable at plan time instead of scanning every chunk
+# looking for a match. A tank/KPI with no reading inside this window is
+# treated as offline/no-data rather than falling back to a stale value.
+# ---------------------------------------------------------------------------
+RECENT_READING_WINDOW_DAYS = 3
+
 
 class KPIConstants:
     KPI_NAMES = KPI_NAMES
