@@ -207,7 +207,8 @@ class CanisterStatus(str, Enum):
     SAFE = "safe"
     RISK = "risk"
     CRITICAL = "critical"
-    
+    OFFLINE = "offline"
+
     @classmethod
     def list(cls):
         return [status.value for status in cls]

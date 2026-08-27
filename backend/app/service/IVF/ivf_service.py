@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Dict, List, Optional
 import logging
 
@@ -10,6 +10,7 @@ from ...models.kpi_config_model import KpiConfig
 from ...models.readings_model import Readings
 
 from ...constants.enums import CanisterStatus
+from ...constants.kpi_constants import RECENT_READING_WINDOW_DAYS
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
@@ -152,7 +153,7 @@ class IVFService:
                          for branches under that hospital.
             branch_id: Optional branch ID to filter by. If provided, only returns tanks for that branch.
             branch_name: Optional branch name filter (additional compatibility filter).
-            status: Optional tank status to filter by (safe, risk, critical). If provided, only returns tanks with that status.
+            status: Optional tank status to filter by (safe, risk, critical, offline). If provided, only returns tanks with that status.
         
         Returns:
             Dictionary containing:
@@ -162,7 +163,8 @@ class IVFService:
                 - tanks: List of active tanks with:
                     - tank_code: Tank code (e.g., 'T1')
                     - updated_at: Latest refill log datetime (refill_date/refill_time); null if no refill logs exist
-                    - status: Tank status (safe, risk, critical)
+                    - status: Tank status (safe, risk, critical, offline — offline means no
+                      reading in any KPI within RECENT_READING_WINDOW_DAYS)
             - total: Total number of active tanks across all branches
         """
         try:
@@ -192,24 +194,33 @@ class IVFService:
 
             # LATERAL: for each (tank_id, kpi_config_id) pair, fetch the single latest
             # reading using the (tank_id, kpi_config_id, timestamp) index — O(log N) each.
+            # Bounded to RECENT_READING_WINDOW_DAYS so TimescaleDB can exclude old
+            # chunks at plan time instead of walking every chunk in the hypertable
+            # looking for a match (cost otherwise grows with chunk count).
+            recent_cutoff = datetime.now(timezone.utc) - timedelta(days=RECENT_READING_WINDOW_DAYS)
             latest_r = (
                 select(Readings.deviation)
                 .where(
                     Readings.tank_id == kpi_pairs.c.tank_id,
                     Readings.kpi_config_id == kpi_pairs.c.kpi_config_id,
+                    Readings.timestamp > recent_cutoff,
                 )
                 .order_by(desc(Readings.timestamp))
                 .limit(1)
                 .lateral("latest_r")
             )
 
-            # Deviation count per tank across all KPIs (latest reading each)
+            # Deviation count per tank across all KPIs (latest reading each), plus
+            # whether any KPI had a reading at all inside the window — a tank with
+            # none is offline/stale rather than genuinely safe.
             deviations_subq = (
                 select(
                     kpi_pairs.c.tank_id,
                     func.count()
                     .filter(latest_r.c.deviation == True)
-                    .label("total_deviations")
+                    .label("total_deviations"),
+                    func.bool_or(latest_r.c.deviation.isnot(None))
+                    .label("has_recent_data"),
                 )
                 .outerjoin(latest_r, true())
                 .group_by(kpi_pairs.c.tank_id)
@@ -245,6 +256,7 @@ class IVFService:
                     HospitalBranch.branch_id,
                     HospitalBranch.branch_name,
                     func.coalesce(deviations_subq.c.total_deviations, 0).label("total_deviations"),
+                    func.coalesce(deviations_subq.c.has_recent_data, False).label("has_recent_data"),
                     latest_refill_subq.c.refill_date.label("latest_refill_date"),
                     latest_refill_subq.c.refill_time.label("latest_refill_time")
                 )
@@ -267,8 +279,13 @@ class IVFService:
             branches_dict = defaultdict(lambda: {"branch_id": None, "branch_name": None, "tanks": []})
             total_tanks = 0
 
-            for tank, branch_id_val, branch_name_val, total_deviations, latest_refill_date, latest_refill_time in results:
-                calculated_status = "critical" if total_deviations > 0 else "safe"
+            for tank, branch_id_val, branch_name_val, total_deviations, has_recent_data, latest_refill_date, latest_refill_time in results:
+                if total_deviations > 0:
+                    calculated_status = "critical"
+                elif not has_recent_data:
+                    calculated_status = "offline"
+                else:
+                    calculated_status = "safe"
                 latest_activity_at = None
                 if latest_refill_date:
                     latest_activity_at = datetime.combine(
