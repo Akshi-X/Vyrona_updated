@@ -1511,9 +1511,14 @@ class QualityService:
     def get_latest_tank_kpi_timestamp(self, tank_id: int) -> Optional[datetime]:
         """Return latest readings.timestamp for a tank (None when no data)."""
         try:
+            # Bounded to RECENT_READING_WINDOW_DAYS so TimescaleDB can exclude old
+            # chunks at plan time instead of costing an Append over every chunk in
+            # the hypertable — that alone was ~29s of planning time per call, and
+            # this runs on every 1H/24H/7D chart load.
+            recent_cutoff = datetime.now(timezone.utc) - timedelta(days=RECENT_READING_WINDOW_DAYS)
             latest_ts = (
                 self.db.query(func.max(Readings.timestamp))
-                .filter(Readings.tank_id == tank_id)
+                .filter(Readings.tank_id == tank_id, Readings.timestamp > recent_cutoff)
                 .scalar()
             )
             return latest_ts
