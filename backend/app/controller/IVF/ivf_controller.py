@@ -148,7 +148,7 @@ def get_active_canisters(
     request: Request,
     db: Session = Depends(get_db),
     branch_id: Optional[int] = Query(None, description="Optional branch ID filter"),
-    status: Optional[CanisterStatus] = Query(None, description="Optional tank status filter (safe, risk, critical)")
+    status: Optional[CanisterStatus] = Query(None, description="Optional tank status filter (safe, risk, critical, offline)")
 ):
     """
     Get active tanks grouped by branch for the current logged-in user's hospital.
