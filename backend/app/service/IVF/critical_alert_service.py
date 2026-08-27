@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from ...config.config import settings
 from ...config.database import SessionLocal
+from ...constants.kpi_constants import RECENT_READING_WINDOW_DAYS
 from ...constants.enums import (
     AlertSource,
     AlertTriggeredBy,
@@ -772,12 +773,20 @@ class CriticalAlertService:
         # arrives first sets occurred_at. Without an explicit order Postgres returns heap
         # order, which shifts whenever a row is updated, and the alert lands on an
         # arbitrary reading instead of the one that started the excursion.
+        # Bounded to RECENT_READING_WINDOW_DAYS so TimescaleDB can exclude old
+        # chunks at plan time instead of building an Append plan over every chunk
+        # in the hypertable — that alone was costing ~36s of planning time per
+        # call, and this runs every ~5s per tank while a deviation persists.
+        # checked=False rows are only ever created fresh, so a genuinely
+        # unprocessed deviation is never older than this window.
+        recent_cutoff = datetime.now(timezone.utc) - timedelta(days=RECENT_READING_WINDOW_DAYS)
         deviations = (
             self.db.query(Readings)
             .filter(
                 Readings.tank_id == tank_id,
                 Readings.deviation == True,
                 or_(Readings.checked.is_(None), Readings.checked == False),
+                Readings.timestamp > recent_cutoff,
             )
             .order_by(Readings.timestamp.asc())
             .all()
@@ -1236,10 +1245,14 @@ class CriticalAlertService:
         Check the readings table for unchecked KPI deviations on a refrigerator zone
         and create CriticalAlert records for each confirmed deviation.
         """
+        # See check_and_create_alert_for_kpi_deviations above — same unbounded
+        # scan issue, same fix.
+        recent_cutoff = datetime.now(timezone.utc) - timedelta(days=RECENT_READING_WINDOW_DAYS)
         query = self.db.query(Readings).filter(
             Readings.refrigerator_id == refrigerator_id,
             Readings.deviation == True,
             or_(Readings.checked.is_(None), Readings.checked == False),
+            Readings.timestamp > recent_cutoff,
         )
         if zone_id is not None:
             query = query.filter(Readings.zone_id == zone_id)
