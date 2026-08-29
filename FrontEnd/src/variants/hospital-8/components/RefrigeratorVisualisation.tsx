@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ACESFilmicToneMapping,
   AmbientLight,
@@ -29,12 +29,11 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { AlertTriangle, Droplets, Thermometer, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, Droplets, Info, Thermometer, TrendingUp, X } from 'lucide-react';
 import type { Task } from '../../../services/tasksService';
 import { useRefrigeratorKpiSnapshot } from '../../../pages/RefrigeratorTracking/sections/useRefrigeratorKpiSnapshot';
 import { useRefrigeratorAlertKpiNames } from '../../../pages/RefrigeratorTracking/commonComponent/useRefrigeratorAlertConfig';
-import RefrigeratorKpiGraph from '../../../pages/RefrigeratorTracking/commonComponent/RefrigeratorKpiGraph';
-import { useRefrigeratorKpiGraph } from '../../../pages/RefrigeratorTracking/commonComponent/useRefrigeratorKpiGraph';
+import RefrigeratorKpiChartModal from '../../../pages/RefrigeratorTracking/sections/RefrigeratorKpiChartModal';
 
 import { ivfAlertsService, type IVFAlert } from '../../../services/ivfAlertsService';
 import ColdStorageRoom from './ColdStorageRoom';
@@ -518,7 +517,7 @@ function EmbeddedAlerts({ refrigeratorId }: { refrigeratorId?: number }) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-3">
+    <div className="flex-1 min-h-0 max-h-[360px] overflow-y-auto p-3">
       <div className="space-y-3">
         {Object.entries(grouped).map(([dateLabel, groups]) => (
           <div key={dateLabel} className="space-y-2">
@@ -629,91 +628,223 @@ function isTempKpi(kpiName: string): boolean {
   return kpiName.includes('temp');
 }
 
-function ZoneKpiSection({
-  zone,
-  refrigeratorId,
+function OverlayInfoPanel({
+  side,
+  title,
+  titleColor,
+  isOpen,
+  onToggle,
+  children,
 }: {
-  zone: RefrigeratorZone;
-  refrigeratorId?: number;
+  side: 'left' | 'right';
+  title: string;
+  titleColor: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: ReactNode;
 }) {
-  const allowedKpiNames = useRefrigeratorAlertKpiNames(refrigeratorId, zone.zone_id, !!refrigeratorId);
+  return (
+    <div
+      className={`absolute ${side === 'left' ? 'left-3' : 'right-3'}`}
+      style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={title}
+        aria-expanded={isOpen}
+        className={`${isOpen ? 'hidden' : 'flex'} @[600px]:hidden w-7 h-7 rounded-full bg-white/85 backdrop-blur-sm border border-white/60 shadow-md items-center justify-center`}
+        style={{ color: titleColor }}
+      >
+        <Info size={14} />
+      </button>
+      <div
+        className={`${isOpen ? '' : 'hidden pointer-events-none'} @[600px]:block @[600px]:pointer-events-none bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]`}
+      >
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div className="text-[8px] font-bold tracking-widest uppercase" style={{ color: titleColor }}>{title}</div>
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={`Close ${title}`}
+            className="@[600px]:hidden -mt-0.5 -mr-1 p-0.5 rounded text-gray-400 hover:text-gray-600 shrink-0"
+          >
+            <X size={11} />
+          </button>
+        </div>
+        <div className="flex flex-col gap-1">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function CheckItem({ text }: { text: string }) {
+  return (
+    <div className="flex items-start gap-1">
+      <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
+        <circle cx="12" cy="12" r="12" fill="#22c55e" />
+        <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span className="text-[9px] text-gray-600 leading-tight">{text}</span>
+    </div>
+  );
+}
+
+function LiveConditionsPanel({
+  zones,
+  refrigeratorId,
+  selectedZoneId,
+  onZoneSelect,
+  selectedSensorId,
+  onSensorSelect,
+  onOpenChart,
+  isLoadingType,
+}: {
+  zones: RefrigeratorZone[];
+  refrigeratorId?: number;
+  selectedZoneId: string | null;
+  onZoneSelect: (zoneId: string) => void;
+  selectedSensorId?: string | null;
+  onSensorSelect?: (sensorId: string) => void;
+  onOpenChart: (kpiKey: string) => void;
+  isLoadingType: boolean;
+}) {
+  const allowedKpiNames = useRefrigeratorAlertKpiNames(
+    refrigeratorId,
+    selectedZoneId ?? undefined,
+    !!refrigeratorId && !!selectedZoneId,
+  );
   const { sensorTiles, isInitialLoading } = useRefrigeratorKpiSnapshot({
     refrigeratorId: refrigeratorId ? String(refrigeratorId) : undefined,
-    zoneId: zone.zone_id,
-    enabled: !!refrigeratorId,
+    zoneId: selectedZoneId ?? undefined,
+    enabled: !!refrigeratorId && !!selectedZoneId,
     allowedKpiNames,
   });
 
+  const orderedTiles = useMemo(
+    () => [...sensorTiles].sort((a, b) => (isTempKpi(a.id) ? 0 : 1) - (isTempKpi(b.id) ? 0 : 1)),
+    [sensorTiles],
+  );
+
+  const activeZoneName = zones.find((z) => z.zone_id === selectedZoneId)?.zone_name ?? '';
+  const loading = isLoadingType || isInitialLoading || allowedKpiNames == null;
+
   return (
-    <div className="flex flex-col gap-2">
-      {isInitialLoading || allowedKpiNames == null ? (
-        <div className="flex flex-col gap-2">
-          {[0, 1].map((i) => (
-            <div key={i} className="animate-pulse h-16 rounded-xl bg-[#f2eaf7]" />
-          ))}
+    <div className="@container min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ flex: '3 1 0%' }}>
+      <div
+        className="flex items-center justify-between gap-3 px-4 py-3 shrink-0 flex-wrap"
+        style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}
+      >
+        <div className="flex items-center gap-2">
+          <TrendingUp size={16} style={{ color: '#6b4a78' }} className="shrink-0" />
+          <div>
+            <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>Live Conditions</span>
+            <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Click a tile to view trend</span>
+          </div>
         </div>
-      ) : sensorTiles.length === 0 ? (
-        <div className="text-xs text-gray-400 italic">No data</div>
-      ) : (
-        [...sensorTiles].sort((a, b) => {
-          const aIsTemp = isTempKpi(a.id) ? 0 : 1;
-          const bIsTemp = isTempKpi(b.id) ? 0 : 1;
-          return aIsTemp - bIsTemp;
-        }).map((tile) => (
-          <ZoneKpiTileCard
-            key={`${zone.zone_id}-${tile.id}`}
-            refrigeratorId={refrigeratorId}
-            tile={tile}
-            zoneId={zone.zone_id}
-            zoneName={zone.zone_name}
-          />
-        ))
-      )}
+        {zones.length > 1 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {zones.map((z) => {
+              const isActive = selectedZoneId === z.zone_id;
+              return (
+                <button
+                  key={z.zone_id}
+                  type="button"
+                  onClick={() => onZoneSelect(z.zone_id)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                    isActive
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-primary hover:text-primary'
+                  }`}
+                >
+                  {z.zone_name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2 max-[899px]:min-h-[210px]">
+        {loading ? (
+          [0, 1].map((i) => <div key={i} className="animate-pulse h-16 rounded-xl bg-[#f2eaf7] shrink-0" />)
+        ) : zones.length === 0 ? (
+          <div className="text-xs text-gray-400 italic">No zones configured.</div>
+        ) : orderedTiles.length === 0 ? (
+          <div className="text-xs text-gray-400 italic">No sensor data.</div>
+        ) : (
+          orderedTiles.map((tile) => (
+            <ZoneKpiTileCard
+              key={`${selectedZoneId}-${tile.id}`}
+              tile={tile}
+              zoneName={activeZoneName}
+              isSelected={selectedSensorId === tile.id}
+              onClick={() => {
+                onSensorSelect?.(tile.id);
+                onOpenChart(tile.id);
+              }}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
 
 function ZoneKpiTileCard({
-  refrigeratorId,
   tile,
-  zoneId,
   zoneName,
+  isSelected,
+  onClick,
 }: {
-  refrigeratorId?: number;
   tile: {
     id: string;
     label: string;
     value: string;
     timestamp?: string | null;
     unit?: string;
+    isMissing?: boolean;
+    withinThreshold?: boolean;
   };
-  zoneId: string;
   zoneName: string;
+  isSelected: boolean;
+  onClick: () => void;
 }) {
   const isTemp = isTempKpi(tile.id);
-  const accent = isTemp ? '#1a7abb' : '#7a22c8';
-  const ring = isTemp ? 'rgba(26,122,187,0.12)' : 'rgba(122,34,200,0.12)';
+  const isAlert = !tile.isMissing && tile.withinThreshold === false;
+  const accent = isAlert ? '#dc2626' : isTemp ? '#1a7abb' : '#7a22c8';
+  const ring = isAlert
+    ? 'rgba(220,38,38,0.12)'
+    : isTemp
+      ? 'rgba(26,122,187,0.12)'
+      : 'rgba(122,34,200,0.12)';
 
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-left w-full rfg-kpi-card group ${isAlert ? 'ring-1 ring-red-300' : ''}`}
       style={{
         borderRadius: 16,
-        border: '1px solid #e6d6ee',
+        padding: '12px 14px',
+        border: `1px solid ${isSelected ? accent : '#e6d6ee'}`,
         background: '#fdfbfe',
-        boxShadow: '0 4px 12px rgba(64,17,83,0.06)',
+        boxShadow: isSelected ? `0 6px 16px ${ring}` : '0 4px 12px rgba(64,17,83,0.06)',
+        position: 'relative',
         overflow: 'hidden',
         flexShrink: 0,
       }}
     >
-      <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, position: 'relative', zIndex: 1 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 10, fontWeight: 600, color: '#8b6c97', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               {tile.label}
             </span>
-            <span className="inline-flex px-1.5 py-0.5 text-[9px] font-semibold rounded-full bg-primary/10 text-primary border border-primary/20">
-              {zoneName}
-            </span>
+            {zoneName && (
+              <span className="inline-flex px-1.5 py-0.5 text-[9px] font-semibold rounded-full bg-primary/10 text-primary border border-primary/20">
+                {zoneName}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 24, fontWeight: 700, color: accent, marginTop: 4 }}>
             {tile.value}
@@ -726,46 +857,29 @@ function ZoneKpiTileCard({
           {isTemp ? <Thermometer size={18} /> : <Droplets size={18} />}
         </div>
       </div>
-      {refrigeratorId != null && (
-        <ZoneKpiInlineGraph
-          accent={accent}
-          kpiKey={tile.id}
-          label={tile.label}
-          refrigeratorId={refrigeratorId}
-          unit={tile.unit ?? '°C'}
-          zoneId={zoneId}
-        />
-      )}
-    </div>
+      <div
+        className="opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 ease-out"
+        style={{
+          position: 'absolute',
+          right: 0,
+          bottom: 0,
+          zIndex: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '5px 10px 5px 8px',
+          borderTopLeftRadius: 12,
+          borderBottomRightRadius: 16,
+          background: accent,
+          color: '#fff',
+          boxShadow: '0 2px 8px rgba(64,17,83,0.3)',
+        }}
+      >
+        <ArrowUpRight size={13} />
+        <span style={{ fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>View trend</span>
+      </div>
+    </button>
   );
-}
-
-function ZoneKpiInlineGraph({
-  accent,
-  kpiKey,
-  label,
-  refrigeratorId,
-  unit,
-  zoneId,
-}: {
-  accent: string;
-  kpiKey: string;
-  label: string;
-  refrigeratorId: number;
-  unit: string;
-  zoneId: string;
-}) {
-  const graphController = useRefrigeratorKpiGraph({
-    refrigeratorId,
-    kpiKey,
-    zoneId,
-    variant: 'inline',
-    accent,
-    unit,
-    label,
-  });
-
-  return <RefrigeratorKpiGraph controller={graphController} />;
 }
 
 export default function RefrigeratorVisualisation({
@@ -789,6 +903,23 @@ export default function RefrigeratorVisualisation({
     fridgeLight: PointLight;
     freezerLight: PointLight;
   } | null>(null);
+
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [kpiModalKey, setKpiModalKey] = useState<string | null>(null);
+  const [guidelinesOpen, setGuidelinesOpen] = useState(false);
+  const [sopOpen, setSopOpen] = useState(false);
+
+  // Zones arrive async; adopt the first one, and drop a selection that no
+  // longer exists after the list changes.
+  useEffect(() => {
+    if (zones.length === 0) {
+      setSelectedZoneId(null);
+      return;
+    }
+    setSelectedZoneId((prev) =>
+      prev && zones.some((z) => z.zone_id === prev) ? prev : zones[0].zone_id,
+    );
+  }, [zones]);
 
   // ── Set up the scene once on mount ─────────────────────────────────────────
   useEffect(() => {
@@ -1215,7 +1346,11 @@ export default function RefrigeratorVisualisation({
         else if (mat) mat.dispose();
       });
     };
-  }, []);
+    // Re-run once the mount element actually exists: while isLoadingType is true
+    // (or type is cold_storage) the mountRef div isn't rendered, so the effect
+    // above bails early. Depend on these so the scene initialises when the 3D
+    // panel appears.
+  }, [isLoadingType, type]);
 
   // ── Alert glow override ────────────────────────────────────────────────────
   useEffect(() => {
@@ -1235,44 +1370,23 @@ export default function RefrigeratorVisualisation({
   }, [hasAlert]);
 
   return (
-    <div className="grid grid-cols-1 auto-rows-min overflow-y-auto min-[900px]:auto-rows-auto min-[900px]:overflow-visible min-[900px]:grid-cols-[minmax(280px,32%)_1fr] xl:grid-cols-[minmax(340px,40%)_1fr] 2xl:grid-cols-2 gap-4 h-full min-h-0">
+    <>
+      <div className="grid grid-cols-1 auto-rows-min overflow-y-auto min-[900px]:auto-rows-auto min-[900px]:overflow-visible min-[900px]:grid-cols-[minmax(280px,32%)_1fr] xl:grid-cols-[minmax(340px,40%)_1fr] 2xl:grid-cols-2 gap-4 h-full min-h-0">
 
       {/* Left: Live Conditions (top) + Messages (bottom) */}
       <aside className="flex flex-col gap-3 min-h-[520px] min-[900px]:min-h-0">
 
         {/* Live Conditions card — 60% */}
-        <div className="@container min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ flex: '3 1 0%' }}>
-          <div
-            className="flex items-center justify-between px-4 py-3 shrink-0"
-            style={{ background: '#f7f2fa', borderBottom: '1px solid #efe5f4' }}
-          >
-            <div>
-              <span className="block text-sm font-semibold" style={{ color: '#5f3b73' }}>Live Conditions</span>
-              <span className="block text-[10px] mt-0.5" style={{ color: '#a07ab8' }}>Click a tile to view trend</span>
-            </div>
-            <TrendingUp size={16} style={{ color: '#6b4a78' }} />
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-3 grid grid-cols-1 @[650px]:grid-cols-2 gap-4 content-start">
-            {isLoadingType ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, width: '100%' }}>
-                <svg className="animate-spin" style={{ width: 20, height: 20, color: '#8b6c97' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              </div>
-            ) : zones.length === 0 ? (
-              <div className="text-xs text-gray-400 italic">No zones configured.</div>
-            ) : (
-              zones.map((zone) => (
-                <ZoneKpiSection
-                  key={zone.zone_id}
-                  zone={zone}
-                  refrigeratorId={refrigeratorId}
-                />
-              ))
-            )}
-          </div>
-        </div>
+        <LiveConditionsPanel
+          zones={zones}
+          refrigeratorId={refrigeratorId}
+          selectedZoneId={selectedZoneId}
+          onZoneSelect={setSelectedZoneId}
+          selectedSensorId={selectedSensorId}
+          onSensorSelect={onSensorSelect}
+          onOpenChart={setKpiModalKey}
+          isLoadingType={isLoadingType}
+        />
 
         {/* Alerts card — 40% */}
         <div className="min-h-0 rounded-2xl border border-line bg-white overflow-hidden flex flex-col" style={{ flex: '2 1 0%' }}>
@@ -1293,7 +1407,7 @@ export default function RefrigeratorVisualisation({
       {/* Center 3D viewer / Room visualization */}
       <section
         data-refrigerator-3d-mount
-        className="relative min-h-[420px] min-[900px]:min-h-0 overflow-hidden"
+        className="@container relative min-h-[420px] min-[900px]:min-h-0 overflow-hidden"
         style={{ borderRadius: 20, border: '1px solid #d8c6e8', background: 'linear-gradient(160deg, #f3eaf9 0%, #ede0f5 40%, #e4d4f0 100%)', boxShadow: '0 8px 20px -12px #4011531f, 0 2px 6px #4011530a' }}
         aria-label="Refrigerator 3D visualisation"
       >
@@ -1357,49 +1471,39 @@ export default function RefrigeratorVisualisation({
             </div>
 
             {/* Mid-left: Storage Guidelines card */}
-            <div className="absolute left-3 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
-              <div className="bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]">
-                <div className="text-[8px] font-bold tracking-widest uppercase mb-1.5" style={{ color: '#5f3b73' }}>Storage Guidelines</div>
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[9px] text-gray-500">Fridge</span>
-                    <span className="text-[9px] font-bold" style={{ color: '#7a22c8' }}>2 – 8 °C</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[9px] text-gray-500">Freezer</span>
-                    <span className="text-[9px] font-bold" style={{ color: '#1a7abb' }}>≤ −20 °C</span>
-                  </div>
-                  <div className="w-full border-t border-gray-100 my-1" />
-                  {['Separate shelf zones', 'No rear-wall contact', 'Quarterly inventory audit'].map((t) => (
-                    <div key={t} className="flex items-start gap-1">
-                      <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
-                        <circle cx="12" cy="12" r="12" fill="#22c55e" />
-                        <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <span className="text-[9px] text-gray-600 leading-tight">{t}</span>
-                    </div>
-                  ))}
-                </div>
+            <OverlayInfoPanel
+              side="left"
+              title="Storage Guidelines"
+              titleColor="#5f3b73"
+              isOpen={guidelinesOpen}
+              onToggle={() => setGuidelinesOpen((p) => !p)}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[9px] text-gray-500">Fridge</span>
+                <span className="text-[9px] font-bold" style={{ color: '#7a22c8' }}>2 – 8 °C</span>
               </div>
-            </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[9px] text-gray-500">Freezer</span>
+                <span className="text-[9px] font-bold" style={{ color: '#1a7abb' }}>≤ −20 °C</span>
+              </div>
+              <div className="w-full border-t border-gray-100 my-1" />
+              {['Separate shelf zones', 'No rear-wall contact', 'Quarterly inventory audit'].map((t) => (
+                <CheckItem key={t} text={t} />
+              ))}
+            </OverlayInfoPanel>
 
             {/* Mid-right: Daily SOP card */}
-            <div className="absolute right-3 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
-              <div className="bg-white/85 backdrop-blur-sm rounded-xl border border-white/60 shadow-md px-3 py-2.5 w-[152px]">
-                <div className="text-[8px] font-bold tracking-widest uppercase mb-1.5" style={{ color: '#1a4d7a' }}>Daily SOP</div>
-                <div className="flex flex-col gap-1">
-                  {['Log temp morning and evening', 'Record any excursions', 'Minimise door-open cycles', 'Check door seals monthly', 'Allow items to equilibrate'].map((t) => (
-                    <div key={t} className="flex items-start gap-1">
-                      <svg width="10" height="10" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none">
-                        <circle cx="12" cy="12" r="12" fill="#22c55e" />
-                        <polyline points="7 12 10.5 15.5 17 8.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <span className="text-[9px] text-gray-600 leading-tight">{t}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <OverlayInfoPanel
+              side="right"
+              title="Daily SOP"
+              titleColor="#1a4d7a"
+              isOpen={sopOpen}
+              onToggle={() => setSopOpen((p) => !p)}
+            >
+              {['Log temp morning and evening', 'Record any excursions', 'Minimise door-open cycles', 'Check door seals monthly', 'Allow items to equilibrate'].map((t) => (
+                <CheckItem key={t} text={t} />
+              ))}
+            </OverlayInfoPanel>
 
             {/* Bottom: scrolling tips strip */}
             <style>{`
@@ -1428,6 +1532,16 @@ export default function RefrigeratorVisualisation({
         )}
       </section>
 
-    </div>
+      </div>
+
+      {kpiModalKey && refrigeratorId != null && (
+        <RefrigeratorKpiChartModal
+          refrigeratorId={refrigeratorId}
+          kpiKey={kpiModalKey}
+          zoneId={selectedZoneId}
+          onClose={() => setKpiModalKey(null)}
+        />
+      )}
+    </>
   );
 }
