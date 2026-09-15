@@ -181,7 +181,12 @@ def extract_tive_temperature_kpis(
     """
     kpis = []
 
-    temp = payload_data.get("DeviceTemperature")
+    temp = None
+    probe_obj = payload_data.get("ProbeTemperature")
+    if isinstance(probe_obj, dict) and probe_obj.get("Celsius") is not None:
+        temp = probe_obj.get("Celsius")
+    if temp is None:
+        temp = payload_data.get("DeviceTemperature")
     if temp is None:
         temp_obj = payload_data.get("Temperature")
         if isinstance(temp_obj, dict):
