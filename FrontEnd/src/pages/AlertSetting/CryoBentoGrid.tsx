@@ -1338,7 +1338,7 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                 cooldown_minutes: cfg.cooldown_minutes,
                 status: cfg.status,
             }));
-            await ivfService.bulkUpsertKpiConfig(selectedCopyTankIds, configsToApply);
+            await ivfService.bulkUpsertKpiConfig(selectedCopyTankIds, configsToApply, tankId);
             toast.success(`Copied to ${selectedCopyTankIds.length} tank${selectedCopyTankIds.length !== 1 ? "s" : ""} successfully`);
         } catch (e: any) {
             toast.error(e?.message || "Failed to copy to tanks");
