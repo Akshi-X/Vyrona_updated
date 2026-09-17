@@ -836,10 +836,11 @@ class QualityService:
         with min, max, alert_type (and unit); otherwise create a new row with the same shape.
         Config items must have kpi_name; optional: alert_name, min, max, unit, alert_type, status.
         Validates each tank belongs to branch when branch_id is provided.
-        Returns {"updated": count, "created": count}.
+        Returns {"updated": count, "created": count, "changes": [{tank_id, kpi_name, created, before, after}]}.
         """
         updated = 0
         created = 0
+        changes: List[Dict] = []
         for tank_id in tank_ids:
             if branch_id is not None:
                 self.validate_tank_belongs_to_branch(tank_id, branch_id)
@@ -907,6 +908,16 @@ class QualityService:
                     query = query.filter(KpiConfig.alert_name == alert_name)
                 existing = query.first()
                 if existing:
+                    before = {
+                        "min": float(existing.min) if existing.min is not None else None,
+                        "max": float(existing.max) if existing.max is not None else None,
+                        "status": bool(existing.status),
+                        "whatsapp_alert": bool(existing.whatsapp_alert),
+                        "email_alert": bool(existing.email_alert),
+                        "cooldown_minutes": existing.cooldown_minutes,
+                        "unack_escalation_threshold": existing.unack_escalation_threshold,
+                        "alert_name": existing.alert_name,
+                    }
                     existing.min = min_val
                     existing.max = max_val
                     existing.alert_type = alert_type_val
@@ -920,6 +931,17 @@ class QualityService:
                     existing.email_alert = email_alert_val
                     self.db.flush()
                     updated += 1
+                    after = {
+                        "min": min_val,
+                        "max": max_val,
+                        "status": bool(status_val),
+                        "whatsapp_alert": whatsapp_alert_val,
+                        "email_alert": email_alert_val,
+                        "cooldown_minutes": existing.cooldown_minutes,
+                        "unack_escalation_threshold": escalation_threshold,
+                        "alert_name": existing.alert_name,
+                    }
+                    changes.append({"tank_id": tank_id, "kpi_name": kpi_name, "created": False, "before": before, "after": after})
                 else:
                     row = KpiConfig(
                         hospital_id=hospital_id,
@@ -942,7 +964,18 @@ class QualityService:
                     self.db.add(row)
                     self.db.flush()
                     created += 1
-        return {"updated": updated, "created": created}
+                    after = {
+                        "min": min_val,
+                        "max": max_val,
+                        "status": bool(status_val),
+                        "whatsapp_alert": whatsapp_alert_val,
+                        "email_alert": email_alert_val,
+                        "cooldown_minutes": row.cooldown_minutes,
+                        "unack_escalation_threshold": escalation_threshold,
+                        "alert_name": row.alert_name,
+                    }
+                    changes.append({"tank_id": tank_id, "kpi_name": kpi_name, "created": True, "before": None, "after": after})
+        return {"updated": updated, "created": created, "changes": changes}
 
     def bulk_upsert_kpi_config_for_incubator(
         self,
@@ -1057,10 +1090,11 @@ class QualityService:
         """
         For each config: if a row exists for (refrigerator_id, zone_id, kpi_name, alert_name) update it;
         otherwise create. zone_id=None targets the zone-less (legacy) configs.
-        Returns {"updated": count, "created": count}.
+        Returns {"updated": count, "created": count, "changes": [{kpi_name, created, before, after}]}.
         """
         updated = 0
         created = 0
+        changes: List[Dict] = []
         for cfg in configs:
             kpi_name = (cfg.get("kpi_name") or "").strip()
             if not kpi_name:
@@ -1110,6 +1144,16 @@ class QualityService:
 
             existing = query.first()
             if existing:
+                before = {
+                    "min": float(existing.min) if existing.min is not None else None,
+                    "max": float(existing.max) if existing.max is not None else None,
+                    "status": bool(existing.status),
+                    "whatsapp_alert": bool(existing.whatsapp_alert),
+                    "email_alert": bool(existing.email_alert),
+                    "cooldown_minutes": existing.cooldown_minutes,
+                    "unack_escalation_threshold": existing.unack_escalation_threshold,
+                    "alert_name": existing.alert_name,
+                }
                 existing.min = min_val
                 existing.max = max_val
                 existing.alert_type = alert_type_val
@@ -1125,6 +1169,17 @@ class QualityService:
                     existing.zone_name = zone_name
                 self.db.flush()
                 updated += 1
+                after = {
+                    "min": min_val,
+                    "max": max_val,
+                    "status": bool(status_val),
+                    "whatsapp_alert": whatsapp_alert_val,
+                    "email_alert": email_alert_val,
+                    "cooldown_minutes": existing.cooldown_minutes,
+                    "unack_escalation_threshold": escalation_threshold,
+                    "alert_name": existing.alert_name,
+                }
+                changes.append({"kpi_name": kpi_name, "created": False, "before": before, "after": after})
             else:
                 row = KpiConfig(
                     hospital_id=hospital_id,
@@ -1150,7 +1205,18 @@ class QualityService:
                 self.db.add(row)
                 self.db.flush()
                 created += 1
-        return {"updated": updated, "created": created}
+                after = {
+                    "min": min_val,
+                    "max": max_val,
+                    "status": bool(status_val),
+                    "whatsapp_alert": whatsapp_alert_val,
+                    "email_alert": email_alert_val,
+                    "cooldown_minutes": row.cooldown_minutes,
+                    "unack_escalation_threshold": escalation_threshold,
+                    "alert_name": row.alert_name,
+                }
+                changes.append({"kpi_name": kpi_name, "created": True, "before": None, "after": after})
+        return {"updated": updated, "created": created, "changes": changes}
 
     def get_last_n_readings_per_kpi(self, tank_id: int, n: int):
         db = self.db

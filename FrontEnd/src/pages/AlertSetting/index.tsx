@@ -230,6 +230,21 @@ export default function AlertSetting() {
         });
     }, [containers, branchFilter, directionFilter]);
 
+    const branchCryotankIds = useMemo(() => {
+        if (branchFilter === "All") return null;
+        return containers
+            .filter((c) => c.branchName === branchFilter && !c.is_incubator && !c.is_refrigerator)
+            .map((c) => c.tank_id);
+    }, [containers, branchFilter]);
+
+    const branchRefrigeratorIds = useMemo(() => {
+        if (branchFilter === "All") return null;
+        return containers
+            .filter((c) => c.branchName === branchFilter && c.is_refrigerator)
+            .map((c) => c.refrigerator_id)
+            .filter((id): id is number => id != null);
+    }, [containers, branchFilter]);
+
     const otherTanks = useMemo(() => {
         if (!primaryContainer || primaryContainer.is_incubator || primaryContainer.is_refrigerator) {
             return [];
@@ -575,16 +590,37 @@ export default function AlertSetting() {
                             )}
                         </div>
                     );
+                    const hasActiveFilter = branchFilter !== "All" || !!primaryContainer;
+                    const clearFilterButton = hasActiveFilter && (
+                        <div className="relative group shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setBranchFilter("All");
+                                    setSelectedContainers([]);
+                                }}
+                                aria-label="Clear filter"
+                                className="h-9 w-9 shrink-0 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary-light active:scale-95 transition-all duration-150"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                            <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-black/80 text-white text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50">
+                                Clear filter
+                            </div>
+                        </div>
+                    );
                     return (
                     <div className="relative flex flex-col flex-1 min-h-0">
                         {/* xl1+: notch that blends into the KPI panel's top edge. Below xl1: normal row above the panel. */}
                         {isXl1 ? (
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 z-30">
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2">
                                 {pillBar}
+                                {clearFilterButton}
                             </div>
                         ) : (
-                            <div className="flex justify-center mb-3">
+                            <div className="flex justify-center items-center gap-2 mb-3">
                                 {pillBar}
+                                {clearFilterButton}
                             </div>
                         )}
                         {containersError && (
@@ -676,15 +712,30 @@ export default function AlertSetting() {
                 <CryoHistoryModal
                     isOpen={showHistory}
                     onClose={() => setShowHistory(false)}
-                    tankId={
-                        primaryContainer && !primaryContainer.is_incubator && !primaryContainer.is_refrigerator
-                            ? primaryContainer.tank_id
+                    deviceType={
+                        primaryContainer?.is_refrigerator || (!primaryContainer && directionFilter === "refrigerators")
+                            ? "refrigerator"
+                            : "tank"
+                    }
+                    deviceId={
+                        primaryContainer && !primaryContainer.is_incubator
+                            ? (primaryContainer.is_refrigerator ? primaryContainer.refrigerator_id : primaryContainer.tank_id) ?? null
                             : null
                     }
-                    tankCode={
-                        primaryContainer && !primaryContainer.is_incubator && !primaryContainer.is_refrigerator
-                            ? primaryContainer.canisterId
-                            : null
+                    deviceCode={
+                        primaryContainer && !primaryContainer.is_incubator ? primaryContainer.canisterId : null
+                    }
+                    branchName={
+                        primaryContainer && !primaryContainer.is_incubator
+                            ? primaryContainer.branchName
+                            : branchFilter !== "All"
+                                ? branchFilter
+                                : null
+                    }
+                    branchDeviceIds={
+                        primaryContainer?.is_refrigerator || (!primaryContainer && directionFilter === "refrigerators")
+                            ? branchRefrigeratorIds
+                            : branchCryotankIds
                     }
                 />
 

@@ -33,6 +33,7 @@ export class ActivityLogService extends BaseApiService {
         actor_id?: string;
         target_type?: string;
         target_id?: string;
+        target_ids?: string[];
         outcome?: string;
         metadata_key?: string;
         metadata_value?: string;
@@ -52,6 +53,7 @@ export class ActivityLogService extends BaseApiService {
         if (options.actor_id) params.append("actor_id", options.actor_id);
         if (options.target_type) params.append("target_type", options.target_type);
         if (options.target_id) params.append("target_id", options.target_id);
+        if (options.target_ids && options.target_ids.length > 0) params.append("target_ids", options.target_ids.join(","));
         if (options.outcome) params.append("outcome", options.outcome);
         if (options.metadata_key) params.append("metadata_key", options.metadata_key);
         if (options.metadata_value) params.append("metadata_value", options.metadata_value);

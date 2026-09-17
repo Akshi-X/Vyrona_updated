@@ -14,6 +14,7 @@ from app.models.user_model import User
 from app.models.IVF.tank_model import Tank
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.hospital_model import Hospital
+from app.models.IVF.refrigerator_model import Refrigerator
 
 
 @dataclass
@@ -82,6 +83,7 @@ class ActivityLogService:
         actor_id: Optional[str] = None,
         target_type: Optional[str] = None,
         target_id: Optional[str] = None,
+        target_ids: Optional[List[str]] = None,
         outcome: Optional[str] = None,
         metadata_key: Optional[str] = None,
         metadata_value: Optional[str] = None,
@@ -111,6 +113,8 @@ class ActivityLogService:
             query = query.filter(ActivityLog.target_type == target_type)
         if target_id:
             query = query.filter(ActivityLog.target_id == target_id)
+        elif target_ids:
+            query = query.filter(ActivityLog.target_id.in_(target_ids))
         if outcome:
             query = query.filter(ActivityLog.outcome == outcome)
         if metadata_key and metadata_value is not None:
@@ -272,6 +276,33 @@ class ActivityLogService:
                             "branch_name": branch.branch_name if branch else None,
                             "hospital_id": branch.hospital_id if branch else None,
                         }
+            elif target_type == "refrigerator":
+                refrigerator_ids = [int(value) for value in ids if value.isdigit()]
+                if refrigerator_ids:
+                    refrigerators = (
+                        self.db.query(Refrigerator)
+                        .filter(Refrigerator.refrigerator_id.in_(refrigerator_ids))
+                        .all()
+                    )
+                    branch_ids = {r.branch_id for r in refrigerators if r.branch_id is not None}
+                    branch_map: Dict[int, HospitalBranch] = {}
+                    if branch_ids:
+                        for branch in (
+                            self.db.query(HospitalBranch)
+                            .filter(HospitalBranch.branch_id.in_(branch_ids))
+                            .all()
+                        ):
+                            branch_map[branch.branch_id] = branch
+
+                    for refrigerator in refrigerators:
+                        branch = branch_map.get(refrigerator.branch_id)
+                        hydrated[(target_type, str(refrigerator.refrigerator_id))] = {
+                            "refrigerator_id": refrigerator.refrigerator_id,
+                            "refrigerator_code": refrigerator.refrigerator_code,
+                            "branch_id": refrigerator.branch_id,
+                            "branch_name": branch.branch_name if branch else None,
+                            "hospital_id": branch.hospital_id if branch else None,
+                        }
             elif target_type == "branch":
                 branch_ids = [int(value) for value in ids if value.isdigit()]
                 if branch_ids:
@@ -325,6 +356,16 @@ class ActivityLogService:
                 .first()
             )
             return branch.hospital_id if branch else None
+
+        if target.target_type == "refrigerator":
+            if not target.target_id.isdigit():
+                return None
+            refrigerator = (
+                self.db.query(Refrigerator)
+                .filter(Refrigerator.refrigerator_id == int(target.target_id))
+                .first()
+            )
+            return refrigerator.hospital_id if refrigerator else None
 
         if target.target_type == "user":
             user = (
