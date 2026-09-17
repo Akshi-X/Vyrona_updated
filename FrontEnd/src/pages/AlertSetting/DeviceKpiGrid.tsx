@@ -391,11 +391,20 @@ const DeviceKpiGrid = forwardRef<DeviceKpiGridHandle, {
         };
     };
 
-    const persistScope = (targetScopeId: string | null, kpiKeys: string[], zoneName?: string | null) => {
+    const persistScope = (
+        targetScopeId: string | null,
+        kpiKeys: string[],
+        zoneName?: string | null,
+        copyMeta?: {
+            sourceZoneId: string | null;
+            sourceZoneName: string | null;
+            copiedToZones?: Array<{ zone_id: string | null; zone_name: string | null }>;
+        },
+    ) => {
         const configs = kpiKeys.map(configForKpi);
         return deviceType === "incubator"
             ? ivfService.bulkUpsertKpiConfigForIncubator(deviceId!, targetScopeId, configs)
-            : ivfService.bulkUpsertKpiConfigForRefrigerator(deviceId!, targetScopeId, configs, zoneName ?? null);
+            : ivfService.bulkUpsertKpiConfigForRefrigerator(deviceId!, targetScopeId, configs, zoneName ?? null, copyMeta);
     };
 
     const handleSave = async () => {
@@ -417,9 +426,25 @@ const DeviceKpiGrid = forwardRef<DeviceKpiGridHandle, {
         if (deviceId == null || selectedCopyIds.length === 0 || savingCopy) return;
         setSavingCopy(true);
         try {
-            for (const id of selectedCopyIds) {
-                const targetName = otherScopes.find((o) => o.id === id)?.label ?? null;
-                await persistScope(id, kpiNames, targetName);
+            const destinations = selectedCopyIds.map((id) => ({
+                id,
+                name: otherScopes.find((o) => o.id === id)?.label ?? null,
+            }));
+            for (let i = 0; i < destinations.length; i++) {
+                const { id, name } = destinations[i];
+                const isLast = i === destinations.length - 1;
+                await persistScope(
+                    id,
+                    kpiNames,
+                    name,
+                    deviceType === "refrigerator"
+                        ? {
+                            sourceZoneId: scopeId,
+                            sourceZoneName: scopeName ?? null,
+                            copiedToZones: isLast ? destinations.map((d) => ({ zone_id: d.id, zone_name: d.name })) : undefined,
+                        }
+                        : undefined,
+                );
             }
             toast.success(`Applied to ${selectedCopyIds.length} ${scopeNoun.toLowerCase()}${selectedCopyIds.length !== 1 ? "s" : ""} successfully`);
         } catch (e: any) {

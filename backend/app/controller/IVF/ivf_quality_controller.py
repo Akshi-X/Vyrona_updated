@@ -753,10 +753,22 @@ def _kpi_config_metadata(row: KpiConfig) -> dict:
         "cooldown_minutes": int(row.cooldown_minutes)
         if row.cooldown_minutes is not None
         else None,
+        "unack_escalation_threshold": row.unack_escalation_threshold,
         "whatsapp_alert": bool(row.whatsapp_alert),
         "email_alert": bool(row.email_alert),
         "status": bool(row.status),
     }
+
+
+def _kpi_config_target(meta: dict):
+    """Resolve the correct activity-log target (tank/incubator/refrigerator) for a KPI config row."""
+    if meta.get("tank_id"):
+        return build_target("tank", str(meta["tank_id"]))
+    if meta.get("incubator_id"):
+        return build_target("incubator", str(meta["incubator_id"]))
+    if meta.get("refrigerator_id"):
+        return build_target("refrigerator", str(meta["refrigerator_id"]))
+    return None
 
 
 @router.get("/hospital-notification-settings")
@@ -960,14 +972,14 @@ def create_kpi_config(
     )
     db.commit()
 
-    target_label = f"incubator:{incubator_id_val}" if incubator_id_val else str(row.tank_id)
+    created_meta = _kpi_config_metadata(row)
     ActivityLogService(db).log_activity(
         action="alert_configuration.kpi_config_created",
         outcome=ActivityOutcome.SUCCESS.value,
         actor=build_actor_from_user(current_user),
-        target=build_target("tank", target_label),
+        target=_kpi_config_target(created_meta),
         metadata={
-            **_kpi_config_metadata(row),
+            **created_meta,
             "kpi_names": [row.kpi_name] if row.kpi_name else [],
         },
         audit_log_disabled=is_audit_log_disabled_for_user(current_user),
@@ -1002,7 +1014,8 @@ def bulk_upsert_kpi_config(
 ):
     """
     Bulk upsert KPI config to multiple tanks (Alert Setting).
-    Body: tank_ids (list of int), configs (list of { kpi_name, alert_name?, min?, max?, unit?, alert_type?, status? }).
+    Body: tank_ids (list of int), configs (list of { kpi_name, alert_name?, min?, max?, unit?, alert_type?, status? }),
+    source_tank_id (optional int) — when set (the "Copy to Other Tanks" flow), tags the log entries as a copy.
     For each tank and each config: if row exists for (tank_id, kpi_name, alert_name) update it; else create.
     IVF Admin, Manager, and User only.
     """
@@ -1010,6 +1023,7 @@ def bulk_upsert_kpi_config(
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     tank_ids = body.get("tank_ids")
     configs = body.get("configs")
+    source_tank_id = body.get("source_tank_id")
     if not isinstance(tank_ids, list) or not tank_ids:
         raise HTTPException(status_code=400, detail="tank_ids must be a non-empty list")
     if not isinstance(configs, list):
@@ -1018,29 +1032,84 @@ def bulk_upsert_kpi_config(
         tank_ids = [int(t) for t in tank_ids]
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="tank_ids must be integers")
+    if source_tank_id is not None:
+        try:
+            source_tank_id = int(source_tank_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="source_tank_id must be an integer")
     quality_service = QualityService(db)
     result = quality_service.bulk_upsert_kpi_config(
         tank_ids=tank_ids, configs=configs, branch_id=branch_id
     )
     db.commit()
 
+    source_tank_code = None
+    source_tank_branch = None
+    dest_tank_codes: dict = {}
+    dest_tank_branches: dict = {}
+    if source_tank_id is not None:
+        branch_names = {b.branch_id: b.branch_name for b in db.query(HospitalBranch).all()}
+        source_tank = db.query(Tank).filter(Tank.tank_id == source_tank_id).first()
+        source_tank_code = source_tank.tank_code if source_tank else None
+        source_tank_branch = branch_names.get(source_tank.branch_id) if source_tank else None
+        for t in db.query(Tank).filter(Tank.tank_id.in_(tank_ids)).all():
+            dest_tank_codes[t.tank_id] = t.tank_code
+            dest_tank_branches[t.tank_id] = branch_names.get(t.branch_id)
+
     unique_kpis = sorted(
         {str(cfg.get("kpi_name")).strip() for cfg in configs if cfg.get("kpi_name")}
     )
-    ActivityLogService(db).log_activity(
-        action="alert_configuration.kpi_config_bulk_upserted",
-        outcome=ActivityOutcome.SUCCESS.value,
-        actor=build_actor_from_user(current_user),
-        target=build_target("branch", str(branch_id)) if branch_id is not None else None,
-        metadata={
-            "tank_ids": tank_ids,
-            "updated": result.get("updated"),
-            "created": result.get("created"),
-            "config_count": len(configs),
-            "kpi_names": unique_kpis,
-        },
-        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
-    )
+    kpi_alert_names = {str(cfg.get("kpi_name")).strip(): cfg.get("alert_name") for cfg in configs if cfg.get("kpi_name")}
+    unique_alert_names = [kpi_alert_names.get(k) or k for k in unique_kpis]
+    all_changes = result.get("changes") or []
+    activity_log_service = ActivityLogService(db)
+    for tid in tank_ids:
+        tank_changes = [c for c in all_changes if c.get("tank_id") == tid]
+        activity_log_service.log_activity(
+            action="alert_configuration.kpi_config_copied" if source_tank_id is not None else "alert_configuration.kpi_config_bulk_upserted",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(current_user),
+            target=build_target("tank", str(tid)),
+            metadata={
+                "updated": result.get("updated"),
+                "created": result.get("created"),
+                "config_count": len(configs),
+                "kpi_names": unique_kpis,
+                "kpi_alert_names": unique_alert_names,
+                "changes": [
+                    {"kpi_name": c.get("kpi_name"), "created": c.get("created"), "before": c.get("before"), "after": c.get("after")}
+                    for c in tank_changes
+                ],
+                **({"copied_from_tank_id": source_tank_id, "copied_from_tank_code": source_tank_code, "copied_from_tank_branch": source_tank_branch} if source_tank_id is not None else {}),
+            },
+            audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+        )
+
+    # Also log a single outgoing entry on the source tank, listing every destination it was copied to —
+    # otherwise a copy to multiple tanks is only visible from each destination's own history, never the source's.
+    if source_tank_id is not None:
+        activity_log_service.log_activity(
+            action="alert_configuration.kpi_config_copied",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(current_user),
+            target=build_target("tank", str(source_tank_id)),
+            metadata={
+                "config_count": len(configs),
+                "kpi_names": unique_kpis,
+                "kpi_alert_names": unique_alert_names,
+                "copied_to_tank_ids": tank_ids,
+                "copied_to_tank_codes": [dest_tank_codes.get(tid) for tid in tank_ids],
+                "copied_to_tank_branches": [dest_tank_branches.get(tid) for tid in tank_ids],
+                # Only attach per-field diffs when there's exactly one destination — with several
+                # destinations each may already hold different prior values, so a single shared diff
+                # list would misrepresent what actually changed on each one.
+                **({"changes": [
+                    {"kpi_name": c.get("kpi_name"), "created": c.get("created"), "before": c.get("before"), "after": c.get("after")}
+                    for c in all_changes
+                ]} if len(tank_ids) == 1 else {}),
+            },
+            audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+        )
     return result
 
 
@@ -1112,12 +1181,18 @@ def bulk_upsert_kpi_config_for_refrigerator(
     Bulk upsert KPI config for a single refrigerator zone.
     Body: refrigerator_id (int), zone_id (str | null), zone_name (str | null), configs (list).
     zone_id=null targets the zone-less legacy config.
+    Optional "Apply to Other Zones" copy tracking: is_copy (bool), source_zone_id, source_zone_name,
+    and copied_to_zones (list of {zone_id, zone_name}, sent only on the last call of a multi-zone copy).
     """
     _require_alert_setting_role(current_user)
     refrigerator_id = body.get("refrigerator_id")
     zone_id = body.get("zone_id")
     zone_name = body.get("zone_name")
     configs = body.get("configs")
+    is_copy = bool(body.get("is_copy"))
+    source_zone_id = body.get("source_zone_id") if is_copy else None
+    source_zone_name = body.get("source_zone_name") if is_copy else None
+    copied_to_zones = body.get("copied_to_zones") if is_copy else None
     if not refrigerator_id:
         raise HTTPException(status_code=400, detail="refrigerator_id is required")
     if not isinstance(configs, list):
@@ -1147,8 +1222,15 @@ def bulk_upsert_kpi_config_for_refrigerator(
     )
     db.commit()
 
-    ActivityLogService(db).log_activity(
-        action="alert_configuration.kpi_config_bulk_upserted",
+    unique_kpis = sorted(
+        {str(cfg.get("kpi_name")).strip() for cfg in configs if cfg.get("kpi_name")}
+    )
+    kpi_alert_names_map = {str(cfg.get("kpi_name")).strip(): cfg.get("alert_name") for cfg in configs if cfg.get("kpi_name")}
+    unique_alert_names = [kpi_alert_names_map.get(k) or k for k in unique_kpis]
+
+    activity_log_service = ActivityLogService(db)
+    activity_log_service.log_activity(
+        action="alert_configuration.kpi_config_copied" if is_copy else "alert_configuration.kpi_config_bulk_upserted",
         outcome=ActivityOutcome.SUCCESS.value,
         actor=build_actor_from_user(current_user),
         target=build_target("refrigerator", str(refrigerator_id)),
@@ -1158,9 +1240,37 @@ def bulk_upsert_kpi_config_for_refrigerator(
             "zone_name": zone_name,
             "updated": result.get("updated"),
             "created": result.get("created"),
+            "changes": result.get("changes") or [],
+            **({"copied_from_zone_id": source_zone_id, "copied_from_zone_name": source_zone_name} if is_copy else {}),
         },
         audit_log_disabled=is_audit_log_disabled_for_user(current_user),
     )
+
+    # Also log a single outgoing entry tagged to the source zone, listing every destination zone it was
+    # copied to — sent only on the last call of the loop so it's logged once, not once per destination.
+    if is_copy and copied_to_zones:
+        activity_log_service.log_activity(
+            action="alert_configuration.kpi_config_copied",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(current_user),
+            target=build_target("refrigerator", str(refrigerator_id)),
+            metadata={
+                "refrigerator_id": refrigerator_id,
+                "zone_id": source_zone_id,
+                "zone_name": source_zone_name,
+                "kpi_names": unique_kpis,
+                "kpi_alert_names": unique_alert_names,
+                "copied_to_zone_ids": [z.get("zone_id") for z in copied_to_zones],
+                "copied_to_zone_names": [z.get("zone_name") for z in copied_to_zones],
+                # This call is always the last (only) destination when there's a single target zone, so its
+                # own result reflects that zone's diff; with several zones each may differ, so diffs are skipped.
+                **({"changes": [
+                    {"kpi_name": c.get("kpi_name"), "created": c.get("created"), "before": c.get("before"), "after": c.get("after")}
+                    for c in (result.get("changes") or [])
+                ]} if len(copied_to_zones) == 1 else {}),
+            },
+            audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+        )
     return result
 
 
@@ -1203,14 +1313,15 @@ def update_kpi_config(
         raise HTTPException(status_code=404, detail="KPI config not found")
     db.commit()
 
+    after_state = _kpi_config_metadata(row)
     ActivityLogService(db).log_activity(
         action="alert_configuration.kpi_config_updated",
         outcome=ActivityOutcome.SUCCESS.value,
         actor=build_actor_from_user(current_user),
-        target=build_target("tank", str(row.tank_id)),
+        target=_kpi_config_target(after_state),
         metadata={
             "before": before_state,
-            "after": _kpi_config_metadata(row),
+            "after": after_state,
             "kpi_names": sorted(
                 {
                     value
@@ -1266,7 +1377,7 @@ def delete_kpi_config(
         action="alert_configuration.kpi_config_deleted",
         outcome=ActivityOutcome.SUCCESS.value,
         actor=build_actor_from_user(current_user),
-        target=build_target("tank", str(before_state.get("tank_id")) if before_state.get("tank_id") else None),
+        target=_kpi_config_target(before_state),
         metadata={
             **before_state,
             "kpi_names": [before_state.get("kpi_name")] if before_state.get("kpi_name") else [],

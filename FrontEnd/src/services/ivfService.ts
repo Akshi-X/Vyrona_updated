@@ -770,11 +770,16 @@ export class IvfService extends BaseApiService {
             email_alert?: boolean;
             status?: boolean;
         }>,
+        sourceTankId?: number,
     ): Promise<{ updated: number; created: number }> {
         return await this.request("/api/ivf/quality/kpi-config/bulk", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tank_ids: tankIds, configs }),
+            body: JSON.stringify({
+                tank_ids: tankIds,
+                configs,
+                ...(sourceTankId != null ? { source_tank_id: sourceTankId } : {}),
+            }),
         });
     }
 
@@ -819,11 +824,30 @@ export class IvfService extends BaseApiService {
             status?: boolean;
         }>,
         zoneName?: string | null,
+        copyMeta?: {
+            sourceZoneId: string | null;
+            sourceZoneName: string | null;
+            /** Full destination-zone list; pass only on the last call of a multi-zone copy so the source-side summary logs once. */
+            copiedToZones?: Array<{ zone_id: string | null; zone_name: string | null }>;
+        },
     ): Promise<{ updated: number; created: number }> {
         return await this.request("/api/ivf/quality/kpi-config/bulk-refrigerator", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refrigerator_id: refrigeratorId, zone_id: zoneId, zone_name: zoneName ?? null, configs }),
+            body: JSON.stringify({
+                refrigerator_id: refrigeratorId,
+                zone_id: zoneId,
+                zone_name: zoneName ?? null,
+                configs,
+                ...(copyMeta
+                    ? {
+                        is_copy: true,
+                        source_zone_id: copyMeta.sourceZoneId,
+                        source_zone_name: copyMeta.sourceZoneName,
+                        ...(copyMeta.copiedToZones ? { copied_to_zones: copyMeta.copiedToZones } : {}),
+                    }
+                    : {}),
+            }),
         });
     }
 
