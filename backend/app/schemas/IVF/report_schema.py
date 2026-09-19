@@ -33,8 +33,14 @@ class CriticalAlertReportRow(BaseModel):
     """Row for critical alert report."""
 
     alert_id: str = Field(..., description="Alert UUID")
-    tank_id: int = Field(..., description="Tank ID")
+    tank_id: Optional[int] = Field(None, description="Tank ID")
     tank_code: Optional[str] = Field(None, description="Tank code")
+    incubator_id: Optional[int] = Field(None, description="Incubator ID")
+    incubator_code: Optional[str] = Field(None, description="Incubator code")
+    refrigerator_id: Optional[int] = Field(None, description="Refrigerator ID")
+    refrigerator_code: Optional[str] = Field(None, description="Refrigerator code")
+    device_type: str = Field(..., description="Device the alert belongs to: tank, incubator, refrigerator")
+    device_code: Optional[str] = Field(None, description="Code of the device the alert belongs to")
     branch_id: int = Field(..., description="Branch ID")
     branch_name: Optional[str] = Field(None, description="Branch name")
     alert_type: str = Field(..., description="Alert type")

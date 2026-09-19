@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import IncubatorTrackingIcon from '../../assets/DashBoardIcons/Embryos.svg';
-import HamburgerButton from '../../components/HamburgerButton';
+import TrackingPageShell from '../../components/TrackingPageShell';
+import SearchCard from '../../components/SearchCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { ivfService, type IvfBranch } from '../../services/ivfService';
 import { userService } from '../../services/userService';
@@ -175,20 +176,12 @@ export default function IncubatorTrackingDashboardPage() {
     };
 
     return (
-        <div className="flex-1 min-h-screen flex items-center justify-center">
-            <div className="fixed top-3 left-4 z-30 md:hidden">
-                <HamburgerButton />
-            </div>
-            <div className="w-full max-w-[560px] rounded-[14px] border border-line bg-white p-6 shadow-sm">
-                <div className="mb-5 flex items-start gap-3">
-                    <img src={IncubatorTrackingIcon} alt="Track Incubator" className="w-6 h-6 mt-0.5" />
-                    <div>
-                        <h2 className="text-[20px] font-semibold leading-none text-black">Track Incubator Quality</h2>
-                        <p className="mt-2 text-xs text-[#5A5A5A]">
-                            {isManagerAdmin ? 'Please select a branch and incubator' : 'Please select an incubator'}
-                        </p>
-                    </div>
-                </div>
+        <TrackingPageShell>
+            <SearchCard
+                icon={<img src={IncubatorTrackingIcon} alt="Track Incubator" className="w-6 h-6 mt-0.5" />}
+                title="Track Incubator Quality"
+                description={isManagerAdmin ? 'Please select a branch and incubator' : 'Please select an incubator'}
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="relative w-full" ref={branchDropdownRef}>
                         <div
@@ -314,7 +307,7 @@ export default function IncubatorTrackingDashboardPage() {
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </SearchCard>
+        </TrackingPageShell>
     );
 }

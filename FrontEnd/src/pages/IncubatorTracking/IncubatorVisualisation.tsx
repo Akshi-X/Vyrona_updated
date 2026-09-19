@@ -51,7 +51,7 @@ type IncubatorVisualisationProps = {
   chambers?: ChamberInfo[];
   selectedChamberId?: string | null;
   onSensorSelect?: (sensorId: string) => void;
-  onChamberSelect?: (chamberId: string) => void;
+  onChamberSelect?: (chamberId: string | null) => void;
   incubatorCode?: string;
   branchName?: string;
   tempAlert?: boolean;
@@ -212,6 +212,12 @@ const SENSOR_ICONS: Record<string, ReactElement> = {
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
     </svg>
   ),
+  incubator_battery: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="18" height="10" rx="2" ry="2" /><line x1="22" y1="10" x2="22" y2="14" />
+      <line x1="6" y1="10" x2="6" y2="14" />
+    </svg>
+  ),
 };
 
 const KPI_CARD_STYLES: Record<string, { accent: string; ring: string }> = {
@@ -222,6 +228,7 @@ const KPI_CARD_STYLES: Record<string, { accent: string; ring: string }> = {
   incubator_humidity:  { accent: "#2563eb", ring: "rgba(37,99,235,0.12)"   },
   incubator_voc:       { accent: "#b45309", ring: "rgba(180,83,9,0.12)"    },
   incubator_lid_state: { accent: "#7c3aed", ring: "rgba(124,58,237,0.12)"  },
+  incubator_battery:   { accent: "#059669", ring: "rgba(5,150,105,0.12)"   },
 };
 
 // ─── CSS ───────────────────────────────────────────────────────────────────────
@@ -241,6 +248,11 @@ const incubatorCss = `
 @keyframes incubatorScrollActivity {
   0%   { transform: translateY(0); }
   100% { transform: translateY(-50%); }
+}
+
+@keyframes incubatorBackdropFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes incubatorPulse {
@@ -309,6 +321,21 @@ export default function IncubatorVisualisation({
 
   const [animeReady, setAnimeReady] = useState<boolean>(false);
   const [activityScrollPaused, setActivityScrollPaused] = useState(false);
+  const [containerWidth, setContainerWidth] = useState<number>(
+    typeof window !== "undefined" ? window.innerWidth : 9999
+  );
+  const [leftOpen, setLeftOpen] = useState(false);
+  const [rightOpen, setRightOpen] = useState(false);
+
+  useEffect(() => {
+    const update = () => setContainerWidth(window.innerWidth);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  const isNarrow = containerWidth < 1450;
+  const isRightNarrow = containerWidth < 1230;
 
   // Map first/second chamber to left/right lids for click handling
   const leftChamberId = chambers[0]?.id ?? null;
@@ -1158,11 +1185,11 @@ export default function IncubatorVisualisation({
   const showSidebar = true;
 
   const gridCols =
-    showSensorTiles && showSidebar
+    showSensorTiles && showSidebar && !isNarrow && !isRightNarrow
       ? "280px minmax(0, 1fr) 300px"
-      : showSensorTiles
+      : showSensorTiles && !isNarrow
         ? "280px minmax(0, 1fr)"
-        : showSidebar
+        : showSidebar && !isRightNarrow
           ? "minmax(0, 1fr) 300px"
           : "minmax(0, 1fr)";
 
@@ -1216,6 +1243,33 @@ export default function IncubatorVisualisation({
               Chamber
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
+              {(() => {
+                const isCommonSelected = selectedChamberId === null;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => onChamberSelect && onChamberSelect(null)}
+                    style={{
+                      padding: "4px 14px",
+                      borderRadius: 999,
+                      border: isCommonSelected ? "1.5px solid #6B1176" : "1px solid #d8c6e8",
+                      background: isCommonSelected
+                        ? "linear-gradient(135deg, #6B1176 0%, #9b4aaa 100%)"
+                        : "rgba(255,255,255,0.75)",
+                      backdropFilter: "blur(8px)",
+                      color: isCommonSelected ? "#ffffff" : "#5f3b73",
+                      fontSize: 12,
+                      fontWeight: isCommonSelected ? 700 : 500,
+                      cursor: "pointer",
+                      boxShadow: isCommonSelected ? "0 4px 14px #6B117630" : "0 1px 4px #40115310",
+                      transition: "all 0.18s ease",
+                      letterSpacing: isCommonSelected ? "0.01em" : undefined,
+                    }}
+                  >
+                    Common
+                  </button>
+                );
+              })()}
               {chambers.map((ch) => {
                 const isSelected = selectedChamberId === ch.id;
                 return (
@@ -1252,6 +1306,7 @@ export default function IncubatorVisualisation({
         <div
           className="incubator-main-grid"
           style={{
+            position: "relative",
             display: "grid",
             gridTemplateColumns: gridCols,
             gap: 18,
@@ -1259,13 +1314,129 @@ export default function IncubatorVisualisation({
             transition: "grid-template-columns 0.35s ease",
           }}
         >
+          {/* Backdrop — dims the visualisation while a slide-in overlay is open */}
+          {((leftOpen && isNarrow) || (rightOpen && isRightNarrow)) && (
+            <div
+              onClick={() => { setLeftOpen(false); setRightOpen(false); }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 15,
+                background: "rgba(20,8,24,0.35)",
+                backdropFilter: "blur(2px)",
+                cursor: "pointer",
+                animation: "incubatorBackdropFadeIn 0.25s ease",
+              }}
+            />
+          )}
+
+          {/* Left overlay toggle — visible only below 1450 px */}
+          {showSensorTiles && isNarrow && !rightOpen && (
+            <button
+              id="onboarding-incubator-left-toggle"
+              type="button"
+              onClick={() => { setLeftOpen(p => { if (!p) setRightOpen(false); return !p; }); }}
+              style={{
+                position:    "absolute",
+                bottom:      20,
+                left:        leftOpen ? 288 : 10,
+                transform:   "translateX(0)",
+                zIndex:      25,
+                display:     "flex",
+                flexDirection: "row",
+                alignItems:  "center",
+                justifyContent: "center",
+                gap:         5,
+                width:       "auto",
+                padding:     "5px 10px",
+                borderRadius: 10,
+                border:      "1px solid #d8c6e8",
+                background:  "#fff",
+                cursor:      "pointer",
+                boxShadow:   "0 2px 8px #40115318",
+                color:       "#6b1176",
+                transition:  "left 0.3s cubic-bezier(0.4,0,0.2,1)",
+              }}
+            >
+              <svg
+                width="11" height="11" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                style={{
+                  transform:  leftOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.3s ease",
+                }}
+              >
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
+              <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                {leftOpen ? "Hide Conditions" : "Live Conditions"}
+              </span>
+            </button>
+          )}
+
+          {/* Right overlay toggle — visible only below 1230 px */}
+          {showSidebar && isRightNarrow && !leftOpen && (
+            <button
+              id="onboarding-incubator-right-toggle"
+              type="button"
+              onClick={() => { setRightOpen(p => { if (!p) setLeftOpen(false); return !p; }); }}
+              style={{
+                position:    "absolute",
+                bottom:      20,
+                right:       rightOpen ? 288 : 10,
+                zIndex:      25,
+                display:     "flex",
+                flexDirection: "row",
+                alignItems:  "center",
+                justifyContent: "center",
+                gap:         5,
+                width:       "auto",
+                padding:     "5px 10px",
+                borderRadius: 10,
+                border:      "1px solid #d8c6e8",
+                background:  "#fff",
+                cursor:      "pointer",
+                boxShadow:   "0 2px 8px #40115318",
+                color:       "#6b1176",
+                transition:  "right 0.3s cubic-bezier(0.4,0,0.2,1)",
+              }}
+            >
+              <svg
+                width="11" height="11" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                style={{
+                  transform:  rightOpen ? "rotate(0deg)" : "rotate(180deg)",
+                  transition: "transform 0.3s ease",
+                }}
+              >
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
+              <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                {rightOpen ? "Hide Activity" : "Activity"}
+              </span>
+            </button>
+          )}
+
           {/* ── Left: Live Conditions ── */}
           {showSensorTiles && (
-            <div style={{ overflow: "hidden" }}>
+            <div style={isNarrow ? {
+              position:   "absolute",
+              top:        0,
+              left:       0,
+              height:     "100%",
+              zIndex:     20,
+              transform:  leftOpen ? "translateX(0)" : "translateX(-290px)",
+              transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+              boxShadow:  leftOpen ? "4px 0 20px #40115322" : "none",
+            } : {
+              overflow: "hidden",
+            }}>
               <div
                 className="bg-white flex flex-col"
                 style={{
-                  width: 280,
+                  width: "100%",
                   height: 620,
                   border: "1px solid #e6d6ee",
                   borderRadius: 18,
@@ -1464,9 +1635,21 @@ export default function IncubatorVisualisation({
 
           {/* ── Right: Sidebar ── */}
           {showSidebar && (
+            <div style={isRightNarrow ? {
+              position:   "absolute",
+              top:        0,
+              right:      0,
+              height:     "100%",
+              zIndex:     20,
+              transform:  rightOpen ? "translateX(0)" : "translateX(310px)",
+              transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+              boxShadow:  rightOpen ? "-4px 0 20px #40115322" : "none",
+            } : {
+              overflow: "hidden",
+            }}>
             <aside
               className="incubator-side-scroll flex flex-col overflow-x-hidden"
-              style={{ gap: 14, height: 620, overflowY: "auto", paddingRight: 4 }}
+              style={{ gap: 14, width: isRightNarrow ? "min(300px, calc(100vw - 40px))" : "100%", height: 620, overflowY: "auto", paddingRight: 4 }}
             >
               {/* System Activity */}
               <div
@@ -1608,6 +1791,7 @@ export default function IncubatorVisualisation({
                 </div>
               </div>
             </aside>
+            </div>
           )}
         </div>
       </div>

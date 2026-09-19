@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Snowflake } from 'lucide-react';
-import HamburgerButton from '../../components/HamburgerButton';
+import TrackingPageShell from '../../components/TrackingPageShell';
+import SearchCard from '../../components/SearchCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { ivfService, type IvfBranch } from '../../services/ivfService';
 import { userService } from '../../services/userService';
@@ -189,21 +190,12 @@ export default function RefrigeratorSelectionPage() {
     };
 
     return (
-        <div className="flex-1 min-h-screen flex items-center justify-center relative bg-gradient-to-br from-[#F4ECFB] via-[#FBF8FF] to-[#F2E9FA]">
-            <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: 'url(/ivf_pattern.png)', backgroundSize: '20%', backgroundRepeat: 'repeat', opacity: 0.30 }} />
-            <div className="fixed top-3 left-4 z-30 md:hidden">
-                <HamburgerButton />
-            </div>
-            <div className="relative z-10 w-full max-w-[560px] rounded-[14px] border border-line bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.18)]">
-                <div className="mb-5 flex items-start gap-3">
-                    <Snowflake className="w-6 h-6 mt-0.5 text-gray-700" />
-                    <div>
-                        <h2 className="text-[20px] font-semibold leading-none text-black">Track Refrigerator Quality</h2>
-                        <p className="mt-2 text-xs text-[#5A5A5A]">
-                            {isManagerAdmin ? 'Please select a branch and refrigerator' : 'Please select a refrigerator'}
-                        </p>
-                    </div>
-                </div>
+        <TrackingPageShell>
+            <SearchCard
+                icon={<Snowflake className="w-6 h-6 mt-0.5 text-gray-700" />}
+                title="Track Refrigerator Quality"
+                description={isManagerAdmin ? 'Please select a branch and refrigerator' : 'Please select a refrigerator'}
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="relative w-full" ref={branchDropdownRef}>
                         <div
@@ -329,7 +321,7 @@ export default function RefrigeratorSelectionPage() {
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </SearchCard>
+        </TrackingPageShell>
     );
 }

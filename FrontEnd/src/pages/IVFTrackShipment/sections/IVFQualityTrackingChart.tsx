@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef, Fragment } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ivfService } from '../../../services/ivfService';
+import { parseTimestamp, formatTimeLabel, formatDateTimeLabel, formatISTDayMonthTime } from '../../../utils/istDateFormat';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -243,56 +244,9 @@ const TIME_RANGES = [
 export type TimeRangeId = (typeof TIME_RANGES)[number]['id'] | 'CUSTOM';
 
 /** Parse timestamp; treat ISO strings without timezone as UTC so we can show locale time. */
-const parseTimestamp = (timestamp: string): Date | null => {
-  try {
-    if (!timestamp) return null;
-    const normalized = timestamp.trim().replace(' ', 'T');
-    // If no timezone suffix (Z or ±HH:MM), assume UTC so display in locale is correct
-    const hasTimezone = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(normalized);
-    const toParse = hasTimezone ? normalized : `${normalized}${normalized.endsWith('Z') ? '' : 'Z'}`;
-    const parsed = new Date(toParse);
-    return isNaN(parsed.getTime()) ? null : parsed;
-  } catch {
-    return null;
-  }
-};
-
-/** Format timestamp for axis: time (HH:MM); for 7D only, two lines: date then time. */
-const formatTimeLabel = (timestamp: string, timeRange?: TimeRangeId): string => {
-  const date = parseTimestamp(timestamp);
-  if (!date) return timestamp;
-  if (timeRange === '7D') {
-    const datePart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    const timePart = date.toLocaleTimeString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-    return `${datePart}, ${timePart}`;
-  }
-  return date.toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-};
-
-/** Format timestamp as date + time (for tooltip hover); no seconds. */
-const formatDateTimeLabel = (timestamp: string): string => {
-  const date = parseTimestamp(timestamp);
-  if (!date) return timestamp;
-  const datePart = date.toLocaleDateString(undefined, {
-    year: '2-digit',
-    month: 'numeric',
-    day: 'numeric',
-  });
-  const timePart = date.toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  return `${datePart}, ${timePart}`;
-};
+/** Format timestamp for axis, applying this page's 7D-includes-date rule. */
+const formatTimeLabelForRange = (timestamp: string, timeRange?: TimeRangeId): string =>
+  formatTimeLabel(timestamp, timeRange === '7D');
 
 function getKpiStats(reading: KpiReading, kpiName: string): { avg: number; min: number | null; max: number | null } | null {
   const k =
@@ -379,6 +333,7 @@ export default function IVFQualityTrackingChart({
   const isConnectingRef = useRef(false);
   const hasConnectedRef = useRef(false);
   const timeRangeRef = useRef<TimeRangeId>('LIVE');
+  const appliedKpiKeyRef = useRef<string | undefined>(undefined);
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000;
 
@@ -479,6 +434,7 @@ export default function IVFQualityTrackingChart({
     setKpiTabs([]);
     setKpiThresholds({});
     setActiveTab('');
+    appliedKpiKeyRef.current = undefined;
   }, [tankId]);
 
   // Fetch KPI config (limits + units) for tabs and visualization
@@ -530,13 +486,17 @@ export default function IVFQualityTrackingChart({
       });
   }, [tankId]);
 
+  // Applies once per distinct selectedKpiKey so it doesn't fight the user's own tab clicks
+  // (activeTab is intentionally excluded from the deps/condition here).
   useEffect(() => {
     if (!selectedKpiKey) return;
     if (!kpiTabs.length) return;
-    if (kpiTabs.some((tab) => tab.id === selectedKpiKey) && activeTab !== selectedKpiKey) {
+    if (appliedKpiKeyRef.current === selectedKpiKey) return;
+    if (kpiTabs.some((tab) => tab.id === selectedKpiKey)) {
+      appliedKpiKeyRef.current = selectedKpiKey;
       setActiveTab(selectedKpiKey);
     }
-  }, [selectedKpiKey, kpiTabs, activeTab]);
+  }, [selectedKpiKey, kpiTabs]);
 
   // Fetch KPI history when tank or time range changes. LIVE = raw limit. 1H/24H/7D = aggregated. CUSTOM = raw from selected start.
   useEffect(() => {
@@ -970,7 +930,7 @@ export default function IVFQualityTrackingChart({
 
   const chartData = useMemo(() => {
     const sorted = plottedReadings;
-    const labels = sorted.map((r) => formatTimeLabel(r.timestamp, timeRange));
+    const labels = sorted.map((r) => formatTimeLabelForRange(r.timestamp, timeRange));
     const stats = sorted.map((r) => getKpiStats(r, activeTab));
     const values = stats.map((s) => (s ? s.avg : null));
     const numericAverages = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
@@ -1131,12 +1091,7 @@ export default function IVFQualityTrackingChart({
   const formatBucketRange = (timestamp: string): string => {
     const start = parseTimestamp(timestamp);
     if (!start) return formatDateTimeLabel(timestamp);
-    const fmt = (d: Date) => {
-      const day = String(d.getDate()).padStart(2, '0');
-      const mon = String(d.getMonth() + 1);
-      const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }).toUpperCase().replace(' ', '');
-      return `${day}/${mon} - ${time}`;
-    };
+    const fmt = formatISTDayMonthTime;
     if (bucketMinutes === 0) return fmt(start);
     const end = new Date(start.getTime() + bucketMinutes * 60 * 1000);
     return `${fmt(start)} to ${fmt(end)}`;

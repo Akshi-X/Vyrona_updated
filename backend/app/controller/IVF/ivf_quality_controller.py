@@ -386,6 +386,78 @@ def _attach_alert_counts(db: Session, tank_id: int, kpi_series: dict,
             point['alert_count'] = kpi_alert_map.get(bucket_iso, 0)
 
 
+def _parse_kpi_from_incubator_dedup(dedup_key: str) -> str:
+    """Extract kpi_config_id from an incubator dedup_key:
+    incubator:{incubator_id}:{chamber_part}:{source}:{alert_type}:YYYY-MM-DD_HH:MM:SS:{extra_info}.
+    Two extra leading segments (literal "incubator" and {chamber_part}) versus the tank
+    format's "tank_id:source:...", plus the timestamp's two internal colons, put extra_info
+    after the 8th colon (8 splits -> 9 parts, extra_info at index 8)."""
+    if not dedup_key:
+        return ''
+    parts = dedup_key.split(':', 8)
+    return parts[8].strip() if len(parts) > 8 else ''
+
+
+def _attach_incubator_alert_counts(db: Session, incubator_id: int, chamber_id: Optional[str], kpi_series: dict,
+                                    since_utc: datetime, until_utc: datetime, bucket_minutes: int) -> None:
+    """Query critical_alerts for this incubator/chamber, resolve kpi_config_id (extra_info) → kpi_name,
+    and attach alert_count to each matching kpi_series data point. Mirrors _attach_alert_counts,
+    but incubator alerts carry real incubator_id/chamber_id columns instead of tank_id."""
+    from collections import defaultdict
+    from app.models.IVF.critical_alert_model import CriticalAlert
+    from app.models.kpi_config_model import KpiConfig
+    try:
+        query = db.query(CriticalAlert).filter(
+            CriticalAlert.incubator_id == incubator_id,
+            CriticalAlert.occurred_at >= since_utc,
+            CriticalAlert.occurred_at <= until_utc,
+        )
+        if chamber_id == "null":
+            # "null" sentinel = Common scope (chamber_id IS NULL), not the literal string.
+            query = query.filter(CriticalAlert.chamber_id.is_(None))
+        elif chamber_id:
+            query = query.filter(CriticalAlert.chamber_id == chamber_id)
+        else:
+            query = query.filter(CriticalAlert.chamber_id.is_(None))
+        alerts = query.all()
+    except Exception:
+        return
+
+    kpi_config_ids: set = set()
+    for alert in alerts:
+        raw_id = _parse_kpi_from_incubator_dedup(alert.dedup_key or '')
+        if raw_id and raw_id.isdigit():
+            kpi_config_ids.add(int(raw_id))
+
+    id_to_kpi_name: dict = {}
+    if kpi_config_ids:
+        try:
+            configs = db.query(KpiConfig.id, KpiConfig.kpi_name).filter(
+                KpiConfig.id.in_(kpi_config_ids)
+            ).all()
+            id_to_kpi_name = {row.id: row.kpi_name for row in configs}
+        except Exception:
+            pass
+
+    alert_counts: dict = defaultdict(lambda: defaultdict(int))
+    for alert in alerts:
+        raw_id = _parse_kpi_from_incubator_dedup(alert.dedup_key or '')
+        if not raw_id:
+            continue
+        kpi_name = id_to_kpi_name.get(int(raw_id)) if raw_id.isdigit() else raw_id
+        if not kpi_name:
+            continue
+        bucket_iso = _floor_to_bucket_iso(alert.occurred_at, bucket_minutes)
+        if bucket_iso:
+            alert_counts[kpi_name][bucket_iso] += 1
+
+    for kpi_name, points in kpi_series.items():
+        kpi_alert_map = alert_counts.get(kpi_name, {})
+        for point in points:
+            bucket_iso = _floor_to_bucket_iso(point.get('timestamp'), bucket_minutes)
+            point['alert_count'] = kpi_alert_map.get(bucket_iso, 0)
+
+
 def _to_float_or_none(value) -> Optional[float]:
     try:
         if value is None:
@@ -2097,6 +2169,17 @@ def get_incubator_kpi_history(
         for name in list(kpi_series.keys()):
             kpi_series[name].reverse()
 
+    # Attach alert counts for 1H/24H/7D (not LIVE)
+    if duration_minutes in {DURATION_1H, DURATION_24H, DURATION_7D} and since is not None:
+        bucket_map = {
+            DURATION_1H: AGG_BUCKET_MINUTES_1H,
+            DURATION_24H: AGG_BUCKET_MINUTES_24H,
+            DURATION_7D: AGG_BUCKET_MINUTES_7D,
+        }
+        bucket_min = bucket_map.get(duration_minutes, AGG_BUCKET_MINUTES_24H)
+        until_ts = latest_timestamp or datetime.now(timezone.utc)
+        _attach_incubator_alert_counts(db, incubator_id, effective_chamber_id, kpi_series, since, until_ts, bucket_min)
+
     return {
         "incubator_id": incubator_id,
         "incubator_code": incubator_code,
@@ -2165,6 +2248,8 @@ def get_incubator_kpi_history_by_date(
                 "unit": item.get("unit") or "",
             }
         )
+
+    _attach_incubator_alert_counts(db, incubator_id, effective_chamber_id, kpi_series, since_utc, until_utc, AGG_BUCKET_MINUTES_24H)
 
     return {
         "incubator_id": incubator_id,
