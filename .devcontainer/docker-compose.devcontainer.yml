@@ -95,7 +95,6 @@ services:
     build:
       context: ../telemetry-service
       dockerfile: Dockerfile
-    platform: linux/amd64
     container_name: mgscale-telemetry
     ports:
       - "7071:80"
@@ -132,7 +131,6 @@ services:
     build:
       context: ../tive-ingestion-function
       dockerfile: Dockerfile
-    platform: linux/amd64
     container_name: mgscale-iot-ingestion
     ports:
       - "7072:80"
