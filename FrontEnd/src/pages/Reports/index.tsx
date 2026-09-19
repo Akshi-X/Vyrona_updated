@@ -48,10 +48,18 @@ type FilterState = {
     severity: string;
     refillStatus: string;
     tankCodes: string[];
+    incubatorCodes: string[];
+    refrigeratorCodes: string[];
     actions: string[];
     outcome: string;
     actorType: string;
     search: string;
+};
+
+const DEVICE_TYPE_LABELS: Record<string, string> = {
+    tank: "Cryotank",
+    incubator: "Incubator",
+    refrigerator: "Refrigerator",
 };
 
 const ALERT_STATUS_OPTIONS = ["All", "Active", "Acknowledged"] as const;
@@ -401,6 +409,8 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
         if (metadata.status) lines.push(`Status: ${metadata.status}`);
         if (metadata.severity) lines.push(`Severity: ${metadata.severity}`);
         if (metadata.tank_codes?.length) lines.push(`Tanks: ${metadata.tank_codes.join(", ")}`);
+        if (metadata.incubator_codes?.length) lines.push(`Incubators: ${metadata.incubator_codes.join(", ")}`);
+        if (metadata.refrigerator_codes?.length) lines.push(`Refrigerators: ${metadata.refrigerator_codes.join(", ")}`);
         if (action === "report.activity_logs.downloaded") {
             if (metadata.search) lines.push(`Search: ${metadata.search}`);
             if (metadata.actions?.length) lines.push(`Actions: ${metadata.actions.join(", ")}`);
@@ -496,6 +506,8 @@ export default function ReportsPage() {
         severity: "All",
         refillStatus: "All",
         tankCodes: [],
+        incubatorCodes: [],
+        refrigeratorCodes: [],
         actions: [],
         outcome: "All",
         actorType: "All",
@@ -518,6 +530,8 @@ export default function ReportsPage() {
     const [totalCount, setTotalCount] = useState(0);
     const [pageSize, setPageSize] = useState(20);
     const [tankOptions, setTankOptions] = useState<string[]>([]);
+    const [incubatorOptions, setIncubatorOptions] = useState<string[]>([]);
+    const [refrigeratorOptions, setRefrigeratorOptions] = useState<string[]>([]);
     const [downloadingCsv, setDownloadingCsv] = useState(false);
 
     const isIvfUser = (department || "").toUpperCase() === "IVF";
@@ -551,10 +565,12 @@ export default function ReportsPage() {
     useEffect(() => {
         if (!isAuthenticated || !isIvfUser) {
             setTankOptions([]);
+            setIncubatorOptions([]);
+            setRefrigeratorOptions([]);
             return;
         }
 
-        const loadTankOptions = async () => {
+        const loadDeviceOptions = async () => {
             try {
                 const response = await shipmentService.getActiveCanisters();
                 const tankCodes = new Set<string>();
@@ -569,9 +585,39 @@ export default function ReportsPage() {
             } catch {
                 setTankOptions([]);
             }
+
+            try {
+                const response = await shipmentService.getActiveIncubators();
+                const incubatorCodes = new Set<string>();
+                response.branches.forEach((branch) => {
+                    branch.incubators.forEach((incubator) => {
+                        if (incubator.incubator_code) {
+                            incubatorCodes.add(incubator.incubator_code);
+                        }
+                    });
+                });
+                setIncubatorOptions(Array.from(incubatorCodes).sort());
+            } catch {
+                setIncubatorOptions([]);
+            }
+
+            try {
+                const response = await shipmentService.getActiveRefrigerators();
+                const refrigeratorCodes = new Set<string>();
+                response.branches.forEach((branch) => {
+                    branch.refrigerators.forEach((refrigerator) => {
+                        if (refrigerator.refrigerator_code) {
+                            refrigeratorCodes.add(refrigerator.refrigerator_code);
+                        }
+                    });
+                });
+                setRefrigeratorOptions(Array.from(refrigeratorCodes).sort());
+            } catch {
+                setRefrigeratorOptions([]);
+            }
         };
 
-        loadTankOptions();
+        loadDeviceOptions();
     }, [isAuthenticated, isIvfUser]);
 
     useEffect(() => {
@@ -626,6 +672,8 @@ export default function ReportsPage() {
                                     ? undefined
                                     : filters.severity,
                             tank_codes: filters.tankCodes,
+                            incubator_codes: filters.incubatorCodes,
+                            refrigerator_codes: filters.refrigeratorCodes,
                             page,
                             page_size: pageSize,
                         });
@@ -732,6 +780,8 @@ export default function ReportsPage() {
         filters.severity,
         filters.refillStatus,
         filters.tankCodes.join(","),
+        filters.incubatorCodes.join(","),
+        filters.refrigeratorCodes.join(","),
         filters.actions.join(","),
         filters.outcome,
         filters.actorType,
@@ -859,6 +909,8 @@ export default function ReportsPage() {
                         status: filters.alertStatus === "All" ? undefined : filters.alertStatus,
                         severity: filters.severity === "All" ? undefined : filters.severity,
                         tank_codes: filters.tankCodes,
+                        incubator_codes: filters.incubatorCodes,
+                        refrigerator_codes: filters.refrigeratorCodes,
                         page: pageNum,
                         page_size: EXPORT_PAGE_SIZE,
                     });
@@ -874,7 +926,8 @@ export default function ReportsPage() {
                     "Occurred Time",
                     "Severity",
                     "Status",
-                    "Tank Code",
+                    "Device Type",
+                    "Device Code",
                     "Message",
                 ];
                 rows = sortedAll.map((row) => {
@@ -884,7 +937,8 @@ export default function ReportsPage() {
                         parts.time,
                         row.severity,
                         row.status,
-                        row.tank_code || row.branch_name || "N/A",
+                        DEVICE_TYPE_LABELS[row.device_type] || "-",
+                        row.device_code || row.branch_name || "N/A",
                         row.message,
                     ];
                 });
@@ -900,6 +954,12 @@ export default function ReportsPage() {
                 }
                 if (filters.tankCodes.length > 0) {
                     filtersForLog.tank_codes = filters.tankCodes;
+                }
+                if (filters.incubatorCodes.length > 0) {
+                    filtersForLog.incubator_codes = filters.incubatorCodes;
+                }
+                if (filters.refrigeratorCodes.length > 0) {
+                    filtersForLog.refrigerator_codes = filters.refrigeratorCodes;
                 }
             } else if (filters.reportType === "refill-logs") {
                 const allRows = await fetchAllPages<RefillLogReportRow>(async (pageNum) => {
@@ -1201,6 +1261,36 @@ export default function ReportsPage() {
                                                 setFilters((prev) => ({
                                                     ...prev,
                                                     tankCodes: selected,
+                                                }))
+                                            }
+                                        />
+                                    </div>
+                                    <div id="onboarding-filter-incubator-codes">
+                                        <MultiSelectDropdown
+                                            label="Incubator Codes"
+                                            options={incubatorOptions}
+                                            selected={filters.incubatorCodes}
+                                            placeholder="All incubators"
+                                            disabled={!isIvfUser}
+                                            onChange={(selected) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    incubatorCodes: selected,
+                                                }))
+                                            }
+                                        />
+                                    </div>
+                                    <div id="onboarding-filter-refrigerator-codes">
+                                        <MultiSelectDropdown
+                                            label="Refrigerator Codes"
+                                            options={refrigeratorOptions}
+                                            selected={filters.refrigeratorCodes}
+                                            placeholder="All refrigerators"
+                                            disabled={!isIvfUser}
+                                            onChange={(selected) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    refrigeratorCodes: selected,
                                                 }))
                                             }
                                         />
@@ -1611,7 +1701,10 @@ export default function ReportsPage() {
                                                 Status
                                             </th>
                                             <th className="px-4 py-3 text-left font-semibold text-primary">
-                                                Tank Code
+                                                Device Type
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-primary">
+                                                Device Code
                                             </th>
                                             <th className="px-4 py-3 text-left font-semibold text-primary">
                                                 Message
@@ -1622,7 +1715,7 @@ export default function ReportsPage() {
                                         {loading
                                             ? Array.from({ length: 6 }).map((_, i) => (
                                                 <tr key={i} className="border-b border-primary-bg bg-white">
-                                                    {[85, 85, 65, 80, 80, 160].map((w, col) => (
+                                                    {[85, 85, 65, 80, 90, 80, 160].map((w, col) => (
                                                         <td key={col} className="px-4 py-3">
                                                             <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
                                                                 <div
@@ -1664,7 +1757,10 @@ export default function ReportsPage() {
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-700">
-                                                    {row.tank_code ||
+                                                    {DEVICE_TYPE_LABELS[row.device_type] || "-"}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {row.device_code ||
                                                         row.branch_name ||
                                                         "N/A"}
                                                 </td>
@@ -1676,7 +1772,7 @@ export default function ReportsPage() {
                                         {!loading && alertRows.length === 0 && (
                                             <tr>
                                                 <td
-                                                    colSpan={5}
+                                                    colSpan={7}
                                                     className="px-4 py-6 text-center text-gray-400"
                                                 >
                                                     No alerts found for the selected

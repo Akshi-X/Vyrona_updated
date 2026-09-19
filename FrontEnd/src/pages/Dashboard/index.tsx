@@ -272,9 +272,21 @@ export default function Dashboard({ }: DashboardProps) {
     setLoadingAlerts(true);
     try {
       if (isIVF) {
-        // Use IVF alerts service for IVF department
-        const response = await ivfAlertsService.getHospitalAlerts();
-        setCriticalAlerts(response.alerts || []);
+        // Tank, refrigerator, and incubator alerts each come from their own
+        // endpoint (get_hospital_alerts inner-joins Tank, so it silently drops
+        // every incubator/refrigerator alert — see the dedicated per-device-type
+        // endpoints instead of trying to make one query cover all three).
+        const [tankResult, refrigeratorResult, incubatorResult] = await Promise.allSettled([
+          ivfAlertsService.getHospitalAlerts(),
+          ivfAlertsService.getHospitalRefrigeratorAlerts(),
+          ivfAlertsService.getHospitalIncubatorAlerts(),
+        ]);
+        const merged = [
+          ...(tankResult.status === 'fulfilled' ? tankResult.value.alerts || [] : []),
+          ...(refrigeratorResult.status === 'fulfilled' ? refrigeratorResult.value.alerts || [] : []),
+          ...(incubatorResult.status === 'fulfilled' ? incubatorResult.value.alerts || [] : []),
+        ].sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
+        setCriticalAlerts(merged);
       } else {
         // Use CGT alerts service for CGT department
         // TODO: Get pharma_id from user context or modify API to use current user context
@@ -830,18 +842,25 @@ export default function Dashboard({ }: DashboardProps) {
       const severity: 'Low' | 'Medium' | 'High' | 'Critical' =
         ivfAlert.severity === 'High' ? 'High' :
         ivfAlert.severity === 'Medium' ? 'Medium' : 'Low';
+      const deviceCodeLabel = ivfAlert.tank_code
+        ? 'Tank Code'
+        : ivfAlert.incubator_code
+          ? 'Incubator Code'
+          : ivfAlert.refrigerator_code
+            ? 'Refrigerator Code'
+            : undefined;
       return {
         id: ivfAlert.alert_id,
         type: ivfAlert.alert_type,
         severity,
         patientId: ivfAlert.tank_code
-          ? ivfAlert.tank_code
-          : ivfAlert.canister_number
-            ? ivfAlert.canister_number
-            : (typeof ivfAlert.canister_id === 'number'
-              ? `Canister ${ivfAlert.canister_id}`
-              : 'N/A'),
-        branchName: (ivfAlert as IVFAlert & { branch_name?: string }).branch_name,
+          || ivfAlert.incubator_code
+          || ivfAlert.refrigerator_code
+          || ivfAlert.canister_number
+          || (typeof ivfAlert.canister_id === 'number' ? `Canister ${ivfAlert.canister_id}` : 'N/A'),
+        deviceCodeLabel,
+        chamberId: ivfAlert.incubator_code && ivfAlert.chamber_id ? `Chamber ${ivfAlert.chamber_id}` : undefined,
+        branchName: ivfAlert.branch_name || undefined,
         dedupKey: (ivfAlert as IVFAlert & { dedup_key?: string }).dedup_key,
         message: ivfAlert.message,
         timestamp: new Date(ivfAlert.occurred_at+"Z")+"",
@@ -1991,7 +2010,7 @@ export default function Dashboard({ }: DashboardProps) {
         alerts={transformedAlerts}
         loading={loadingAlerts}
         focusAlertId={focusAlertId}
-        patientIdLabel={isIVF ? 'Tank Code' : 'Patient ID'}
+        patientIdLabel={isIVF ? 'Device Code' : 'Patient ID'}
       />
 
       {/* My Tasks Modal */}

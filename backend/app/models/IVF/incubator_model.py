@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Boolean, UniqueConstraint
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Boolean, Numeric, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from ...config.database import Base
@@ -23,9 +23,20 @@ class Incubator(Base):
     chamber_c = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
 
+    # Calibration constants for the derived culture-media pH calculation
+    # (Henderson-Hasselbalch from live CO2%/temperature) — see
+    # telemetry-service/shared/publisher_logic.py compute_incubator_ph().
+    # Null means "not calibrated yet"; pH is skipped, never defaulted, when
+    # either is missing.
+    pressure_mmhg = Column(Numeric(6, 2), nullable=True, comment="Local atmospheric pressure at the site (mmHg)")
+    hco3_mm = Column(Numeric(6, 2), nullable=True, comment="Clinic's calibrated bicarbonate constant for the media brand in use (mM)")
+
     # Relationships
     hospital = relationship("Hospital", back_populates="incubators")
     branch = relationship("HospitalBranch", back_populates="incubators")
+    devices = relationship(
+        "IncubatorDevice", back_populates="incubator", cascade="all, delete-orphan"
+    )
 
     # Constraints
     __table_args__ = (

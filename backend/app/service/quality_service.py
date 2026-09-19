@@ -1534,7 +1534,9 @@ class QualityService:
                 )
 
             q = self.db.query(KpiConfig).filter(KpiConfig.incubator_id == incubator_id)
-            if chamber_id is not None:
+            if chamber_id == "null":
+                q = q.filter(KpiConfig.chamber_id.is_(None))
+            elif chamber_id:
                 q = q.filter(KpiConfig.chamber_id == chamber_id)
             rows = q.all()
 
@@ -1568,6 +1570,12 @@ class QualityService:
                 "kpi_limits": {},
             }
 
+    def _incubator_chamber_filter(self, chamber_id: str):
+        """Build an incubator chamber filter that handles the "null" sentinel
+        (Common scope, chamber_id IS NULL) — a plain `== "null"` would compare
+        against the literal string, never matching a real NULL row."""
+        return Readings.chamber_id.is_(None) if chamber_id == "null" else Readings.chamber_id == chamber_id
+
     def get_last_n_readings_per_kpi_incubator(
         self, incubator_id: int, chamber_id: str, n: int
     ) -> Optional[dict]:
@@ -1584,7 +1592,7 @@ class QualityService:
             db.query(Readings.id, row_number)
             .filter(
                 Readings.incubator_id == incubator_id,
-                Readings.chamber_id == chamber_id,
+                self._incubator_chamber_filter(chamber_id),
             )
             .subquery()
         )
@@ -1643,7 +1651,7 @@ class QualityService:
             .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
             .filter(
                 Readings.incubator_id == incubator_id,
-                Readings.chamber_id == chamber_id,
+                self._incubator_chamber_filter(chamber_id),
                 Readings.timestamp >= since,
             )
             .order_by(Readings.timestamp.desc())
@@ -1678,7 +1686,10 @@ class QualityService:
     ) -> Optional[dict]:
         """Aggregated KPI history for an incubator chamber (mirrors get_tank_kpi_history_aggregated)."""
         bucket_seconds = bucket_minutes * 60
-        sql = text("""
+        # "null" sentinel = Common scope (chamber_id IS NULL) — a bound `= :chamber_id`
+        # with chamber_id=None never matches a real NULL row, so this needs its own clause.
+        chamber_clause = "r.chamber_id IS NULL" if chamber_id == "null" else "r.chamber_id = :chamber_id"
+        sql = text(f"""
             SELECT
                 to_timestamp(
                     floor(extract(epoch from r.timestamp AT TIME ZONE 'UTC') / :bucket_sec) * :bucket_sec
@@ -1692,7 +1703,7 @@ class QualityService:
             FROM readings r
             JOIN kpi_config k ON r.kpi_config_id = k.id
             WHERE r.incubator_id = :incubator_id
-              AND r.chamber_id = :chamber_id
+              AND {chamber_clause}
               AND r.timestamp >= :since
               AND (:until IS NULL OR r.timestamp <= :until)
             GROUP BY bucket_start, k.id, k.kpi_name, k.unit
@@ -1745,7 +1756,7 @@ class QualityService:
                 self.db.query(func.max(Readings.timestamp))
                 .filter(
                     Readings.incubator_id == incubator_id,
-                    Readings.chamber_id == chamber_id,
+                    self._incubator_chamber_filter(chamber_id),
                 )
                 .scalar()
             )

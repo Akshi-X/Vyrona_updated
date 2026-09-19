@@ -90,7 +90,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
         dropdown: true,
         children: [
             { label: "Cryotanks",  path: "/alert-setting" },
-           // { label: "Incubators",    path: "/alert-setting?direction=incubators"    },
+            { label: "Incubators",    path: "/alert-setting?direction=incubators"    },
             { label: "Refrigerators", path: "/alert-setting?direction=refrigerators" },
         ],
     },

@@ -5,11 +5,13 @@ Service layer for IVF reports with role-based access control.
 from datetime import date, datetime
 from typing import List, Optional, Tuple
 
-from sqlalchemy import func, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from ...models.IVF.critical_alert_model import CriticalAlert
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
+from ...models.IVF.incubator_model import Incubator
+from ...models.IVF.refrigerator_model import Refrigerator
 from ...models.IVF.reservoir_model import Reservoir
 from ...models.IVF.reservoir_log_model import ReservoirLog
 from ...models.IVF.tank_model import Tank
@@ -170,6 +172,8 @@ class IVFReportsService:
         status: Optional[str],
         severity: Optional[str],
         tank_codes: Optional[List[str]],
+        incubator_codes: Optional[List[str]],
+        refrigerator_codes: Optional[List[str]],
         page: int,
         page_size: int,
     ) -> dict:
@@ -181,9 +185,16 @@ class IVFReportsService:
             self.db.query(
                 CriticalAlert,
                 Tank.tank_code,
+                Incubator.incubator_code,
+                Refrigerator.refrigerator_code,
                 HospitalBranch.branch_name,
             )
-            .join(Tank, CriticalAlert.tank_id == Tank.tank_id)
+            .outerjoin(Tank, CriticalAlert.tank_id == Tank.tank_id)
+            .outerjoin(Incubator, CriticalAlert.incubator_id == Incubator.incubator_id)
+            .outerjoin(
+                Refrigerator,
+                CriticalAlert.refrigerator_id == Refrigerator.refrigerator_id,
+            )
             .join(HospitalBranch, CriticalAlert.branch_id == HospitalBranch.branch_id)
             .filter(CriticalAlert.hospital_id == hospital_id)
         )
@@ -197,10 +208,22 @@ class IVFReportsService:
         if severity:
             query = query.filter(CriticalAlert.severity == severity)
 
-        if tank_codes:
-            cleaned_codes = [code for code in tank_codes if code]
-            if cleaned_codes:
-                query = query.filter(Tank.tank_code.in_(cleaned_codes))
+        # Device code filters are additive across device types: selecting codes in any
+        # combination of the three lists narrows the report to those devices only.
+        device_filters = []
+        cleaned_tank_codes = [code for code in (tank_codes or []) if code]
+        if cleaned_tank_codes:
+            device_filters.append(Tank.tank_code.in_(cleaned_tank_codes))
+        cleaned_incubator_codes = [code for code in (incubator_codes or []) if code]
+        if cleaned_incubator_codes:
+            device_filters.append(Incubator.incubator_code.in_(cleaned_incubator_codes))
+        cleaned_refrigerator_codes = [code for code in (refrigerator_codes or []) if code]
+        if cleaned_refrigerator_codes:
+            device_filters.append(
+                Refrigerator.refrigerator_code.in_(cleaned_refrigerator_codes)
+            )
+        if device_filters:
+            query = query.filter(or_(*device_filters))
 
         if start:
             query = query.filter(CriticalAlert.occurred_at >= datetime.combine(start, datetime.min.time()))
@@ -218,12 +241,24 @@ class IVFReportsService:
         )
 
         alerts: List[dict] = []
-        for alert, tank_code, branch_name in results:
+        for alert, tank_code, incubator_code, refrigerator_code, branch_name in results:
+            if alert.incubator_id is not None:
+                device_type, device_code = "incubator", incubator_code
+            elif alert.refrigerator_id is not None:
+                device_type, device_code = "refrigerator", refrigerator_code
+            else:
+                device_type, device_code = "tank", tank_code
             alerts.append(
                 {
                     "alert_id": alert.alert_id,
                     "tank_id": alert.tank_id,
                     "tank_code": tank_code,
+                    "incubator_id": alert.incubator_id,
+                    "incubator_code": incubator_code,
+                    "refrigerator_id": alert.refrigerator_id,
+                    "refrigerator_code": refrigerator_code,
+                    "device_type": device_type,
+                    "device_code": device_code,
                     "branch_id": alert.branch_id,
                     "branch_name": branch_name,
                     "alert_type": alert.alert_type,

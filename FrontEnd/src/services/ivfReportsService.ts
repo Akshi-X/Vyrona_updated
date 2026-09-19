@@ -18,8 +18,14 @@ export interface MonthlySummaryResponse {
 
 export interface CriticalAlertReportRow {
     alert_id: string;
-    tank_id: number;
+    tank_id?: number | null;
     tank_code?: string | null;
+    incubator_id?: number | null;
+    incubator_code?: string | null;
+    refrigerator_id?: number | null;
+    refrigerator_code?: string | null;
+    device_type: "tank" | "incubator" | "refrigerator";
+    device_code?: string | null;
     branch_id: number;
     branch_name?: string | null;
     alert_type: string;
@@ -103,6 +109,8 @@ export class IvfReportsService extends BaseApiService {
         status?: string;
         severity?: string;
         tank_codes?: string[];
+        incubator_codes?: string[];
+        refrigerator_codes?: string[];
         page?: number;
         page_size?: number;
     }): Promise<CriticalAlertReportResponse> {
@@ -123,6 +131,20 @@ export class IvfReportsService extends BaseApiService {
             options.tank_codes.forEach((code) => {
                 if (code) {
                     params.append("tank_codes", code);
+                }
+            });
+        }
+        if (options.incubator_codes && options.incubator_codes.length > 0) {
+            options.incubator_codes.forEach((code) => {
+                if (code) {
+                    params.append("incubator_codes", code);
+                }
+            });
+        }
+        if (options.refrigerator_codes && options.refrigerator_codes.length > 0) {
+            options.refrigerator_codes.forEach((code) => {
+                if (code) {
+                    params.append("refrigerator_codes", code);
                 }
             });
         }

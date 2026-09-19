@@ -4019,14 +4019,14 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               }}
             >
 
-            <div style={{ position: "relative", width: 280, height: isEmbedded ? 520 : 620 }}>
+            <div style={{ position: "relative", width: "min(280px, calc(100vw - 40px))", height: isEmbedded ? 520 : 620 }}>
               {/* Inspection panel: canister details + cryolock cards */}
               <div
                 className="cryo-fade-in bg-white flex flex-col"
                 style={{
                   position: "absolute",
                   inset: 0,
-                  width: 280,
+                  width: "min(280px, calc(100vw - 40px))",
                   height: isEmbedded ? 520 : 620,
                   border: "1px solid #e6d6ee",
                   borderRadius: 18,
@@ -4202,7 +4202,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                 style={{
                   position: "absolute",
                   inset: 0,
-                  width: 280,
+                  width: "min(280px, calc(100vw - 40px))",
                   height: isEmbedded ? 520 : 620,
                   border: "1px solid #e6d6ee",
                   borderRadius: 18,
@@ -5124,7 +5124,7 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               className="cryo-side-scroll flex flex-col overflow-x-hidden"
               style={{
                 gap: 14,
-                width: 300,
+                width: "min(300px, calc(100vw - 40px))",
                 height: isEmbedded ? 520 : 620,
                 overflowY: "auto",
                 paddingRight: 4,

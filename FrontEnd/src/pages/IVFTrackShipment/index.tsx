@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
+import PageBreadcrumb from '../../components/PageBreadcrumb';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/CryocanDarkN.svg';
 import { useAuth } from '../../contexts/AuthContext';
 // import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
@@ -530,17 +531,7 @@ export default function IVFTrackShipmentPage() {
           <PageLayout title="Cryocan" description="Live cryogenic monitoring and canister storage." icon={ContainerQualityTrackingIcon} actions={pageActions}>
                             {/* Breadcrumb */}
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                                <div className="flex items-center gap-1 text-sm">
-                                    <button
-                                        type="button"
-                                        onClick={() => navigate("/dashboard")}
-                                        className="text-gray-500 font-semibold hover:text-gray-700 transition-colors"
-                                    >
-                                        Dashboard
-                                    </button>
-                                    <span className="text-gray-500">/</span>
-                                    <span className="text-black font-semibold">Cryocan Quality Tracking</span>
-                                </div>
+                                <PageBreadcrumb label="Cryocan Quality Tracking" />
                                 <div className="flex items-center gap-3">
                                     <div className="text-sm font-semibold text-black">
                                         {headerTankCode} - {headerBranchName}

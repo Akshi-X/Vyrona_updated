@@ -402,3 +402,78 @@ def check_and_create_refrigerator_kpi_alerts(
             exc_info=True,
         )
         return []
+
+
+def _check_and_create_incubator_kpi_alerts_sync(
+    incubator_id: int,
+    chamber_id: Optional[str],
+) -> None:
+    """
+    Internal function that calls the backend endpoint to check and create incubator
+    chamber KPI deviation alerts (runs in background thread).
+    """
+    try:
+        api_url = f"{config.ALERT_API_BASE_URL}/api/ivf/alerts/check_kpi_incubator"
+
+        payload: Dict[str, Any] = {"incubator_id": incubator_id}
+        if chamber_id is not None:
+            payload["chamber_id"] = chamber_id
+
+        response = requests.post(
+            api_url,
+            json=payload,
+            timeout=config.ALERT_API_TIMEOUT,
+            headers=_get_internal_headers(),
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            alerts = result.get("alerts", [])
+            logger.info(
+                f"✓ Created/updated {len(alerts)} alert records for incubator_id={incubator_id} chamber_id={chamber_id}"
+            )
+        else:
+            logger.warning(
+                f"Alert API returned non-200 status: {response.status_code} "
+                f"for incubator_id={incubator_id}. Response: {response.text[:200]}"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Error calling alert check API for incubator_id={incubator_id}: {e}",
+            exc_info=True,
+        )
+
+
+def check_and_create_incubator_kpi_alerts(
+    incubator_id: int,
+    chamber_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Check and create KPI deviation alerts for an incubator chamber via external API
+    (fire-and-forget, non-blocking).
+
+    Args:
+        incubator_id: Incubator ID
+        chamber_id: Optional chamber ID
+
+    Returns:
+        Empty list immediately (actual API call happens in background)
+    """
+    try:
+        thread = threading.Thread(
+            target=_check_and_create_incubator_kpi_alerts_sync,
+            args=(incubator_id, chamber_id),
+            daemon=True,
+        )
+        thread.start()
+        logger.info(
+            f"✓ Triggered incubator alert check for incubator_id={incubator_id} chamber_id={chamber_id} (background thread)"
+        )
+        return []
+    except Exception as e:
+        logger.error(
+            f"Error starting incubator alert check thread for incubator_id={incubator_id}: {e}",
+            exc_info=True,
+        )
+        return []
