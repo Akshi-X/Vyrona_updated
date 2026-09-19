@@ -1,10 +1,11 @@
 
 from sqlalchemy import text
 from .redis_client import get_redis_client
-from shared.alert_api_client import trigger_immediate_alert_email, check_and_create_alerts, check_and_create_refrigerator_kpi_alerts
+from shared.alert_api_client import trigger_immediate_alert_email, check_and_create_alerts, check_and_create_refrigerator_kpi_alerts, check_and_create_incubator_kpi_alerts
 
 import json
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +57,36 @@ class KPI_NAMES:
     REFRIGERATOR_TEMP = "refrigerator_temp"
     REFRIGERATOR_HUMIDITY = "refrigerator_humidity"
 
+    # Matches the KPI names the backend's Chamber Health card already reserves
+    # (app/controller/IVF/ivf_quality_controller.py:_CHAMBER_HEALTH_KPIS) — do
+    # not rename these without updating that dict too.
+    INCUBATOR_TEMP = "incubator_temp"
+    INCUBATOR_O2 = "incubator_o2"
+    INCUBATOR_CO2 = "incubator_co2"
+    INCUBATOR_HUMIDITY = "incubator_humidity"
+    # Matches the frontend's DKPI.INC_VOC ("incubator_voc") — do not use "tvoc"
+    # here even though the device payload field is named "tvoc".
+    INCUBATOR_VOC = "incubator_voc"
+    INCUBATOR_LID_STATE = "incubator_lid_state"
+    # Device-level (chamber_id IS NULL), not per-chamber — matches DKPI.INC_BATTERY.
+    INCUBATOR_BATTERY = "incubator_battery"
+    # Derived (never a raw sensor value) — see compute_incubator_ph() below.
+    INCUBATOR_PH = "incubator_ph"
+
     def get_unit_for_kpi(kpi_name):
         """Return the unit for a given KPI name."""
-        if kpi_name in [KPI_NAMES.IVF_TEMPERATURE_INTERNAL, KPI_NAMES.IVF_TEMPERATURE_EXTERNAL, KPI_NAMES.REFRIGERATOR_TEMP]:
+        if kpi_name in [KPI_NAMES.IVF_TEMPERATURE_INTERNAL, KPI_NAMES.IVF_TEMPERATURE_EXTERNAL, KPI_NAMES.REFRIGERATOR_TEMP, KPI_NAMES.INCUBATOR_TEMP]:
             return "°C"
-        elif kpi_name in [KPI_NAMES.REFRIGERATOR_HUMIDITY]:
+        elif kpi_name in [KPI_NAMES.REFRIGERATOR_HUMIDITY, KPI_NAMES.INCUBATOR_HUMIDITY, KPI_NAMES.INCUBATOR_O2, KPI_NAMES.INCUBATOR_CO2]:
             return "%"
+        elif kpi_name in [KPI_NAMES.INCUBATOR_VOC]:
+            return "ppb"
+        elif kpi_name in [KPI_NAMES.INCUBATOR_LID_STATE]:
+            return "state"
+        elif kpi_name in [KPI_NAMES.INCUBATOR_BATTERY]:
+            return "%"
+        elif kpi_name in [KPI_NAMES.INCUBATOR_PH]:
+            return "pH"
         elif kpi_name in [KPI_NAMES.IVF_LN2_LEVEL]:
             return "Kg"
         elif kpi_name in [KPI_NAMES.IVF_LN2_EVAPORATION_RATE]:
@@ -78,6 +103,45 @@ class KPI_NAMES:
             return "state"
         else:
             return ""
+
+
+def compute_incubator_ph(co2_pct, temp_c, pressure_mmhg, hco3_mm):
+    """Derived (not directly probed) culture-media pH via Henderson-Hasselbalch,
+    from live CO2%/temperature sensor readings plus two per-incubator
+    calibration constants (Incubator.pressure_mmhg, Incubator.hco3_mm).
+
+    This is the one and only pH estimation method in use — do not substitute
+    another approach. Returns None (never a guessed/defaulted value) when any
+    input is missing, so a mis-calibrated or uncalibrated incubator silently
+    produces no incubator_ph reading rather than a wrong one.
+
+    Caveats (apply to every value this returns, not just edge cases):
+    - pKa(T)'s -0.01/°C slope is from mammalian blood plasma studies, not
+      media-specific data — an approximation.
+    - alpha(T) is anchored to the known 37°C plasma solubility value, not
+      independently verified for this specific culture media.
+    - Assumes hco3_mm was correctly back-calculated for the media brand
+      actually in use in this incubator.
+    """
+    if co2_pct is None or temp_c is None or pressure_mmhg is None or hco3_mm is None:
+        return None
+
+    co2_pct = float(co2_pct)
+    temp_c = float(temp_c)
+    pressure_mmhg = float(pressure_mmhg)
+    hco3_mm = float(hco3_mm)
+
+    p_co2 = (co2_pct / 100) * pressure_mmhg
+    alpha_t = 0.03 * math.exp(2400 * (1 / (temp_c + 273.15) - 1 / 310.15))
+    pka_t = 6.1 + (-0.01) * (temp_c - 37)
+    ph = pka_t + math.log10(hco3_mm / (alpha_t * p_co2))
+
+    return {
+        "pH": round(ph, 4),
+        "pCO2": round(p_co2, 4),
+        "alpha_T": round(alpha_t, 4),
+        "pKa_T": round(pka_t, 4),
+    }
 
     """
     quality_data = {
@@ -425,6 +489,29 @@ def get_kpi_config_for_refrigerator_zone(db_session, kpi_name: str, refrigerator
     })
     return [dict(row._mapping) for row in result.fetchall()]
 
+def get_kpi_config_for_incubator_chamber(db_session, kpi_name: str, incubator_id: int, chamber_id: str) -> list[dict]:
+    # chamber_id=None means the incubator-level "Common" scope (e.g. battery) —
+    # a bound `chamber_id = NULL` param never matches, even against a real NULL
+    # row, so that case needs its own IS NULL clause.
+    if chamber_id is None:
+        query = text("""
+            SELECT * FROM kpi_config
+            WHERE incubator_id = :incubator_id
+              AND chamber_id IS NULL
+              AND kpi_name = :kpi_name
+        """)
+        params = {"incubator_id": incubator_id, "kpi_name": kpi_name}
+    else:
+        query = text("""
+            SELECT * FROM kpi_config
+            WHERE incubator_id = :incubator_id
+              AND chamber_id = :chamber_id
+              AND kpi_name = :kpi_name
+        """)
+        params = {"incubator_id": incubator_id, "chamber_id": chamber_id, "kpi_name": kpi_name}
+    result = db_session.execute(query, params)
+    return [dict(row._mapping) for row in result.fetchall()]
+
 def get_tank_code_for_device_code(db_session, device_code: str) -> str:
     """
     Fetch the tank code associated with a given device code.
@@ -569,6 +656,115 @@ def publish_refrigerator_kpi_readings_to_redis(refrigerator_id: int, refrigerato
     except Exception as e:
         logger.error(f"Error publishing refrigerator KPI readings to Redis: {e}")
         return False
+
+def publish_incubator_kpi_readings_to_redis(incubator_id: int, incubator_code: str, chamber_id: str, kpi_readings: list[dict]):
+    try:
+        r = get_redis_client()
+        data_json = json.dumps({
+            "incubator_id": incubator_id,
+            "incubator_code": incubator_code,
+            "chamber_id": chamber_id,
+            "kpis": kpi_readings,
+        })
+        r.publish("incubator_kpi_readings_channel", data_json)
+        logger.info(f"Published to incubator_kpi_readings_channel (incubator_code={incubator_code}, chamber_id={chamber_id})")
+        return True
+    except Exception as e:
+        logger.error(f"Error publishing incubator KPI readings to Redis: {e}")
+        return False
+
+def save_incubator_kpi_readings(
+    db_session,
+    incubator_id: int,
+    chamber_id: str,
+    incubator_code: str,
+    hospital_id: int,
+    branch_id: int,
+    kpi_readings: list[dict],
+):
+    VALID_INCUBATOR_KPI_NAMES = {
+        KPI_NAMES.INCUBATOR_TEMP,
+        KPI_NAMES.INCUBATOR_O2,
+        KPI_NAMES.INCUBATOR_CO2,
+        KPI_NAMES.INCUBATOR_HUMIDITY,
+        KPI_NAMES.INCUBATOR_VOC,
+        KPI_NAMES.INCUBATOR_LID_STATE,
+        KPI_NAMES.INCUBATOR_BATTERY,
+        KPI_NAMES.INCUBATOR_PH,
+    }
+
+    for reading in kpi_readings:
+        kpi_name = reading["name"]
+
+        if kpi_name not in VALID_INCUBATOR_KPI_NAMES:
+            logger.warning(f"KPI name '{kpi_name}' not valid for incubator. Skipping.")
+            continue
+
+        kpi_configs = get_kpi_config_for_incubator_chamber(db_session, kpi_name, incubator_id, chamber_id)
+        logger.info(f"Fetched KPI configs for '{kpi_name}', incubator_id={incubator_id}, chamber_id={chamber_id}: {kpi_configs}")
+
+        if reading.get("value") is None:
+            logger.info(f"KPI value is None for '{kpi_name}'. Skipping.")
+            continue
+
+        try:
+            kpi_value = float(reading["value"])
+        except Exception as e:
+            logger.error(f"Failed to convert KPI value for '{kpi_name}': {e}")
+            continue
+
+        alert_level, kpi_config_id, send_alert = KPI_ALERTS.check_deviation_from_thresholds(kpi_value, kpi_configs)
+        logger.info(f"Deviation check for '{kpi_name}': alert_level={alert_level}, kpi_config_id={kpi_config_id}")
+
+        if kpi_config_id is None and kpi_configs:
+            kpi_config_id = kpi_configs[0].get("id")
+
+        if kpi_config_id is None:
+            logger.info(f"No kpi_config_id for '{kpi_name}' on incubator {incubator_id}/{chamber_id}. Skipping insert.")
+            continue
+
+        query = text("""
+            INSERT INTO readings (hospital_id, branch_id, incubator_id, chamber_id,
+                                  kpi_config_id, kpi_value, timestamp,
+                                  deviation_alert_sent, deviation)
+            VALUES (:hospital_id, :branch_id, :incubator_id, :chamber_id,
+                    :kpi_config_id, :kpi_value, :timestamp,
+                    :deviation_alert_sent, :deviation)
+        """)
+        try:
+            db_session.execute(query, {
+                "hospital_id": hospital_id,
+                "branch_id": branch_id,
+                "incubator_id": incubator_id,
+                "chamber_id": chamber_id,
+                "kpi_config_id": kpi_config_id,
+                "kpi_value": kpi_value,
+                "timestamp": reading["timestamp"],
+                "deviation_alert_sent": send_alert if send_alert is not None else False,
+                "deviation": alert_level != KPI_ALERTS.NO_ALERT,
+            })
+            logger.info(f"Inserted incubator KPI reading for '{kpi_name}' (kpi_config_id={kpi_config_id}).")
+        except Exception as e:
+            logger.error(f"Failed to insert incubator KPI reading for '{kpi_name}': {e}")
+
+    try:
+        db_session.commit()
+        logger.info("Committed incubator KPI readings to database.")
+    except Exception as e:
+        logger.error(f"Failed to commit incubator KPI readings: {e}")
+
+    try:
+        publish_incubator_kpi_readings_to_redis(incubator_id, incubator_code, chamber_id, kpi_readings)
+    except Exception as e:
+        logger.error(f"Failed to publish incubator KPI readings to Redis: {e}")
+
+    try:
+        check_and_create_incubator_kpi_alerts(incubator_id, chamber_id)
+        logger.info(f"Triggered alert check for incubator_id={incubator_id}, chamber_id={chamber_id}")
+    except Exception as e:
+        logger.error(f"Failed to trigger incubator alert check: {e}")
+
+    return True
 
 def save_refrigerator_kpi_readings(
     db_session,

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Thermometer } from 'lucide-react';
+import PageBreadcrumb from '../../components/PageBreadcrumb';
 import { ivfService } from '../../services/ivfService';
 import IncubatorQualityTrackingChart from './IncubatorQualityTrackingChart';
 import IncubatorVisualisation, { type IncubatorSensorTile } from './IncubatorVisualisation';
@@ -124,14 +125,13 @@ export default function IncubatorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const incubatorId = id ? parseInt(id, 10) : NaN;
   const hasIncubatorId = !isNaN(incubatorId);
-  const navigate = useNavigate();
   const { userRole } = useAuth();
 
   const [viewMode, setViewMode] = useState<'classic' | '3d'>('3d');
   const [incubatorCode, setIncubatorCode] = useState<string>('-');
   const [branchName, setBranchName] = useState<string>('-');
   const [chambers, setChambers] = useState<string[]>([]);
-  const [chamberId, setChamberId] = useState<string>('');
+  const [chamberId, setChamberId] = useState<string | null>('');
   const [latestMetrics, setLatestMetrics] = useState<Record<string, number | string>>({});
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [kpiTabs, setKpiTabs] = useState<Array<{ id: string; label: string; unit: string }>>([]);
@@ -159,7 +159,8 @@ export default function IncubatorDetailPage() {
   const myTasksCount = myTasks.filter((t) => t.status === 'Not started' || t.status === 'In progress').length;
   const resolvedCode = incubatorCode !== '-' ? incubatorCode : '';
 
-  const sensorTiles: IncubatorSensorTile[] = kpiTabs.map((tab) => {
+  const sensorTiles: IncubatorSensorTile[] = kpiTabs
+    .map((tab) => {
     const raw = latestMetrics[tab.id];
     let display = '—';
     if (raw != null && raw !== '') {
@@ -251,9 +252,12 @@ export default function IncubatorDetailPage() {
     userService.getProfile().then(setCurrentUser).catch(() => {});
   }, [incubatorId, chamberId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const showViewToggle = false;
+
   const pageActions = (
     <div className="flex items-center gap-6">
       {/* View mode toggle */}
+      {showViewToggle && (
       <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-1">
         <button
           type="button"
@@ -285,6 +289,7 @@ export default function IncubatorDetailPage() {
           3D View
         </button>
       </div>
+      )}
       {/* Critical Alerts */}
       <div className="relative group">
         <img
@@ -347,25 +352,7 @@ export default function IncubatorDetailPage() {
       <PageLayout title="Incubator Tracking" lucideIcon={Thermometer} actions={pageActions}>
         {/* Breadcrumb — always visible */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
-          <div className="flex items-center gap-1 text-sm">
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="text-gray-500 font-semibold hover:text-gray-700 transition-colors"
-            >
-              Dashboard
-            </button>
-            <span className="text-gray-500">/</span>
-            <button
-              type="button"
-              onClick={() => navigate('/incubator-tracking')}
-              className="text-gray-500 font-semibold hover:text-gray-700 transition-colors"
-            >
-              Incubator Tracking
-            </button>
-            <span className="text-gray-500">/</span>
-            <span className="text-black font-semibold">Incubator Quality Tracking</span>
-          </div>
+          <PageBreadcrumb label="Incubator Quality Tracking" />
           <div className="text-sm font-semibold text-black">
             {incubatorCode} - {branchName}
           </div>
@@ -373,7 +360,7 @@ export default function IncubatorDetailPage() {
 
         {/* Hidden data feed — only needed for classic view (3D view's visible chart
             provides the same data callbacks). Uses absolute positioning so Chart.js can init. */}
-        {viewMode === 'classic' && hasIncubatorId && chamberId && (
+        {viewMode === 'classic' && hasIncubatorId && chamberId !== '' && (
           <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
             <IncubatorQualityTrackingChart
               incubatorId={incubatorId}
@@ -412,7 +399,7 @@ export default function IncubatorDetailPage() {
             {/* Live chart + illustration */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="h-full min-h-80 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                {hasIncubatorId && chamberId ? (
+                {hasIncubatorId && chamberId !== '' ? (
                   <IncubatorQualityTrackingChart
                     incubatorId={incubatorId}
                     chamberId={chamberId}
@@ -434,7 +421,7 @@ export default function IncubatorDetailPage() {
 
             {/* Container contents */}
             {hasIncubatorId ? (
-              <MockContainerDataTable incubatorId={incubatorId} chamberId={chamberId} />
+              <MockContainerDataTable incubatorId={incubatorId} chamberId={chamberId ?? ''} />
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
                 <div className="py-8 text-center text-gray-400">No incubator selected.</div>
@@ -446,7 +433,7 @@ export default function IncubatorDetailPage() {
         {/* ── 3D view — bleeds edge-to-edge by cancelling PageLayout padding ── */}
         {viewMode === '3d' && (
           <>
-            <div className="-mx-4 md:-mx-6 -mt-2 md:-mt-6">
+            <div className="-mx-4 md:-mx-6">
               <IncubatorVisualisation
                 sensorTiles={sensorTiles}
                 systemActivity={[]}
@@ -462,7 +449,7 @@ export default function IncubatorDetailPage() {
                 branchName={branchName !== '-' ? branchName : undefined}
               />
             </div>
-            {hasIncubatorId && chamberId && (
+            {hasIncubatorId && chamberId !== '' && (
               <div ref={qualityChartRef} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mt-4">
                 <IncubatorQualityTrackingChart
                   incubatorId={incubatorId}

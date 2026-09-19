@@ -68,6 +68,8 @@ def get_critical_alert_report(
     status: Optional[str] = Query(None, description="Alert status (Active/Acknowledged)"),
     severity: Optional[str] = Query(None, description="Alert severity (High/Medium/Low)"),
     tank_codes: Optional[List[str]] = Query(None, description="Filter by tank codes"),
+    incubator_codes: Optional[List[str]] = Query(None, description="Filter by incubator codes"),
+    refrigerator_codes: Optional[List[str]] = Query(None, description="Filter by refrigerator codes"),
     page: int = Query(1, ge=1, le=10000, description="Page number"),
     page_size: int = Query(20, ge=1, le=200, description="Page size"),
     db: Session = Depends(get_db),
@@ -97,6 +99,8 @@ def get_critical_alert_report(
             status=status,
             severity=severity,
             tank_codes=tank_codes,
+            incubator_codes=incubator_codes,
+            refrigerator_codes=refrigerator_codes,
             page=page,
             page_size=page_size,
         )

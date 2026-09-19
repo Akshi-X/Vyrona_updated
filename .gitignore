@@ -9,3 +9,5 @@ logs/
 n-task.csv
 docs/
 ml/
+ml.zip
+telemetry-service/.venv/

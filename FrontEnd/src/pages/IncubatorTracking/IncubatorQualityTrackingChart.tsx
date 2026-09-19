@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ivfService } from '../../services/ivfService';
+import { parseTimestamp, formatTimeLabel, formatDateTimeLabel, formatISTDayMonthTime } from '../../utils/istDateFormat';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -28,6 +29,7 @@ const INCUBATOR_KPI_TABS = [
   { id: 'incubator_ph',       label: 'pH',           unit: ''    },
   { id: 'incubator_voc',      label: 'VOC',          unit: 'ppb' },
   { id: 'incubator_lid_state',label: 'Lid State',    unit: ''    },
+  { id: 'incubator_battery',  label: 'Battery',      unit: '%'   },
 ] as const;
 
 type IncubatorKpiTabId = (typeof INCUBATOR_KPI_TABS)[number]['id'];
@@ -35,7 +37,11 @@ type IncubatorKpiTabId = (typeof INCUBATOR_KPI_TABS)[number]['id'];
 const KPI_ORDER: IncubatorKpiTabId[] = [
   'incubator_temp', 'incubator_co2', 'incubator_o2',
   'incubator_humidity', 'incubator_ph', 'incubator_voc', 'incubator_lid_state',
+  'incubator_battery',
 ];
+
+// KPI tab ids to hide from the chart, if any ever need it again.
+const HIDDEN_KPI_TABS = new Set<string>([]);
 
 const DEFAULT_TAB_UNIT_MAP = INCUBATOR_KPI_TABS.reduce<Record<string, string>>((acc, tab) => {
   acc[tab.id] = tab.unit;
@@ -119,35 +125,8 @@ type TimeRangeId = (typeof TIME_RANGES)[number]['id'] | 'CUSTOM';
 // ---------------------------------------------------------------------------
 // Utility functions
 // ---------------------------------------------------------------------------
-const parseTimestamp = (timestamp: string): Date | null => {
-  try {
-    if (!timestamp) return null;
-    const normalized = timestamp.trim().replace(' ', 'T');
-    const hasTimezone = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(normalized);
-    const toParse = hasTimezone ? normalized : `${normalized}Z`;
-    const parsed = new Date(toParse);
-    return isNaN(parsed.getTime()) ? null : parsed;
-  } catch {
-    return null;
-  }
-};
-
-const formatTimeLabel = (timestamp: string, timeRange?: TimeRangeId): string => {
-  const date = parseTimestamp(timestamp);
-  if (!date) return timestamp;
-  if (timeRange === '7D') {
-    const datePart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    const timePart = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
-    return `${datePart}, ${timePart}`;
-  }
-  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
-};
-
-const formatDateTimeLabel = (timestamp: string): string => {
-  const date = parseTimestamp(timestamp);
-  if (!date) return timestamp;
-  return `${date.toLocaleDateString(undefined, { year: '2-digit', month: 'numeric', day: 'numeric' })}, ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
-};
+const formatTimeLabelForRange = (timestamp: string, timeRange?: TimeRangeId): string =>
+  formatTimeLabel(timestamp, timeRange === '7D');
 
 function getKpiStats(
   reading: IncubatorKpiReading,
@@ -181,7 +160,8 @@ function getKpiStats(
 // ---------------------------------------------------------------------------
 interface IncubatorQualityTrackingChartProps {
   incubatorId: number;
-  chamberId: string;
+  /** null = Common scope (chamber_id IS NULL), e.g. device-level battery. */
+  chamberId: string | null;
   incubatorCode?: string;
   selectedKpiKey?: string | null;
   onLatestValues?: (vals: Record<string, number | string>) => void;
@@ -209,6 +189,7 @@ export default function IncubatorQualityTrackingChart({
   const isConnectingRef = useRef(false);
   const hasConnectedRef = useRef(false);
   const timeRangeRef = useRef<TimeRangeId>('LIVE');
+  const appliedKpiKeyRef = useRef<string | undefined>(undefined);
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000;
 
@@ -300,15 +281,20 @@ export default function IncubatorQualityTrackingChart({
     setHasReceivedData(false);
     setHistoryLoaded(false);
     setError(null);
+    appliedKpiKeyRef.current = undefined;
   }, [incubatorId, chamberId]);
 
-  // Sync activeTab from external selectedKpiKey (e.g. KPI tile clicked in visualizer)
+  // Sync activeTab from external selectedKpiKey (e.g. KPI tile clicked in visualizer).
+  // Applies once per distinct selectedKpiKey so it doesn't fight the user's own tab clicks
+  // (activeTab is intentionally excluded from the deps/condition here).
   useEffect(() => {
     if (!selectedKpiKey) return;
-    if (kpiTabs.some((tab) => tab.id === selectedKpiKey) && activeTab !== selectedKpiKey) {
+    if (appliedKpiKeyRef.current === selectedKpiKey) return;
+    if (kpiTabs.some((tab) => tab.id === selectedKpiKey)) {
+      appliedKpiKeyRef.current = selectedKpiKey;
       setActiveTab(selectedKpiKey);
     }
-  }, [selectedKpiKey, kpiTabs, activeTab]);
+  }, [selectedKpiKey, kpiTabs]);
 
   // Fetch KPI config for tabs and threshold lines
   useEffect(() => {
@@ -331,6 +317,7 @@ export default function IncubatorQualityTrackingChart({
 
         // Build tabs from DB kpi_config; order by KPI_ORDER
         const keys = Object.keys(res.kpi_limits)
+          .filter((name) => !HIDDEN_KPI_TABS.has(name))
           .filter((name) => {
             const entry = (res.kpi_limits as Record<string, unknown>)[name];
             if (!entry || typeof entry !== 'object') return true;
@@ -354,7 +341,9 @@ export default function IncubatorQualityTrackingChart({
       .catch(() => {
         if (!isMountedRef.current) return;
         // Fall back to full INCUBATOR_KPI_TABS
-        const tabs = INCUBATOR_KPI_TABS.map((t) => ({ id: t.id, label: t.label, unit: t.unit }));
+        const tabs = INCUBATOR_KPI_TABS
+          .filter((t) => !HIDDEN_KPI_TABS.has(t.id))
+          .map((t) => ({ id: t.id, label: t.label, unit: t.unit }));
         setKpiTabs(tabs);
         setActiveTab(tabs[0]?.id ?? '');
         setHasLoadedKpiConfig(true);
@@ -515,9 +504,11 @@ export default function IncubatorQualityTrackingChart({
               return;
             }
 
-            // Only accept incubator_kpi messages matching our incubator+chamber
+            // Only accept incubator_kpi messages matching our incubator+chamber.
+            // Backend never sets a "type" field on this broadcast (same as the
+            // tank KPI path), so tolerate it being absent, not just the literal value.
             const isIncubatorKpi =
-              parsed.type === 'incubator_kpi' &&
+              (parsed.type === 'incubator_kpi' || parsed.type === undefined) &&
               parsed.incubator_id != null &&
               Number(parsed.incubator_id) === incubatorId &&
               parsed.chamber_id === chamberId &&
@@ -554,7 +545,7 @@ export default function IncubatorQualityTrackingChart({
             setKpiTabs((currentTabs) => {
               if (currentTabs.length > 0) return currentTabs;
               const names = new Set<string>();
-              parsed.kpis.forEach((k: { name?: string }) => { if (k?.name?.trim()) names.add(k.name.trim()); });
+              parsed.kpis.forEach((k: { name?: string }) => { if (k?.name?.trim() && !HIDDEN_KPI_TABS.has(k.name.trim())) names.add(k.name.trim()); });
               if (names.size === 0) return currentTabs;
               const sorted = Array.from(names).sort((a, b) => {
                 const ai = KPI_ORDER.indexOf(a as IncubatorKpiTabId);
@@ -692,12 +683,7 @@ export default function IncubatorQualityTrackingChart({
   const formatBucketRange = (timestamp: string): string => {
     const start = parseTimestamp(timestamp);
     if (!start) return formatDateTimeLabel(timestamp);
-    const fmt = (d: Date) => {
-      const day = String(d.getDate()).padStart(2, '0');
-      const mon = String(d.getMonth() + 1);
-      const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }).toUpperCase().replace(' ', '');
-      return `${day}/${mon} - ${time}`;
-    };
+    const fmt = formatISTDayMonthTime;
     if (bucketMinutes === 0) return fmt(start);
     const end = new Date(start.getTime() + bucketMinutes * 60 * 1000);
     return `${fmt(start)} to ${fmt(end)}`;
@@ -731,7 +717,7 @@ export default function IncubatorQualityTrackingChart({
 
   const chartData = useMemo(() => {
     const sorted = plottedReadings;
-    const labels = sorted.map((r) => formatTimeLabel(r.timestamp, timeRange));
+    const labels = sorted.map((r) => formatTimeLabelForRange(r.timestamp, timeRange));
     const stats = sorted.map((r) => getKpiStats(r, activeTab));
     const values = stats.map((s) => (s ? s.avg : null));
     const numericAverages = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
@@ -828,6 +814,85 @@ export default function IncubatorQualityTrackingChart({
     return { labels, datasets };
   }, [plottedReadings, activeTab, kpiTabs, kpiThresholds, timeRange, showLidCountChart]);
 
+  const alertCounts = useMemo(() => {
+    if (timeRange === 'LIVE') return [] as number[];
+    return plottedReadings.map((r) => {
+      const kpi = r.kpis?.find((k: any) => k.name === activeTab);
+      const count = kpi?.alert_count;
+      return typeof count === 'number' && count > 0 ? count : 0;
+    });
+  }, [plottedReadings, activeTab, timeRange]);
+
+  const hasAlertBadges = useMemo(() => alertCounts.some((c) => c > 0), [alertCounts]);
+
+  // react-chartjs-2 does not re-init an inline plugin when its closure changes,
+  // so the plugin object stays stable and reads the latest counts from a ref.
+  const alertCountsRef = useRef<number[]>(alertCounts);
+  alertCountsRef.current = alertCounts;
+
+  const alertBadgePlugin = useMemo(
+    () => ({
+      id: 'alertBadges',
+      afterDatasetsDraw: (chart: any) => {
+        const counts = alertCountsRef.current;
+        if (!counts.some((c) => c > 0)) return;
+        // Badges anchor to the main avg line dataset, or the lid-count bar when the
+        // Lid State tab renders a bar chart (no line dataset present).
+        let datasetIndex = chart.data.datasets.findIndex(
+          (d: any) => d.type === 'line' && !d.borderDash && d.data?.some((v: any) => v != null)
+        );
+        if (datasetIndex < 0) {
+          datasetIndex = chart.data.datasets.findIndex((d: any) => d._isLidCount);
+        }
+        if (datasetIndex < 0) return;
+        const meta = chart.getDatasetMeta(datasetIndex);
+        if (!meta || meta.hidden) return;
+        const { ctx } = chart;
+        meta.data.forEach((point: any, i: number) => {
+          const count = counts[i];
+          if (!count || !point || !Number.isFinite(point.y)) return;
+          const label = count > 99 ? '99+' : String(count);
+          ctx.save();
+          ctx.font = '700 10px sans-serif';
+          const textW = ctx.measureText(label).width;
+          const padX = 6;
+          const bw = Math.max(18, textW + padX * 2);
+          const bh = 16;
+          const tail = 5;
+          const cx = point.x;
+          const bottom = point.y - 8;
+          const top = bottom - bh - tail;
+          const left = cx - bw / 2;
+          const radius = 5;
+
+          ctx.fillStyle = '#E11D2A';
+          ctx.beginPath();
+          ctx.moveTo(left + radius, top);
+          ctx.lineTo(left + bw - radius, top);
+          ctx.arcTo(left + bw, top, left + bw, top + radius, radius);
+          ctx.lineTo(left + bw, top + bh - radius);
+          ctx.arcTo(left + bw, top + bh, left + bw - radius, top + bh, radius);
+          ctx.lineTo(cx + tail, top + bh);
+          ctx.lineTo(cx, top + bh + tail);
+          ctx.lineTo(cx - tail, top + bh);
+          ctx.lineTo(left + radius, top + bh);
+          ctx.arcTo(left, top + bh, left, top + bh - radius, radius);
+          ctx.lineTo(left, top + radius);
+          ctx.arcTo(left, top, left + radius, top, radius);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label, cx, top + bh / 2 + 0.5);
+          ctx.restore();
+        });
+      },
+    }),
+    []
+  );
+
   const chartOptions = useMemo(() => {
     const sorted = plottedReadings;
     const stats = sorted.map((r) => getKpiStats(r, activeTab)).filter((v): v is { avg: number; min: number | null; max: number | null } => v != null);
@@ -891,7 +956,7 @@ export default function IncubatorQualityTrackingChart({
           },
         },
       },
-      layout: { padding: { top: 0, right: 8, bottom: 0, left: 0 } },
+      layout: { padding: { top: hasAlertBadges ? 34 : 0, right: 8, bottom: 0, left: 0 } },
       interaction: { mode: 'index' as const, intersect: false },
       scales: {
         x: {
@@ -926,7 +991,7 @@ export default function IncubatorQualityTrackingChart({
             },
       },
     };
-  }, [plottedReadings, activeTab, kpiTabs, kpiThresholds, timeRange, bucketMinutes, showLidCountChart, isLidKpi]);
+  }, [plottedReadings, activeTab, kpiTabs, kpiThresholds, timeRange, bucketMinutes, showLidCountChart, isLidKpi, hasAlertBadges]);
 
   const hasData = displayReadings.length > 0;
 
@@ -1001,7 +1066,7 @@ export default function IncubatorQualityTrackingChart({
           </>
         ) : (
           <>
-            <Chart type="line" data={chartData} options={chartOptions as any} />
+            <Chart type="line" data={chartData} options={chartOptions as any} plugins={[alertBadgePlugin]} />
             {isRangeLoading && (
               <div className="absolute inset-0 bg-white/75 flex items-center justify-center z-10" aria-hidden="true">
                 <svg className="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-label="Loading">

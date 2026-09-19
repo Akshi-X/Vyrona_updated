@@ -26,6 +26,7 @@ from ...constants.enums import (
     ApprovalStatus,
     CanisterStatus,
 )
+from ...constants.kpi_constants import KPI_NAMES
 from ...models import KpiConfig, Readings
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.critical_alert_model import (
@@ -102,10 +103,18 @@ _WA_USER_COOLDOWN_SECONDS = 60 * 60
 _WA_ADMIN_COOLDOWN_SECONDS = 2 * 60 * 60
 _wa_last_sent_key = lambda kpi_config_id, group: f"alert:whatsapp:last_sent:{kpi_config_id}:{group}"
 
-# WhatsApp Content Template SIDs
-_WA_TEMPLATE_DEVIATION = "HX890c0696439223c8f7b952d35360ea25"   # "{{1}} is deviated to {{2}} in {{3}} branch for {{4}} tank"
-_WA_TEMPLATE_LID_STATE = "HXb0f2ec1db58e9f6ac5be31473a6a6cf7"   # "{{1}} is {{2}} in {{3}} branch for {{4}} tank"
-_WA_TEMPLATE_LN2_LEVEL = "HXcb6b9aeb47949e7b1c45efbfe7900eed"   # "{{1}} crossed L2 in {{2}} branch for {{3}} tank"
+# WhatsApp Content Template SIDs (v5). Every v5 body shares one variable contract —
+# {{1}} KPI label, {{2}} the reading with its unit, {{3}} branch, {{4}} device noun,
+# {{5}} device code — so a single template per KPI family covers tanks, incubators and
+# refrigerators instead of one template per device type. The continuity variants add
+# {{6}}, how long the condition has been live, and are used when the episode was
+# already alerted on.
+_WA_TEMPLATE_DEVIATION = "HX4560ac2b2da329fc6288609bf6478188"              # v5_default_newline
+_WA_TEMPLATE_DEVIATION_CONTINUITY = "HX80b24c1cb3263668798fa0ea057d8f77"   # v5_default_continuity
+_WA_TEMPLATE_LID_STATE = "HX7fb155feb2a74484c67a19cf3ba842d1"              # v5_lid_state
+_WA_TEMPLATE_LID_STATE_CONTINUITY = "HXc9cc2ee547739edcdbe04dbc6a65fe66"   # v5_lidstate_continuity
+_WA_TEMPLATE_LN2_LEVEL = "HXa014f4a92deee1aa97f740672d238371"              # v5_ln2
+_WA_TEMPLATE_LN2_LEVEL_CONTINUITY = "HX20a55e6f061aea485c157c2c33e740c4"   # v5_ln2_continuity
 
 # Alert-email artwork. Embedded as inline CID attachments rather than linked, so the
 # images render without a publicly reachable host and without the recipient having to
@@ -198,6 +207,8 @@ _DEVIATION_KPI_NAMES = {
     "ln2_evaporation_rate", "shock", "tive_battery_percentage",
     "incubator_o2", "incubator_co2", "incubator_temp",
     "incubator_humidity", "incubator_ph", "incubator_voc",
+    "incubator_battery",
+    "refrigerator_temp", "refrigerator_humidity",
 }
 
 
@@ -448,23 +459,31 @@ class CriticalAlertService:
             is not None
         )
 
-    def _episode_start(self, kpi_config_id: int, *device_filters) -> Optional[datetime]:
+    def _episode_start(
+        self, kpi_config_id: int, *device_filters, before: Optional[datetime] = None
+    ) -> Optional[datetime]:
         """Timestamp of the first deviating reading in the current unbroken episode.
 
         Anchored to the most recent clearing reading, so a recovery ends the episode
         and the next deviation starts a fresh one. device_filters scope the lookup to
         one device (tank, or refrigerator + zone). Returns None when no deviating
-        reading exists."""
-        last_clear = (
-            self.db.query(Readings)
-            .filter(
-                *device_filters,
-                Readings.kpi_config_id == kpi_config_id,
-                Readings.deviation == False,
-            )
-            .order_by(Readings.timestamp.desc())
-            .first()
+        reading exists.
+
+        `before` anchors "most recent clearing reading" to the deviation actually
+        being evaluated (its own timestamp), not whatever is latest in the table
+        right now. Without it, a deviation left unchecked long enough for newer
+        readings to clear the condition finds a last_clear *after* itself, the
+        first-deviation lookup below (bounded to timestamp >= last_clear) then
+        matches nothing, and callers relying on a non-None result — e.g. the
+        lid-state continuity/tolerance guard — silently skip their check."""
+        last_clear_query = self.db.query(Readings).filter(
+            *device_filters,
+            Readings.kpi_config_id == kpi_config_id,
+            Readings.deviation == False,
         )
+        if before is not None:
+            last_clear_query = last_clear_query.filter(Readings.timestamp <= before)
+        last_clear = last_clear_query.order_by(Readings.timestamp.desc()).first()
 
         query = self.db.query(Readings).filter(
             *device_filters,
@@ -540,18 +559,63 @@ class CriticalAlertService:
             if span:
                 return f"{math.floor(float(value) / span * 100)}%"
 
-        unit = (kpi_config.unit or "") if kpi_config is not None else ""
+        # kpi_config.unit is nullable, so fall back to the unit the KPI is defined with
+        # rather than reporting a bare number.
+        unit = ""
+        if kpi_config is not None:
+            unit = kpi_config.unit or KPI_NAMES.get_unit_for_kpi(kpi_config.kpi_name)
         return f"{round(value, 2)}{unit}"
 
+    def _device_scope_label(self, device_code: str, scope: Optional[str]) -> str:
+        """Render a device as '<code> (<scope>)', where scope is a refrigerator zone
+        name or an incubator chamber. Tanks and Common-scope configs have no scope and
+        read as the bare code."""
+        return f"{device_code} ({scope})" if scope else device_code
+
+    def _frame_alert_message(
+        self,
+        kpi_config,
+        value: Optional[float],
+        *,
+        branch_name: Optional[str],
+        device_noun: str,
+        device_label: str,
+        tank_id: Optional[int] = None,
+    ) -> str:
+        """One wording for KPI deviation alert messages across tanks, incubators and
+        refrigerators. This is what gets stored on CriticalAlert.message and embedded
+        verbatim in alert emails, so keep it in sync with the email template rather than
+        trimming it for the dashboard list — the list does its own display-time shortening
+        (see the frontend CriticalAlertsModal)."""
+        if kpi_config.kpi_name in _LID_STATE_KPI_NAMES:
+            headline = f"The {kpi_config.alert_name} is {'OPEN' if value == 1 else 'CLOSED'}"
+        elif kpi_config.kpi_name in _LN2_LEVEL_KPI_NAMES:
+            # ln2_level configs carry the crossed threshold ('l1'/'l2'/'critical') in
+            # alert_name rather than a display label.
+            headline = f"The LN2 is still under {(kpi_config.alert_name or 'L2').upper()} level"
+        else:
+            formatted = self._format_kpi_value(kpi_config, value, tank_id=tank_id)
+            headline = f"The {kpi_config.alert_name} has deviated to {formatted}."
+        return (
+            f"{headline}\n"
+            f"Branch: {branch_name or 'N/A'}\n"
+            f"{device_noun} Code: {device_label}\n\n"
+            "Kindly address the deviation and acknowledge the alert."
+        )
+
     def _format_duration(self, seconds: float) -> str:
-        """Render an elapsed span as '2HR', '45MIN' or '2HR 15MIN'."""
+        """Render an elapsed span as e.g. '2d 5h 15m', '2h 15m', '45m'."""
         total_minutes = max(0, int(seconds // 60))
-        hours, minutes = divmod(total_minutes, 60)
-        if hours and minutes:
-            return f"{hours}h {minutes}m"
+        days, rem_minutes = divmod(total_minutes, 24 * 60)
+        hours, minutes = divmod(rem_minutes, 60)
+        parts = []
+        if days:
+            parts.append(f"{days}d")
         if hours:
-            return f"{hours}h"
-        return f"{minutes}m"
+            parts.append(f"{hours}h")
+        if minutes or not parts:
+            parts.append(f"{minutes}m")
+        return " ".join(parts)
 
     def _hospital_push_configured(self, hospital_id: Optional[int]) -> bool:
         """Push stays a hospital-wide toggle (unlike email/whatsapp, which are
@@ -825,7 +889,9 @@ class CriticalAlertService:
                 if kpi_config.cooldown_minutes is not None
                 else 3600
             )
-            episode_start = self._episode_start(kpi_config.id, Readings.tank_id == tank_id)
+            episode_start = self._episode_start(
+                kpi_config.id, Readings.tank_id == tank_id, before=deviation.timestamp
+            )
 
             if kpi_config.kpi_name in _LID_STATE_KPI_NAMES and episode_start is not None:
                 # Continuity is the span of the actual deviating readings — first open
@@ -981,13 +1047,14 @@ class CriticalAlertService:
                 .scalar()
             )
 
-            # Frame message
-            message = f"{kpi_config.alert_name} is deviated to {round(deviation.kpi_value, 2)} in {branch_name} branch for {tank_code} tank"
-            if kpi_config.kpi_name in _LID_STATE_KPI_NAMES:
-                message = f"{kpi_config.alert_name} is {'OPEN' if deviation.kpi_value == 1 else 'CLOSED'} in {branch_name} branch for {tank_code} tank"
-
-            if kpi_config.kpi_name == "ln2_level":
-                message = f"{kpi_config.alert_name} crossed L2 in {branch_name} branch for {tank_code} tank"
+            message = self._frame_alert_message(
+                kpi_config,
+                deviation.kpi_value,
+                branch_name=branch_name,
+                device_noun="Tank",
+                device_label=tank_code or f"Tank-{tank_id}",
+                tank_id=tank_id,
+            )
 
             alert, created = self._create_alert(
                 tank_id=tank_id,
@@ -1043,7 +1110,12 @@ class CriticalAlertService:
                     kpi_config.id,
                 )
             if kpi_config.whatsapp_alert:
-                self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+                self._send_alert_whatsapp(
+                    alert,
+                    kpi_config=kpi_config,
+                    kpi_value=deviation.kpi_value,
+                    first_alert_at=episode_first_alert_at,
+                )
             else:
                 logger.info(
                     "Skipping WhatsApp for alert_id=%s because kpi_config_id=%s has whatsapp_alert disabled",
@@ -1333,7 +1405,9 @@ class CriticalAlertService:
             device_filters = [Readings.refrigerator_id == refrigerator_id]
             if zone_id is not None:
                 device_filters.append(Readings.zone_id == zone_id)
-            episode_start = self._episode_start(kpi_config.id, *device_filters)
+            episode_start = self._episode_start(
+                kpi_config.id, *device_filters, before=deviation.timestamp
+            )
 
             first_episode_alert = None
             if episode_start is not None:
@@ -1377,10 +1451,14 @@ class CriticalAlertService:
             ).first()
             refrigerator_code = refrigerator.refrigerator_code if refrigerator else str(refrigerator_id)
 
-            message = (
-                f"{kpi_config.alert_name} is deviated to {round(deviation.kpi_value, 2)}"
-                f" in {branch_name} branch for refrigerator {refrigerator_code}"
-                + (f" zone {zone_id}" if zone_id else "")
+            message = self._frame_alert_message(
+                kpi_config,
+                deviation.kpi_value,
+                branch_name=branch_name,
+                device_noun="Refrigerator",
+                device_label=self._device_scope_label(
+                    refrigerator_code, kpi_config.zone_name or zone_id
+                ),
             )
 
             alert, created = self._create_refrigerator_alert(
@@ -1421,7 +1499,12 @@ class CriticalAlertService:
                     kpi_config.id,
                 )
             if kpi_config.whatsapp_alert:
-                self._send_alert_whatsapp(alert, kpi_config=kpi_config, kpi_value=deviation.kpi_value)
+                self._send_alert_whatsapp(
+                    alert,
+                    kpi_config=kpi_config,
+                    kpi_value=deviation.kpi_value,
+                    first_alert_at=episode_first_alert_at,
+                )
             else:
                 logger.info(
                     "Skipping WhatsApp for alert_id=%s because kpi_config_id=%s has whatsapp_alert disabled",
@@ -1496,6 +1579,444 @@ class CriticalAlertService:
             "Refrigerator alert creation complete for refrigerator_id=%s zone_id=%s: %s alert(s) created/updated",
             refrigerator_id,
             zone_id,
+            len(alerts_created),
+        )
+        self.db.commit()
+        return alerts_created
+
+    def _get_incubator_hospital_branch(self, incubator_id: int) -> tuple:
+        """Get hospital_id and branch_id for an incubator."""
+        incubator = self.db.query(Incubator).filter(
+            Incubator.incubator_id == incubator_id
+        ).first()
+        if not incubator:
+            raise ValueError(f"Incubator {incubator_id} not found")
+        return incubator.hospital_id, incubator.branch_id
+
+    def _create_incubator_alert(
+        self,
+        incubator_id: int,
+        chamber_id: Optional[str],
+        alert_type: AlertType,
+        source: AlertSource,
+        severity: AlertSeverity,
+        message: str,
+        occurred_at: datetime,
+        triggered_by: AlertTriggeredBy = AlertTriggeredBy.SYSTEM,
+        extra_info: Optional[str] = None,
+    ) -> tuple[CriticalAlert, bool]:
+        """Create a new incubator alert if it doesn't already exist (using dedup_key).
+        Returns (alert, created) — created=False means an existing ACTIVE row was
+        reused, so callers must not re-send notifications for it."""
+        hospital_id, branch_id = self._get_incubator_hospital_branch(incubator_id)
+
+        chamber_part = chamber_id or "all"
+        timestamp_str = occurred_at.strftime("%Y-%m-%d_%H:%M:%S")
+        dedup_key = f"incubator:{incubator_id}:{chamber_part}:{source.value}:{alert_type.value}:{timestamp_str}:{extra_info or ''}"
+
+        existing_alert = (
+            self.db.query(CriticalAlert)
+            .filter(
+                CriticalAlert.dedup_key == dedup_key,
+                CriticalAlert.status == AlertStatus.ACTIVE.value,
+            )
+            .first()
+        )
+        if existing_alert:
+            existing_alert.occurred_at = occurred_at
+            existing_alert.updated_at = datetime.now(timezone.utc)
+            return existing_alert, False
+
+        incubator = self.db.query(Incubator).filter(
+            Incubator.incubator_id == incubator_id
+        ).first()
+        incubator_code = incubator.incubator_code if incubator else None
+
+        try:
+            alert = CriticalAlert(
+                alert_id=str(uuid.uuid4()),
+                incubator_id=incubator_id,
+                chamber_id=chamber_id,
+                hospital_id=hospital_id,
+                branch_id=branch_id,
+                alert_type=alert_type.value,
+                source=source.value,
+                severity=severity.value,
+                message=message,
+                status=AlertStatus.ACTIVE.value,
+                triggered_by=triggered_by.value,
+                occurred_at=occurred_at,
+                dedup_key=dedup_key,
+                created_at=datetime.now(timezone.utc),
+            )
+            self.db.add(alert)
+            self.db.flush()
+            ActivityLogService(self.db).log_activity(
+                action="alert.created",
+                outcome=ActivityOutcome.SUCCESS.value,
+                actor=build_system_actor("critical_alert"),
+                target=build_target("incubator", str(incubator_id), incubator_code),
+                metadata={
+                    "alert_id": alert.alert_id,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "message": message,
+                    "incubator_id": incubator_id,
+                    "incubator_code": incubator_code,
+                    "chamber_id": chamber_id,
+                    "branch_id": branch_id,
+                },
+            )
+            return alert, True
+        except IntegrityError as e:
+            if isinstance(e.orig, UniqueViolation) and "dedup_key" in str(e.orig):
+                logger.info(
+                    f"Incubator alert with dedup_key={dedup_key} already exists (race condition), fetching existing"
+                )
+                self.db.rollback()
+                existing_alert = (
+                    self.db.query(CriticalAlert)
+                    .filter(
+                        CriticalAlert.dedup_key == dedup_key,
+                        CriticalAlert.status == AlertStatus.ACTIVE.value,
+                    )
+                    .first()
+                )
+                if existing_alert:
+                    existing_alert.occurred_at = occurred_at
+                    existing_alert.updated_at = datetime.now(timezone.utc)
+                    self.db.flush()
+                    return existing_alert, False
+            raise
+
+    def check_and_create_alert_for_incubator_kpi_deviations(
+        self,
+        incubator_id: int,
+        chamber_id: Optional[str] = None,
+    ) -> list[dict]:
+        """
+        Check the readings table for unchecked KPI deviations on an incubator
+        chamber and create CriticalAlert records for each confirmed deviation.
+        """
+        query = self.db.query(Readings).filter(
+            Readings.incubator_id == incubator_id,
+            Readings.deviation == True,
+            or_(Readings.checked.is_(None), Readings.checked == False),
+        )
+        if chamber_id is not None:
+            query = query.filter(Readings.chamber_id == chamber_id)
+        else:
+            # None means the Common scope (chamber_id IS NULL), e.g. battery —
+            # not "no filter". The only caller (telemetry-service) passes None
+            # exactly for that case; a bare `is not None` here would otherwise
+            # sweep in every chamber's unchecked deviations too.
+            query = query.filter(Readings.chamber_id.is_(None))
+        deviations = query.all()
+
+        logger.info(
+            "Deviation count for incubator_id=%s chamber_id=%s: %s",
+            incubator_id,
+            chamber_id,
+            len(deviations),
+        )
+
+        alerts_created = []
+        checked_kpi_configs = []
+
+        for deviation in deviations:
+            kpi_config = (
+                self.db.query(KpiConfig)
+                .filter(
+                    KpiConfig.id == deviation.kpi_config_id,
+                    KpiConfig.status == True,
+                )
+                .first()
+            )
+            if not kpi_config or kpi_config.id in checked_kpi_configs:
+                deviation.checked = True
+                continue
+
+            now = datetime.now(timezone.utc)
+            cooldown_seconds = (
+                int(kpi_config.cooldown_minutes) * 60
+                if kpi_config.cooldown_minutes is not None
+                else 3600
+            )
+
+            device_filters = [Readings.incubator_id == incubator_id]
+            device_filters.append(
+                Readings.chamber_id == chamber_id
+                if chamber_id is not None
+                else Readings.chamber_id.is_(None)
+            )
+
+            if kpi_config.kpi_name in _LID_STATE_KPI_NAMES:
+                # Mirrors the tank path: continuity is the span of the actual deviating
+                # readings — first open reading to the latest one in this unbroken
+                # episode — not now-vs-start. A single stale reading (device went
+                # silent after one "open") spans 0s and must not page; only readings
+                # that genuinely persist open for the tolerance window do.
+                lid_episode_start = self._episode_start(
+                    kpi_config.id, *device_filters, before=deviation.timestamp
+                )
+                if lid_episode_start is not None:
+                    latest_deviation_ts = (
+                        self.db.query(func.max(Readings.timestamp))
+                        .filter(
+                            *device_filters,
+                            Readings.kpi_config_id == kpi_config.id,
+                            Readings.deviation == True,
+                            Readings.timestamp >= lid_episode_start,
+                        )
+                        .scalar()
+                    )
+                    if latest_deviation_ts is not None and latest_deviation_ts.tzinfo is None:
+                        latest_deviation_ts = latest_deviation_ts.replace(tzinfo=timezone.utc)
+                    continuity_seconds = (
+                        (latest_deviation_ts - lid_episode_start).total_seconds()
+                        if latest_deviation_ts is not None
+                        else 0.0
+                    )
+                    logger.info(
+                        "%s continuity for kpi_config_id=%s: start_time=%s latest_reading=%s duration=%.0fs tolerance=%.0fs",
+                        kpi_config.kpi_name,
+                        kpi_config.id,
+                        lid_episode_start,
+                        latest_deviation_ts,
+                        continuity_seconds,
+                        _LID_OPEN_TOLERANCE_SECONDS,
+                    )
+                    if continuity_seconds < _LID_OPEN_TOLERANCE_SECONDS:
+                        logger.info(
+                            "Skipping %s alert for kpi_config_id=%s; continuous deviation %.0fs below tolerance %.0fs",
+                            kpi_config.kpi_name,
+                            kpi_config.id,
+                            continuity_seconds,
+                            _LID_OPEN_TOLERANCE_SECONDS,
+                        )
+                        deviation.checked = True
+                        checked_kpi_configs.append(kpi_config.id)
+                        continue
+
+            # Dedup prefix: incubator variant keyed by incubator_id and kpi_config_id
+            chamber_part = chamber_id or "all"
+            dedup_prefix = (
+                f"incubator:{incubator_id}:{chamber_part}"
+                f":{AlertSource.KPI.value}:{AlertType.DEVIATION_ALERT.value}:%:{kpi_config.id}"
+            )
+            last_alert = (
+                self.db.query(CriticalAlert)
+                .filter(
+                    CriticalAlert.incubator_id == incubator_id,
+                    CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                    or_(
+                        CriticalAlert.dedup_key.like(dedup_prefix),
+                        CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                    ),
+                    CriticalAlert.status != AlertStatus.ACKNOWLEDGED.value,
+                )
+                .order_by(CriticalAlert.created_at.desc())
+                .first()
+            )
+
+            if last_alert:
+                last_alert_time = last_alert.created_at
+                if last_alert_time:
+                    last_alert_time = (
+                        last_alert_time
+                        if last_alert_time.tzinfo
+                        else last_alert_time.replace(tzinfo=timezone.utc)
+                    )
+                    if abs((now - last_alert_time).total_seconds()) < cooldown_seconds:
+                        logger.info(
+                            "Skipping incubator alert for kpi_config_id=%s within cooldown (%s min)",
+                            kpi_config.id,
+                            kpi_config.cooldown_minutes,
+                        )
+                        deviation.checked = True
+                        checked_kpi_configs.append(kpi_config.id)
+                        continue
+
+            # Episode tracking, mirroring the tank/refrigerator path: an alert
+            # already raised since the last clearing reading means the condition
+            # never recovered, so recipients get the continuation notice instead
+            # of a fresh alert. Reuses device_filters built above (also used by the
+            # lid-state tolerance check).
+            episode_start = self._episode_start(
+                kpi_config.id, *device_filters, before=deviation.timestamp
+            )
+
+            first_episode_alert = None
+            if episode_start is not None:
+                first_episode_alert = (
+                    self.db.query(CriticalAlert)
+                    .filter(
+                        CriticalAlert.incubator_id == incubator_id,
+                        CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                        or_(
+                            CriticalAlert.dedup_key.like(dedup_prefix),
+                            CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                        ),
+                        CriticalAlert.created_at >= episode_start,
+                    )
+                    .order_by(CriticalAlert.created_at.asc())
+                    .first()
+                )
+            episode_first_alert_at = (
+                first_episode_alert.created_at if first_episode_alert else None
+            )
+            episode_first_value = None
+            if first_episode_alert is not None:
+                first_reading = (
+                    self.db.query(Readings)
+                    .filter(Readings.alert_id == first_episode_alert.alert_id)
+                    .order_by(Readings.timestamp.asc())
+                    .first()
+                )
+                if first_reading is not None:
+                    episode_first_value = self._format_kpi_value(
+                        kpi_config, first_reading.kpi_value
+                    )
+
+            branch_name = (
+                self.db.query(HospitalBranch.branch_name)
+                .filter(HospitalBranch.branch_id == deviation.branch_id)
+                .scalar()
+            )
+            incubator = self.db.query(Incubator).filter(
+                Incubator.incubator_id == incubator_id
+            ).first()
+            incubator_code = incubator.incubator_code if incubator else str(incubator_id)
+
+            message = self._frame_alert_message(
+                kpi_config,
+                deviation.kpi_value,
+                branch_name=branch_name,
+                device_noun="Incubator",
+                device_label=self._device_scope_label(
+                    incubator_code, f"Chamber {chamber_id}" if chamber_id else None
+                ),
+            )
+
+            alert, created = self._create_incubator_alert(
+                incubator_id=incubator_id,
+                chamber_id=chamber_id,
+                alert_type=AlertType.DEVIATION_ALERT,
+                source=AlertSource.KPI,
+                severity=AlertSeverity.LOW if kpi_config.alert_type == "soft" else AlertSeverity.HIGH,
+                message=message,
+                occurred_at=deviation.timestamp,
+                triggered_by=AlertTriggeredBy.SYSTEM,
+                extra_info=str(kpi_config.id),
+            )
+
+            if kpi_config.email_alert:
+                if kpi_config.unack_escalation_threshold is not None:
+                    self._send_alert_email_to_users_only(
+                        alert,
+                        alert_name=kpi_config.alert_name,
+                        kpi_name=kpi_config.kpi_name,
+                        first_alert_at=episode_first_alert_at,
+                        first_alert_value=episode_first_value,
+                        current_value=self._format_kpi_value(kpi_config, deviation.kpi_value),
+                    )
+                else:
+                    self._send_alert_email(
+                        alert,
+                        alert_name=kpi_config.alert_name,
+                        kpi_name=kpi_config.kpi_name,
+                        first_alert_at=episode_first_alert_at,
+                        first_alert_value=episode_first_value,
+                        current_value=self._format_kpi_value(kpi_config, deviation.kpi_value),
+                    )
+            else:
+                logger.info(
+                    "Skipping email for alert_id=%s because kpi_config_id=%s has email_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+            if kpi_config.whatsapp_alert:
+                self._send_alert_whatsapp(
+                    alert,
+                    kpi_config=kpi_config,
+                    kpi_value=deviation.kpi_value,
+                    first_alert_at=episode_first_alert_at,
+                )
+            else:
+                logger.info(
+                    "Skipping WhatsApp for alert_id=%s because kpi_config_id=%s has whatsapp_alert disabled",
+                    alert.alert_id,
+                    kpi_config.id,
+                )
+
+            # Push stays hospital-wide (Hospital.is_push_notify) and gated on `created` —
+            # mirrors the tank/refrigerator path; unlike email/whatsapp it has no
+            # cooldown-driven re-notify design of its own, only a per-alert-id Redis
+            # dedup guard.
+            if created:
+                if self._hospital_push_configured(alert.hospital_id):
+                    self._send_alert_push(alert)
+                else:
+                    logger.info(
+                        "Skipping push for alert_id=%s because hospital_id=%s has push notifications disabled",
+                        alert.alert_id,
+                        alert.hospital_id,
+                    )
+
+            if created and kpi_config.unack_escalation_threshold is not None:
+                if self._check_incubator_escalation_needed(kpi_config, incubator_id, chamber_id):
+                    unack_alerts = (
+                        self.db.query(CriticalAlert)
+                        .filter(
+                            CriticalAlert.incubator_id == incubator_id,
+                            CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                            or_(
+                                CriticalAlert.dedup_key.like(dedup_prefix),
+                                CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                            ),
+                            CriticalAlert.status == AlertStatus.ACTIVE.value,
+                        )
+                        .order_by(CriticalAlert.created_at.desc())
+                        .all()
+                    )
+                    kpi_cfg_id = kpi_config.id
+                    alerts_snapshot = list(unack_alerts)
+                    count = len(alerts_snapshot)
+
+                    def _escalation_bg(
+                        kpi_id=kpi_cfg_id, iid=incubator_id, cid=chamber_id, c=count, a=alerts_snapshot
+                    ):
+                        bg_db = SessionLocal()
+                        try:
+                            bg_kpi = bg_db.query(KpiConfig).filter(KpiConfig.id == kpi_id).first()
+                            if bg_kpi:
+                                CriticalAlertService(bg_db)._send_incubator_escalation_email_to_admins(
+                                    bg_kpi, iid, cid, c, a
+                                )
+                                bg_db.commit()
+                        except Exception as exc:
+                            logger.error(
+                                "Incubator escalation email failed for kpi_config_id=%s: %s",
+                                kpi_id, exc, exc_info=True,
+                            )
+                        finally:
+                            bg_db.close()
+
+                    threading.Thread(target=_escalation_bg, daemon=True).start()
+                    logger.info(
+                        "Started incubator escalation email thread for kpi_config_id=%s incubator_id=%s chamber_id=%s (%s unacknowledged)",
+                        kpi_config.id, incubator_id, chamber_id, count,
+                    )
+
+            deviation.alert_id = alert.alert_id
+            deviation.checked = True
+            checked_kpi_configs.append(kpi_config.id)
+            alerts_created.append(alert)
+
+        logger.info(
+            "Incubator alert creation complete for incubator_id=%s chamber_id=%s: %s alert(s) created/updated",
+            incubator_id,
+            chamber_id,
             len(alerts_created),
         )
         self.db.commit()
@@ -1800,6 +2321,21 @@ class CriticalAlertService:
                 "device_noun": "Refrigerator",
                 "device_code": label,
                 "zone_name": alert.zone_id,
+                "is_cryotank": False,
+            }
+        elif alert.incubator_id:
+            incubator = self.db.query(Incubator).filter(
+                Incubator.incubator_id == alert.incubator_id
+            ).first()
+            if not incubator:
+                return None, None
+            label = incubator.incubator_code or f"Incubator-{incubator.incubator_id}"
+            ctx = {
+                "device_label": f"{label} Chamber {alert.chamber_id}" if alert.chamber_id else label,
+                "device_branch_id": incubator.branch_id,
+                "device_noun": "Incubator",
+                "device_code": label,
+                "zone_name": alert.chamber_id,
                 "is_cryotank": False,
             }
         else:
@@ -2239,9 +2775,20 @@ class CriticalAlertService:
             escalation_mode=True,
         )
 
-    def _send_alert_whatsapp(self, alert: CriticalAlert, *, kpi_config=None, kpi_value: Optional[float] = None):
+    def _send_alert_whatsapp(
+        self,
+        alert: CriticalAlert,
+        *,
+        kpi_config=None,
+        kpi_value: Optional[float] = None,
+        first_alert_at: Optional[datetime] = None,
+    ):
         """Send WhatsApp notification via Twilio for critical (High severity) alerts only.
-        Recipients: all Managers across the hospital + Users in the tank's branch."""
+        Recipients: all Managers across the hospital + Users in the device's branch.
+        Works for tank, incubator, and refrigerator alerts via _resolve_alert_email_context.
+
+        first_alert_at is when the current episode was first alerted on; supplying it
+        switches the message to the continuity template."""
         if alert.severity != AlertSeverity.HIGH.value:
             return
 
@@ -2271,17 +2818,11 @@ class CriticalAlertService:
             )
             return
 
-        tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
-        if not tank:
+        branch, ctx = self._resolve_alert_email_context(alert)
+        if branch is None:
             return
-
-        branch = (
-            self.db.query(HospitalBranch)
-            .filter(HospitalBranch.branch_id == tank.branch_id)
-            .first()
-        )
-        if not branch:
-            return
+        device_code = ctx["device_code"]
+        device_branch_id = ctx["device_branch_id"]
 
         hospital_id = branch.hospital_id
         all_branches = (
@@ -2310,7 +2851,7 @@ class CriticalAlertService:
             .filter(
                 User.department == "IVF",
                 User.role == "User",
-                User.branch_id == tank.branch_id,
+                User.branch_id == device_branch_id,
                 User.status == True,
                 User.approved_status == ApprovalStatus.APPROVED,
             )
@@ -2331,23 +2872,49 @@ class CriticalAlertService:
 
         client = Client(account_sid, auth_token)
         from_whatsapp_number = _to_whatsapp_number(from_number)
-        tank_code = tank.tank_code or f"Tank-{tank.tank_id}"
+        # The v5 templates name the device kind in {{4}} and its code in {{5}}, where
+        # the code is qualified with the scope the reading came from — a refrigerator's
+        # zone name (its raw zone id when the zone was never named) or an incubator's
+        # "Chamber <n>" label. Common-scope configs (zone/chamber NULL, e.g. battery)
+        # and tanks have no scope, so they send the bare code.
+        device_noun = ctx["device_noun"]
+        device_scope = None
+        if alert.refrigerator_id:
+            device_scope = (
+                getattr(kpi_config, "zone_name", None) if kpi_config else None
+            ) or alert.zone_id
+        elif alert.incubator_id:
+            device_scope = f"Chamber {alert.chamber_id}" if alert.chamber_id else None
+        device_label = self._device_scope_label(device_code, device_scope)
         branch_name = branch.branch_name or "N/A"
 
         kpi_name = kpi_config.kpi_name if kpi_config else None
         alert_name = (kpi_config.alert_name or kpi_name or alert.alert_type) if kpi_config else alert.alert_type
 
+        # An episode already alerted on gets the continuity wording, citing how long
+        # the condition has been live — same episode anchor the continuation email uses.
+        duration_text = None
+        if first_alert_at is not None:
+            started = first_alert_at if first_alert_at.tzinfo else first_alert_at.replace(tzinfo=timezone.utc)
+            duration_text = self._format_duration(
+                (datetime.now(timezone.utc) - started).total_seconds()
+            )
+
         if kpi_name in _LN2_LEVEL_KPI_NAMES:
-            template_sid = _WA_TEMPLATE_LN2_LEVEL
-            content_variables = {"1": alert_name, "2": branch_name, "3": tank_code}
+            # "L2" is a fixed label, not a per-alert tier — there is no L1/L3 concept
+            # in this codebase; the original tank-only template hardcoded the same
+            # literal text ("crossed L2"), so {{2}} reproduces it verbatim here.
+            template_sid = _WA_TEMPLATE_LN2_LEVEL_CONTINUITY if duration_text else _WA_TEMPLATE_LN2_LEVEL
+            alert_name = "LN2"
+            value_str = "L2"
         elif kpi_name in _LID_STATE_KPI_NAMES:
-            lid_str = "OPEN" if kpi_value == 1 else "CLOSED"
-            template_sid = _WA_TEMPLATE_LID_STATE
-            content_variables = {"1": alert_name, "2": lid_str, "3": branch_name, "4": tank_code}
+            template_sid = _WA_TEMPLATE_LID_STATE_CONTINUITY if duration_text else _WA_TEMPLATE_LID_STATE
+            value_str = "OPEN" if kpi_value == 1 else "CLOSED"
         elif kpi_name in _DEVIATION_KPI_NAMES:
-            value_str = str(round(kpi_value, 2)) if kpi_value is not None else "N/A"
-            template_sid = _WA_TEMPLATE_DEVIATION
-            content_variables = {"1": alert_name, "2": value_str, "3": branch_name, "4": tank_code}
+            template_sid = _WA_TEMPLATE_DEVIATION_CONTINUITY if duration_text else _WA_TEMPLATE_DEVIATION
+            value_str = (
+                self._format_kpi_value(kpi_config, kpi_value, tank_id=alert.tank_id) or "N/A"
+            )
         else:
             logger.warning(
                 "Unrecognised kpi_name=%s for alert_id=%s; skipping WhatsApp",
@@ -2355,15 +2922,38 @@ class CriticalAlertService:
             )
             return
 
+        content_variables = {
+            "1": alert_name,
+            "2": value_str,
+            "3": branch_name,
+            "4": device_noun,
+            "5": device_label,
+        }
+        if duration_text:
+            content_variables["6"] = duration_text
+
         role_group = lambda u: "user" if u.role == "User" else "admin"
         sent_groups: set = set()
         if kpi_config is not None and alert.occurred_at is not None:
             _aware = lambda ts: ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
             current_ts = _aware(alert.occurred_at)
+            if alert.tank_id:
+                device_reading_filters = [Readings.tank_id == alert.tank_id]
+            elif alert.refrigerator_id:
+                device_reading_filters = [Readings.refrigerator_id == alert.refrigerator_id]
+                if alert.zone_id:
+                    device_reading_filters.append(Readings.zone_id == alert.zone_id)
+            else:
+                device_reading_filters = [Readings.incubator_id == alert.incubator_id]
+                device_reading_filters.append(
+                    Readings.chamber_id == alert.chamber_id
+                    if alert.chamber_id
+                    else Readings.chamber_id.is_(None)
+                )
             latest_clear_reading = (
                 self.db.query(Readings)
                 .filter(
-                    Readings.tank_id == alert.tank_id,
+                    *device_reading_filters,
                     Readings.kpi_config_id == kpi_config.id,
                     Readings.deviation == False,
                 )
@@ -2441,7 +3031,7 @@ class CriticalAlertService:
                         "severity": alert.severity,
                         "message": alert.message,
                         "tank_id": alert.tank_id,
-                        "tank_code": tank_code,
+                        "tank_code": device_code,
                         "branch_name": branch_name,
                         "template_sid": template_sid,
                         "twilio_sid": msg.sid,
@@ -2468,7 +3058,7 @@ class CriticalAlertService:
                         "severity": alert.severity,
                         "message": alert.message,
                         "tank_id": alert.tank_id,
-                        "tank_code": tank_code,
+                        "tank_code": device_code,
                         "branch_name": branch_name,
                         "template_sid": template_sid,
                         "error": str(e),
@@ -2881,6 +3471,204 @@ class CriticalAlertService:
             except Exception as e:
                 logger.error(
                     "Failed to send refrigerator escalation email to %s: %s", user.email, str(e)
+                )
+
+        kpi_config.last_escalation_sent_at = datetime.now(timezone.utc)
+
+    def _check_incubator_escalation_needed(
+        self, kpi_config, incubator_id: int, chamber_id: Optional[str]
+    ) -> bool:
+        """Return True when N consecutive unacknowledged alerts exist for an incubator
+        chamber KPI and the escalation cooldown has passed."""
+        if kpi_config.unack_escalation_threshold is None:
+            return False
+
+        threshold = int(kpi_config.unack_escalation_threshold)
+        chamber_part = chamber_id or "all"
+        dedup_prefix = (
+            f"incubator:{incubator_id}:{chamber_part}"
+            f":{AlertSource.KPI.value}:{AlertType.DEVIATION_ALERT.value}:%:{kpi_config.id}"
+        )
+
+        unack_count = (
+            self.db.query(CriticalAlert)
+            .filter(
+                CriticalAlert.incubator_id == incubator_id,
+                CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                or_(
+                    CriticalAlert.dedup_key.like(dedup_prefix),
+                    CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                ),
+                CriticalAlert.status == AlertStatus.ACTIVE.value,
+            )
+            .count()
+        )
+
+        if unack_count <= threshold:
+            logger.info(
+                "Escalation not triggered for kpi_config_id=%s incubator_id=%s chamber_id=%s: %s unacknowledged <= threshold %s",
+                kpi_config.id, incubator_id, chamber_id, unack_count, threshold,
+            )
+            return False
+
+        if kpi_config.last_escalation_sent_at is not None:
+            last_sent = kpi_config.last_escalation_sent_at
+            if not last_sent.tzinfo:
+                last_sent = last_sent.replace(tzinfo=timezone.utc)
+            cooldown_secs = (
+                int(kpi_config.cooldown_minutes) * 60
+                if kpi_config.cooldown_minutes is not None
+                else 3600
+            )
+            elapsed = (datetime.now(timezone.utc) - last_sent).total_seconds()
+            if elapsed < cooldown_secs:
+                logger.info(
+                    "Skipping incubator escalation for kpi_config_id=%s; last sent %.0fs ago (cooldown=%.0fs)",
+                    kpi_config.id, elapsed, cooldown_secs,
+                )
+                return False
+
+        logger.info(
+            "Escalation triggered for kpi_config_id=%s incubator_id=%s chamber_id=%s: %s unacknowledged >= threshold %s",
+            kpi_config.id, incubator_id, chamber_id, unack_count, threshold,
+        )
+        return True
+
+    def _send_incubator_escalation_email_to_admins(
+        self,
+        kpi_config,
+        incubator_id: int,
+        chamber_id: Optional[str],
+        unack_count: int,
+        alerts: list,
+    ):
+        """Send escalation email to Admins and Managers when N unacknowledged incubator
+        chamber KPI alerts exist. Updates kpi_config.last_escalation_sent_at — caller commits."""
+        incubator = self.db.query(Incubator).filter(
+            Incubator.incubator_id == incubator_id
+        ).first()
+        if not incubator:
+            return
+
+        branch = (
+            self.db.query(HospitalBranch)
+            .filter(HospitalBranch.branch_id == incubator.branch_id)
+            .first()
+        )
+        if not branch:
+            return
+
+        hospital_id = incubator.hospital_id
+        if not (kpi_config.email_alert or kpi_config.whatsapp_alert):
+            logger.info(
+                "Skipping incubator escalation email — kpi_config_id=%s has no notification channel enabled",
+                kpi_config.id,
+            )
+            return
+
+        all_branch_ids = [
+            b.branch_id
+            for b in self.db.query(HospitalBranch)
+            .filter(HospitalBranch.hospital_id == hospital_id)
+            .all()
+        ]
+        recipients = (
+            self.db.query(User)
+            .filter(
+                User.department == "IVF",
+                User.role.in_(["Manager", "Admin"]),
+                User.branch_id.in_(all_branch_ids),
+                User.status.is_(True),
+                User.approved_status == ApprovalStatus.APPROVED,
+            )
+            .all()
+        )
+        recipients = list({u.user_id: u for u in recipients}.values())
+
+        if not recipients:
+            logger.warning(
+                "No admin/manager recipients for incubator escalation — kpi_config_id=%s incubator_id=%s",
+                kpi_config.id, incubator_id,
+            )
+            return
+
+        label = incubator.incubator_code or f"Incubator-{incubator_id}"
+        device_label = f"{label} {chamber_id}" if chamber_id else label
+        acknowledge_url = f"{settings.FRONTEND_URL}/dashboard"
+        template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
+        jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))
+
+        try:
+            template = jinja_env.get_template("escalation_alert_email.html")
+        except Exception:
+            template = None
+
+        subject = (
+            f"Escalation: {unack_count} Unacknowledged Alerts — "
+            f"{kpi_config.alert_name or kpi_config.kpi_name} — {device_label}"
+        )
+        alert_data = [
+            {
+                "occurred_at": str(a.occurred_at),
+                "message": a.message,
+                "alert_id": a.alert_id,
+            }
+            for a in alerts
+        ]
+
+        for user in recipients:
+            try:
+                if template:
+                    html_body = template.render(
+                        subject=subject,
+                        kpi_name=kpi_config.alert_name or kpi_config.kpi_name,
+                        tank_code=device_label,
+                        branch_name=branch.branch_name or "N/A",
+                        unack_count=unack_count,
+                        threshold=kpi_config.unack_escalation_threshold,
+                        alerts=alert_data,
+                        acknowledge_url=acknowledge_url,
+                    )
+                else:
+                    alert_rows = "".join(
+                        f"<li>{a['occurred_at']} — {a['message']}</li>" for a in alert_data
+                    )
+                    html_body = f"""
+                    <html><body>
+                        <h2>Escalation: {unack_count} Unacknowledged Alerts</h2>
+                        <p><strong>KPI:</strong> {kpi_config.alert_name or kpi_config.kpi_name}</p>
+                        <p><strong>Device:</strong> {device_label} — {branch.branch_name or "N/A"}</p>
+                        <p><strong>Threshold:</strong> {kpi_config.unack_escalation_threshold} consecutive unacknowledged alerts</p>
+                        <ul>{alert_rows}</ul>
+                        <a href="{acknowledge_url}">View &amp; Acknowledge</a>
+                    </body></html>
+                    """
+
+                send_email(user.email, subject, html_body)
+                logger.info(
+                    "Sent incubator escalation email to %s for kpi_config_id=%s incubator_id=%s",
+                    user.email, kpi_config.id, incubator_id,
+                )
+                ActivityLogService(self.db).log_activity(
+                    action="email.escalation_sent",
+                    outcome=ActivityOutcome.SUCCESS.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.email),
+                    metadata={
+                        "recipient_email": user.email,
+                        "recipient_user_id": user.user_id,
+                        "kpi_config_id": kpi_config.id,
+                        "kpi_name": kpi_config.kpi_name,
+                        "incubator_id": incubator_id,
+                        "chamber_id": chamber_id,
+                        "device_label": device_label,
+                        "unack_count": unack_count,
+                        "threshold": kpi_config.unack_escalation_threshold,
+                    },
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to send incubator escalation email to %s: %s", user.email, str(e)
                 )
 
         kpi_config.last_escalation_sent_at = datetime.now(timezone.utc)
@@ -3550,16 +4338,26 @@ class CriticalAlertService:
 
         alerts = query.order_by(desc(CriticalAlert.occurred_at)).all()
 
-        # Get tank codes and canister numbers for all alerts (tank-level monitoring)
+        # Get tank codes, branch names for all alerts (tank-level monitoring)
         tank_ids = [alert.tank_id for alert in alerts]
-        tanks = self.db.query(Tank).filter(Tank.tank_id.in_(tank_ids)).all()
-        tank_code_map = {t.tank_id: t.tank_code for t in tanks}
+        tanks = (
+            self.db.query(Tank, HospitalBranch.branch_name)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(Tank.tank_id.in_(tank_ids))
+            .all()
+        )
+        tank_code_map = {t.tank_id: t.tank_code for t, _ in tanks}
+        tank_branch_map = {t.tank_id: branch_name for t, branch_name in tanks}
 
         # Build alert responses with tank_code
         alert_responses = []
         for alert in alerts:
             tank_code = tank_code_map.get(alert.tank_id) or f"Tank-{alert.tank_id}"
-            alert_dict = {**alert.__dict__, "tank_code": tank_code}
+            alert_dict = {
+                **alert.__dict__,
+                "tank_code": tank_code,
+                "branch_name": tank_branch_map.get(alert.tank_id),
+            }
             alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
 
         active_count = sum(1 for a in alerts if a.status == AlertStatus.ACTIVE.value)
@@ -3585,8 +4383,9 @@ class CriticalAlertService:
         Refrigerator and returns alerts where refrigerator_id IS NOT NULL.
         """
         query = (
-            self.db.query(CriticalAlert, Refrigerator.refrigerator_code)
+            self.db.query(CriticalAlert, Refrigerator.refrigerator_code, HospitalBranch.branch_name)
             .join(Refrigerator, CriticalAlert.refrigerator_id == Refrigerator.refrigerator_id)
+            .join(HospitalBranch, Refrigerator.branch_id == HospitalBranch.branch_id)
         )
 
         if role and role == "User" and branch_id:
@@ -3601,10 +4400,60 @@ class CriticalAlertService:
 
         alert_responses = []
         active_count = 0
-        for alert, refrigerator_code in rows:
+        for alert, refrigerator_code, branch_name in rows:
             alert_dict = {
                 **alert.__dict__,
                 "refrigerator_code": refrigerator_code or f"Refrigerator-{alert.refrigerator_id}",
+                "branch_name": branch_name,
+            }
+            alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
+            if alert.status == AlertStatus.ACTIVE.value:
+                active_count += 1
+        acknowledged_count = len(alert_responses) - active_count
+
+        return HospitalAlertsResponse(
+            alerts=alert_responses,
+            total_count=len(alert_responses),
+            active_count=active_count,
+            acknowledged_count=acknowledged_count,
+        )
+
+    def get_hospital_incubator_alerts(
+        self,
+        branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
+        role: Optional[str] = None,
+        status: Optional[AlertStatus] = None,
+    ) -> HospitalAlertsResponse:
+        """
+        Get incubator alerts for the hospital. Unlike get_hospital_alerts (which
+        inner-joins Tank and so excludes incubator alerts), this joins Incubator
+        and returns alerts where incubator_id IS NOT NULL — mirrors
+        get_hospital_refrigerator_alerts.
+        """
+        query = (
+            self.db.query(CriticalAlert, Incubator.incubator_code, HospitalBranch.branch_name)
+            .join(Incubator, CriticalAlert.incubator_id == Incubator.incubator_id)
+            .join(HospitalBranch, Incubator.branch_id == HospitalBranch.branch_id)
+        )
+
+        if role and role == "User" and branch_id:
+            query = query.filter(Incubator.branch_id == branch_id)
+        elif hospital_id is not None:
+            query = query.filter(Incubator.hospital_id == hospital_id)
+
+        if status:
+            query = query.filter(CriticalAlert.status == status.value)
+
+        rows = query.order_by(desc(CriticalAlert.occurred_at)).all()
+
+        alert_responses = []
+        active_count = 0
+        for alert, incubator_code, branch_name in rows:
+            alert_dict = {
+                **alert.__dict__,
+                "incubator_code": incubator_code or f"Incubator-{alert.incubator_id}",
+                "branch_name": branch_name,
             }
             alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
             if alert.status == AlertStatus.ACTIVE.value:

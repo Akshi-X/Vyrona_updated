@@ -583,8 +583,10 @@ export class IvfService extends BaseApiService {
         );
     }
 
-    /** Get KPI limits config for an incubator chamber (for threshold lines on the chart). */
-    async getIncubatorKpiConfig(incubatorId: number, chamberId?: string): Promise<{
+    /** Get KPI limits config for an incubator chamber (for threshold lines on the chart).
+     * chamberId===null means the Common scope (chamber_id IS NULL) and is sent as the
+     * literal string "null"; chamberId===undefined omits the param entirely. */
+    async getIncubatorKpiConfig(incubatorId: number, chamberId?: string | null): Promise<{
         incubator_id: number;
         incubator_code: string;
         chamber_id?: string | null;
@@ -593,7 +595,8 @@ export class IvfService extends BaseApiService {
         kpi_limits: Record<string, Record<string, { min?: number | null; max?: number | null; alert_type?: string | null }>>;
     }> {
         const params = new URLSearchParams();
-        if (chamberId != null) params.set("chamber_id", chamberId);
+        if (chamberId === null) params.set("chamber_id", "null");
+        else if (chamberId !== undefined) params.set("chamber_id", chamberId);
         const qs = params.toString();
         return await this.request(
             `/api/ivf/quality/incubators/${encodeURIComponent(incubatorId)}/kpi-config${qs ? `?${qs}` : ""}`,
@@ -604,7 +607,7 @@ export class IvfService extends BaseApiService {
     /** Get incubator KPI history for Quality Tracking chart. Same duration_minutes semantics as tank endpoint. */
     async getIncubatorKpiHistory(
         incubatorId: number,
-        chamberId?: string,
+        chamberId?: string | null,
         durationMinutes?: number,
     ): Promise<{
         incubator_id: number;
@@ -621,7 +624,8 @@ export class IvfService extends BaseApiService {
         }>>;
     }> {
         const params = new URLSearchParams();
-        if (chamberId != null) params.set("chamber_id", chamberId);
+        if (chamberId === null) params.set("chamber_id", "null");
+        else if (chamberId !== undefined) params.set("chamber_id", chamberId);
         if (durationMinutes != null && durationMinutes > 0) params.set("duration_minutes", String(durationMinutes));
         const qs = params.toString();
         return await this.request(
@@ -634,7 +638,7 @@ export class IvfService extends BaseApiService {
     async getIncubatorKpiHistoryByDate(
         incubatorId: number,
         date: string,
-        chamberId?: string,
+        chamberId?: string | null,
     ): Promise<{
         incubator_id: number;
         incubator_code: string;
@@ -651,7 +655,8 @@ export class IvfService extends BaseApiService {
     }> {
         const params = new URLSearchParams();
         params.set("date", date);
-        if (chamberId != null) params.set("chamber_id", chamberId);
+        if (chamberId === null) params.set("chamber_id", "null");
+        else if (chamberId !== undefined) params.set("chamber_id", chamberId);
         return await this.request(
             `/api/ivf/quality/incubators/${encodeURIComponent(incubatorId)}/kpi-history-date?${params.toString()}`,
             { method: "GET" },

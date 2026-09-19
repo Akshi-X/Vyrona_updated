@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Modal from "../Modal";
+import SearchCard from "../SearchCard";
 import ContainerQualityTrackingIcon from "../../assets/DashBoardIcons/CryocanDarkN.svg";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -577,24 +578,13 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
 
     if (inlineMode) {
         return (
-            <div className="w-full max-w-[560px] rounded-[14px] border border-line bg-white p-6 shadow-sm">
-                <div className="mb-5 flex items-start gap-3">
-                    <img
-                        src={icon}
-                        alt="Track Canister"
-                        className="w-6 h-6 mt-0.5"
-                    />
-                    <div>
-                        <h2 className="text-[20px] font-semibold leading-none text-black">
-                            {title}
-                        </h2>
-                        <p className="mt-2 text-xs text-[#5A5A5A]">
-                            {descriptionText}
-                        </p>
-                    </div>
-                </div>
+            <SearchCard
+                icon={<img src={icon} alt="Track Canister" className="w-6 h-6 mt-0.5" />}
+                title={title}
+                description={descriptionText}
+            >
                 {formContent}
-            </div>
+            </SearchCard>
         );
     }
 

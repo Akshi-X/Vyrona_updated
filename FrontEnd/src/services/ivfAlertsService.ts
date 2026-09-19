@@ -29,6 +29,10 @@ export interface IVFAlert {
   updated_at?: string;
   refrigerator_id?: number | null;
   refrigerator_code?: string | null;
+  incubator_id?: number | null;
+  incubator_code?: string | null;
+  chamber_id?: string | null;
+  branch_name?: string | null;
 }
 
 export interface CanisterAlertsResponse {
@@ -121,6 +125,15 @@ export class IvfAlertsService extends BaseApiService {
     const queryParam = status ? `?status=${encodeURIComponent(status)}` : '';
     return await this.request<HospitalAlertsResponse>(
       `/api/ivf/alerts/hospital/refrigerators${queryParam}`,
+      { method: 'GET' }
+    );
+  }
+
+  /** Hospital alerts scoped to incubators only (incubator_id IS NOT NULL) */
+  async getHospitalIncubatorAlerts(status?: 'Active' | 'Acknowledged'): Promise<HospitalAlertsResponse> {
+    const queryParam = status ? `?status=${encodeURIComponent(status)}` : '';
+    return await this.request<HospitalAlertsResponse>(
+      `/api/ivf/alerts/hospital/incubators${queryParam}`,
       { method: 'GET' }
     );
   }
