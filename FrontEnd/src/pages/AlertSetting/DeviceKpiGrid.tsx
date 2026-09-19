@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import type { ReactNode } from "react";
 import { toast } from "react-toastify";
 import {
+    Battery,
     CloudFog,
     CloudRain,
     DoorOpen,
@@ -44,6 +45,7 @@ const DKPI = {
     INC_PH: "incubator_ph",
     INC_VOC: "incubator_voc",
     INC_LID_STATE: "incubator_lid_state",
+    INC_BATTERY: "incubator_battery",
     REF_HUMIDITY: "refrigerator_humidity",
     REF_TEMP: "refrigerator_temp",
 } as const;
@@ -62,8 +64,8 @@ const INCUBATOR_KPI_NAMES = [
     DKPI.INC_HUMIDITY,
     DKPI.INC_VOC,
 ];
-/** Incubator-level (Common) scope: only the ambient external temperature applies. */
-const INCUBATOR_COMMON_KPI_NAMES = [DKPI.TEMP_EXTERNAL];
+/** Incubator-level (Common) scope: device battery, not tied to any one chamber. */
+const INCUBATOR_COMMON_KPI_NAMES = [DKPI.INC_BATTERY];
 const REFRIGERATOR_KPI_NAMES = [DKPI.REF_TEMP, DKPI.REF_HUMIDITY];
 
 // ─── Slider metadata (bounds, step, unit) ────────────────────────────────────
@@ -77,6 +79,7 @@ const DEVICE_META: Record<string, KpiSliderMeta> = {
     [DKPI.INC_PH]: { label: "pH Level", unit: "pH", lo: 6, hi: 8, step: 0.01, dual: true },
     [DKPI.INC_VOC]: { label: "VOC", unit: "ppb", lo: 0, hi: 1000, step: 1, dual: true },
     [DKPI.INC_LID_STATE]: { label: "Lid State", unit: "", lo: 0, hi: 1, step: 1, dual: false },
+    [DKPI.INC_BATTERY]: { label: "Battery", unit: "%", lo: 0, hi: 100, step: 1, dual: false },
     [DKPI.REF_HUMIDITY]: { label: "Humidity", unit: "%", lo: 0, hi: 100, step: 1, dual: true },
     [DKPI.REF_TEMP]: { label: "Temperature", unit: "°C", lo: -30, hi: 30, step: 0.1, dual: true },
 };
@@ -94,6 +97,11 @@ const KPI_CARD: Record<string, KpiCardSpec> = {
         title: "External temperature:",
         sub: "Ambient room temperature around the incubator",
         deco: <ThermometerSun strokeWidth={1.25} className="absolute top-3 right-3 w-20 h-20 text-[#6B3A7E] opacity-[0.12]" />,
+    },
+    [DKPI.INC_BATTERY]: {
+        title: "Battery:",
+        sub: "Device battery level for this incubator",
+        deco: <Battery strokeWidth={1.25} className="absolute top-3 right-3 w-20 h-20 text-[#6B3A7E] opacity-[0.12]" />,
     },
     [DKPI.INC_O2]: {
         title: "O₂ level:",
@@ -159,6 +167,7 @@ interface RecDefault {
 const RECOMMENDED: Record<string, RecDefault> = {
     // Incubator — Common scope (ambient)
     [DKPI.TEMP_EXTERNAL]: { min: 18, max: 30, whatsapp_alert: false, email_alert: false },
+    [DKPI.INC_BATTERY]: { min: 20, max: null, whatsapp_alert: false, email_alert: false },   // low-battery warning
     // Incubator — per chamber
     [DKPI.INC_TEMP]: { min: 36.5, max: 37.5, whatsapp_alert: true, email_alert: true },   // embryo culture ~37 °C
     [DKPI.INC_CO2]: { min: 5, max: 7, whatsapp_alert: true, email_alert: true },           // ~6 % keeps media pH in band

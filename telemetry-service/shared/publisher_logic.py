@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from .kpi_utils import KPI_NAMES, save_kpi_readings, save_refrigerator_kpi_readings
+from .kpi_utils import KPI_NAMES, save_kpi_readings, save_refrigerator_kpi_readings, save_incubator_kpi_readings, compute_incubator_ph
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -168,6 +168,102 @@ def find_refrigerator_by_device_code(
     except Exception as e:
         logger.error(f"Error finding refrigerator by device_code: {e}", exc_info=True)
         return None
+
+
+def find_incubator_by_device_id(
+    db_session, device_id: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Find the incubator an external IoT device_id belongs to.
+
+    Queries incubator_devices to resolve incubator_id. Unlike
+    find_refrigerator_by_device_code, there is no zone/chamber column here —
+    one incubator device reports every chamber of that incubator in a single
+    payload, so chamber identity is resolved separately per-chamber against
+    the incubator's chamber_r x chamber_c grid (see process_custom_incubator_iot).
+    Returns dict or None if no mapping exists.
+    """
+    if not device_id:
+        return None
+
+    try:
+        query = text("""
+            SELECT id.id, id.incubator_id, i.incubator_code, i.hospital_id, i.branch_id,
+                   i.chamber_r, i.chamber_c, i.pressure_mmhg, i.hco3_mm
+            FROM incubator_devices id
+            JOIN incubators i ON id.incubator_id = i.incubator_id
+            WHERE id.device_id = :device_id
+              AND i.is_active = true
+            LIMIT 1
+        """)
+        result = db_session.execute(query, {"device_id": device_id})
+        row = result.fetchone()
+        if row:
+            return {
+                "incubator_device_id": row[0],
+                "incubator_id": row[1],
+                "incubator_code": row[2],
+                "hospital_id": row[3],
+                "branch_id": row[4],
+                "chamber_r": row[5],
+                "chamber_c": row[6],
+                "pressure_mmhg": row[7],
+                "hco3_mm": row[8],
+            }
+        return None
+    except Exception as e:
+        logger.error(f"Error finding incubator by device_id: {e}", exc_info=True)
+        return None
+
+
+def resolve_internal_chamber_id(
+    db_session, incubator_device_id: int, device_chamber_id: str,
+    chamber_r: Optional[int], chamber_c: Optional[int],
+) -> Optional[str]:
+    """
+    Resolve a device's reported chamber_id to our internal_chamber_id.
+
+    Checks incubator_chamber_map for an explicit installer-configured override
+    first (hardware doesn't always number chambers in row-major order); falls
+    back to treating device_chamber_id as the row-major position within
+    chamber_r x chamber_c when no override exists. Returns None when the
+    value is unresolvable (non-numeric with no override, or out of range for
+    a grid that IS configured).
+    """
+    try:
+        override = db_session.execute(
+            text("""
+                SELECT internal_chamber_id FROM incubator_chamber_map
+                WHERE incubator_device_id = :incubator_device_id
+                  AND device_chamber_id = :device_chamber_id
+                LIMIT 1
+            """),
+            {"incubator_device_id": incubator_device_id, "device_chamber_id": str(device_chamber_id)},
+        ).first()
+        if override:
+            return override[0]
+    except Exception as e:
+        logger.error(f"Error looking up incubator_chamber_map: {e}", exc_info=True)
+        # fall through to the row-major default rather than dropping the reading
+
+    try:
+        chamber_index = int(device_chamber_id)
+    except (TypeError, ValueError):
+        logger.warning(
+            f"Non-numeric chamber_id '{device_chamber_id}' with no incubator_chamber_map "
+            f"override for incubator_device_id={incubator_device_id} - unresolvable"
+        )
+        return None
+
+    total_chambers = (chamber_r or 0) * (chamber_c or 0) or None
+    if total_chambers is not None and not (1 <= chamber_index <= total_chambers):
+        logger.warning(
+            f"chamber_id {chamber_index} out of range for incubator_device_id={incubator_device_id} "
+            f"(grid {chamber_r}x{chamber_c} = {total_chambers} chambers) and no override configured"
+        )
+        return None
+
+    return str(chamber_index)
 
 
 def extract_tive_temperature_kpis(
@@ -332,6 +428,169 @@ def is_custom_composite_iot_source(webhook_payload: Dict[str, Any]) -> bool:
     temperature/humidity and device battery/charging state in one object.
     """
     return webhook_payload.get("source") == "CUSTOM_COMPOSITE_IOT"
+
+
+def is_custom_incubator_iot_source(webhook_payload: Dict[str, Any]) -> bool:
+    """
+    Detect CUSTOM_INCUBATOR_IOT source from payload field.
+    CUSTOM_INCUBATOR_IOT payloads carry one device_id reporting multiple
+    chambers' environmental readings (temperature, humidity, tvoc, o2, co2)
+    in a single "chambers" array.
+    """
+    return webhook_payload.get("source") == "CUSTOM_INCUBATOR_IOT"
+
+
+def process_custom_incubator_iot(
+    db_session, webhook_payload: Dict[str, Any], is_stale: bool = False
+) -> bool:
+    """
+    Process CUSTOM_INCUBATOR_IOT payloads.
+
+    One device reports every chamber of its incubator in a single payload's
+    "chambers" array. Each chamber's payload chamber_id ("1", "2", ...)
+    resolves to an internal_chamber_id via resolve_internal_chamber_id():
+    an explicit incubator_chamber_map override if the installer configured
+    one (hardware doesn't always number chambers in row-major order), else
+    its row-major position within chamber_r x chamber_c. A chamber that
+    resolves to neither is skipped rather than guessed at.
+
+    Every chamber's full payload is archived to incubator_raw_data
+    unconditionally (mirrors insert_refrigerator_raw_data), independent of
+    whether KPI extraction/deviation-checking below succeeds.
+
+    device_battery_percentage/device_charging_state are device-level, not
+    per-chamber, and are not currently persisted (no incubator-scoped slot
+    for device battery exists yet — unlike tive_battery_percentage for tanks).
+    """
+    device_id = webhook_payload.get("device_id")
+    timestamp_str = webhook_payload.get("timestamp_utc_iso")
+    chambers = webhook_payload.get("chambers")
+
+    if not device_id or not timestamp_str or not chambers:
+        logger.warning(
+            "Missing required CUSTOM_INCUBATOR_IOT fields (device_id, timestamp_utc_iso, or chambers)"
+        )
+        return False
+
+    if timestamp_str.endswith("Z"):
+        timestamp_str = timestamp_str[:-1] + "+00:00"
+    try:
+        timestamp = datetime.fromisoformat(timestamp_str)
+    except (TypeError, ValueError):
+        logger.warning(f"Invalid timestamp_utc_iso in CUSTOM_INCUBATOR_IOT payload: {timestamp_str}")
+        return False
+
+    incubator_info = find_incubator_by_device_id(db_session, device_id)
+    if incubator_info is None:
+        logger.warning(f"No incubator registered for device_id={device_id} - skipping")
+        return False
+
+    incubator_device_id = incubator_info["incubator_device_id"]
+    incubator_id = incubator_info["incubator_id"]
+    incubator_code = incubator_info["incubator_code"]
+    hospital_id = incubator_info["hospital_id"]
+    branch_id = incubator_info["branch_id"]
+    chamber_r = incubator_info.get("chamber_r")
+    chamber_c = incubator_info.get("chamber_c")
+    pressure_mmhg = incubator_info.get("pressure_mmhg")
+    hco3_mm = incubator_info.get("hco3_mm")
+
+    timestamp_iso = timestamp.isoformat()
+    processed_any = False
+
+    for chamber in chambers:
+        raw_chamber_id = chamber.get("chamber_id")
+        internal_chamber_id = resolve_internal_chamber_id(
+            db_session, incubator_device_id, raw_chamber_id, chamber_r, chamber_c
+        )
+        if internal_chamber_id is None:
+            logger.warning(
+                f"Could not resolve chamber_id '{raw_chamber_id}' for device_id={device_id} "
+                f"(incubator_id={incubator_id}) - skipping this chamber"
+            )
+            continue
+
+        lid_closed_state = chamber.get("lid_closed_state")
+        lid_state_value = None if lid_closed_state is None else (0 if lid_closed_state else 1)
+
+        kpis = [
+            {"timestamp": timestamp_iso, "name": KPI_NAMES.INCUBATOR_TEMP, "value": chamber.get("temperature")},
+            {"timestamp": timestamp_iso, "name": KPI_NAMES.INCUBATOR_HUMIDITY, "value": chamber.get("humidity")},
+            {"timestamp": timestamp_iso, "name": KPI_NAMES.INCUBATOR_VOC, "value": chamber.get("tvoc")},
+            {"timestamp": timestamp_iso, "name": KPI_NAMES.INCUBATOR_O2, "value": chamber.get("o2")},
+            {"timestamp": timestamp_iso, "name": KPI_NAMES.INCUBATOR_CO2, "value": chamber.get("co2")},
+            # lid_closed_state arrives as an explicit boolean (or None); 0 = closed
+            # (normal), 1 = open, matching the frontend's incubator_lid_state scale.
+            {"timestamp": timestamp_iso, "name": KPI_NAMES.INCUBATOR_LID_STATE, "value": lid_state_value},
+        ]
+
+        # Derived, not a raw sensor value — only computed when this incubator has
+        # both calibration constants set (see compute_incubator_ph docstring for
+        # the full method and caveats). Never defaulted/guessed.
+        ph_result = compute_incubator_ph(
+            chamber.get("co2"), chamber.get("temperature"), pressure_mmhg, hco3_mm
+        )
+        if ph_result is not None:
+            kpis.append({
+                "timestamp": timestamp_iso,
+                "name": KPI_NAMES.INCUBATOR_PH,
+                "value": ph_result["pH"],
+            })
+
+        # Insert raw data (always) — archive the full payload so the raw audit
+        # trail exists even when every KPI value for this chamber is null.
+        insert_incubator_raw_data(
+            db_session,
+            incubator_id,
+            internal_chamber_id,
+            device_id,
+            chamber.get("temperature"),
+            chamber.get("humidity"),
+            chamber.get("tvoc"),
+            chamber.get("o2"),
+            chamber.get("co2"),
+            webhook_payload,
+            timestamp,
+        )
+
+        if all(k["value"] is None for k in kpis):
+            logger.info(
+                f"No KPI values for chamber {internal_chamber_id} on incubator_id={incubator_id} - skipping"
+            )
+            continue
+
+        save_incubator_kpi_readings(
+            db_session=db_session,
+            incubator_id=incubator_id,
+            chamber_id=internal_chamber_id,
+            incubator_code=incubator_code,
+            hospital_id=hospital_id,
+            branch_id=branch_id,
+            kpi_readings=kpis,
+        )
+        processed_any = True
+        logger.info(
+            f"Processed incubator telemetry for device {device_id}: "
+            f"incubator_id={incubator_id}, chamber_id={internal_chamber_id}"
+        )
+
+    # device_battery_percentage is device-level, not per-chamber — save it once
+    # per event against the incubator's Common scope (chamber_id IS NULL),
+    # matching how external temperature already occupies that scope.
+    battery_value = webhook_payload.get("device_battery_percentage")
+    if battery_value is not None:
+        save_incubator_kpi_readings(
+            db_session=db_session,
+            incubator_id=incubator_id,
+            chamber_id=None,
+            incubator_code=incubator_code,
+            hospital_id=hospital_id,
+            branch_id=branch_id,
+            kpi_readings=[{"timestamp": timestamp_iso, "name": KPI_NAMES.INCUBATOR_BATTERY, "value": battery_value}],
+        )
+        processed_any = True
+
+    return processed_any
 
 
 def find_ivf_shipment_by_identifiers(
@@ -1174,6 +1433,60 @@ def insert_refrigerator_raw_data(
         return row_id
     except Exception as e:
         logger.error(f"Error inserting refrigerator_raw_data: {e}", exc_info=True)
+        raise
+
+
+def insert_incubator_raw_data(
+    db_session,
+    incubator_id: int,
+    chamber_id: str,
+    device_id: Optional[str],
+    temperature: Optional[float],
+    humidity: Optional[float],
+    tvoc: Optional[float],
+    o2: Optional[float],
+    co2: Optional[float],
+    payload: Dict[str, Any],
+    timestamp: datetime,
+) -> Optional[int]:
+    """Insert raw incubator chamber sensor payload into incubator_raw_data table.
+
+    payload is the full multi-chamber webhook payload as received — one row
+    per chamber, but each carries the whole batch for audit completeness,
+    same convention as insert_refrigerator_raw_data."""
+    try:
+        insert_query = text("""
+            INSERT INTO incubator_raw_data
+            (incubator_id, chamber_id, device_id, raw_temperature, raw_humidity,
+             raw_tvoc, raw_o2, raw_co2, payload, created_at)
+            VALUES (:incubator_id, :chamber_id, :device_id, :raw_temperature, :raw_humidity,
+                    :raw_tvoc, :raw_o2, :raw_co2, :payload, :created_at)
+            RETURNING id
+        """).bindparams(bindparam("payload", type_=JSONB))
+
+        result = db_session.execute(
+            insert_query,
+            {
+                "incubator_id": incubator_id,
+                "chamber_id": chamber_id,
+                "device_id": device_id,
+                "raw_temperature": temperature,
+                "raw_humidity": humidity,
+                "raw_tvoc": tvoc,
+                "raw_o2": o2,
+                "raw_co2": co2,
+                "payload": payload,
+                "created_at": timestamp,
+            },
+        )
+
+        row_id = result.scalar()
+        logger.info(
+            f"✓ Inserted incubator_raw_data (id={row_id}, incubator_id={incubator_id}, chamber_id={chamber_id})"
+        )
+        return row_id
+    except Exception as e:
+        logger.error(f"Error inserting incubator_raw_data: {e}", exc_info=True)
         raise
 
 
@@ -4927,6 +5240,27 @@ def process_webhook_payload(
             except Exception as e:
                 logger.error(
                     f"Error in CUSTOM_COMPOSITE_IOT processing: {e}", exc_info=True
+                )
+                db.rollback()
+                raise
+
+        # 2c. CUSTOM_INCUBATOR_IOT (one device reporting multiple incubator chambers)
+        if is_custom_incubator_iot_source(webhook_payload):
+            logger.debug("Processing CUSTOM_INCUBATOR_IOT webhook...")
+            try:
+                success = process_custom_incubator_iot(
+                    db, webhook_payload, is_stale=is_stale
+                )
+                if success:
+                    db.commit()
+                    return 1
+                else:
+                    logger.warning("CUSTOM_INCUBATOR_IOT processing failed")
+                    db.rollback()
+                    return 0
+            except Exception as e:
+                logger.error(
+                    f"Error in CUSTOM_INCUBATOR_IOT processing: {e}", exc_info=True
                 )
                 db.rollback()
                 raise

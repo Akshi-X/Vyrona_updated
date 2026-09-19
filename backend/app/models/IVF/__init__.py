@@ -3,6 +3,9 @@ from .hospital_model import Hospital
 from .hospital_branch_model import HospitalBranch
 from .tank_model import Tank
 from .incubator_model import Incubator
+from .incubator_device_model import IncubatorDevice
+from .incubator_chamber_map_model import IncubatorChamberMap
+from .incubator_raw_data_model import IncubatorRawData
 from .refrigerator_model import Refrigerator
 from .refrigerator_device_model import RefrigeratorDevice
 from .refrigerator_raw_data_model import RefrigeratorRawData

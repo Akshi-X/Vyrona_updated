@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Snowflake } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
+import PageBreadcrumb from '../../components/PageBreadcrumb';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
 import StakeholderChatBox from '../../components/StakeholderChatBox';
 import { shipmentService } from '../../services/shipmentService';
@@ -170,25 +171,7 @@ export default function RefrigeratorTrackingPage() {
     <>
     <PageLayout title="Refrigerator Tracking" description="Monitor temperature, alerts and tasks for IVF storage units" lucideIcon={Snowflake} actions={pageActions}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
-        <div className="flex items-center gap-1 text-sm">
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="text-gray-500 font-semibold hover:text-gray-700 transition-colors"
-          >
-            Dashboard
-          </button>
-          <span className="text-gray-500">/</span>
-          <button
-            type="button"
-            onClick={() => navigate('/refrigerator-tracking')}
-            className="text-gray-500 font-semibold hover:text-gray-700 transition-colors"
-          >
-            Refrigerator Tracking
-          </button>
-          <span className="text-gray-500">/</span>
-          <span className="text-black font-semibold">{refrigeratorCode}</span>
-        </div>
+        <PageBreadcrumb label="Refrigerator Quality Tracking" />
         <div className="text-sm font-semibold text-black">
           {refrigeratorCode} - {branchName}
         </div>

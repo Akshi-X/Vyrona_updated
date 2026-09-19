@@ -7,6 +7,11 @@ interface CriticalAlert {
     type: string;
     severity: "Low" | "Medium" | "High" | "Critical";
     patientId: string;
+    /** Label for patientId specific to this alert's device, e.g. "Tank Code",
+     * "Incubator Code", "Refrigerator Code". Falls back to the modal-wide
+     * patientIdLabel prop when not supplied. */
+    deviceCodeLabel?: string;
+    chamberId?: string;
     branchName?: string;
     dedupKey?: string;
     message: string;
@@ -406,6 +411,16 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
         });
     };
 
+    // The backend message is the full text also embedded verbatim in alert emails
+    // (headline + "Branch: ..." + "<Device> Code: ..." + a "Kindly address..." footer).
+    // The list shows the device code, chamber and branch as their own fields below, so
+    // this only needs the headline — trimmed here at display time, not on the stored
+    // message emails rely on.
+    const getShortMessage = (message: string): string => {
+        const headline = message.split("\n")[0]?.trim() ?? message;
+        return headline.replace(/\.$/, "");
+    };
+
     const getBranchName = (alert: CriticalAlert): string | undefined => {
         if (alert.branchName && alert.branchName.trim()) {
             return alert.branchName.trim();
@@ -415,13 +430,6 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
         return match?.[1]?.trim();
     };
 
-    const getPatientDisplay = (alert: CriticalAlert): string => {
-        const branchName = getBranchName(alert);
-        if (branchName) {
-            return `${alert.patientId} (${branchName})`;
-        }
-        return alert.patientId;
-    };
 
     const isLidStateAlert = (alert: CriticalAlert) =>
         /\bis (OPEN|CLOSED) in .+ branch for .+ tank/i.test(alert.message);
@@ -775,24 +783,39 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                         </div>
                                                         <div className="mt-1 text-sm text-[#333333]">
                                                             {
-                                                                latestAlert.message
+                                                                getShortMessage(latestAlert.message)
                                                             }
                                                         </div>
                                                         {showPatientId && (
                                                             <>
                                                                 <div className="mt-2 flex flex-wrap items-center gap-x-2 text-sm text-[#333333]">
                                                                     <span className="font-semibold text-primary">
-                                                                        {
-                                                                            patientIdLabel
-                                                                        }
-                                                                        :
+                                                                        {latestAlert.deviceCodeLabel || patientIdLabel}:
                                                                     </span>{" "}
                                                                     <span className="font-semibold text-[#1f2937] tracking-wide">
-                                                                        {getPatientDisplay(
-                                                                            latestAlert,
-                                                                        )}
+                                                                        {latestAlert.patientId}
                                                                     </span>
                                                                 </div>
+                                                                {latestAlert.chamberId && (
+                                                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-[#333333]">
+                                                                        <span className="font-semibold text-primary">
+                                                                            Chamber:
+                                                                        </span>{" "}
+                                                                        <span className="font-semibold text-[#1f2937] tracking-wide">
+                                                                            {latestAlert.chamberId}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {getBranchName(latestAlert) && (
+                                                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-[#333333]">
+                                                                        <span className="font-semibold text-primary">
+                                                                            Branch:
+                                                                        </span>{" "}
+                                                                        <span className="font-semibold text-[#1f2937] tracking-wide">
+                                                                            {getBranchName(latestAlert)}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
                                                                 <div className="mt-1 text-xs text-gray-500">
                                                                     {formatAlertTime(
                                                                         latestAlert.timestamp,
@@ -908,7 +931,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                             >
                                                                 <div className="min-w-0 text-left">
                                                                     <div className="text-sm text-[#333333]">
-                                                                        {alert.message}
+                                                                        {getShortMessage(alert.message)}
                                                                     </div>
                                                                     <div className="mt-1 text-xs text-gray-500">
                                                                         {formatAlertTime(alert.timestamp)}
@@ -970,7 +993,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                 <div className="mt-4">
                                     {latestLidStateMessage && (
                                         <p className="text-xs text-gray-500 mb-2 truncate">
-                                            Latest: {latestLidStateMessage}
+                                            Latest: {getShortMessage(latestLidStateMessage)}
                                         </p>
                                     )}
                                     <label className="block text-sm font-medium text-[#1f2937] mb-1">
