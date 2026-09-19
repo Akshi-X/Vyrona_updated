@@ -411,8 +411,16 @@ function buildCompartment(
   return { group, doorHit, doorGroup, highlightRing, interiorLight, interiorBack: back, mistMeshes };
 }
 
+// Backend serialises alert timestamps from naive UTC DateTime columns, so the
+// string carries no offset and Date() would read it as local time.
+function parseUtcTimestamp(ts: string): Date {
+  const norm = ts.trim().replace(' ', 'T');
+  const withZ = /([zZ]|[+-]\d{2}:?\d{2})$/.test(norm) ? norm : `${norm}Z`;
+  return new Date(withZ);
+}
+
 function getDateLabel(ts: string): string {
-  const d = new Date(ts);
+  const d = parseUtcTimestamp(ts);
   if (isNaN(d.getTime())) return 'Unknown';
   const today = new Date(); today.setHours(0,0,0,0);
   const item = new Date(d); item.setHours(0,0,0,0);
@@ -423,7 +431,7 @@ function getDateLabel(ts: string): string {
 }
 
 function formatAlertTime(ts: string): string {
-  const d = new Date(ts);
+  const d = parseUtcTimestamp(ts);
   if (isNaN(d.getTime())) return ts;
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
 }
@@ -492,7 +500,7 @@ function EmbeddedAlerts({ refrigeratorId }: { refrigeratorId?: number }) {
 
   const grouped = useMemo(() => {
     const byDate: Record<string, AlertGroup[]> = {};
-    const sorted = [...alerts].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const sorted = [...alerts].sort((a, b) => parseUtcTimestamp(b.created_at).getTime() - parseUtcTimestamp(a.created_at).getTime());
     for (const a of sorted) {
       const dateKey = getDateLabel(a.created_at);
       if (!byDate[dateKey]) byDate[dateKey] = [];
