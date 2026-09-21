@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { History, FlaskConical, Activity, Sun, Tag, Server, Star } from 'lucide-react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { ivfService, type IvfCycle, type IvfCycleLog, type IvfCycleWithLogs, type IvfLogUpsert, type ChamberLatestItem } from '../../services/ivfService';
 import { activityLogService, type ActivityLogRecord } from '../../services/activityLogService';
@@ -47,7 +47,6 @@ interface EmbryologyLogFormState {
 }
 
 export default function EmbryoGradingDetailPage() {
-  const navigate = useNavigate();
   const { his } = useParams<{ his: string }>();
   const location = useLocation();
   const detailHis = his?.trim().toUpperCase() || '';
@@ -1253,22 +1252,41 @@ export default function EmbryoGradingDetailPage() {
                         </select>
                       </div>
                       {logForm.day5Stage === 'Blastocyst' && (
-                        <div className="col-span-2">
-                          {blastGradeFields5 ? (
-                            <div className="w-full rounded-xl bg-primary-bg border border-[#c084fc]/40 px-3 py-2.5 text-center">
-                              <span className="text-[10px] text-primary-muted uppercase tracking-wide block mb-0.5">D5 Grade</span>
-                              <span className={`text-2xl font-black ${getGradeColor(generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade))}`}>{generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade)}</span>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/embryo-console/${his}/ai-grading`, { state: { savedLogForm: logForm, savedEditingLogId: editingLogId } })}
-                              className="w-full px-4 py-3 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-primary transition-colors"
-                            >
-                              Start AI Grading
-                            </button>
-                          )}
-                        </div>
+                        <>
+                          <div>
+                            <label className={lbl}>Expansion Grade</label>
+                            <select className={sel} value={logForm.day5ExpansionGrade} onChange={(e) => handleLogFieldChange('day5ExpansionGrade', e.target.value)}>
+                              <option value="">—</option>
+                              {['1','2','3','4','5','6'].map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={lbl}>ICM Grade</label>
+                            <select className={sel} value={logForm.day5IcmGrade} onChange={(e) => handleLogFieldChange('day5IcmGrade', e.target.value)}>
+                              <option value="">—</option>
+                              {['A','B','C'].map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={lbl}>TE Grade</label>
+                            <select className={sel} value={logForm.day5TeGrade} onChange={(e) => handleLogFieldChange('day5TeGrade', e.target.value)}>
+                              <option value="">—</option>
+                              {['A','B','C'].map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex items-end">
+                            {blastGradeFields5 ? (
+                              <div className="w-full rounded-xl bg-primary-bg border border-[#c084fc]/40 px-3 py-2.5 text-center">
+                                <span className="text-[10px] text-primary-muted uppercase tracking-wide block mb-0.5">D5 Grade</span>
+                                <span className={`text-2xl font-black ${getGradeColor(generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade))}`}>{generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade)}</span>
+                              </div>
+                            ) : (
+                              <div className="w-full rounded-xl bg-gray-50 border border-gray-200 px-3 py-2.5 text-center text-xs text-gray-400">
+                                Select grades
+                              </div>
+                            )}
+                          </div>
+                        </>
                       )}
                       <div className="col-span-2"><label className={lbl}>Notes</label><input className={inp} placeholder="Day 5 notes…" value={logForm.day5Notes} onChange={(e) => handleLogFieldChange('day5Notes', e.target.value)} /></div>
                     </div>
@@ -1295,7 +1313,7 @@ export default function EmbryoGradingDetailPage() {
                           </select>
                         </div>
                         {logForm.day6Stage === 'Blastocyst' && (
-                          blastGradeFields6 ? (<>
+                          <>
                             <div>
                               <label className={lbl}>Expansion Grade</label>
                               <select className={sel} value={logForm.day6ExpansionGrade} onChange={(e) => handleLogFieldChange('day6ExpansionGrade', e.target.value)}>
@@ -1318,22 +1336,18 @@ export default function EmbryoGradingDetailPage() {
                               </select>
                             </div>
                             <div className="flex items-end">
-                              <div className="w-full rounded-xl bg-primary-bg border border-[#c084fc]/40 px-3 py-2.5 text-center">
-                                <span className="text-[10px] text-primary-muted uppercase tracking-wide block mb-0.5">D6 Grade</span>
-                                <span className={`text-2xl font-black ${getGradeColor(generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade))}`}>{generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade)}</span>
-                              </div>
+                              {blastGradeFields6 ? (
+                                <div className="w-full rounded-xl bg-primary-bg border border-[#c084fc]/40 px-3 py-2.5 text-center">
+                                  <span className="text-[10px] text-primary-muted uppercase tracking-wide block mb-0.5">D6 Grade</span>
+                                  <span className={`text-2xl font-black ${getGradeColor(generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade))}`}>{generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade)}</span>
+                                </div>
+                              ) : (
+                                <div className="w-full rounded-xl bg-gray-50 border border-gray-200 px-3 py-2.5 text-center text-xs text-gray-400">
+                                  Select grades
+                                </div>
+                              )}
                             </div>
-                          </>) : (
-                            <div className="col-span-2">
-                              <button
-                                type="button"
-                                onClick={() => navigate(`/embryo-console/${his}/ai-grading`, { state: { savedLogForm: logForm, savedEditingLogId: editingLogId } })}
-                                className="w-full px-4 py-3 rounded-lg bg-[#3b0764] text-white text-sm font-semibold hover:bg-primary transition-colors"
-                              >
-                                Start AI Grading
-                              </button>
-                            </div>
-                          )
+                          </>
                         )}
                         {logForm.day6Stage && (
                           <div className="col-span-2">

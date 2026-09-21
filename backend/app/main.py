@@ -45,7 +45,6 @@ from app.controller.IVF import (
     ivf_dashboard_controller,
     ivf_quality_controller,
     ivf_reports_controller,
-    ml_grading_controller,
     quality_tracking_controller,
     refrigerator_dashboard_controller,
 )
@@ -244,7 +243,6 @@ app.include_router(refrigerator_dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)
 app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_reports_controller.router, prefix=API_PREFIX)
-app.include_router(ml_grading_controller.router, prefix=API_PREFIX)
 app.include_router(internal_alert_controller.router, prefix=API_PREFIX)
 app.include_router(internal_refill_controller.router, prefix=API_PREFIX)
 app.include_router(integration_auth_controller.router, prefix=API_PREFIX)

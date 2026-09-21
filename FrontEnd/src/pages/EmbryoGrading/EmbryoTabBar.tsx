@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ClipboardList, Star, ArrowLeftRight, BarChart2, Home } from 'lucide-react';
 
-type Tab = 'logsheet' | 'grading' | 'compare' | 'reports';
+type Tab = 'logsheet' | 'compare' | 'reports';
 
 interface EmbryoTabBarProps {
   his: string;
@@ -14,8 +14,6 @@ export default function EmbryoTabBar({ his }: EmbryoTabBarProps) {
   const onDashboard = !his;
   const active: Tab | null = onDashboard
     ? null
-    : pathname.endsWith('/ai-grading')
-    ? 'grading'
     : pathname.endsWith('/compare')
     ? 'compare'
     : pathname.endsWith('/reports')
@@ -24,7 +22,6 @@ export default function EmbryoTabBar({ his }: EmbryoTabBarProps) {
 
   const tabs: { id: Tab; label: string; short: string; to: string; Icon: typeof Star }[] = [
     { id: 'logsheet', label: 'Development Tracker', short: 'Tracker', to: `/embryo-console/${his}`,           Icon: ClipboardList },
-    { id: 'grading',  label: 'AI Grading',          short: 'Grading', to: `/embryo-console/${his}/ai-grading`, Icon: Star },
     { id: 'compare',  label: 'Compare & Select',    short: 'Compare', to: `/embryo-console/${his}/compare`,    Icon: ArrowLeftRight },
     { id: 'reports',  label: 'Client Report',       short: 'Report',  to: `/embryo-console/${his}/reports`,    Icon: BarChart2 },
   ];
