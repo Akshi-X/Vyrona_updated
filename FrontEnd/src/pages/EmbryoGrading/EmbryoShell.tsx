@@ -9,13 +9,10 @@ export default function EmbryoShell() {
 
   const hisPart = `HIS: ${his.toUpperCase()}`;
 
-  const isAdvanced = pathname.endsWith('/ai-grading');
   const isCompare  = pathname.endsWith('/compare');
   const isReports  = pathname.endsWith('/reports');
 
-  const titleLabel = isAdvanced
-    ? 'AI Grading'
-    : isCompare
+  const titleLabel = isCompare
     ? 'Compare'
     : isReports
     ? 'Embryo Reports'
@@ -23,9 +20,7 @@ export default function EmbryoShell() {
 
   const titleSuffix = hisPart;
 
-  const description = isAdvanced
-    ? 'AI-powered embryo image analysis and morphology grading'
-    : isCompare
+  const description = isCompare
     ? 'Side-by-side comparison of embryo quality and morphology scores'
     : isReports
     ? 'Generate and export comprehensive cycle reports for clinical records'

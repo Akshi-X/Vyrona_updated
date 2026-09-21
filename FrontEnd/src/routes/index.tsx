@@ -18,7 +18,6 @@ import UsersPage from "../pages/Users";
 import InviteSignup from "../pages/InviteSignup";
 import EmbryoGradingPage from "../pages/EmbryoGrading";
 import EmbryoGradingDetailPage from "../pages/EmbryoGrading/EmbryoGradingDetailPage";
-import AdvancedEmbryoGradingPage from "../pages/EmbryoGrading/AdvancedToolPage";
 import EmbryoComparePage from "../pages/EmbryoGrading/EmbryoComparePage";
 import EmbryoReportsPage from "../pages/EmbryoGrading/EmbryoReportsPage";
 import EmbryoShell from "../pages/EmbryoGrading/EmbryoShell";
@@ -310,7 +309,6 @@ export const router = createBrowserRouter([
             { path: "/onboarding/success",                               element: <><OnboardingSuccess /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/users",                                 element: <><UsersPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/embryo-console",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/embryo-console/:his/ai-grading",        element: <><AdvancedEmbryoGradingPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking/:id",                element: <><IncubatorDetailPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/track/:patientId",                      element: <><TrackPage /><ActiveOnboardingLevel /></> },
@@ -341,7 +339,6 @@ export const router = createBrowserRouter([
                 element: <EmbryoShellWithAuth />,
                 children: [
                     { index: true,         element: <EmbryoGradingDetailPage /> },
-                    { path: "ai-grading",  element: <AdvancedEmbryoGradingPage /> },
                     { path: "compare",     element: <EmbryoComparePage /> },
                     { path: "reports",     element: <EmbryoReportsPage /> },
                 ],
