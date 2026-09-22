@@ -29,7 +29,6 @@ pandas==2.3.3
 passlib==1.7.4
 pluggy==1.6.0
 psycopg2-binary==2.9.10
-psycopg2==2.9.10
 pyasn1==0.6.1
 pycparser==2.23
 pydantic-core==2.33.2
