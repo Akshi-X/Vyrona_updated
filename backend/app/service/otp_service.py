@@ -95,8 +95,7 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
             logger.info(f"OTP email sent successfully to {email}")
         else:
             logger.info(
-                f"FIXED_OTP_MODE enabled: skipping email send. Using fixed OTP '{otp_code}' for {email}. "
-                f"Any OTP can be used to login for testing."
+                f"FIXED_OTP_MODE enabled: skipping email send. Using fixed OTP '{otp_code}' for {email}."
             )
         
         # Email sent successfully (or skipped in FIXED_OTP_MODE), NOW commit the transaction
@@ -128,10 +127,10 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
 
 def verify_otp(db: Session, user_id: str, otp_code: str) -> bool:
     """
-    Verify OTP code for a user
+    Verify OTP code for a user.
     
-    In FIXED_OTP_MODE (Docker development), any OTP is accepted for testing.
-    In production, OTP must match exactly.
+    Validates that the entered OTP matches the stored code (e.g., 123456 in FIXED_OTP_MODE,
+    or the generated code in production).
     
     Args:
         db: Database session
@@ -142,25 +141,6 @@ def verify_otp(db: Session, user_id: str, otp_code: str) -> bool:
         True if OTP is valid, False otherwise
     """
     try:
-        # In FIXED_OTP_MODE (docker), accept any OTP for testing
-        if settings.FIXED_OTP_MODE:
-            logger.debug(f"FIXED_OTP_MODE enabled: accepting any OTP for testing")
-            # Still mark the OTP as used (best practice)
-            otp = db.query(OTP).filter(
-                and_(
-                    OTP.user_id == user_id,
-                    OTP.is_used == False,
-                    OTP.expires_at > datetime.now(timezone.utc)
-                )
-            ).order_by(OTP.created_at.desc()).first()
-            
-            if otp:
-                otp.is_used = True
-                db.commit()
-            
-            return True
-        
-        # Production mode: verify exact OTP code
         # Find the most recent unused OTP for the user
         otp = db.query(OTP).filter(
             and_(
