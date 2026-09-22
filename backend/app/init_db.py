@@ -1283,7 +1283,7 @@ def init_db():
     # create_ivf_admins()
 
     # Create MyGrape platform admin if not exists
-    # create_mygrape_admin()
+    create_mygrape_admin()
 
     logger.info("Database initialization complete")
     logger.info("=" * 60)
