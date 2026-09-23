@@ -1,4 +1,4 @@
-# MyGrape - Supply Chain Tracking Platform
+# Vyrona - Supply Chain Tracking Platform
 
 A comprehensive supply chain tracking platform with real-time monitoring, patient management, shipment tracking, and quality control.
 
@@ -49,11 +49,7 @@ See **[DEVELOPER_SETUP_GUIDE.md](./DEVELOPER_SETUP_GUIDE.md)** for detailed inst
 4. Start frontend: `cd FrontEnd && npm run dev`
 5. Start publisher: `cd publisher && python -m publisher.publisher`
 
-## 📝 License
 
-[Add your license information here]
 
 ## 👥 Authors
-
-- Surya Senthilkumar - surya.senthilkumar@zucisystems.com
-- Jothika Rajendran - jothika.rajendran@zucisystems.com
+- Akshith Mahesh K
