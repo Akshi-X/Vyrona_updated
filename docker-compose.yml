@@ -99,8 +99,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      backend:
-        condition: service_started
       eventhub-emulator:
         condition: service_started
     environment:
@@ -131,8 +129,6 @@ services:
     depends_on:
       azurite:
         condition: service_healthy
-      backend:
-        condition: service_started
       eventhub-emulator:
         condition: service_started
     environment:

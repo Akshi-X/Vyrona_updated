@@ -12,3 +12,4 @@ ml/
 ml.zip
 telemetry-service/.venv/
 .github
+uv.lock
