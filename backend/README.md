@@ -266,17 +266,33 @@ alembic upgrade head
 
 #### Seed Demo Data
 
-To populate sample data for CGT and IVF dashboards:
+After starting the backend with `poetry run uvicorn app.main:app` (which automatically creates the database tables), run the unified master seed script:
 
 ```bash
 poetry run python seed_db.py
 ```
 
-This creates:
-- **CGT (Pharma)**: Patients, shipments, provider, carrier (5 patients, 5 shipments with legs)
-- **IVF**: Tanks, cryolocks (embryos), outbound shipments
+This single command seeds all required demo data (fully idempotent with zero conflicts on fresh or existing databases):
+- **Platform & Hospital Users**: `mygrape_admin@test.com`, `pharma_admin@test.com`, `admin@test.com` (IVF Admin), `manager@test.com`, `doctor@test.com`, `priya.ivf@test.com`
+- **Hospitals & Branches**: ARC Fertility Hospitals (Chennai Main, Bangalore, Hyderabad), Apollo Hospitals, Fortis Healthcare, Max Super Speciality Hospital
+- **Cryotanks**: Tanks T10, T20, T30, T40, T50, TIVE-TEST-999 with capacities, tare/gross weights, and static evaporation rates
+- **Patient Cryolocks / Embryos**: 12 patient cryolock records mapped across canisters and canes
+- **LN2 IoT Devices & Readings**: Device mappings, 12 LN2 historical readings, and raw IoT telemetry
+- **Telemetry & Quality Logs**: IVF quality logs for deviation tracking charts
+- **KPI Configurations & Readings**: Preset thresholds (internal/external temp, LN2 level, evap rate, battery, shock, lid) and 5 snapshots of demo readings
+- **Laboratory Refrigerators**: Dual-zone `REF-01` and `REF-02` with fridge/freezer zones, devices, KPI configs, and readings
+- **Branch Reservoirs**: Default branch reservoirs for all hospital branches
+- **CGT (Pharma)**: Providers, carriers, patients, stages, shipments with legs, therapy parameters, tasks, and feedback tickets
 
-Log in as pharma user or `admin@zucisystems.com` (IVF) to view the dashboards.
+##### Available Login Accounts:
+| Role | Email | Password | Scope |
+|---|---|---|---|
+| **Mygrape_admin** | `mygrape_admin@test.com` | `Admin123` | Global Platform Superadmin |
+| **Pharma_admin** | `pharma_admin@test.com` | `Admin123` | Pharma Company A |
+| **Admin** | `admin@test.com` | `Admin123` | ARC Fertility Hospitals (Chennai Main) |
+| **Manager** | `manager@test.com` | `Admin123` | ARC Fertility Hospitals (Bangalore) |
+| **User** | `doctor@test.com` | `Admin123` | ARC Fertility Hospitals (Hyderabad) |
+| **User** | `priya.ivf@test.com` | `Ivf@1234` | ARC Fertility Hospitals (Chennai Main) |
 
 ### 6. Redis Setup
 

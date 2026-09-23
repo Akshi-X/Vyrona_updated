@@ -238,6 +238,15 @@ CREATE DATABASE mygrape;
 psql -U postgres -d mygrape -c "SELECT version();"
 ```
 
+### Step 4: Seed Demo Data (After Starting Backend)
+
+Once the backend is started with `poetry run uvicorn app.main:app` (which automatically creates database tables), you can seed all demo data (Cryotanks, Refrigerators, Users, Readings, KPI configs) in a single command:
+
+```bash
+cd backend
+poetry run python seed_db.py
+```
+
 ---
 
 ## 🔴 Redis Setup
@@ -635,14 +644,41 @@ INFO:     Application startup complete.
 - **Health Check:** http://localhost:8000/health
 
 **First Run Notes:**
-- On first startup, the backend will:
-  1. Create all database tables automatically
-  2. Create pharma companies from `pharma_admins.json`
-  3. Create pharma admin users
-  4. Create MyGrape platform admin user
-  5. Start quality monitoring background tasks
+- On first startup, the backend automatically creates all database tables and verifies schema definitions.
+- Once the server is running, proceed to seed all demo data below.
 
-Check the console output for confirmation messages.
+---
+
+### Step 1b: Seed All Demo Data (Cryotanks, Refrigerators, Users, Readings)
+
+After starting `app.main:app` (which creates the database tables and runs schema sync), run the unified master seed script to populate all demo data:
+
+```bash
+# In the backend directory:
+poetry run python seed_db.py
+```
+
+> **Note:** `seed_db.py` is fully idempotent and safe to run on fresh or existing databases with zero conflicts. It populates:
+> - **Platform & Hospital Users:** `mygrape_admin@test.com`, `pharma_admin@test.com`, `admin@test.com` (IVF Admin), `manager@test.com`, `doctor@test.com`, `priya.ivf@test.com`
+> - **Hospitals & Branches:** ARC Fertility Hospitals (Chennai Main, Bangalore, Hyderabad), Apollo Hospitals, Fortis Healthcare, Max Super Speciality Hospital
+> - **Cryotanks:** T10, T20, T30, T40, T50, TIVE-TEST-999 with capacities, tare/gross weights, and static evaporation rates
+> - **Patient Cryolocks / Embryos:** 12 cryolock records mapped across tanks, canisters, and canes
+> - **LN2 IoT Devices & Readings:** Device mappings, 12 LN2 historical readings, and raw IoT telemetry
+> - **Telemetry & Quality Logs:** IVF quality logs for deviation tracking charts
+> - **KPI Configurations & Readings:** Preset thresholds (internal/external temp, LN2 level, evap rate, battery, shock, lid) and 5 snapshots of demo readings
+> - **Laboratory Refrigerators:** Dual-zone `REF-01` and `REF-02` with fridge/freezer zones, devices, KPI configs, and readings
+> - **Branch Reservoirs:** Auto-creates default branch reservoirs for all hospital branches
+> - **CGT / Pharma Demo Data:** Providers, carriers, patients, stages, shipments, tasks, and feedback tickets
+
+#### Available Login Accounts:
+| Role | Email | Password | Scope |
+|---|---|---|---|
+| **Mygrape_admin** | `mygrape_admin@test.com` | `Admin123` | Global Platform Superadmin |
+| **Pharma_admin** | `pharma_admin@test.com` | `Admin123` | Pharma Company A |
+| **Admin** | `admin@test.com` | `Admin123` | ARC Fertility Hospitals (Chennai Main) |
+| **Manager** | `manager@test.com` | `Admin123` | ARC Fertility Hospitals (Bangalore) |
+| **User** | `doctor@test.com` | `Admin123` | ARC Fertility Hospitals (Hyderabad) |
+| **User** | `priya.ivf@test.com` | `Ivf@1234` | ARC Fertility Hospitals (Chennai Main) |
 
 ---
 

@@ -148,4 +148,4 @@ volumes:
 
 networks:
   mgscale-network:
-    driver: bridge
+    driver: bridge  
