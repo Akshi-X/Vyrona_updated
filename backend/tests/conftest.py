@@ -320,27 +320,27 @@ def get_config_by_kpi(client, env_data: dict, kpi_name: str, auth_headers: dict 
 
 # ── Test Reporting - Done with the help of html-reporter.py───────────────────────────────────────────────────
 
-from tests.reporters.html_reporter import generate_grouped_html_report
-
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    """Capture test docstring and collect report for custom HTML generation."""
-    outcome = yield
-    report = outcome.get_result()
-    # Collect for grouped custom report
-    if not hasattr(item.config, "_custom_reports"):
-        item.config._custom_reports = []
-    item.config._custom_reports.append(report)
-    # Capture docstring for display
-    if report.when == "call":
-        doc = None
-        try:
-            doc = inspect.getdoc(item.obj) or inspect.getdoc(item.function)
-        except Exception:
-            doc = None
-        report.description = doc or ""
-
-def pytest_sessionfinish(session, exitstatus):
-    """Generate custom grouped HTML report at session end."""
-    generate_grouped_html_report(session, exitstatus)
+# from tests.reporters.html_reporter import generate_grouped_html_report
+#
+#
+# @pytest.hookimpl(hookwrapper=True)
+# def pytest_runtest_makereport(item, call):
+#     """Capture test docstring and collect report for custom HTML generation."""
+#     outcome = yield
+#     report = outcome.get_result()
+#     # Collect for grouped custom report
+#     if not hasattr(item.config, "_custom_reports"):
+#         item.config._custom_reports = []
+#     item.config._custom_reports.append(report)
+#     # Capture docstring for display
+#     if report.when == "call":
+#         doc = None
+#         try:
+#             doc = inspect.getdoc(item.obj) or inspect.getdoc(item.function)
+#         except Exception:
+#             doc = None
+#         report.description = doc or ""
+#
+# def pytest_sessionfinish(session, exitstatus):
+#     """Generate custom grouped HTML report at session end."""
+#     generate_grouped_html_report(session, exitstatus)

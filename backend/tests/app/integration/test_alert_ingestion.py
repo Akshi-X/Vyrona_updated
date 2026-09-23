@@ -11,7 +11,7 @@ from app.models.readings_model import Readings
 
 # Endpoints
 INGESTION_URL = "http://localhost:7072/api/tive/webhook"
-SMTP_API_URL = "http://localhost:5005/api/Messages"
+SMTP_API_URL = "http://localhost:5000/api/Messages"
 
 
 def clear_smtp4dev():
@@ -44,6 +44,8 @@ def setup_teardown_environment(db):
 
     print("[Setup] Adding missing columns to ln2_iot_devices for testing...")
     try:
+        db.execute(text("ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS is_push_notify BOOLEAN NOT NULL DEFAULT false;"))
+        db.execute(text("ALTER TABLE hospitals ALTER COLUMN is_push_notify SET DEFAULT false;"))
         db.execute(text("""
             ALTER TABLE ln2_iot_devices 
             ADD COLUMN IF NOT EXISTS closed_noise_margin_kg_per_h NUMERIC,
@@ -74,12 +76,13 @@ def setup_teardown_environment(db):
     
     # 1. Create Hospital 9926
     db.execute(text("""
-        INSERT INTO hospitals (hospital_id, hospital_name, created_at, updated_at, is_email_notifify, is_whatsapp_notify)
-        VALUES (9926, 'Test Hospital 9926', NOW(), NOW(), true, true)
+        INSERT INTO hospitals (hospital_id, hospital_name, created_at, updated_at, is_email_notifify, is_whatsapp_notify, is_push_notify)
+        VALUES (9926, 'Test Hospital 9926', NOW(), NOW(), true, true, false)
         ON CONFLICT (hospital_id) DO UPDATE SET
             hospital_name = EXCLUDED.hospital_name,
             is_email_notifify = EXCLUDED.is_email_notifify,
-            is_whatsapp_notify = EXCLUDED.is_whatsapp_notify;
+            is_whatsapp_notify = EXCLUDED.is_whatsapp_notify,
+            is_push_notify = EXCLUDED.is_push_notify;
     """))
 
     # 2. Create Branch 9926 (linked to Hospital 9926)
@@ -256,10 +259,10 @@ def setup_teardown_environment(db):
     # 6. Create test user (User role, IVF department, Branch 9926) to receive notifications
     db.execute(text("""
         INSERT INTO users (
-            user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, created_at, updated_at
+            user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, push_enabled, created_at, updated_at
         )
         VALUES (
-            'usr-test-94', 'test-user94@mygrape.com', 'dummy_hash_for_testing', 'Test', 'User', 'User', true, 'approved', 9926, 9926, 'IVF', false, NOW(), NOW()
+            'usr-test-94', 'test-user94@mygrape.com', 'dummy_hash_for_testing', 'Test', 'User', 'User', true, 'approved', 9926, 9926, 'IVF', false, true, NOW(), NOW()
         )
         ON CONFLICT (email) DO UPDATE SET
             user_id = EXCLUDED.user_id,
@@ -269,6 +272,7 @@ def setup_teardown_environment(db):
             role = EXCLUDED.role,
             status = EXCLUDED.status,
             approved_status = EXCLUDED.approved_status,
+            push_enabled = EXCLUDED.push_enabled,
             password_hash = EXCLUDED.password_hash;
     """))
 
@@ -327,6 +331,10 @@ def setup_teardown_environment(db):
             INSERT INTO kpi_config (hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status)
             VALUES (9926, 9926, 97, :kpi_name, :alert_name, :min_val, :max_val, :unit, 'critical', 1, true)
         """), {"kpi_name": kpi_name, "alert_name": alert_name, "min_val": min_val, "max_val": max_val, "unit": unit})
+
+    # Enable per-KPI email notification (email_alert defaults to false); the backend
+    # only dispatches an alert email when kpi_config.email_alert is true.
+    db.execute(text("UPDATE kpi_config SET email_alert = true WHERE tank_id IN (94, 95, 96, 97);"))
 
     db.commit()
 
@@ -647,7 +655,7 @@ def test_tive_alert_flow(db):
                     # Payload sent ProbeTemperature=-10.0 -> temp_internal excursion
                     html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html", timeout=5)
                     html_content = html_res.text if html_res.status_code == 200 else ""
-                    if "Internal Temperature is deviated to -10" in html_content:
+                    if "Internal Temperature has deviated to -10" in html_content:
                         email_dispatched = True
                         print(f"OK: Found dispatched email with correct content: '{subject}' to {to_addr}")
                         break
@@ -756,7 +764,7 @@ def test_tive_alert_cooldown_flow(db):
                     if "test-user94@mygrape.com" in to_addr and "Critical Alert" in subject:
                         # Payload sent ProbeTemperature=-10.0 -> temp_internal excursion
                         html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html", timeout=5)
-                        if html_res.status_code == 200 and "Internal Temperature is deviated to -10" in html_res.text:
+                        if html_res.status_code == 200 and "Internal Temperature has deviated to -10" in html_res.text:
                             new_emails.append(msg)
         except Exception as e:
             print(f"Error checking smtp4dev: {e}")
@@ -912,10 +920,10 @@ def test_tive_alert_escalation_flow(db):
     # 3. Create two users for branch 9926
     db.execute(text("""
         INSERT INTO users (
-            user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, created_at, updated_at
+            user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, push_enabled, created_at, updated_at
         )
         VALUES (
-            'usr-test-esc-u', 'test-user-esc@mygrape.com', 'dummy_hash', 'Esc', 'User', 'User', true, 'approved', 9926, 9926, 'IVF', false, NOW(), NOW()
+            'usr-test-esc-u', 'test-user-esc@mygrape.com', 'dummy_hash', 'Esc', 'User', 'User', true, 'approved', 9926, 9926, 'IVF', false, true, NOW(), NOW()
         )
         ON CONFLICT (email) DO UPDATE SET
             user_id = EXCLUDED.user_id,
@@ -925,14 +933,15 @@ def test_tive_alert_escalation_flow(db):
             role = EXCLUDED.role,
             status = EXCLUDED.status,
             approved_status = EXCLUDED.approved_status,
+            push_enabled = EXCLUDED.push_enabled,
             password_hash = EXCLUDED.password_hash;
     """))
     db.execute(text("""
         INSERT INTO users (
-            user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, created_at, updated_at
+            user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, push_enabled, created_at, updated_at
         )
         VALUES (
-            'usr-test-esc-a', 'test-admin-esc@mygrape.com', 'dummy_hash', 'Esc', 'Admin', 'Admin', true, 'approved', 9926, 9926, 'IVF', false, NOW(), NOW()
+            'usr-test-esc-a', 'test-admin-esc@mygrape.com', 'dummy_hash', 'Esc', 'Admin', 'Admin', true, 'approved', 9926, 9926, 'IVF', false, true, NOW(), NOW()
         )
         ON CONFLICT (email) DO UPDATE SET
             user_id = EXCLUDED.user_id,
@@ -942,6 +951,7 @@ def test_tive_alert_escalation_flow(db):
             role = EXCLUDED.role,
             status = EXCLUDED.status,
             approved_status = EXCLUDED.approved_status,
+            push_enabled = EXCLUDED.push_enabled,
             password_hash = EXCLUDED.password_hash;
     """))
     db.commit()
@@ -954,7 +964,7 @@ def test_tive_alert_escalation_flow(db):
     """))
     db.execute(text("""
         UPDATE kpi_config
-        SET cooldown_minutes = 1, min = -196.0000, max = -150.0000, alert_type = 'critical', unack_escalation_threshold = 1, status = true, last_escalation_sent_at = NULL
+        SET cooldown_minutes = 1, min = -196.0000, max = -150.0000, alert_type = 'critical', unack_escalation_threshold = 1, status = true, email_alert = true, last_escalation_sent_at = NULL
         WHERE tank_id = 96 AND kpi_name = 'temp_internal';
     """))
     db.commit()
@@ -1053,7 +1063,7 @@ def test_tive_alert_escalation_flow(db):
     for _ in range(10):
         time.sleep(1)
         # Payload sent ProbeTemperature=-10.0 -> temp_internal excursion
-        user_emails = get_emails_for("test-user-esc@mygrape.com", seen_email_ids, "Internal Temperature is deviated to -10")
+        user_emails = get_emails_for("test-user-esc@mygrape.com", seen_email_ids, "Internal Temperature has deviated to -10")
         if user_emails:
             email_found_user_1 = True
             for msg in user_emails:
@@ -1517,18 +1527,24 @@ def test_email_content_check(db):
     headers = {"Content-Type": "application/json"}
     requests.post(INGESTION_URL, json=payload, headers=headers, timeout=10)
     
-    # 3. Wait for the background worker (telemetry-service) to process it
-    print("Waiting 5s for the background worker to send the email...")
-    time.sleep(5)
-    
-    # 4. Fetch the inbox from smtp4dev
-    res = requests.get(f"{SMTP_API_URL}?pageSize=10").json()
-    msgs = res.get("results", res) if isinstance(res, dict) else res
-    
-    assert len(msgs) > 0, "Failed: No email was delivered to smtp4dev."
-    
+    # 3. Poll the inbox while the background worker (webhook -> Event Hub -> telemetry ->
+    # backend alert -> email) completes; the full pipeline routinely takes longer than a
+    # single fixed wait, so retry rather than sleeping once.
+    latest_msg = None
+    for _ in range(20):
+        time.sleep(1)
+        res = requests.get(f"{SMTP_API_URL}?pageSize=10", timeout=5).json()
+        msgs = res.get("results", res) if isinstance(res, dict) else res
+        for m in msgs:
+            if "test-user94@mygrape.com" in (m.get("to") or "") and "Critical Alert" in (m.get("subject") or ""):
+                latest_msg = m
+                break
+        if latest_msg:
+            break
+
+    assert latest_msg is not None, "Failed: No email was delivered to smtp4dev."
+
     # 5. Inspect the metadata
-    latest_msg = msgs[0]
     msg_id = latest_msg["id"]
     subject = latest_msg["subject"]
     
@@ -1544,8 +1560,8 @@ def test_email_content_check(db):
     assert "Internal Temperature" in html_content, "Missing Alert KPI Name in HTML"
     assert "Main Branch 9926" in html_content, "Missing Branch Name in HTML"
     
-    # Assert on the specific deviation message format you requested
-    expected_message = "Internal Temperature is deviated to 20.00 in Main Branch 9926 branch for T94 tank"
+    # Assert on the specific deviation message format (backend headline wording)
+    expected_message = "Internal Temperature has deviated to 20.00"
     assert expected_message in html_content, f"Missing exact deviation message: {expected_message}"
     
     print("OK: Email content was successfully verified!")
@@ -1639,7 +1655,7 @@ def test_midnight_cooldown_check(db):
                         html_text = html_res.text if html_res.status_code == 200 else ""
                         msg["html"] = html_text
                         # Payload sent ProbeTemperature=-10.0 -> temp_internal excursion
-                        if "Internal Temperature is deviated to -10" in html_text:
+                        if "Internal Temperature has deviated to -10" in html_text:
                             new_emails.append(msg)
         except Exception as e:
             print(f"Error checking smtp4dev: {e}")
