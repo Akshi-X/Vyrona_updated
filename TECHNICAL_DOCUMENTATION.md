@@ -94,6 +94,105 @@ mG-SCALE/
 ├── README.md
 └── TECHNICAL_DOCUMENTATION.md  # This file
 ```
+### Architecture Diagram 
+
+flowchart TD
+
+subgraph group_web["Web application"]
+  node_webapp["React application<br/>[App.tsx]"]
+  node_routes["Page routing<br/>[index.tsx]"]
+  node_tracking["Shipment tracking<br/>[index.tsx]"]
+  node_ivftracking["IVF tracking<br/>[index.tsx]"]
+  node_refrigerator["Cold storage<br/>[index.tsx]"]
+  node_embryo["Embryo grading<br/>[index.tsx]"]
+  node_dashboard["Operational dashboards<br/>[index.tsx]"]
+  node_authui["Authentication client<br/>[authService.ts]"]
+end
+
+subgraph group_api["API and domain"]
+  node_api["FastAPI application<br/>[main.py]"]
+  node_authcontroller["Integration auth"]
+  node_authservice["Integration token service"]
+  node_shipmentcontroller["Shipment endpoints"]
+  node_ivfcontroller["IVF quality endpoints"]
+  node_refillcontroller["Refill and quality logs"]
+  node_chatcontroller["Stakeholder messaging<br/>[chat_controller.py]"]
+  node_shipmentservice["Shipment domain service"]
+  node_qualityservice["Quality monitoring<br/>[quality_service.py]"]
+end
+
+subgraph group_data["Persistence"]
+  node_database[("SQL database<br/>[database.py]")]
+  node_models["Domain records"]
+end
+
+subgraph group_ingest["Telemetry and integrations"]
+  node_telemetry["Telemetry processing<br/>[consumer.py]"]
+  node_webhook["Tive webhook ingestion<br/>[__init__.py]"]
+  node_redis[("Redis state and pub/sub<br/>[redis_client.py]")]
+end
+
+node_user(("Platform user"))
+node_hms(("Hospital system"))
+
+node_user -->|"uses"| node_webapp
+node_webapp -->|"renders routes"| node_routes
+node_routes -->|"selects page"| node_tracking
+node_routes -->|"selects page"| node_ivftracking
+node_routes -->|"selects page"| node_refrigerator
+node_routes -->|"selects page"| node_embryo
+node_routes -->|"selects page"| node_dashboard
+node_authui -->|"sends auth requests"| node_api
+node_api -->|"dispatches"| node_authcontroller
+node_authcontroller -->|"calls"| node_authservice
+node_hms -.->|"requests integration access"| node_authcontroller
+node_api -->|"dispatches"| node_shipmentcontroller
+node_api -->|"dispatches"| node_ivfcontroller
+node_api -->|"dispatches"| node_refillcontroller
+node_api -->|"dispatches"| node_chatcontroller
+node_shipmentcontroller -->|"calls"| node_shipmentservice
+node_authservice -->|"reads and writes tokens"| node_database
+node_api -->|"starts listener"| node_qualityservice
+node_qualityservice -->|"listens"| node_redis
+node_telemetry -->|"uses state"| node_redis
+node_webhook -.->|"ingests events"| node_api
+node_database -->|"persists"| node_models
+
+click node_webapp "https://github.com/akshi-x/vyrona_updated/blob/main/FrontEnd/src/App.tsx"
+click node_routes "https://github.com/akshi-x/vyrona_updated/blob/main/FrontEnd/src/routes/index.tsx"
+click node_tracking "https://github.com/akshi-x/vyrona_updated/blob/main/FrontEnd/src/pages/Track/index.tsx"
+click node_ivftracking "https://github.com/akshi-x/vyrona_updated/blob/main/FrontEnd/src/pages/IVFTrackShipment/index.tsx"
+click node_refrigerator "https://github.com/akshi-x/vyrona_updated/blob/main/FrontEnd/src/pages/RefrigeratorTracking/index.tsx"
+click node_embryo "https://github.com/akshi-x/vyrona_updated/blob/main/FrontEnd/src/pages/EmbryoGrading/index.tsx"
+click node_dashboard "https://github.com/akshi-x/vyrona_updated/blob/main/FrontEnd/src/pages/Dashboard/index.tsx"
+click node_authui "https://github.com/akshi-x/vyrona_updated/blob/main/FrontEnd/src/services/authService.ts"
+click node_api "https://github.com/akshi-x/vyrona_updated/blob/main/backend/app/main.py"
+click node_authcontroller "https://github.com/akshi-x/vyrona_updated/blob/main/backend/app/controller/external/integration_auth_controller.py"
+click node_authservice "https://github.com/akshi-x/vyrona_updated/blob/main/backend/app/service/external/integration_auth_service.py"
+click node_shipmentcontroller "https://github.com/akshi-x/vyrona_updated/blob/main/backend/app/controller/shipment_controller.py"
+click node_ivfcontroller "https://github.com/akshi-x/vyrona_updated/blob/main/backend/app/controller/IVF/ivf_quality_controller.py"
+click node_refillcontroller "https://github.com/akshi-x/vyrona_updated/blob/main/backend/app/controller/IVF/quality_tracking_controller.py"
+click node_chatcontroller "https://github.com/akshi-x/vyrona_updated/blob/main/backend/app/controller/chat_controller.py"
+click node_shipmentservice "https://github.com/akshi-x/vyrona_updated/blob/main/backend/app/service/shipment_service.py"
+click node_qualityservice "https://github.com/akshi-x/vyrona_updated/blob/main/backend/app/service/quality_service.py"
+click node_database "https://github.com/akshi-x/vyrona_updated/blob/main/backend/app/config/database.py"
+click node_models "https://github.com/akshi-x/vyrona_updated/tree/main/backend/app/models"
+click node_telemetry "https://github.com/akshi-x/vyrona_updated/blob/main/telemetry-service/shared/ln2_iot/consumer.py"
+click node_webhook "https://github.com/akshi-x/vyrona_updated/blob/main/tive-ingestion-function/TiveWebhook/__init__.py"
+click node_redis "https://github.com/akshi-x/vyrona_updated/blob/main/telemetry-service/shared/redis_client.py"
+
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_webapp,node_routes,node_tracking,node_ivftracking,node_refrigerator,node_embryo,node_dashboard,node_authui,node_user toneBlue
+class node_api,node_authcontroller,node_authservice,node_shipmentcontroller,node_ivfcontroller,node_refillcontroller,node_chatcontroller,node_shipmentservice,node_qualityservice toneAmber
+class node_database,node_models toneMint
+class node_telemetry,node_webhook,node_redis toneRose
+class node_hms toneIndigo
 
 ### 2.2 Request Flow (Backend)
 
