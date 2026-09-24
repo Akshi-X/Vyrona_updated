@@ -1,7 +1,7 @@
 [
     {
         "id": "q5-1",
-        "prompt": "How does mgSCALE detect when a container has been refilled?",
+        "prompt": "How does Vyrona detect when a container has been refilled?",
         "choices": [
             "By manual entry from the technician after each refill",
             "Automatically, using sensor data from the container",

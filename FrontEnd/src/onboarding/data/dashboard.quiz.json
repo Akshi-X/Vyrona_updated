@@ -1,7 +1,7 @@
 [
     {
         "id": "dash-q1",
-        "prompt": "Does mgSCALE alert you when something goes beyond set threshold??",
+        "prompt": "Does Vyrona alert you when something goes beyond set threshold??",
         "choices": [
             "Yes",
             "No",
@@ -25,7 +25,7 @@
     },
     {
         "id": "dash-q3",
-        "prompt": "Does mgSCALE tell you which factor is causing more problem with the tanks?",
+        "prompt": "Does Vyrona tell you which factor is causing more problem with the tanks?",
         "choices": [
             "Yes",
             "No, it doesn't",

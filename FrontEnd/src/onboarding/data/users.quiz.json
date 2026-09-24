@@ -5,7 +5,7 @@
         "choices": [
             "LN2 alert thresholds and KPI configurations",
             "Monthly KPI summaries and critical alert reports",
-            "Everyone who has access to the clinic's mgSCALE account — their roles, branches, and invite status",
+            "Everyone who has access to the clinic's Vyrona account — their roles, branches, and invite status",
             "Live sensor readings and refill detection events"
         ],
         "correctIndex": 2,
@@ -102,7 +102,7 @@
             "Only Admins",
             "All users regardless of role",
             "Managers and Admins",
-            "Admins and the Mygrape support team"
+            "Admins and the Vyrona support team"
         ],
         "correctIndex": 2,
         "points": 15

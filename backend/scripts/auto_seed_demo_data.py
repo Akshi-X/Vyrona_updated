@@ -87,7 +87,7 @@ def seed_pharma(db):
             )
         """),
         {
-            "pharma_name": "MyGrape Demo Pharma",
+            "pharma_name": "Vyrona Demo Pharma",
             "location": "Chennai, India",
         },
     )

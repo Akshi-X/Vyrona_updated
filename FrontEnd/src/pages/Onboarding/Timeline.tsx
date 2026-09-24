@@ -55,7 +55,7 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                         You've mastered the platform!
                     </h3>
                     <p className="text-[11px] text-slate-500 mb-4">
-                        All missions completed. You're ready to use mgSCALE at full capacity.
+                        All missions completed. You're ready to use Vyrona at full capacity.
                     </p>
                     <button
                         type="button"

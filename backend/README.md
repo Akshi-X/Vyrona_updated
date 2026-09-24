@@ -1,6 +1,6 @@
-# MyGrape Backend API
+# Vyrona Backend API
 
-A comprehensive FastAPI-based backend for the MyGrape Supply Chain Tracking Platform. This RESTful API provides secure, scalable endpoints for patient management, shipment tracking, user authentication, feedback systems, and real-time collaboration.
+A comprehensive FastAPI-based backend for the Vyrona Supply Chain Tracking Platform. This RESTful API provides secure, scalable endpoints for patient management, shipment tracking, user authentication, feedback systems, and real-time collaboration.
 
 ## 🚀 Features
 
@@ -1069,8 +1069,8 @@ poetry shell
 | `SENDGRID_API_KEY` | Yes | - | SendGrid API key |
 | `SENDER_EMAIL` | Yes | - | SendGrid sender email |
 | `ADMIN_DEFAULT_PASSWORD` | Yes | - | Default admin password |
-| `MYGRAPE_ADMIN_EMAIL` | Yes | - | MyGrape admin email |
-| `MYGRAPE_ADMIN_PASSWORD` | Yes | - | MyGrape admin password |
+| `MYGRAPE_ADMIN_EMAIL` | Yes | - | Vyrona admin email |
+| `MYGRAPE_ADMIN_PASSWORD` | Yes | - | Vyrona admin password |
 | `FRONTEND_URL` | Yes | - | Frontend application URL |
 | `BACKEND_URL` | Yes | - | Backend API URL |
 | `ALLOWED_ORIGINS` | Yes | - | CORS allowed origins (comma-separated) |

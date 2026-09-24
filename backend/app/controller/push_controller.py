@@ -281,7 +281,7 @@ def send_test_notification(
         raise HTTPException(status_code=404, detail="No registered devices for this user")
 
     payload = {
-        "title": "mG Scale test notification",
+        "title": "Vyrona test notification",
         "body": "Push notifications are working on this device.",
         "url": f"{settings.FRONTEND_URL}/user-profile",
     }

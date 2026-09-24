@@ -9,7 +9,7 @@ DB_NAME=mygrape
 # JWT Secret Key (min 32 characters)
 SECRET_KEY=your-super-secret-key-min-32-characters-long
 
-# Admin / MyGrape (required for app to start)
+# Admin / Vyrona (required for app to start)
 ADMIN_EMAIL=admin@example.com
 ADMIN_DEFAULT_PASSWORD=your-admin-default-password
 MYGRAPE_ADMIN_EMAIL=mygrape-admin@example.com

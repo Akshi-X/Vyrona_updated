@@ -309,7 +309,7 @@ const Login: React.FC = () => {
 
                     {/* Footer */}
                     {/* <p className="text-center text-sm text-gray-500 mt-2">
-                        New to myGrape?{" "}
+                        New to Vyrona?{" "}
                         <Link to="/signup" className="text-primary-light font-semibold underline">
                             Create an account
                         </Link>

@@ -87,7 +87,7 @@ export const pageTours: PageTour[] = [
         route: "/onboarding/users",
         title: "Users",
         quick_start: { message: "See how to filter by role and branch, invite members, and control who has access." },
-        quick_exit: { headerTitle: "Users Tour Complete", title: "Users Tour Complete", message: "You can manage who has access to your mgSCALE account." },
+        quick_exit: { headerTitle: "Users Tour Complete", title: "Users Tour Complete", message: "You can manage who has access to your Vyrona account." },
     },
     {
         id: "tour-cryocan",

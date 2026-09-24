@@ -1,6 +1,6 @@
-# mG-SCALE (MyGrape) – Technical Documentation
+# Vyrona – Technical Documentation
 
-Technical reference for the MyGrape Supply Chain Tracking Platform. For setup and run instructions, see [DEVELOPER_SETUP_GUIDE.md](./DEVELOPER_SETUP_GUIDE.md) and [README.md](./README.md).
+Technical reference for the Vyrona Supply Chain Tracking Platform. For setup and run instructions, see [DEVELOPER_SETUP_GUIDE.md](./DEVELOPER_SETUP_GUIDE.md) and [README.md](./README.md).
 
 ---
 
@@ -16,12 +16,13 @@ Technical reference for the MyGrape Supply Chain Tracking Platform. For setup an
 8. [Environment & Configuration](#8-environment--configuration)
 9. [CI/CD & Deployment](#9-cicd--deployment)
 10. [External Integrations](#10-external-integrations)
+11. [Comparable Products](#11-comparable-products)
 
 ---
 
 ## 1. System Overview
 
-**mG-SCALE (MyGrape)** is a supply chain tracking platform with:
+**Vyrona** is a supply chain tracking platform with:
 
 - **Real-time monitoring** of shipments and patients  
 - **Patient management** and journey tracking  
@@ -193,6 +194,8 @@ class node_api,node_authcontroller,node_authservice,node_shipmentcontroller,node
 class node_database,node_models toneMint
 class node_telemetry,node_webhook,node_redis toneRose
 class node_hms toneIndigo
+
+![alt text](diagram(2).png)
 
 ### 2.2 Request Flow (Backend)
 
@@ -438,7 +441,7 @@ Required and optional variables (see `backend/.env.example` and `backend/app/con
 | SECRET_KEY | Yes | JWT signing (min 32 chars). |
 | ADMIN_EMAIL | Yes | Admin email. |
 | ADMIN_DEFAULT_PASSWORD | Yes | Super admin bootstrap. |
-| MYGRAPE_ADMIN_EMAIL, MYGRAPE_ADMIN_PASSWORD | Yes | MyGrape platform admin. |
+| MYGRAPE_ADMIN_EMAIL, MYGRAPE_ADMIN_PASSWORD | Yes | Vyrona platform admin. |
 | FRONTEND_URL, BACKEND_URL | Yes | URLs for CORS and links. |
 | ALLOWED_ORIGINS | Yes | CORS origins (comma or *). |
 | IOT_CLIENT_ID, IOT_CLIENT_SECRET, IOT_ACCOUNT_ID | Yes | IoT provider (e.g. Tive). |
@@ -491,6 +494,21 @@ Database URL is built from DB_* and SSL is enforced in code; for Neon use the co
 | **Google Maps** | Geocoding / maps | GOOGLE_MAPS_API_KEY (backend/frontend). |
 | **FlightRadar24** | On-time flight data | FLIGHTRADAR24_API_KEY. |
 | **Tive (IoT)** | Device/sensor API | IOT_CLIENT_ID, IOT_CLIENT_SECRET, IOT_ACCOUNT_ID; base URL in constants. |
+
+---
+
+## 11. Comparable Products
+
+Similar commercial products, for market reference. Most specialize in one area; Vyrona spans all three (lab management + LN2 monitoring + AI grading).
+
+| Product | What it does |
+|---------|--------------|
+| [ART Compass](https://www.artcompass.io/ivf-lab-management-software/) | IVF lab management with embryo tracking, cryostorage, and cycle logging. Closest all-in-one analog to Vyrona. |
+| [IVFcheck (IVFtech)](https://www.ivftech.com/products/witness-system/ivfcheck/) | Lab management with embryo tracking, tank management, and pregnancy/statistics reports. Overlaps our cryotank + embryo modules. |
+| [eWitness (Vitrolife)](https://www.vitrolife.com/products/electronic-witnessing/ewitness/) | Barcode/RFID electronic witnessing that logs every lab action. Comparable to our audit-trail and traceability. |
+| [Gelida Connect (Genea Biomedx)](https://www.geneabiomedx.com/products/cryostorage-solution/gelida-47/) | Smart LN2 tanks with real-time temp/level monitoring and mobile alerts. Comparable to our ControlTower + alert configs. |
+| [CenTrak](https://centrak.com/solutions/environment/cryogenic-storage) | Wireless cryo temperature/level monitoring with threshold alerts. Comparable to our KPI alert thresholds. |
+| [Caremaps-AI (Care Fertility)](https://carefertility.com/blog/how-we-select-your-embryos-with-caremapsai) | AI morphokinetic embryo scoring for viability. Comparable to our AdvancedTool AI grading page. |
 
 ---
 

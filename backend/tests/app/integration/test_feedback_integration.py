@@ -124,7 +124,7 @@ class TestFeedbackSMTPIntegration:
             status=True,
         )
 
-        # Deactivate other active MyGrape admin users so get_mygrape_admin_email() returns this specific test admin
+        # Deactivate other active Vyrona admin users so get_mygrape_admin_email() returns this specific test admin
         self.other_admins = self.db.query(User).filter(
             User.role == "Mygrape_admin", 
             User.email != self.admin.email,
@@ -212,7 +212,7 @@ class TestFeedbackSMTPIntegration:
                     except Exception:
                         pass
 
-                if "New Support Ticket Created - myGrape" in subject:
+                if "New Support Ticket Created - Vyrona" in subject:
                     html_body = get_smtp4dev_html_content(msg)
                     if ticket_id in html_body and "Integration Test Subject" in html_body:
                         if "mygrapeadmin@example.com" in to_addr:
@@ -281,7 +281,7 @@ class TestFeedbackSMTPIntegration:
                     except Exception:
                         pass
 
-                if "Ticket Status Update - myGrape" in subject:
+                if "Ticket Status Update - Vyrona" in subject:
                     html_body = get_smtp4dev_html_content(msg)
                     if ticket_id in html_body and "In Progress" in html_body:
                         if "mygrapeadmin@example.com" in to_addr:
@@ -337,7 +337,7 @@ class TestFeedbackSMTPIntegration:
                     except Exception:
                         pass
 
-                if "New Comment Added to Ticket - myGrape" in subject:
+                if "New Comment Added to Ticket - Vyrona" in subject:
                     html_body = get_smtp4dev_html_content(msg)
                     if ticket_id in html_body and "real SMTP integration test comment" in html_body:
                         if "mygrapeadmin@example.com" in to_addr:
@@ -387,7 +387,7 @@ class TestFeedbackSMTPIntegration:
                     except Exception:
                         pass
 
-                if "Ticket Status Update - myGrape" in subject:
+                if "Ticket Status Update - Vyrona" in subject:
                     html_body = get_smtp4dev_html_content(msg)
                     if ticket_id in html_body and "In Progress" in html_body:
                         if "mygrapeadmin@example.com" in to_addr:
