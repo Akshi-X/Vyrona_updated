@@ -58,7 +58,7 @@ def brand_logo_inline(extra: Optional[dict] = None) -> dict:
 
     Missing files are dropped rather than raising, so a stripped-down deployment
     still sends the mail with its alt text intact."""
-    assets = {BRAND_LOGO_CID: "mygrape-logo.png"}
+    assets = {BRAND_LOGO_CID: "vyrona-logo.png"}
     assets.update(extra or {})
     return {
         cid: str(BRAND_ASSET_DIR / rel)
@@ -380,9 +380,9 @@ def send_feedback_new_ticket_email(
     if send_to_user:
         send_email(submitted_by_email, email_subject, html_body)
     
-    # Send to MyGrape admin (notification)
+    # Send to Vyrona admin (notification)
     send_email(mygrape_admin_email, email_subject, html_body)
-    logger.info(f"Feedback notification sent to MyGrape admin: {mygrape_admin_email}")
+    logger.info(f"Feedback notification sent to Vyrona admin: {mygrape_admin_email}")
 
     # Send to any extra recipients (e.g., support inbox)
     if extra_recipient_emails:
@@ -434,9 +434,9 @@ def send_feedback_status_update_email(
     if send_to_user:
         send_email(submitted_by_email, email_subject, html_body)
     
-    # Send to MyGrape admin (notification)
+    # Send to Vyrona admin (notification)
     send_email(mygrape_admin_email, email_subject, html_body)
-    logger.info(f"Feedback status update sent to MyGrape admin: {mygrape_admin_email}")
+    logger.info(f"Feedback status update sent to Vyrona admin: {mygrape_admin_email}")
 
 
 def send_feedback_new_comment_email(
@@ -478,9 +478,9 @@ def send_feedback_new_comment_email(
     if send_to_user:
         send_email(submitted_by_email, email_subject, html_body)
     
-    # Send to MyGrape admin (notification)
+    # Send to Vyrona admin (notification)
     send_email(mygrape_admin_email, email_subject, html_body)
-    logger.info(f"Feedback comment notification sent to MyGrape admin: {mygrape_admin_email}")
+    logger.info(f"Feedback comment notification sent to Vyrona admin: {mygrape_admin_email}")
 def send_password_reset_email(user_email: str, reset_link: str, first_name: str):
     """
     Send password reset link to user's email with HTML template

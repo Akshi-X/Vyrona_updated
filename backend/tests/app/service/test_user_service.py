@@ -131,7 +131,7 @@ def test_get_pharma_admin_email_exception(db_session):
 
 @patch('app.service.user_service.get_settings')
 def test_get_mygrape_admin_email_success(mock_get_settings):
-    """Test getting MyGrape admin email successfully"""
+    """Test getting Vyrona admin email successfully"""
     mock_settings = MagicMock()
     mock_settings.MYGRAPE_ADMIN_EMAIL = "admin@mygrape.com"
     mock_get_settings.return_value = mock_settings

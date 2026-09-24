@@ -72,7 +72,7 @@ logging.basicConfig(
 # Create FastAPI app with security scheme for Swagger
 app = FastAPI(
     title=APP_NAME,
-    description="MyGrape Supply Chain Tracking API",
+    description="Vyrona Supply Chain Tracking API",
     version="1.0.0",
     swagger_ui_parameters={
         "persistAuthorization": True  # Keep authorization after page refresh

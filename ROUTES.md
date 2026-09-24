@@ -1,4 +1,4 @@
-# mG-SCALE Routes Reference
+# Vyrona Routes Reference
 
 All frontend (React) and backend (API) routes. Backend base URL uses `API_PREFIX = "/api"`.
 

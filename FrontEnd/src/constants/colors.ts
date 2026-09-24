@@ -1,4 +1,4 @@
-// Color palette for MyGrape project
+// Color palette for Vyrona project
 export const COLORS = {
   // Primary colors
   primary: {
