@@ -13,7 +13,7 @@ import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { userService } from "../../services/userService";
 
-import MyGrapeLogo from "../../assets/mGScale.svg";
+import VyronaLogo from "../../assets/Vyrona.svg";
 import IsolationModeBanner from "../../assets/Isolation_Mode.svg";
 import DashboardIconWhite from "../../assets/DashBoardIcons/DashboardWhite.svg";
 import DatabaseIconWhite from "../../assets/DashBoardIcons/DataBaseWhite.svg";
@@ -218,8 +218,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 {/* Logo */}
                 <header className="flex items-center gap-[7px] px-6 pt-0 pb-2 md:pb-6 shrink-0 relative z-10">
                     <img
-                        src={MyGrapeLogo}
-                        alt="myGrape logo"
+                        src={VyronaLogo}
+                        alt="Vyrona logo"
                         className="w-[110px] h-[75px] md:w-[135px] md:h-[90px]"
                     />
                 </header>

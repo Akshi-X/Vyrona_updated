@@ -138,7 +138,7 @@
         "completion": {
             "headerTitle": "Onboarding Complete",
             "title": "You're All Set!",
-            "message": "You've completed the mgSCALE onboarding — from tracking cryocan quality and configuring alerts to managing your profile. You're ready to run your clinic at full power.",
+            "message": "You've completed the Vyrona onboarding — from tracking cryocan quality and configuring alerts to managing your profile. You're ready to run your clinic at full power.",
             "badge": "🎓"
         },
         "quick_exit": {

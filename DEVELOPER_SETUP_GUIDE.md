@@ -1,8 +1,8 @@
-# MyGrape Developer Setup Guide
+# Vyrona Developer Setup Guide
 
 **Complete setup guide for new developers - No questions needed!**
 
-This guide provides step-by-step instructions to set up the entire MyGrape development environment from scratch. Follow this guide sequentially, and you'll have everything running without needing to ask anyone.
+This guide provides step-by-step instructions to set up the entire Vyrona development environment from scratch. Follow this guide sequentially, and you'll have everything running without needing to ask anyone.
 
 ---
 
@@ -82,7 +82,7 @@ See `FrontEnd/package.json` for complete dependency list.
 
 ## 🏗️ Project Overview
 
-The MyGrape project consists of three main components:
+The Vyrona project consists of three main components:
 
 1. **Backend** (`backend/`) - FastAPI REST API server
 2. **Frontend** (`FrontEnd/`) - React + TypeScript web application
@@ -408,7 +408,7 @@ SENDER_EMAIL=your-email@example.com
 # ============================================
 ADMIN_DEFAULT_PASSWORD=SecureAdminPassword123!
 MYGRAPE_ADMIN_EMAIL=admin@mygrape.com
-MYGRAPE_ADMIN_PASSWORD=SecureMyGrapeAdmin123!
+MYGRAPE_ADMIN_PASSWORD=SecureVyronaAdmin123!
 
 # ============================================
 # Application URLs
@@ -765,7 +765,7 @@ curl http://localhost:8000/health
 ```json
 {
   "status": "healthy",
-  "platform": "MyGrape",
+  "platform": "Vyrona",
   "service": "Supply Chain Tracking",
   "environment": "development",
   "database_connected": true
@@ -774,7 +774,7 @@ curl http://localhost:8000/health
 
 ### Step 2: Verify Frontend is Running
 
-Open http://localhost:5173 in your browser. You should see the MyGrape application.
+Open http://localhost:5173 in your browser. You should see the Vyrona application.
 
 ### Step 3: Verify Publisher is Running
 
@@ -1305,5 +1305,5 @@ If you encounter issues not covered in this guide:
 5. Check environment variables are correct
 
 **Last Updated:** 2024
-**Maintained By:** MyGrape Development Team
+**Maintained By:** Vyrona Development Team
 

@@ -793,9 +793,9 @@ export default function IncubatorVisualisation({
     lfc.font = "bold 15px sans-serif";
     lfc.textBaseline = "middle";
     lfc.fillText("UH₂", 160, 238);
-    // myGrape branding
+    // Vyrona branding
     lfc.font = "bold 24px sans-serif";
-    lfc.fillText("myGrape", 62, 300);
+    lfc.fillText("Vyrona", 62, 300);
     lfc.fillStyle = "#b98ecb";
     for (const [gx, gy] of [[48, 292], [42, 300], [54, 300], [48, 308]] as const) {
       lfc.beginPath();

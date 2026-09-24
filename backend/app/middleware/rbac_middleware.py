@@ -101,7 +101,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
                 raise ManagerRoleRequiredException(user_role=user_role)
         
         elif self._requires_mygrape_admin(method, path):
-            if user_role not in ['admin', 'mygrape_admin']:  # Admin can access MyGrape admin endpoints
+            if user_role not in ['admin', 'mygrape_admin']:  # Admin can access Vyrona admin endpoints
                 raise AdminRoleRequiredException(user_role=user_role)
         
         elif self._requires_user(method, path):
@@ -125,7 +125,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
         return self._matches_endpoint_set(method, path, PHARMA_ADMIN_ENDPOINTS)
     
     def _requires_mygrape_admin(self, method: str, path: str) -> bool:
-        """Check if endpoint requires MyGrape admin role"""
+        """Check if endpoint requires Vyrona admin role"""
         return self._matches_endpoint_set(method, path, MYGRAPE_ADMIN_ENDPOINTS)
     
     def _requires_manager(self, method: str, path: str) -> bool:

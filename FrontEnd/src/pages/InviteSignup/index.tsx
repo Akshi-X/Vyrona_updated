@@ -125,7 +125,7 @@ const InviteSignup: React.FC = () => {
                         <>
                             <h2 className="text-2xl font-bold text-gray-800 mb-1">Accept Invite</h2>
                             <p className="text-gray-500 text-sm mb-1">
-                                You've been invited to join <span className="font-medium text-gray-700">{inviteData?.hospital_name ?? "myGrape"}</span> as a <span className="font-medium text-gray-700">{inviteData?.role}</span>.
+                                You've been invited to join <span className="font-medium text-gray-700">{inviteData?.hospital_name ?? "Vyrona"}</span> as a <span className="font-medium text-gray-700">{inviteData?.role}</span>.
                             </p>
                             <p className="text-xs text-amber-600 mb-6">Invite expires on {expiresLabel}.</p>
 

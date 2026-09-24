@@ -125,7 +125,7 @@ _EMAIL_ASSET_DIR = Path(__file__).resolve().parents[2] / "assets" / "email"
 _EMAIL_BANNER_PATH = "/banner-hex.png"
 
 _EMAIL_INLINE_ASSETS = {
-    "mg_logo": "mygrape-logo.png",
+    "mg_logo": "vyrona-logo.png",
     "mg_alert_badge": "email-icons/mg_alert_badge.png",
     "otp_wave": "email-icons/otp_wave.png",
     "otp_fdivider": "email-icons/otp_fdivider.png",

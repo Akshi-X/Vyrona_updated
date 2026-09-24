@@ -11,7 +11,7 @@ import { userService } from '../../services/userService';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatBox from '../../components/StakeholderChatBox';
 import RefrigeratorVisualisation from './components/RefrigeratorVisualisation';
-import brandLogo from '../../assets/mGScale.svg';
+import brandLogo from '../../assets/Vyrona.svg';
 
 type RefrigeratorZone = { zone_id: string; zone_name: string };
 
@@ -272,7 +272,7 @@ export default function RefrigeratorTrackingPageHospital8() {
             }}
           />
           <div
-            aria-label="mgSCALE"
+            aria-label="Vyrona"
             className="relative w-16 h-16"
             style={{
               backgroundColor: '#6b1176',
@@ -284,7 +284,7 @@ export default function RefrigeratorTrackingPageHospital8() {
         </div>
         <div className="mt-7 flex flex-col items-center gap-2">
           <p className="text-sm font-black tracking-tight text-gray-800">
-            mgSCALE <span className="text-gray-300 font-thin">|</span>{' '}
+            Vyrona <span className="text-gray-300 font-thin">|</span>{' '}
             <span style={{ color: '#6b1176' }}>ColdSense</span>
           </p>
           <div className="h-4 flex items-center justify-center">

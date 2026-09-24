@@ -300,7 +300,7 @@ const Signup: React.FC = () => {
                                     Sign up
                                 </h1>
                                 <p className="font-normal text-[#6c6c6c] text-base">
-                                    Create an account to access myGrape
+                                    Create an account to access Vyrona
                                 </p>
                             </div>
 
@@ -592,7 +592,7 @@ const Signup: React.FC = () => {
                             </p>
 
                             <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
-                                By signing up, you agree to myGrape's{" "}
+                                By signing up, you agree to Vyrona's{" "}
                                 <a href="#" className="text-primary inline">
                                     Terms of Service
                                 </a>{" "}

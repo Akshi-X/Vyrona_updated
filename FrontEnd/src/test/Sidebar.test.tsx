@@ -55,10 +55,10 @@ describe('Sidebar', () => {
   }
 
   describe('Rendering', () => {
-  it('renders the myGrape logo and title', () => {
+  it('renders the Vyrona logo and title', () => {
     renderSidebar()
-    expect(screen.getByText('myGrape')).toBeInTheDocument()
-      expect(screen.getByAltText('myGrape logo icon')).toBeInTheDocument()
+    expect(screen.getByText('Vyrona')).toBeInTheDocument()
+      expect(screen.getByAltText('Vyrona logo icon')).toBeInTheDocument()
   })
 
     it('renders all navigation items', () => {

@@ -2,9 +2,9 @@
     {
         "id": "intro",
         "target": "#root > div.flex.w-full.min-h-screen.overflow-x-hidden",
-        "title": "myGrape Genie",
+        "title": "Vyrona Genie",
         "icon": "LayoutDashboard",
-        "content": "Hi, Welcome to mgSCALE, I'm the care taker of the lab. I understand that you are here to learn how to use mgSCALE. That's a right choice! with mgSCALE most of your burden are automated. I'll walk you through on how it's possible.",
+        "content": "Hi, Welcome to Vyrona, I'm the care taker of the lab. I understand that you are here to learn how to use Vyrona. That's a right choice! with Vyrona most of your burden are automated. I'll walk you through on how it's possible.",
         "placement": "middle_middle",
         "requireClick": false,
         "genieImage": "/genie/welcoming_with_waving_hand.webp"
@@ -84,7 +84,7 @@
         "target": "#onboarding-dashboard-performance-deviations",
         "title": "Quality Deviations Flagged",
         "icon": "AlertTriangle",
-        "content": "The total number of quality deviations currently flagged across all monitored containers. This includes the ones that are active alerts or acknowledged ones. This number here says that mgSCALE has cautioned you on deviations.",
+        "content": "The total number of quality deviations currently flagged across all monitored containers. This includes the ones that are active alerts or acknowledged ones. This number here says that Vyrona has cautioned you on deviations.",
         "placement": "middle_right",
         "requireClick": false,
         "genieImage": "/genie/explaining_caution.webp"

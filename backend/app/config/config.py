@@ -105,7 +105,7 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str
     # Super Admin Setup (required in .env)
     ADMIN_DEFAULT_PASSWORD: str
-    # MyGrape Platform Admin (required in .env)
+    # Vyrona Platform Admin (required in .env)
     MYGRAPE_ADMIN_EMAIL: str
     MYGRAPE_ADMIN_PASSWORD: str
     # SendGrid (Optional - for enhanced email delivery)
