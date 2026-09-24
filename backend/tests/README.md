@@ -1,6 +1,6 @@
-# mG-SCALE Pytest Test Suite Documentation
+# Vyrona Pytest Test Suite Documentation
 
-This documentation provides future contributors with a comprehensive guide on the prerequisites, setup instructions, execution steps, and functional coverage of the pytest test suite for the mG-SCALE backend.
+This documentation provides future contributors with a comprehensive guide on the prerequisites, setup instructions, execution steps, and functional coverage of the pytest test suite for the Vyrona backend.
 
 ---
 

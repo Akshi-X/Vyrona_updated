@@ -7,7 +7,7 @@ import {
   Layers, CalendarDays, FileText, Pencil, X, Building2,
   Loader2, SlidersHorizontal, Trash2, Lock,
 } from 'lucide-react';
-const mGScaleLogo = '/mGScaleDark.svg';
+const VyronaLogo = '/VyronaDark.svg';
 import { ivfService, type IvfCycle, type IvfCycleLog, type IvfCycleWithLogs, type IvfCycleReport } from '../../services/ivfService';
 import { userService, type HospitalBranding } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -981,7 +981,7 @@ export default function EmbryoReportsPage() {
       <div className="flex items-center justify-between pt-3 border-t border-gray-200">
         <div className="flex items-center gap-1.5">
           <span className="text-[8px] text-gray-400">Powered by</span>
-          <img src={mGScaleLogo} alt="mGSCALE" className="h-4 w-auto" />
+          <img src={VyronaLogo} alt="Vyrona" className="h-4 w-auto" />
         </div>
         <div className="text-center text-[8px] text-gray-400">
           <p>Ijzerenpoortkaai 3 bus 24, 2000 Antwerpen</p>

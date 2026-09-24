@@ -104,10 +104,10 @@ def get_pharma_admin_email(pharma_id: int, db: Session) -> Optional[str]:
 
 def get_mygrape_admin_email(db: Session) -> Optional[str]:
     """
-    Get an active approved MyGrape admin email from the users table.
+    Get an active approved Vyrona admin email from the users table.
     
     Returns:
-        MyGrape admin email if found, otherwise None
+        Vyrona admin email if found, otherwise None
     """
     try:
         mygrape_admin = db.query(user_model.User).filter(
@@ -117,12 +117,12 @@ def get_mygrape_admin_email(db: Session) -> Optional[str]:
         ).first()
 
         if not mygrape_admin:
-            logger.warning("No active approved MyGrape admin found in users table")
+            logger.warning("No active approved Vyrona admin found in users table")
             return None
 
         return mygrape_admin.email
     except Exception as e:
-        logger.error(f"Error getting MyGrape admin email from DB: {str(e)}")
+        logger.error(f"Error getting Vyrona admin email from DB: {str(e)}")
         return None
 
 
@@ -837,7 +837,7 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
         # Scope users based on tenant type:
         # - Hospital users (IVF/Oncology): same hospital (+ same department when available)
         # - Pharma users (CGT): same pharma
-        # This prevents cross-tenant leakage (e.g., MyGrape admin users in IVF mentions).
+        # This prevents cross-tenant leakage (e.g., Vyrona admin users in IVF mentions).
         base_query = db.query(User).filter(
             User.approved_status == 'approved',
             User.status == True
@@ -1169,7 +1169,7 @@ def resend_invite(db: Session, current_user: User, user_id: str, base_url: str) 
         recipient_email=target.email,
         invited_by=invited_by,
         role=normalize_role_to_title_case(target.role),
-        company=hospital.hospital_name if hospital else "myGrape",
+        company=hospital.hospital_name if hospital else "Vyrona",
         signup_url=invite_url,
     )
     return {"message": f"Invite resent to {target.email}"}

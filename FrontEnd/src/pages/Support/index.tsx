@@ -641,11 +641,11 @@ const Support: React.FC = () => {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
                         <div className="mb-6">
                             <h1 className="text-2xl font-bold text-gray-900">
-                                myGrape Support & Feedback
+                                Vyrona Support & Feedback
                             </h1>
                             <p className="text-sm text-gray-500 mt-2">
                                 This form is built for our partner teams using
-                                myGrape. Whether you've encountered an issue or
+                                Vyrona. Whether you've encountered an issue or
                                 want to request a feature, please fill out the
                                 details below. Our team will respond within 24
                                 hours.

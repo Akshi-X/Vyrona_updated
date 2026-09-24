@@ -260,7 +260,7 @@ def create_feedback(
     
     # Send email notifications - always send to admin, conditionally to user
     try:
-        # Get common MyGrape admin email
+        # Get common Vyrona admin email
         mygrape_admin_email = get_mygrape_admin_email(db)
         if not mygrape_admin_email:
             raise FeedbackUserNotFoundException(user_id="Mygrape_admin")
@@ -352,7 +352,7 @@ def add_comment(
     
     # Send email notifications in background - always send to admin, conditionally to user
     if background_tasks:
-        # Get common MyGrape admin email (cache this if possible, but for now keep it simple)
+        # Get common Vyrona admin email (cache this if possible, but for now keep it simple)
         mygrape_admin_email = get_mygrape_admin_email(db)
         if not mygrape_admin_email:
             raise FeedbackUserNotFoundException(user_id="Mygrape_admin")
@@ -473,7 +473,7 @@ def update_feedback_status(
     
     # Send email notifications in background - always send to admin, conditionally to user
     if background_tasks:
-        # Get common MyGrape admin email
+        # Get common Vyrona admin email
         mygrape_admin_email = get_mygrape_admin_email(db)
         if not mygrape_admin_email:
             raise FeedbackUserNotFoundException(user_id="Mygrape_admin")

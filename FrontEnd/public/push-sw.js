@@ -9,10 +9,10 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data.json()
   } catch (e) {
-    payload = { title: 'mG Scale', body: event.data.text() }
+    payload = { title: 'Vyrona', body: event.data.text() }
   }
 
-  const title = payload.title || 'mG Scale Alert'
+  const title = payload.title || 'Vyrona Alert'
   const options = {
     body: payload.body || '',
     icon: '/pwa-192.png',

@@ -1,5 +1,5 @@
-import MyGrapeBanner from "../assets/Isolation_Mode.svg";
-import MyGrapeLogo from "../assets/mGScale.svg";
+import VyronaBanner from "../assets/Isolation_Mode.svg";
+import VyronaLogo from "../assets/Vyrona.svg";
 
 export default function AuthBrandPanel() {
     return (
@@ -10,14 +10,14 @@ export default function AuthBrandPanel() {
         >
             <div className="absolute inset-0 flex items-center justify-center z-0 overflow-hidden">
                 <img
-                    src={MyGrapeBanner}
+                    src={VyronaBanner}
                     className="w-full h-auto max-h-full object-contain"
                     alt="banner"
                 />
             </div>
 
             <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
-                <img src={MyGrapeLogo} alt="logo" className="w-[150px] h-[100px]" />
+                <img src={VyronaLogo} alt="logo" className="w-[150px] h-[100px]" />
             </div>
 
             <div className="flex-1 relative z-0"></div>

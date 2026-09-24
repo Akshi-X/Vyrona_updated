@@ -2,7 +2,7 @@
 
 ## Overview
 
-The mG-SCALE backend now supports two OTP modes:
+The Vyrona backend now supports two OTP modes:
 
 1. **FIXED_OTP_MODE** (Docker Compose) - For development/testing
 2. **Production Mode** - For live environments with SMTP/SendGrid

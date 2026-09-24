@@ -4,7 +4,7 @@
         "target": "#onboarding-sidebar-users",
         "title": "Users",
         "icon": "Users",
-        "content": "The Users page is your roster for everyone with access to your clinic's mgSCALE account — Admins, Managers, and branch-level Users — all in one searchable, filterable list.",
+        "content": "The Users page is your roster for everyone with access to your clinic's Vyrona account — Admins, Managers, and branch-level Users — all in one searchable, filterable list.",
         "placement": "right",
         "requireClick": false,
         "startPage": "/onboarding/dashboard",

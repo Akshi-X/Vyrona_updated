@@ -730,7 +730,7 @@ const UserProfilePage: React.FC = () => {
             <div className="flex flex-col xl:flex-row items-center gap-4 xl:gap-5 min-w-0">
               <img src="/genie/explaining_casual.webp" alt="" className="w-28 h-28 sm:w-32 sm:h-32 object-contain shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900">You know your way around mgSCALE</p>
+                <p className="text-sm font-semibold text-gray-900">You know your way around Vyrona</p>
                 <p className="text-xs text-gray-500 mt-1 leading-relaxed">All onboarding levels completed. Drop back in anytime to revisit a workflow, explore advanced features, or walk a new team member through the tour.</p>
               </div>
             </div>
@@ -1061,7 +1061,7 @@ const UserProfilePage: React.FC = () => {
  
             <div id="onboarding-profile-notif-updates" className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-sm font-bold text-gray-900">Include me in myGrape feature update emails</h3>
+                <h3 className="text-sm font-bold text-gray-900">Include me in Vyrona feature update emails</h3>
                 <p className="text-sm text-gray-500 mt-1">Stay informed about new features and improvements</p>
                 <p className="text-xs text-gray-400 mt-1">Coming soon</p>
               </div>

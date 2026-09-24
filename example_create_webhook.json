@@ -1,7 +1,7 @@
 {
-  "name": "MyGrape Webhook",
+  "name": "Vyrona Webhook",
   "url": "http://14.141.162.122:8000/api/iot/webhooks/consume",
-  "description": "Webhook for receiving Tive events at MyGrape VMS",
+  "description": "Webhook for receiving Tive events at Vyrona VMS",
   "version": "1.0",
   "template": "",
   "headers": [],

@@ -143,7 +143,7 @@ class LaneComplexityCalculator:
         2. United States (Open Data): Bureau of Transportation Statistics (BTS)
         3. Europe (Open Data): Eurocontrol — Monthly Airspace Delay Reports
         4. Global (Fallback): World Bank LPI Timeliness Index
-        5. myGrape Internal Shipment Data (historical lane performance)
+        5. Vyrona Internal Shipment Data (historical lane performance)
         
         FlightStats provides an indicator between 0 and 5 based on actual delays and cancellations.
         This indicator is then translated to a classification between Basic and Excellent:
@@ -671,7 +671,7 @@ class LaneComplexityCalculator:
         2. BTS (USA flights) - Fallback
         3. Eurocontrol (European flights) - Fallback
         4. World Bank LPI Timeliness Index - Fallback
-        5. myGrape Internal Historical Shipment Data - Fallback
+        5. Vyrona Internal Historical Shipment Data - Fallback
         
         Returns:
             OTP result dict with format:
@@ -807,7 +807,7 @@ class LaneComplexityCalculator:
             return None
     
     def _compute_otp_internal(self, leg) -> Optional[Dict[str, Any]]:
-        """Compute OTP from myGrape Internal Historical Shipment Data."""
+        """Compute OTP from Vyrona Internal Historical Shipment Data."""
         try:
             from sqlalchemy import and_
             

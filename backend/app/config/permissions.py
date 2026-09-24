@@ -93,7 +93,7 @@ PHARMA_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
 MYGRAPE_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
     # User management
     ("GET", "/api/user/{user_id}"),     # View user details
-    # Feedback admin endpoints (only for MyGrape admin)
+    # Feedback admin endpoints (only for Vyrona admin)
     ("GET", "/api/feedback/admin"),     # View all feedback for admin
     # ("PATCH", "/api/feedback/{feedback_id}/status"),   # Update status
 }

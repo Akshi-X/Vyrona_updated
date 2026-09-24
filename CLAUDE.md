@@ -1,4 +1,4 @@
-# mG-SCALE — Claude Context
+# Vyrona — Claude Context
 
 ## Project Overview
 

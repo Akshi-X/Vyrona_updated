@@ -38,7 +38,7 @@ def get_health_response() -> dict:
 
     return {
         "status": overall_status,
-        "platform": "MyGrape",
+        "platform": "Vyrona",
         "service": "Supply Chain Tracking",
         "environment": settings.ENVIRONMENT,
         "database_connected": db_ok,

@@ -441,6 +441,11 @@ def sync_ivf_schema():
                 "ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS is_push_notify BOOLEAN NOT NULL DEFAULT false"
             )
         )
+        db.execute(
+            text(
+                "ALTER TABLE hospitals ALTER COLUMN is_push_notify SET DEFAULT false"
+            )
+        )
 
         # users: optional phone number
         db.execute(
@@ -453,6 +458,11 @@ def sync_ivf_schema():
         db.execute(
             text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS push_enabled BOOLEAN NOT NULL DEFAULT true"
+            )
+        )
+        db.execute(
+            text(
+                "ALTER TABLE users ALTER COLUMN push_enabled SET DEFAULT true"
             )
         )
 
@@ -1122,7 +1132,7 @@ def create_ivf_admins():
 
 def create_mygrape_admin():
     """
-    Create MyGrape platform admin account.
+    Create Vyrona platform admin account.
     This admin can view all feedback tickets and manage the platform.
     """
     logger.info("=" * 60)
@@ -1131,24 +1141,24 @@ def create_mygrape_admin():
 
     db = SessionLocal()
     try:
-        # Check if MyGrape admin already exists
+        # Check if Vyrona admin already exists
         existing_admin = (
             db.query(User).filter(User.email == settings.MYGRAPE_ADMIN_EMAIL).first()
         )
 
         if existing_admin:
-            logger.info(f"MyGrape admin already exists: {settings.MYGRAPE_ADMIN_EMAIL}")
+            logger.info(f"Vyrona admin already exists: {settings.MYGRAPE_ADMIN_EMAIL}")
             return
 
-        # Create MyGrape admin
+        # Create Vyrona admin
         mygrape_admin = User(
             user_id=generate_user_id(),
-            first_name="MyGrape",
+            first_name="Vyrona",
             last_name="Admin",
             email=settings.MYGRAPE_ADMIN_EMAIL,
             password_hash=get_password_hash(settings.MYGRAPE_ADMIN_PASSWORD),
             role="Mygrape_admin",
-            pharma_id=None,  # MyGrape admin doesn't belong to any pharma company
+            pharma_id=None,  # Vyrona admin doesn't belong to any pharma company
             status=True,
             approved_status="approved",
             created_by="system",
@@ -1160,11 +1170,11 @@ def create_mygrape_admin():
         db.refresh(mygrape_admin)
 
         logger.info(
-            f"MyGrape platform admin created successfully: {settings.MYGRAPE_ADMIN_EMAIL}"
+            f"Vyrona platform admin created successfully: {settings.MYGRAPE_ADMIN_EMAIL}"
         )
 
     except Exception as e:
-        logger.error(f"ERROR creating MyGrape admin: {str(e)}")
+        logger.error(f"ERROR creating Vyrona admin: {str(e)}")
         db.rollback()
     finally:
         db.close()
@@ -1282,7 +1292,7 @@ def init_db():
     # Create IVF admins if ivf_admins.json exists
     # create_ivf_admins()
 
-    # Create MyGrape platform admin if not exists
+    # Create Vyrona platform admin if not exists
     # create_mygrape_admin()
 
     logger.info("Database initialization complete")

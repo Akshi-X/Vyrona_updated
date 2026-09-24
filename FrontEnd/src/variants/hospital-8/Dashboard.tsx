@@ -68,7 +68,7 @@ import Map3DContainer, {
 import DashboardCard from "./components/DashboardCard";
 import NoiseOverlay from "./components/NoiseOverlay";
 // import abstractBg from "../../assets/aaabstract.png";
-import brandLogo from "../../assets/mGScale.svg";
+import brandLogo from "../../assets/Vyrona.svg";
 import { mapService } from "./services/mapService";
 import {
   refrigeratorDashboardService,
@@ -90,7 +90,7 @@ ChartJS.register(
   Filler,
 );
 
-const BRAND_FULL = 'mgSCALE | ColdSense';
+const BRAND_FULL = 'Vyrona | ColdSense';
 
 const BRAND_STYLES = `
   @keyframes brand-shimmer {
@@ -1114,7 +1114,7 @@ const DashboardHospital8: React.FC = () => {
                 }}
               />
               <div
-                aria-label="mgSCALE"
+                aria-label="Vyrona"
                 className="relative w-16 h-16"
                 style={{
                   backgroundColor: "#6b1176",
@@ -1126,7 +1126,7 @@ const DashboardHospital8: React.FC = () => {
             </div>
             <div className="mt-7 flex flex-col items-center gap-2">
               <p className="text-sm font-black tracking-tight text-gray-800">
-                mgSCALE <span className="text-gray-300 font-thin">|</span>{" "}
+                Vyrona <span className="text-gray-300 font-thin">|</span>{" "}
                 <span style={{ color: "#6b1176" }}>ColdSense</span>
               </p>
               <div className="h-4 flex items-center justify-center">

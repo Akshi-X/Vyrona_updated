@@ -24,7 +24,7 @@ def setup_mygrape_admin():
     from app.config.database import SessionLocal
     db = SessionLocal()
 
-    # Deactivate other active MyGrape admin users so get_mygrape_admin_email() returns this specific test admin
+    # Deactivate other active Vyrona admin users so get_mygrape_admin_email() returns this specific test admin
     other_admins = db.query(User).filter(
         User.role == "Mygrape_admin",
         User.email != "mygrapeadmin@example.com",
@@ -590,7 +590,7 @@ class TestSupportTicketCreation:
     def test_create_ticket_success_without_attachments(self, mock_send_email, setup_mygrape_admin, setup_hospital_user):
         """Verify successful support ticket creation without attachments.
 
-        Arrange: Create a hospital user, mock active MyGrape admin email, and prepare valid ticket fields.
+        Arrange: Create a hospital user, mock active Vyrona admin email, and prepare valid ticket fields.
         Act: Send POST /api/feedback/create with JSON data in 'request' field.
         Assert: Response is 200, ticket exists in DB, and email trigger is generated.
         """
@@ -649,7 +649,7 @@ class TestSupportTicketCreation:
     def test_create_ticket_success_with_attachments(self, mock_send_email, setup_mygrape_admin, setup_hospital_user):
         """Verify successful support ticket creation with a file attachment.
 
-        Arrange: Create a hospital user, mock active MyGrape admin email, and prepare valid ticket fields and mock upload file.
+        Arrange: Create a hospital user, mock active Vyrona admin email, and prepare valid ticket fields and mock upload file.
         Act: Send POST /api/feedback/create with JSON data in 'request' and mock file in 'attachments'.
         Assert: Response is 200, ticket and attachment exist in DB, and email is triggered.
         """
@@ -712,7 +712,7 @@ class TestSupportTicketCreation:
     def test_create_ticket_email_not_sent_to_user(self, mock_send_email, setup_mygrape_admin, setup_hospital_user):
         """Verify ticket creation with send_email=False triggers email with send_to_user=False.
 
-        Arrange: Create a hospital user, mock active MyGrape admin email, and prepare valid ticket fields with send_email=False.
+        Arrange: Create a hospital user, mock active Vyrona admin email, and prepare valid ticket fields with send_email=False.
         Act: Send POST /api/feedback/create.
         Assert: Response is 200, and email trigger kwargs has send_to_user=False.
         """

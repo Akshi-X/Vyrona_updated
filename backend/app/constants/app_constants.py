@@ -128,17 +128,17 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d -
 # EMAIL TEMPLATES
 # ============================================
 EMAIL_APPROVAL_SUBJECT = "New User Registration Pending Approval"
-EMAIL_OTP_SUBJECT = "Your Login OTP - myGrape"
-EMAIL_WELCOME_SUBJECT = "Welcome to myGrape"
+EMAIL_OTP_SUBJECT = "Your Login OTP - Vyrona"
+EMAIL_WELCOME_SUBJECT = "Welcome to Vyrona"
 EMAIL_REJECTION_SUBJECT = "Registration Status Update"
-EMAIL_PASSWORD_RESET_SUBJECT = "Reset Your Password - myGrape"
-EMAIL_USER_APPROVED_SUBJECT = "Registration Approved - Welcome to myGrape!"
-EMAIL_INVITE_SUBJECT = "You're Invited to Join myGrape"
+EMAIL_PASSWORD_RESET_SUBJECT = "Reset Your Password - Vyrona"
+EMAIL_USER_APPROVED_SUBJECT = "Registration Approved - Welcome to Vyrona!"
+EMAIL_INVITE_SUBJECT = "You're Invited to Join Vyrona"
 
 # Feedback Email Subjects
-EMAIL_FEEDBACK_NEW_TICKET_SUBJECT = "New Support Ticket Created - myGrape"
-EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT = "Ticket Status Update - myGrape"
-EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT = "New Comment Added to Ticket - myGrape"
+EMAIL_FEEDBACK_NEW_TICKET_SUBJECT = "New Support Ticket Created - Vyrona"
+EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT = "Ticket Status Update - Vyrona"
+EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT = "New Comment Added to Ticket - Vyrona"
 
 # ============================================
 # TIME ZONES
@@ -210,7 +210,7 @@ IOT_TOKEN_EXPIRY_SECONDS = 3600
 IOT_TOKEN_SAFETY_MARGIN_SECONDS = 60
 IOT_RESPONSE_PREVIEW_LENGTH = 500
 IOT_LONG_RESPONSE_PREVIEW_LENGTH = 2000
-IOT_USER_AGENT = "MyGrape-API-Client/1.0"
+IOT_USER_AGENT = "Vyrona-API-Client/1.0"
 
 # JWT Token parsing constants
 IOT_JWT_TOKEN_PARTS_COUNT = 3
