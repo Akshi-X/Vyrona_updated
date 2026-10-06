@@ -4,8 +4,7 @@ import { ChevronRight, ChevronDown, ChevronUp, Download, Users } from "lucide-re
 import RefillIcon from "./RefillIcon";
 
 import { useSidebar } from "../contexts/SidebarContext";
-import { useOnboardingMode } from "../contexts/OnboardingModeContext";
-import { useHasVariant } from "./VariantRoute";
+import { useCapabilities } from "../contexts/CapabilityContext";
 import { useAuth } from "../contexts/AuthContext";
 import { userService } from "../services/userService";
 import { InstallPromptCard } from "./InstallPromptCard";
@@ -109,10 +108,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const location = useLocation();
     const { isAuthenticated, userRole } = useAuth();
     const { isMobileOpen, closeMobile } = useSidebar();
-    const isOnboardingCtx = useOnboardingMode();
-    const isOnboarding = isOnboardingCtx || location.pathname.startsWith("/onboarding");
-    const embryoGradingEnabled = useHasVariant("/embryo-console#enabled");
-    const incubatorTrackingEnabled = useHasVariant("/incubator-tracking#enabled");
+    const { hasIncubators, hasRefrigerators } = useCapabilities();
 
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [dashboardOpen, setDashboardOpen] = useState(false);
@@ -127,9 +123,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const [profileName, setProfileName] = useState("");
     const [profileEmail, setProfileEmail] = useState("");
 
-    // Prefix path with /onboarding when in onboarding mode
-    const resolvePath = (path: string) =>
-        isOnboarding ? `/onboarding${path}` : path;
+    const resolvePath = (path: string) => path;
 
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -163,7 +157,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         if (item.label === "Pending approvals")
             return userRole === "Admin" || userRole === "Pharma_admin";
         if (item.label === "Users")
-            return !isCGT && (isOnboarding || userRole === "Admin" || userRole === "Manager");
+            return !isCGT && (userRole === "Admin" || userRole === "Manager");
         if (item.label === "Refill log")
             return !isCGT;
         if (item.label === "Alert Config")
@@ -172,7 +166,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             return isIVF;
         if (item.label === "Database")
             return !isIVF;
-        if (item.label === "Control Tower" && userRole === "User" && !isOnboarding)
+        if (item.label === "Control Tower" && userRole === "User")
             return !isIVF;
         return true;
     }).map((item) => {
@@ -180,9 +174,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         if (isDropdown(item)) {
             const filtered = item.children.filter((child) => {
                 if (child.path === "/cryocan-tracking") return isIVF;
-                if (child.path === "/refrigerator-tracking") return isIVF;
-                if (child.path === "/embryo-console") return isOnboarding || embryoGradingEnabled;
-                if (child.path === "/incubator-tracking") return isOnboarding || incubatorTrackingEnabled;
+                if (child.path === "/refrigerator-tracking") return hasRefrigerators;
+                if (child.path === "/embryo-console") return isIVF;
+                if (child.path === "/incubator-tracking") return hasIncubators;
                 return true;
             });
             return { ...item, children: filtered };
@@ -220,9 +214,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         closeMobile();
     };
 
-    const resolvedPathname = isOnboarding
-        ? location.pathname.replace("/onboarding", "")
-        : location.pathname;
+    const resolvedPathname = location.pathname;
 
     // Profile, and the support-ticket flow launched from it (profile → support → success).
     const profileActive = ["/user-profile", "/support", "/success"].some(
@@ -309,7 +301,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                             return (
                                 <div key={index} className="flex flex-col gap-0.5">
                                     <button
-                                        id={isAlertConfig ? "onboarding-sidebar-alert-setting" : isDashboard ? "onboarding-sidebar-dashboard" : undefined}
                                         onClick={() => setOpen((o: boolean) => !o)}
                                         className={`h-auto w-full justify-between gap-4 px-3 py-[7px] rounded-[10px] flex items-center transition-colors ${
                                             active
@@ -347,7 +338,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                 return (
                                                     <button
                                                         key={ci}
-                                                        id={isAlertConfig ? `onboarding-sidebar-alert-${child.label.toLowerCase()}` : child.path === "/cryocan-tracking" ? "onboarding-sidebar-cryocan-tracking" : undefined}
                                                         onClick={() => {
                                                             setOpen(true);
                                                             handleNavigation(child.path);
@@ -392,7 +382,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                         return (
                             <button
                                 key={index}
-                                id={label === "Control Tower" ? "onboarding-sidebar-control-tower" : label === "Refill log" ? "onboarding-sidebar-refill-log" : label === "Reports" ? "onboarding-sidebar-reports" : label === "Users" ? "onboarding-sidebar-users" : undefined}
                                 onClick={() => handleNavigation(path)}
                                 className={`h-auto w-full justify-start gap-4 px-3 py-[7px] rounded-[10px] flex items-center ${
                                     isActive ? "bg-white" : "bg-transparent hover:bg-white/10"
@@ -446,7 +435,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
 
                 {/* Profile */}
                 <button
-                    id="onboarding-sidebar-profile"
                     type="button"
                     onClick={() => { navigate(resolvePath("/user-profile")); closeMobile(); }}
                     className={`group w-full flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 flex-shrink-0 relative z-10 text-white transition-colors text-left ${

@@ -6,7 +6,6 @@ import { shipmentService } from "../../services/shipmentService";
 import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
 import PageLayout from "../../components/PageLayout";
 import { Bell, ChevronDown, History, Sparkles, X } from "lucide-react";
-import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import CryoBentoGrid, { type CryoBentoGridHandle } from "./CryoBentoGrid";
 import DeviceKpiGrid, { type DeviceKpiGridHandle } from "./DeviceKpiGrid";
 import CryoHistoryModal from "./CryoHistoryModal";
@@ -30,7 +29,6 @@ interface ContainerRow {
 
 export default function AlertSetting() {
     const { isAuthenticated } = useAuth();
-    const isOnboarding = useOnboardingMode();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const directionFilter: "cryotanks" | "incubators" | "refrigerators" = (() => {
@@ -262,7 +260,6 @@ export default function AlertSetting() {
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (isOnboarding) return;
             if (
                 branchDropdownRef.current &&
                 !branchDropdownRef.current.contains(event.target as Node)
@@ -285,7 +282,7 @@ export default function AlertSetting() {
         document.addEventListener("mousedown", handleClickOutside);
         return () =>
             document.removeEventListener("mousedown", handleClickOutside);
-    }, [isOnboarding]);
+    }, []);
 
     const openNotifySettings = async () => {
         setShowNotifySettings(true);
@@ -371,7 +368,6 @@ export default function AlertSetting() {
                     actions={
                         <div className="flex items-center gap-2">
                             <button
-                                id="onboarding-alert-config-history"
                                 type="button"
                                 onClick={() => setShowHistory(true)}
                                 title="Config History"
@@ -382,7 +378,6 @@ export default function AlertSetting() {
                                 <span className="hidden min-[900px]:inline">Config History</span>
                             </button>
                             <button
-                                id="onboarding-alert-notify-open"
                                 type="button"
                                 onClick={openNotifySettings}
                                 title="Notifications"
@@ -416,7 +411,6 @@ export default function AlertSetting() {
                             {/* Branch pill */}
                             <div className="relative max-[490px]:flex-1 max-[490px]:basis-[calc(50%-0.1875rem)] max-[490px]:min-w-0" ref={branchDropdownRef}>
                                 <button
-                                    id="onboarding-alert-branch-dropdown"
                                     type="button"
                                     onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
                                     className={`h-9 px-4 rounded-full text-[13px] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors focus:outline-none max-[490px]:w-full ${
@@ -429,13 +423,11 @@ export default function AlertSetting() {
                                     <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${isBranchDropdownOpen ? "rotate-180" : ""}`} />
                                 </button>
                                 {isBranchDropdownOpen && (
-                                    <div id="onboarding-alert-branch-dropdown-list" className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                    <div className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                                         {branchOptions.map((opt) => {
-                                            const branchObj = branches.find((b) => b.branch_name === opt);
                                             return (
                                                 <button
                                                     key={opt}
-                                                    id={branchObj ? `onboarding-alert-branch-${branchObj.branch_id}` : undefined}
                                                     type="button"
                                                     onClick={() => {
                                                         setBranchFilter(opt);
@@ -458,7 +450,6 @@ export default function AlertSetting() {
                             {/* Tank / Incubator pill */}
                             <div className="relative max-[490px]:flex-1 max-[490px]:basis-[calc(50%-0.1875rem)] max-[490px]:min-w-0" ref={tankDropdownRef}>
                                 <button
-                                    id="onboarding-alert-tank-dropdown"
                                     type="button"
                                     onClick={() => {
                                         if (!containersLoading && filteredContainers.length > 0) {
@@ -481,13 +472,12 @@ export default function AlertSetting() {
                                 </button>
 
                                 {showBranchDropdown && filteredContainers.length > 0 && (
-                                    <div id="onboarding-alert-tank-dropdown-list" className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                    <div className="absolute top-full mt-2 left-0 w-44 z-[9999] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                                         {filteredContainers.map((c) => {
                                             const isSelected = selectedContainers.some((s) => s.tank_id === c.tank_id);
                                             return (
                                                 <button
                                                     key={`${c.branch_id}-${c.tank_id}-${c.canisterId}`}
-                                                    id={`onboarding-alert-container-${c.canisterId}`}
                                                     type="button"
                                                     onClick={() => {
                                                         setSelectedContainers([c]);
@@ -626,7 +616,7 @@ export default function AlertSetting() {
                         {containersError && (
                             <p className="mt-2 text-xs text-red-600">{containersError}</p>
                         )}
-                        <section id="onboarding-alert-kpi-panel" className="bg-white rounded-2xl border border-line p-4 min-w-0 flex flex-1 flex-col min-h-0 xl1:relative">
+                        <section className="bg-white rounded-2xl border border-line p-4 min-w-0 flex flex-1 flex-col min-h-0 xl1:relative">
                             <div className="flex items-center justify-between gap-3 mb-4">
                                 <h2 className="font-bold text-black text-base">
                                     {deviceLabel} Configuration
@@ -635,7 +625,6 @@ export default function AlertSetting() {
                                     {(primaryContainer || directionFilter === "cryotanks") && (
                                         <div className="relative group hidden md:block">
                                             <button
-                                                id="onboarding-alert-set-recommended"
                                                 type="button"
                                                 disabled={!primaryContainer}
                                                 onClick={() => {
@@ -745,14 +734,13 @@ export default function AlertSetting() {
                     <div
                         className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
                         onClick={() => {
-                            if (!notifySettingsSaving && !isOnboarding) {
+                            if (!notifySettingsSaving) {
                                 setShowNotifySettings(false);
                                 setNotifySettingsError(null);
                             }
                         }}
                     >
                         <div
-                            id="onboarding-alert-notify-modal"
                             className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
                             onClick={(e) => e.stopPropagation()}
                         >
@@ -761,7 +749,6 @@ export default function AlertSetting() {
                                     Push Notifications
                                 </h3>
                                 <button
-                                    id="onboarding-alert-notify-close"
                                     type="button"
                                     onClick={() => {
                                         if (!notifySettingsSaving) {

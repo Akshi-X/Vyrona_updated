@@ -1333,7 +1333,6 @@ export default function IncubatorVisualisation({
           {/* Left overlay toggle — visible only below 1450 px */}
           {showSensorTiles && isNarrow && !rightOpen && (
             <button
-              id="onboarding-incubator-left-toggle"
               type="button"
               onClick={() => { setLeftOpen(p => { if (!p) setRightOpen(false); return !p; }); }}
               style={{
@@ -1378,7 +1377,6 @@ export default function IncubatorVisualisation({
           {/* Right overlay toggle — visible only below 1230 px */}
           {showSidebar && isRightNarrow && !leftOpen && (
             <button
-              id="onboarding-incubator-right-toggle"
               type="button"
               onClick={() => { setRightOpen(p => { if (!p) setLeftOpen(false); return !p; }); }}
               style={{

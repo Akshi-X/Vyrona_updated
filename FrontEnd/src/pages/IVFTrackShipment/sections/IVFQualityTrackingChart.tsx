@@ -1393,7 +1393,7 @@ export default function IVFQualityTrackingChart({
   const hasData = displayReadings.length > 0;
 
   return (
-    <div id="onboarding-ivf-quality-chart" className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-line rounded-lg p-4">
+    <div className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-line rounded-lg p-4">
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
@@ -1426,14 +1426,13 @@ export default function IVFQualityTrackingChart({
 
       {/* KPI Tabs (from DB kpi_config when available) */}
       {!hideTabs && (
-        <div id="onboarding-chart-kpi-tabs" className="flex items-center gap-0 mb-3 flex-wrap mt-2">
+        <div className="flex items-center gap-0 mb-3 flex-wrap mt-2">
           {!hasLoadedKpiConfig ? (
             <span className="text-xs text-[#7C7C7C]">Loading...</span>
           ) : (
             kpiTabs.map((tab, index) => (
               <Fragment key={tab.id}>
                 <button
-                  id={tab.id === 'ln2_level' ? 'onboarding-chart-tab-ln2' : undefined}
                   type="button"
                   onClick={() => { setActiveTab(tab.id); onTabChange?.(tab.id); }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
@@ -1576,13 +1575,12 @@ export default function IVFQualityTrackingChart({
       </div>
 
       {/* Time range toggle: fetch from API for range; live data still appends */}
-      <div id="onboarding-chart-range-switcher" className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 flex-wrap">
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 flex-wrap">
         <span className="text-xs text-[#7C7C7C] mr-1">Range:</span>
         <div className="flex rounded-md border border-gray-200 overflow-hidden bg-gray-50">
           {TIME_RANGES.map((range) => (
             <button
               key={range.id}
-              id={range.id === '24H' ? 'onboarding-chart-range-24h' : undefined}
               type="button"
               onClick={() => {
                 if (range.id !== timeRange) setIsRangeLoading(true);

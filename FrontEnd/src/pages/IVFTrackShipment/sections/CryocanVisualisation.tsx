@@ -3914,7 +3914,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           {/* Left overlay toggle — visible only below 1450 px */}
           {showSensorTiles && isNarrow && !rightOpen && (
             <button
-              id="onboarding-cryo-left-toggle"
               type="button"
               onClick={() => { setLeftOpen(p => { if (!p) setRightOpen(false); return !p; }); }}
               style={{
@@ -3961,7 +3960,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
           {/* Right overlay toggle — visible only below 1230 px */}
           {showSidebar && isRightNarrow && !leftOpen && (
             <button
-              id="onboarding-cryo-right-toggle"
               type="button"
               onClick={() => { setRightOpen(p => { if (!p) setLeftOpen(false); return !p; }); }}
               style={{
@@ -4197,7 +4195,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
               </div>
               {/* Live Conditions card — shown when not inspecting */}
               <div
-                id="onboarding-cryo-live-conditions"
                 className="cryo-fade-in bg-white flex flex-col"
                 style={{
                   position: "absolute",
@@ -4275,7 +4272,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
                   return (
                     <button
                       key={tile.id}
-                      id={`onboarding-cryo-tile-${tile.id}`}
                       type="button"
                       onClick={() => onSensorSelect && onSensorSelect(tile.id)}
                       className="text-left kpi-card group"
@@ -4446,7 +4442,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
           {/* 3D canvas column */}
           <div
-            id="onboarding-cryo-canvas"
             className="cryo-fade-in relative overflow-hidden"
             style={{
               background: externalTempAlert
@@ -5132,7 +5127,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
             >
             {/* System Activity panel */}
             <div
-              id="onboarding-cryo-system-activity"
               className="cryo-fade-in bg-white"
               style={{
                 flexShrink: 0,
@@ -5278,7 +5272,6 @@ const CryocanVisualizer = forwardRef<CryocanVisualizerHandle, CryocanVisualizerP
 
             {/* Container Data */}
             <div
-              id="onboarding-cryo-container-data"
               className="cryo-fade-in bg-white"
               style={{
                 flexShrink: 0,

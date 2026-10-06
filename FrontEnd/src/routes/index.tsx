@@ -1,4 +1,5 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import Login from "../pages/Login";
 import TrackAndTrace from "../pages/TrackAndTrace";
 import TrackPage from "../pages/Track";
@@ -31,57 +32,28 @@ import ResetPassword from "../pages/ResetPassword";
 import SuccessAlert from "../pages/SuccessAlert";
 import { RoleBasedRoute } from "../components/RoleBasedRoute";
 import { AuthRedirect } from "../components/AuthRedirect";
-import { VariantRoute } from "../components/VariantRoute";
-import { OnboardingGate } from "../components/OnboardingGate";
-import {
-    OnboardingLevel,
-    OnboardingShell,
-} from "../pages/Onboarding";
-import OnboardingSuccess from "../pages/Onboarding/OnboardingSuccess";
 import Dashboard from "../pages/Dashboard";
-import { OnboardingProvider, useOnboarding } from "../contexts/OnboardingContext";
-import { useTourNavContext } from "../contexts/TourNavContext";
+import { useCapabilities } from "../contexts/CapabilityContext";
+import { FullPageLoader } from "../components/FullPageLoader";
 
-// Renders whichever level is currently active — works on any page.
-// Prevents two OnboardingLevel instances from fighting over the shared tour instance.
-// A preview session (launched from a real page's TourEntryButton) always mounts its
-// level; otherwise prioritise pendingStartLevelId so Start/Resume mounts the right one.
-function ActiveOnboardingLevel() {
-    const { levels, state } = useOnboarding();
-    const tourNavCtx = useTourNavContext();
-
-    const previewId = tourNavCtx?.previewLevelId;
-    const pendingId = tourNavCtx?.pendingStartLevelId;
-
-    // A preview session mounts its tour directly by id — page tours are not in the
-    // gamified `levels` list, so mount previewId as-is rather than looking it up.
-    if (previewId) return <OnboardingLevel levelId={previewId} />;
-
-    const active = pendingId
-        ? (levels.find((l) => l.id === pendingId) ?? null)
-        : (
-            levels.find((l) => state.levels[l.id]?.status === "in_progress") ??
-            levels.find((l) => state.levels[l.id]?.status === "available") ??
-            null
-        );
-
-    if (!active) return null;
-    return <OnboardingLevel levelId={active.id} />;
-}
+// Refrigerator-only tenants get the bespoke hospital-8 experience, lazy-loaded so
+// its 3D/WebGL bundle never ships to any other tenant.
+const DashboardRefrigeratorOnly = lazy(() => import("../variants/hospital-8/Dashboard"));
+const RefrigeratorTrackingRefrigeratorOnly = lazy(() => import("../variants/hospital-8/RefrigeratorTracking"));
 
 /**
- * Dashboard with variant support
- * If the user's hospital has a custom Dashboard variant, it will be rendered.
- * Otherwise, the default Dashboard component is used.
+ * Dashboard — default for all tenants; refrigerator-only tenants get the hospital-8 dashboard.
  */
-const DashboardWithVariant = () => (
-    <RoleBasedRoute restrictedRoles={["mygrape_admin"]}>
-        <VariantRoute
-            routePath="/dashboard"
-            defaultComponent={<Dashboard />}
-        />
-    </RoleBasedRoute>
-);
+const DashboardWithVariant = () => {
+    const { isRefrigeratorOnly } = useCapabilities();
+    return (
+        <RoleBasedRoute restrictedRoles={["mygrape_admin"]}>
+            {isRefrigeratorOnly
+                ? <Suspense fallback={<FullPageLoader />}><DashboardRefrigeratorOnly /></Suspense>
+                : <Dashboard />}
+        </RoleBasedRoute>
+    );
+};
 
 /**
  * Database with role-based access
@@ -102,10 +74,7 @@ const ControlTowerWithVariant = () => (
         restrictedRoles={["mygrape_admin"]}
         requireControlTower={true}
     >
-        <VariantRoute
-            routePath="/control-tower"
-            defaultComponent={<ControlTower />}
-        />
+        <ControlTower />
     </RoleBasedRoute>
 );
 
@@ -127,10 +96,7 @@ const RefillLogWithAuth = () => (
  */
 const TrackPageWithVariant = () => (
     <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={true}>
-        <VariantRoute
-            routePath="/track/:patientId"
-            defaultComponent={<TrackPage />}
-        />
+        <TrackPage />
     </RoleBasedRoute>
 );
 
@@ -154,10 +120,7 @@ const IVFTrackShipmentWithTankVariant = () => (
         restrictedRoles={["mygrape_admin"]}
         restrictIVFAdmin={false}
     >
-        <VariantRoute
-            routePath="/cryocan-tracking/:tankId"
-            defaultComponent={<IVFTrackShipmentPage />}
-        />
+        <IVFTrackShipmentPage />
     </RoleBasedRoute>
 );
 
@@ -166,10 +129,7 @@ const IVFTrackShipmentWithTankVariant = () => (
  */
 const OutboundQualityTrackingWithVariant = () => (
     <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={true}>
-        <VariantRoute
-            routePath="/outbound-quality-tracking"
-            defaultComponent={<OutboundQualityTrackingPage />}
-        />
+        <OutboundQualityTrackingPage />
     </RoleBasedRoute>
 );
 
@@ -178,10 +138,7 @@ const OutboundQualityTrackingWithVariant = () => (
  */
 const OutboundQualityTrackingWithCanisterVariant = () => (
     <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={true}>
-        <VariantRoute
-            routePath="/outbound-quality-tracking/:canisterId"
-            defaultComponent={<OutboundQualityTrackingPage />}
-        />
+        <OutboundQualityTrackingPage />
     </RoleBasedRoute>
 );
 
@@ -218,14 +175,16 @@ const IncubatorDetailWithAuth = () => (
     </RoleBasedRoute>
 );
 
-const RefrigeratorTrackingWithAuth = () => (
-    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
-        <VariantRoute
-            routePath="/refrigerator-tracking/:refrigeratorId"
-            defaultComponent={<RefrigeratorTrackingPage />}
-        />
-    </RoleBasedRoute>
-);
+const RefrigeratorTrackingWithAuth = () => {
+    const { isRefrigeratorOnly } = useCapabilities();
+    return (
+        <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
+            {isRefrigeratorOnly
+                ? <Suspense fallback={<FullPageLoader />}><RefrigeratorTrackingRefrigeratorOnly /></Suspense>
+                : <RefrigeratorTrackingPage />}
+        </RoleBasedRoute>
+    );
+};
 
 /**
  * Refrigerator selection page - /refrigerator-tracking (list of all refrigerators)
@@ -242,32 +201,20 @@ const RefrigeratorSelectionWithAuth = () => (
  */
 const AlertSettingWithAuth = () => (
     <RoleBasedRoute allowedRoles={["Manager", "Admin", "User"]}>
-        <VariantRoute
-            routePath="/alert-setting"
-            defaultComponent={<AlertSetting />}
-        />
+        <AlertSetting />
     </RoleBasedRoute>
 );
 
 /**
  * Application Router Configuration
  *
- * Routes are organized into categories:
- * 1. Public routes (no auth required)
- * 2. Auth routes (login, signup, password reset)
- * 3. Protected routes with variant support
- * 4. Protected routes without variant support
+ * Routes are organized into:
+ * 1. Public / auth routes (no auth required)
+ * 2. Protected routes behind the shared app layout
  *
- * ADDING VARIANT SUPPORT TO A ROUTE:
- * 1. Wrap the component with <VariantRoute>
- * 2. Set routePath to match the route pattern
- * 3. Set defaultComponent to the default page component
- * 4. Loader is shown until variant is ready (no default flash)
- *
- * CREATING A VARIANT:
- * 1. Create component in src/variants/hospital-{id}/{ComponentName}.tsx
- * 2. Add database mapping: INSERT INTO ui_route_variants
- *    (hospital_id, route_path, component_key) VALUES (id, '/route', 'ComponentNameHospital{id}')
+ * Tenant differences are driven by capability flags (see useCapabilities) — e.g.
+ * refrigerator-only tenants get the hospital-8 dashboard/sidebar — not by a
+ * per-hospital variant registry.
  */
 export const router = createBrowserRouter([
     // ============================================================
@@ -281,42 +228,6 @@ export const router = createBrowserRouter([
     { path: "/forgot-password", element: <ForgotPassword /> },
     { path: "/reset-password", element: <ResetPassword /> },
     { path: "/success", element: <SuccessAlert /> },
-
-    // ============================================================
-    // ONBOARDING ROUTES
-    // ============================================================
-    {
-        path: "/onboarding",
-        element: (
-            <OnboardingGate>
-                <OnboardingProvider>
-                    <OnboardingShell />
-                </OnboardingProvider>
-            </OnboardingGate>
-        ),
-        children: [
-            { path: "/onboarding",               element: <Navigate to="/onboarding/dashboard" replace /> },
-            // Playground routes — level tours run on top of these as invisible overlays
-            { path: "/onboarding/dashboard",     element: <><Dashboard /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/control-tower", element: <><ControlTower /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/cryocan-tracking",                      element: <><IVFTrackShipmentSearchPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/cryocan-tracking/:tankId",              element: <><IVFTrackShipmentPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/alert-setting",                         element: <><AlertSetting /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/reports",                               element: <><ReportsPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/refill-log",                            element: <><RefillLog /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/user-profile",                          element: <><UserProfilePage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/support",                               element: <><Support /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/success",                               element: <><OnboardingSuccess /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/users",                                 element: <><UsersPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/embryo-console",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/incubator-tracking/:id",                element: <><IncubatorDetailPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/track/:patientId",                      element: <><TrackPage /><ActiveOnboardingLevel /></> },
-            { path: "/onboarding/database",                               element: <><Database /><ActiveOnboardingLevel /></> },
-            // Catch-all: any unknown /onboarding/* path → dashboard
-            { path: "/onboarding/*",             element: <Navigate to="/onboarding/dashboard" replace /> },
-        ],
-    },
 
     // ============================================================
     // PROTECTED ROUTES WITH SHARED APP LAYOUT
