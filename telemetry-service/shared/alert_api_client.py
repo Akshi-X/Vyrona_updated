@@ -23,7 +23,7 @@ def _get_internal_headers() -> Dict[str, str]:
     """Build headers with internal API key for service-to-service auth."""
     headers = {"Content-Type": "application/json"}
     if config.INTERNAL_API_KEY:
-        headers["X-Internal-Api-Key"] = "CHANGE_ME_TO_A_SECURE_RANDOM_STRING"
+        headers["X-Internal-Api-Key"] = config.INTERNAL_API_KEY
     else:
         logger.warning(
             "INTERNAL_API_KEY not configured — alert API calls will be rejected by dashboard-service"
