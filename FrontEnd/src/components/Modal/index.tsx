@@ -1,7 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
-import { useTourNavContext } from "../../contexts/TourNavContext";
 
 interface ModalProps {
     isOpen: boolean;
@@ -29,15 +28,13 @@ const Modal: React.FC<ModalProps> = ({
     id,
 }) => {
     useBodyScrollLock(isOpen);
-    const tourNavCtx = useTourNavContext();
-    const isTourActive = tourNavCtx?.isTourActive ?? false;
 
     if (!isOpen) return null;
 
     return createPortal(
         <div
             className="fixed inset-0 bg-black/70 z-[100] md:flex md:items-center md:justify-center md:p-4"
-            onClick={isTourActive ? undefined : onClose}
+            onClick={onClose}
         >
             <div
                 id={id}
@@ -64,7 +61,7 @@ const Modal: React.FC<ModalProps> = ({
                     </div>
                     <div className="flex items-center gap-2 md:gap-3 ml-3 shrink-0">
                         {headerAction}
-                        <button id="onboarding-modal-close-btn" onClick={onClose} className="p-1.5 md:p-2 hover:bg-gray-100 rounded-full transition-colors">
+                        <button onClick={onClose} className="p-1.5 md:p-2 hover:bg-gray-100 rounded-full transition-colors">
                             <svg className="w-5 h-5 md:w-6 md:h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>

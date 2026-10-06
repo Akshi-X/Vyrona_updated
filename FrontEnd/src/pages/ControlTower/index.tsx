@@ -1,5 +1,5 @@
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 import ControlTowerMap from '../../components/ControlTowerMap';
@@ -37,8 +37,6 @@ const formatSensorLabel = (countValue: unknown): string => {
 const ControlTower = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const isOnboarding = location.pathname.startsWith("/onboarding");
   const [searchParams, setSearchParams] = useSearchParams();
 
     const [selectedRegion, setSelectedRegion] = useState<string>("All");
@@ -63,7 +61,7 @@ const ControlTower = () => {
         setSearchParams(params, { replace: true });
     }, [selectedBranch, selectedStatusInbound, setSearchParams]);
 
-    // Reset filters when onboarding navigates to clean URL (level-3 start)
+    // Reset filters when the URL has no branch/status params
     useEffect(() => {
         const branchFromUrl = searchParams.get("branch_id");
         const statusFromUrl = searchParams.get("status");
@@ -729,9 +727,9 @@ const ControlTower = () => {
                         <div className="order-2 lg:order-1 flex flex-col gap-6 min-w-0 lg:h-full lg:min-h-0 lg:row-span-2">
 
                             {/* Inline Filter Panel — desktop only */}
-                            <div id="onboarding-control-filter-panel" className="hidden lg:flex flex-col gap-3 bg-white border border-line rounded-lg px-3 py-3 shrink-0">
+                            <div className="hidden lg:flex flex-col gap-3 bg-white border border-line rounded-lg px-3 py-3 shrink-0">
                                 {isIvfUser && (
-                                    <div id="onboarding-control-filter-direction">
+                                    <div>
                                         <FilterToggle
                                             label="Device Type"
                                             value={deviceType}
@@ -744,7 +742,7 @@ const ControlTower = () => {
                                     </div>
                                 )}
                                 {!isIvfUser && (
-                                    <div id="onboarding-control-filter-direction">
+                                    <div>
                                         <FilterToggle
                                             label="Direction"
                                             value={direction}
@@ -757,7 +755,7 @@ const ControlTower = () => {
                                     </div>
                                 )}
                                 {direction === "inbound" && (
-                                    <div id="onboarding-control-filter-branch">
+                                    <div>
                                         <FilterSelect
                                             label="Branch"
                                             value={selectedBranch}
@@ -771,8 +769,6 @@ const ControlTower = () => {
                                             }}
                                             options={branchOptions}
                                             allLabel="All Branches"
-                                            buttonId="onboarding-control-branch-btn"
-                                            listId="onboarding-control-branch-list"
                                         />
                                     </div>
                                 )}
@@ -785,15 +781,13 @@ const ControlTower = () => {
                                         allLabel="All Regions"
                                     />
                                 )}
-                                <div id="onboarding-control-filter-status">
+                                <div>
                                     <FilterSelect
                                         label="Status"
                                         value={direction === "inbound" ? selectedStatusInbound : selectedStatusOutbound}
                                         onChange={(v) => direction === "inbound" ? setSelectedStatusInbound(v) : setSelectedStatusOutbound(v)}
                                         options={statusOptions}
                                         allLabel="All Status"
-                                        buttonId="onboarding-control-status-btn"
-                                        listId="onboarding-control-status-list"
                                     />
                                 </div>
                                 {direction === "outbound" && (
@@ -808,7 +802,7 @@ const ControlTower = () => {
                             </div>
 
                             {/* Active Routes/Canisters List */}
-                            <div id="onboarding-control-active-containers" className="bg-white border border-line rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
+                            <div className="bg-white border border-line rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
                                 <h2 className="font-bold text-black text-base mb-2">
                                     {isIvfUser
                                         ? deviceType === "incubators" ? "Active Incubators" : deviceType === "refrigerators" ? "Active Refrigerators" : "Active Containers"
@@ -828,7 +822,6 @@ const ControlTower = () => {
                                     </div>
                                 </div>
                                 <div
-                                    id="onboarding-control-container-list"
                                     className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
                                     style={{
                                         scrollbarWidth: "thin",
@@ -976,7 +969,7 @@ const ControlTower = () => {
                                                                     <div className="min-w-0 text-left overflow-hidden">
                                                                         {route?.patientId ? (
                                                                             <Link
-                                                                                to={`${isOnboarding ? "/onboarding" : ""}/track/${route.patientId}`}
+                                                                                to={`/track/${route.patientId}`}
                                                                                 className="text-primary text-xs font-bold hover:underline cursor-pointer truncate block"
                                                                                 onClick={(
                                                                                     e,
@@ -1080,11 +1073,10 @@ const ControlTower = () => {
                                                                     className="grid grid-cols-3 pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
                                                                     onClick={() => {
                                                                         try {
-                                                                            const prefix = isOnboarding ? "/onboarding" : "";
                                                                             if (deviceType === "incubators") {
-                                                                                navigate(`${prefix}/incubator-tracking/${canister.tankId}`);
+                                                                                navigate(`/incubator-tracking/${canister.tankId}`);
                                                                             } else if (deviceType === "refrigerators") {
-                                                                                navigate(`${prefix}/refrigerator-tracking/${canister.tankId}`);
+                                                                                navigate(`/refrigerator-tracking/${canister.tankId}`);
                                                                             } else {
                                                                                 if (
                                                                                     canister.branchId &&
@@ -1100,7 +1092,7 @@ const ControlTower = () => {
                                                                                         ? canister.tankId
                                                                                         : canister.canisterId,
                                                                                 );
-                                                                                navigate(`${prefix}/cryocan-tracking/${tankParam}`);
+                                                                                navigate(`/cryocan-tracking/${tankParam}`);
                                                                             }
                                                                         } catch {}
                                                                     }}
@@ -1176,7 +1168,7 @@ const ControlTower = () => {
                         </div>
 
                         {/* Right Panel - Map Visualization */}
-                        <div id="onboarding-control-map" className="order-1 lg:order-2 flex flex-col gap-6 min-w-0 w-full h-[45vh] lg:row-span-2 lg:h-full lg:min-h-0">
+                        <div className="order-1 lg:order-2 flex flex-col gap-6 min-w-0 w-full h-[45vh] lg:row-span-2 lg:h-full lg:min-h-0">
                             <ControlTowerMap
                                 filters={{
                                     selectedRegion,

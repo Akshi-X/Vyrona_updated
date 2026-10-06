@@ -9,7 +9,7 @@ import { userService } from "../../services/userService";
 import { shipmentService } from "../../services/shipmentService";
 import MultiSelectDropdown from "../../components/MultiSelectDropdown";
 import { FilterSelect } from "../../components/FilterPanel";
-import { useHasVariant } from "../../components/VariantRoute";
+import { useCapabilities } from "../../contexts/CapabilityContext";
 import {
     ivfReportsService,
     type CriticalAlertReportRow,
@@ -473,7 +473,7 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
 
 export default function ReportsPage() {
     const { isAuthenticated, userRole } = useAuth();
-    const refrigeratorOnly = useHasVariant("/reports#refrigerator-only");
+    const { isRefrigeratorOnly: refrigeratorOnly } = useCapabilities();
     const reportOptions = refrigeratorOnly
         ? REPORT_TYPES.filter((r) => REFRIGERATOR_REPORT_VALUES.includes(r.value))
         : REPORT_TYPES;
@@ -795,18 +795,6 @@ export default function ReportsPage() {
     useEffect(() => {
         setActivitySearchInput(filters.search);
     }, [filters.search]);
-
-    // Onboarding tour events — each report-type step fires one of these to auto-select that type
-    useEffect(() => {
-        const handlers: Array<[string, () => void]> = [
-            ["onboarding:report-type:monthly-summary",  () => setFilters((p) => ({ ...p, reportType: "monthly-summary" }))],
-            ["onboarding:report-type:critical-alerts",  () => setFilters((p) => ({ ...p, reportType: "critical-alerts" }))],
-            ["onboarding:report-type:refill-logs",      () => setFilters((p) => ({ ...p, reportType: "refill-logs" }))],
-            ["onboarding:report-type:activity-logs",    () => setFilters((p) => ({ ...p, reportType: "activity-logs" }))],
-        ];
-        handlers.forEach(([event, fn]) => document.addEventListener(event, fn));
-        return () => { handlers.forEach(([event, fn]) => document.removeEventListener(event, fn)); };
-    }, []);
 
     const activeRowsCount = useMemo(() => {
         if (filters.reportType === "monthly-summary") {
@@ -1131,7 +1119,7 @@ export default function ReportsPage() {
     return (
                 <PageLayout title="Reports" description="Generate monthly summary, critical alert and activity reports." lucideIcon={Download} patternBackground>
 
-                    <section id="onboarding-reports-filters" className="bg-white border border-line rounded-lg p-5">
+                    <section className="bg-white border border-line rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
                                 <h2 className="text-base font-semibold text-black">
@@ -1163,7 +1151,7 @@ export default function ReportsPage() {
                         </div>
 
                         <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                            <div id="onboarding-reports-report-type">
+                            <div>
                                 <FilterSelect
                                     label="Report Type"
                                     value={filters.reportType}
@@ -1175,7 +1163,7 @@ export default function ReportsPage() {
                             </div>
 
                             {filters.reportType === "monthly-summary" && (
-                                <div id="onboarding-filter-month" className="flex flex-col">
+                                <div className="flex flex-col">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Month
                                     </label>
@@ -1196,7 +1184,7 @@ export default function ReportsPage() {
 
                             {filters.reportType === "critical-alerts" && (
                                 <>
-                                    <div id="onboarding-filter-date-from" className="flex flex-col">
+                                    <div className="flex flex-col">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date From
                                         </label>
@@ -1213,7 +1201,7 @@ export default function ReportsPage() {
                                             disabled={!isIvfUser}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-date-to" className="flex flex-col">
+                                    <div className="flex flex-col">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date To
                                         </label>
@@ -1230,7 +1218,7 @@ export default function ReportsPage() {
                                             disabled={!isIvfUser}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-status">
+                                    <div>
                                         <FilterSelect
                                             label="Status"
                                             value={filters.alertStatus}
@@ -1240,7 +1228,7 @@ export default function ReportsPage() {
                                             options={[...ALERT_STATUS_OPTIONS]}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-severity">
+                                    <div>
                                         <FilterSelect
                                             label="Severity"
                                             value={filters.severity}
@@ -1250,7 +1238,7 @@ export default function ReportsPage() {
                                             options={[...SEVERITY_OPTIONS]}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-tank-codes">
+                                    <div>
                                         <MultiSelectDropdown
                                             label="Tank Codes"
                                             options={tankOptions}
@@ -1265,7 +1253,7 @@ export default function ReportsPage() {
                                             }
                                         />
                                     </div>
-                                    <div id="onboarding-filter-incubator-codes">
+                                    <div>
                                         <MultiSelectDropdown
                                             label="Incubator Codes"
                                             options={incubatorOptions}
@@ -1280,7 +1268,7 @@ export default function ReportsPage() {
                                             }
                                         />
                                     </div>
-                                    <div id="onboarding-filter-refrigerator-codes">
+                                    <div>
                                         <MultiSelectDropdown
                                             label="Refrigerator Codes"
                                             options={refrigeratorOptions}
@@ -1300,7 +1288,7 @@ export default function ReportsPage() {
 
                             {filters.reportType === "refill-logs" && (
                                 <>
-                                    <div id="onboarding-filter-date-from" className="flex flex-col">
+                                    <div className="flex flex-col">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date From
                                         </label>
@@ -1317,7 +1305,7 @@ export default function ReportsPage() {
                                             disabled={!isIvfUser}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-date-to" className="flex flex-col">
+                                    <div className="flex flex-col">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date To
                                         </label>
@@ -1334,7 +1322,7 @@ export default function ReportsPage() {
                                             disabled={!isIvfUser}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-status">
+                                    <div>
                                         <FilterSelect
                                             label="Status"
                                             value={filters.refillStatus}
@@ -1344,7 +1332,7 @@ export default function ReportsPage() {
                                             options={[...REFILL_STATUS_OPTIONS]}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-tank-codes">
+                                    <div>
                                         <MultiSelectDropdown
                                             label="Tank Codes"
                                             options={tankOptions}
@@ -1364,7 +1352,7 @@ export default function ReportsPage() {
 
                             {filters.reportType === "activity-logs" && (
                                 <>
-                                    <div id="onboarding-filter-date-from" className="flex flex-col">
+                                    <div className="flex flex-col">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date From
                                         </label>
@@ -1381,7 +1369,7 @@ export default function ReportsPage() {
                                             disabled={!canViewActivityLogs}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-date-to" className="flex flex-col">
+                                    <div className="flex flex-col">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date To
                                         </label>
@@ -1398,7 +1386,7 @@ export default function ReportsPage() {
                                             disabled={!canViewActivityLogs}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-actions">
+                                    <div>
                                         <MultiSelectDropdown
                                             label="Actions"
                                             options={ACTIVITY_ACTION_OPTIONS}
@@ -1413,7 +1401,7 @@ export default function ReportsPage() {
                                             }
                                         />
                                     </div>
-                                    <div id="onboarding-filter-outcome">
+                                    <div>
                                         <FilterSelect
                                             label="Outcome"
                                             value={filters.outcome}
@@ -1423,7 +1411,7 @@ export default function ReportsPage() {
                                             options={ACTIVITY_OUTCOME_OPTIONS}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-actor-type">
+                                    <div>
                                         <FilterSelect
                                             label="Actor Type"
                                             value={filters.actorType}
@@ -1433,7 +1421,7 @@ export default function ReportsPage() {
                                             options={ACTOR_TYPE_OPTIONS}
                                         />
                                     </div>
-                                    <div id="onboarding-filter-search" className="flex flex-col">
+                                    <div className="flex flex-col">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Search
                                         </label>
@@ -1526,7 +1514,7 @@ export default function ReportsPage() {
                         </div>
                     </section>
 
-                    <section id="onboarding-reports-results" className="bg-white border border-line rounded-lg p-5">
+                    <section className="bg-white border border-line rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
                                 <h2 className="text-base font-semibold text-black">

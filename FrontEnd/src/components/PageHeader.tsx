@@ -1,7 +1,6 @@
 import type { ReactNode, ElementType } from "react";
 import { ChevronRight } from "lucide-react";
 import HamburgerButton from "./HamburgerButton";
-import TourEntryButton from "./TourEntryButton";
 
 type PageHeaderProps = {
     title: string;
@@ -10,15 +9,13 @@ type PageHeaderProps = {
     iconAlt?: string;
     lucideIcon?: ElementType;
     actions?: ReactNode;
-    /** Suppress the page-tour icon next to the title (e.g. Dashboard places it elsewhere). */
-    hideTourButton?: boolean;
     /** Small pill rendered next to the title, e.g. "Beta". */
     titleBadge?: string;
     /** Extra title text rendered after the badge, e.g. "| HIS: ABC123". */
     titleSuffix?: string;
 };
 
-const PageHeader = ({ title, description, icon, iconAlt, lucideIcon: LucideIcon, actions, hideTourButton, titleBadge, titleSuffix }: PageHeaderProps) => {
+const PageHeader = ({ title, description, icon, iconAlt, lucideIcon: LucideIcon, actions, titleBadge, titleSuffix }: PageHeaderProps) => {
     return (
         <div className="flex items-center justify-between sticky top-0 z-30 bg-surface -mx-4 px-4 py-3 md:static md:bg-transparent md:mx-0 md:px-0 md:py-0">
             <div className="flex items-center gap-2 md:gap-3">
@@ -46,7 +43,6 @@ const PageHeader = ({ title, description, icon, iconAlt, lucideIcon: LucideIcon,
                                 </span>
                             </>
                         )}
-                        {!hideTourButton && <TourEntryButton />}
                     </div>
                     {description && <p className="text-xs font-semibold text-primary mt-0.5 hidden md:block">{description}</p>}
                 </div>

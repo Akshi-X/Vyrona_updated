@@ -23,7 +23,6 @@ import { userService } from '../../services/userService';
 import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 import DashboardIconDark from '../../assets/DashBoardIcons/DashBoardDark.svg';
 import PageLayout from '../../components/PageLayout';
-import TourEntryButton from '../../components/TourEntryButton';
 // Dashboard Icons
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -51,8 +50,8 @@ import DeviationDriverIcon from '../../assets/flag-icon.svg';
 import { ivfService } from '../../services/ivfService';
 import type { IVFTreatment } from '../../types/ivf.ts';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
-import { Microscope } from 'lucide-react';
-import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
+import { Microscope, Refrigerator } from 'lucide-react';
+import { useCapabilities } from '../../contexts/CapabilityContext';
 
 interface StakeholderChat {
   id: string;
@@ -72,7 +71,7 @@ interface DashboardProps { }
 
 export default function Dashboard({ }: DashboardProps) {
   const { isAuthenticated, userRole } = useAuth();
-  const isOnboarding = useOnboardingMode();
+  const { hasRefrigerators } = useCapabilities();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusAlertId = searchParams.get('alert_id');
@@ -97,7 +96,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   // WebSocket for unread chat count (tagged messages only)
   const { unreadCount: wsUnreadCount, unreadMessages: wsUnreadMessages, refresh: refreshUnread } = useDashboardChatWebSocket({
-    enabled: !isOnboarding,
+    enabled: true,
   });
 
   // User initials for avatar (set for potential future use)
@@ -175,6 +174,11 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfIncubatorDeviations, setIvfIncubatorDeviations] = useState<number | null>(null);
   const [ivfIncubatorTopDriver, setIvfIncubatorTopDriver] = useState<string | null>(null);
   const [loadingIvfIncubatorDeviations, setLoadingIvfIncubatorDeviations] = useState(false);
+
+  // Refrigerator deviations metric — replaces the incubator slot for refrigerator-capable tenants
+  const [refrigeratorDeviations, setRefrigeratorDeviations] = useState<number | null>(null);
+  const [refrigeratorTopDriver, setRefrigeratorTopDriver] = useState<string | null>(null);
+  const [loadingRefrigeratorDeviations, setLoadingRefrigeratorDeviations] = useState(false);
 
   // IVF quality deviation chart data (live API data)
   const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
@@ -706,6 +710,39 @@ export default function Dashboard({ }: DashboardProps) {
     return () => { cancelled = true; };
   }, [userDepartment, isAuthenticated]);
 
+  // Fetch refrigerator deviations — shown in place of the incubator slot for refrigerator-capable tenants
+  useEffect(() => {
+    if (!hasRefrigerators || !isAuthenticated) return;
+
+    let cancelled = false;
+    const fetchRefrigeratorDeviations = async () => {
+      setLoadingRefrigeratorDeviations(true);
+      try {
+        const now = new Date();
+        const fromTs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        const toTs = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
+        const [devRes, topRes] = await Promise.all([
+          ivfService.getRefrigeratorDeviationsByCategory(fromTs, toTs),
+          ivfService.getRefrigeratorTopKpi(fromTs, toTs),
+        ]);
+        if (!cancelled) {
+          setRefrigeratorDeviations(devRes?.total ?? 0);
+          setRefrigeratorTopDriver(topRes?.label ?? 'N/A');
+        }
+      } catch {
+        if (!cancelled) {
+          setRefrigeratorDeviations(0);
+          setRefrigeratorTopDriver('N/A');
+        }
+      } finally {
+        if (!cancelled) setLoadingRefrigeratorDeviations(false);
+      }
+    };
+
+    fetchRefrigeratorDeviations();
+    return () => { cancelled = true; };
+  }, [hasRefrigerators, isAuthenticated]);
+
   // Fetch IVF quality deviation chart from API
   useEffect(() => {
     const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
@@ -990,7 +1027,6 @@ export default function Dashboard({ }: DashboardProps) {
 
   const dashboardActionIcons = (
     <div className="flex items-center gap-4">
-      <TourEntryButton />
       <div className="relative">
         <img className="w-[22px] h-[22px] cursor-pointer" alt="Critical Alerts" src={CriticalAlertsIcon}
           onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }} />
@@ -1022,9 +1058,8 @@ export default function Dashboard({ }: DashboardProps) {
   );
 
   const dashboardActionIconsWithId = (
-    <div id="onboarding-dashboard-alerts" className="flex items-center gap-6">
-      <TourEntryButton label="Tour" />
-      <div id="onboarding-dashboard-critical-alerts-icon" className="flex flex-col items-center gap-1 cursor-pointer"
+    <div className="flex items-center gap-6">
+      <div className="flex flex-col items-center gap-1 cursor-pointer"
         onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
         <div className="relative">
           <img className="w-[28px] h-[28px]" alt="Critical Alerts" src={CriticalAlertsIcon} />
@@ -1036,7 +1071,7 @@ export default function Dashboard({ }: DashboardProps) {
         </div>
         <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Alerts</span>
       </div>
-      <div id="onboarding-dashboard-stakeholder-icon" className="flex flex-col items-center gap-1 cursor-pointer"
+      <div className="flex flex-col items-center gap-1 cursor-pointer"
         onClick={() => { refreshUnread(); fetchStakeholderChats(); setShowStakeholderChats(true); }}>
         <div className="relative">
           <img className="w-[28px] h-[28px]" alt="Stakeholder Chats" src={StakeholderChatsIcon} />
@@ -1048,7 +1083,7 @@ export default function Dashboard({ }: DashboardProps) {
         </div>
         <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Messages</span>
       </div>
-      <div id="onboarding-dashboard-mytasks-icon" className="flex flex-col items-center gap-1 cursor-pointer"
+      <div className="flex flex-col items-center gap-1 cursor-pointer"
         onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
         <div className="relative">
           <img className="w-[28px] h-[28px]" alt="My Tasks" src={MyTasksIcon} />
@@ -1065,7 +1100,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   return (
     <>
-      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop patternBackground hideTourButton>
+      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop patternBackground>
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
@@ -1100,11 +1135,11 @@ export default function Dashboard({ }: DashboardProps) {
                 {/* Left Column - Volume, Performance, Shipment sections */}
                 <div className="flex-1 flex flex-col gap-6 min-w-0">
                   {/* Volume Section */}
-                  <section id="onboarding-dashboard-kpis">
+                  <section>
                     <h2 className="font-semibold text-black text-base mb-4">Volume</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Total Embryos/Cryolocks */}
-                      <div id="onboarding-dashboard-kpi-cryolocks" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
+                      <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Embryos" src={EmbryosIcon} />
@@ -1123,7 +1158,7 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Total number of Containers */}
-                      <div id="onboarding-dashboard-kpi-containers" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
+                      <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Containers" src={ContainersIcon} />
@@ -1144,11 +1179,11 @@ export default function Dashboard({ }: DashboardProps) {
                   </section>
 
                   {/* Performance Section */}
-                  <section id="onboarding-dashboard-performance">
+                  <section>
                     <h2 className="font-semibold text-black text-base mb-4">Container Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Quality Deviations Flagged */}
-                      <div id="onboarding-dashboard-performance-deviations" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
+                      <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={CriticalAlertsIcon} />
@@ -1167,7 +1202,7 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Top Deviation Driver */}
-                      <div id="onboarding-dashboard-performance-driver" className="flex flex-col bg-white border border-line rounded-lg p-2 md:p-3 sm:h-[123px]">
+                      <div className="flex flex-col bg-white border border-line rounded-lg p-2 md:p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start md:mb-2 ml-2 md:ml-3 w-full min-w-0">
                           <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
@@ -1188,11 +1223,11 @@ export default function Dashboard({ }: DashboardProps) {
                   </section>
 
                   {/* Outbound Shipments Section */}
-                  <section id="onboarding-dashboard-incubator">
-                    <h2 className="font-semibold text-black text-base mb-4">Incubator Performance</h2>
+                  <section>
+                    <h2 className="font-semibold text-black text-base mb-4">{hasRefrigerators ? 'Refrigerator Performance' : 'Incubator Performance'}</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Outbound Shipments */}
-                      <div id="onboarding-dashboard-incubator-deviations" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
+                      <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={CriticalAlertsIcon} />
@@ -1201,15 +1236,15 @@ export default function Dashboard({ }: DashboardProps) {
                             Quality Deviations<br className="sm:hidden" /> Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {loadingIvfIncubatorDeviations
+                            {(hasRefrigerators ? loadingRefrigeratorDeviations : loadingIvfIncubatorDeviations)
                               ? '--'
-                              : <AnimatedNumber value={ivfIncubatorDeviations ?? 0} />}
+                              : <AnimatedNumber value={(hasRefrigerators ? refrigeratorDeviations : ivfIncubatorDeviations) ?? 0} />}
                           </div>
                         </div>
                       </div>
 
                       {/* Incubator Top Deviation Driver */}
-                      <div id="onboarding-dashboard-incubator-driver" className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
+                      <div className="flex flex-col bg-white border border-line rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-surface rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
@@ -1217,10 +1252,10 @@ export default function Dashboard({ }: DashboardProps) {
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
                             Top Deviation<br className="sm:hidden" /> Driver
                           </div>
-                          <div className="font-semibold text-black text-[23px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={ivfIncubatorTopDriver || undefined}>
-                            {loadingIvfIncubatorDeviations
+                          <div className="font-semibold text-black text-[23px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={(hasRefrigerators ? refrigeratorTopDriver : ivfIncubatorTopDriver) || undefined}>
+                            {(hasRefrigerators ? loadingRefrigeratorDeviations : loadingIvfIncubatorDeviations)
                               ? '--'
-                              : ivfIncubatorTopDriver ?? 'N/A'}
+                              : (hasRefrigerators ? refrigeratorTopDriver : ivfIncubatorTopDriver) ?? 'N/A'}
                           </div>
                         </div>
                       </div>
@@ -1232,14 +1267,13 @@ export default function Dashboard({ }: DashboardProps) {
                 <div className="flex-1 flex flex-col gap-6 min-w-0">
                   {/* <h1 className="font-semibold text-black text-lg">Monthly Summary</h1> */}
                   {/* Quality Tracking Links - Above the chart */}
-                  <section id="onboarding-dashboard-quality-tracking">
+                  <section>
                     <h2 className="font-semibold text-black text-base mb-4 text-right">
                       Monthly ({new Date().toLocaleString('default', { month: 'long' })})
                     </h2>
                     <div className="flex gap-6">
                       {/* Container Quality Tracking */}
                           <div
-                            id="onboarding-dashboard-cryocan-card"
                             className="flex-1 bg-primary rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5"
                         onClick={() => {
                           setShowTrackCanister(true);
@@ -1340,27 +1374,31 @@ export default function Dashboard({ }: DashboardProps) {
                       <div className="flex-1 bg-primary rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden  hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5">
                         {/* Background Graphic - Subtle Icon */}
                         <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
-                          <img
-                            className="w-24 h-24"
-                            alt="Incubator Quality Tracking background"
-                            src={IncubatorQualityTrackingIcon}
-                          />
+                          {hasRefrigerators
+                            ? <Refrigerator size={96} className="text-white" />
+                            : <img
+                                className="w-24 h-24"
+                                alt="Incubator Quality Tracking background"
+                                src={IncubatorQualityTrackingIcon}
+                              />}
                         </div>
 
                         {/* Content */}
                         <div className="relative h-full px-3 py-4">
                           {/* Icon at Top Left */}
                           <div className="absolute top-4 left-4">
-                            <img
-                              className="w-[18px] h-[18px] brightness-0 invert"
-                              alt="Incubator Quality Tracking"
-                              src={IncubatorQualityTrackingIcon}
-                            />
+                            {hasRefrigerators
+                              ? <Refrigerator size={18} className="text-white" />
+                              : <img
+                                  className="w-[18px] h-[18px] brightness-0 invert"
+                                  alt="Incubator Quality Tracking"
+                                  src={IncubatorQualityTrackingIcon}
+                                />}
                           </div>
 
                           {/* Title - Left aligned */}
                           <div className="font-semibold text-white text-[11px] md:text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
-                            Incubator <br /> Quality Tracking
+                            {hasRefrigerators ? 'Refrigerator' : 'Incubator'} <br /> Quality Tracking
                           </div>
 
                           {/* Arrow Button at Bottom Right */}
@@ -1384,7 +1422,7 @@ export default function Dashboard({ }: DashboardProps) {
                   </section>
 
                   {/* Quality Deviation Chart - Below Quality Tracking */}
-                  <section id="onboarding-dashboard-deviation-chart" className="flex-1 h-[347px]">
+                  <section className="flex-1 h-[347px]">
                     {loadingIvfQualityDeviationChart ? (
                       <div className="bg-white border border-line rounded-lg p-4 h-[347px] flex items-center justify-center">
                         <p className="text-gray-500">Loading quality deviation data...</p>
@@ -1404,7 +1442,7 @@ export default function Dashboard({ }: DashboardProps) {
               </div>
 
               {/* Ongoing Treatments Section */}
-              <section id="onboarding-dashboard-shipments" className="w-full">
+              <section className="w-full">
                 <div className="flex flex-col bg-white border border-line rounded-2xl p-4 w-full overflow-x-auto">
                 <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
@@ -2006,7 +2044,6 @@ export default function Dashboard({ }: DashboardProps) {
             setSearchParams(searchParams, { replace: true });
           }
         }}
-        id="onboarding-dashboard-critical-alerts-modal"
         alerts={transformedAlerts}
         loading={loadingAlerts}
         focusAlertId={focusAlertId}
@@ -2017,7 +2054,6 @@ export default function Dashboard({ }: DashboardProps) {
       <MyTasksModal
         isOpen={showMyTasks}
         onClose={() => setShowMyTasks(false)}
-        id="onboarding-dashboard-mytasks-modal"
         tasks={transformedTasks}
         loading={loadingTasks}
         variant="dashboard"
@@ -2027,7 +2063,6 @@ export default function Dashboard({ }: DashboardProps) {
       <StakeholderChatsModal
         isOpen={showStakeholderChats}
         onClose={() => setShowStakeholderChats(false)}
-        id="onboarding-dashboard-stakeholder-modal"
         chats={stakeholderChats}
         loading={loadingChats}
       />
