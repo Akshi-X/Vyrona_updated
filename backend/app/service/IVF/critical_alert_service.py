@@ -916,6 +916,11 @@ class CriticalAlertService:
                     if latest_deviation_ts is not None
                     else 0.0
                 )
+                tolerance_seconds = (
+                    min(cooldown_seconds, _LID_OPEN_TOLERANCE_SECONDS)
+                    if cooldown_seconds is not None
+                    else _LID_OPEN_TOLERANCE_SECONDS
+                )
                 logger.info(
                     "%s continuity for kpi_config_id=%s: start_time=%s latest_reading=%s duration=%.0fs tolerance=%.0fs",
                     kpi_config.kpi_name,
@@ -923,15 +928,15 @@ class CriticalAlertService:
                     episode_start,
                     latest_deviation_ts,
                     continuity_seconds,
-                    _LID_OPEN_TOLERANCE_SECONDS,
+                    tolerance_seconds,
                 )
-                if continuity_seconds < _LID_OPEN_TOLERANCE_SECONDS:
+                if continuity_seconds < tolerance_seconds:
                     logger.info(
                         "Skipping %s alert for kpi_config_id=%s; continuous deviation %.0fs below tolerance %.0fs",
                         kpi_config.kpi_name,
                         kpi_config.id,
                         continuity_seconds,
-                        _LID_OPEN_TOLERANCE_SECONDS,
+                        tolerance_seconds,
                     )
                     deviation.checked = True
                     checked_kpi_configs.append(kpi_config.id)
@@ -1777,6 +1782,11 @@ class CriticalAlertService:
                         if latest_deviation_ts is not None
                         else 0.0
                     )
+                    tolerance_seconds = (
+                        min(cooldown_seconds, _LID_OPEN_TOLERANCE_SECONDS)
+                        if cooldown_seconds is not None
+                        else _LID_OPEN_TOLERANCE_SECONDS
+                    )
                     logger.info(
                         "%s continuity for kpi_config_id=%s: start_time=%s latest_reading=%s duration=%.0fs tolerance=%.0fs",
                         kpi_config.kpi_name,
@@ -1784,15 +1794,15 @@ class CriticalAlertService:
                         lid_episode_start,
                         latest_deviation_ts,
                         continuity_seconds,
-                        _LID_OPEN_TOLERANCE_SECONDS,
+                        tolerance_seconds,
                     )
-                    if continuity_seconds < _LID_OPEN_TOLERANCE_SECONDS:
+                    if continuity_seconds < tolerance_seconds:
                         logger.info(
                             "Skipping %s alert for kpi_config_id=%s; continuous deviation %.0fs below tolerance %.0fs",
                             kpi_config.kpi_name,
                             kpi_config.id,
                             continuity_seconds,
-                            _LID_OPEN_TOLERANCE_SECONDS,
+                            tolerance_seconds,
                         )
                         deviation.checked = True
                         checked_kpi_configs.append(kpi_config.id)

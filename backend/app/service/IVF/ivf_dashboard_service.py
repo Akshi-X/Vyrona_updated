@@ -49,8 +49,8 @@ class IVFDashboardService:
                                 c.hospital_id = :hospital_id
                                 AND c.source = 'KPI'
                                 AND (:branch_id IS NULL OR c.branch_id = :branch_id)
-                                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
-                                AND (:to_dt IS NULL OR c.created_at < :to_dt)
+                                AND (:from_dt IS NULL OR c.occurred_at >= :from_dt)
+                                AND (:to_dt IS NULL OR c.occurred_at < :to_dt)
                             GROUP BY
                                 COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown');""")
 
@@ -243,42 +243,16 @@ class IVFDashboardService:
         Returns:
             Dictionary with total_quality_deviations count and breakdown counts
         """
-        # Apply branch filter based on role
-        filter_branch_id = self._get_branch_filter(branch_id, role)
-        
-        # Base query: count deviations in ivf_quality_log
-        # A deviation is defined as any KPI loss flag or quality_loss > 0
-        base_filter = or_(
-            and_(IVFQualityLog.quality_loss.isnot(None), IVFQualityLog.quality_loss > 0),
-            IVFQualityLog.is_temp_internal_loss == True,
-            IVFQualityLog.is_temp_external_loss == True,
-            IVFQualityLog.is_shock_loss == True,
+        # KPI deviation alerts (critical_alerts, source='KPI') for the current month.
+        month_start, next_month_start = self._get_current_month_bounds()
+        counts = self.get_deviation_counts_by_kpi(
+            hospital_id=hospital_id, branch_id=branch_id, role=role,
+            from_dt=month_start, to_dt=next_month_start,
         )
-        
-        q = self.db.query(
-            func.count(IVFQualityLog.id).label("total_quality_deviations"),
-        ).filter(base_filter)
-        
-        # Apply branch or hospital filtering if needed (ivf_quality_log is tank-level monitoring)
-        if filter_branch_id is not None:
-            q = (
-                q.join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
-                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                 .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
-        elif hospital_id is not None:
-            q = (
-                q.join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
-                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                 .filter(HospitalBranch.hospital_id == hospital_id)
-            )
-        
-        row = q.first()
-        total_deviations = int(row.total_quality_deviations or 0)
 
         # Keep ln2_level_deviations as 0 (legacy field used by older UI/types).
         return {
-            "total_quality_deviations": total_deviations,
+            "total_quality_deviations": sum(counts.values()),
             "ln2_level_deviations": 0,
         }
     
@@ -307,65 +281,27 @@ class IVFDashboardService:
         Returns:
             Dictionary with top deviation driver name, count, and all drivers breakdown
         """
-        # Apply branch filter based on role
-        filter_branch_id = self._get_branch_filter(branch_id, role)
-        
-        # Helper function to build query with optional branch/hospital filtering
-        # Join through: IVFQualityLog -> Tank -> Branch (tank-level monitoring)
-        def build_query(deviation_filter):
-            query = (
-                self.db.query(func.count(IVFQualityLog.id))
-                .filter(deviation_filter)
-            )
-            
-            if filter_branch_id is not None:
-                query = (
-                    query
-                    .join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(HospitalBranch.branch_id == filter_branch_id)
-                )
-            elif hospital_id is not None:
-                query = (
-                    query
-                    .join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(HospitalBranch.hospital_id == hospital_id)
-                )
-            
-            return query
-        
-        # Count internal temperature deviations
-        temp_internal_count = build_query(IVFQualityLog.is_temp_internal_loss == True).scalar() or 0
-        
-        # Count external temperature deviations
-        temp_external_count = build_query(IVFQualityLog.is_temp_external_loss == True).scalar() or 0
-        
-        # Count shock deviations
-        shock_count = build_query(IVFQualityLog.is_shock_loss == True).scalar() or 0
-        
-        # Determine top driver
-        drivers = {
-            "Internal Temperature": temp_internal_count,
-            "External Temperature": temp_external_count,
-            "Shock": shock_count
-        }
-        
-        # Find top driver
-        if not any(drivers.values()):
+        # KPI deviation alerts (critical_alerts, source='KPI') grouped by the
+        # configured alert name, for the current month.
+        month_start, next_month_start = self._get_current_month_bounds()
+        drivers = self.get_deviation_counts_by_kpi(
+            hospital_id=hospital_id, branch_id=branch_id, role=role,
+            from_dt=month_start, to_dt=next_month_start,
+        )
+
+        if not drivers or not any(drivers.values()):
             return {
                 "driver_name": "N/A",
                 "count": 0,
-                "all_drivers": drivers
+                "all_drivers": dict(drivers),
             }
-        
-        top_driver = max(drivers.items(), key=lambda x: x[1])
-        driver_name, driver_count = top_driver
-        
+
+        driver_name, driver_count = max(drivers.items(), key=lambda x: x[1])
+
         return {
             "driver_name": driver_name,
             "count": driver_count,
-            "all_drivers": drivers
+            "all_drivers": dict(drivers),
         }
     
     def get_total_deviations(
@@ -396,8 +332,8 @@ class IVFDashboardService:
               AND c.source = 'KPI'
               AND c.status = 'Active'
               AND (:branch_id IS NULL OR c.branch_id = :branch_id)
-              AND (:from_dt IS NULL OR c.created_at >= :from_dt)
-              AND (:to_dt IS NULL OR c.created_at < :to_dt)
+              AND (:from_dt IS NULL OR c.occurred_at >= :from_dt)
+              AND (:to_dt IS NULL OR c.occurred_at < :to_dt)
         """)
         active_count = self.db.execute(active_query, {
             "hospital_id": hospital_id,
@@ -511,8 +447,8 @@ class IVFDashboardService:
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
                 AND (:branch_id IS NULL OR b.branch_id = :branch_id)
-                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
-                AND (:to_dt IS NULL OR c.created_at < :to_dt)
+                AND (:from_dt IS NULL OR c.occurred_at >= :from_dt)
+                AND (:to_dt IS NULL OR c.occurred_at < :to_dt)
             GROUP BY
                 b.branch_name,
                 t.tank_code,
@@ -544,8 +480,8 @@ class IVFDashboardService:
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
                 AND (:branch_id IS NULL OR b.branch_id = :branch_id)
-                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
-                AND (:to_dt IS NULL OR c.created_at < :to_dt)
+                AND (:from_dt IS NULL OR c.occurred_at >= :from_dt)
+                AND (:to_dt IS NULL OR c.occurred_at < :to_dt)
             GROUP BY
                 b.branch_name, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
             ORDER BY
@@ -635,8 +571,8 @@ class IVFDashboardService:
             WHERE
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
-                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
-                AND (:to_dt IS NULL OR c.created_at < :to_dt)
+                AND (:from_dt IS NULL OR c.occurred_at >= :from_dt)
+                AND (:to_dt IS NULL OR c.occurred_at < :to_dt)
             GROUP BY
                 c.branch_id, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
         )
