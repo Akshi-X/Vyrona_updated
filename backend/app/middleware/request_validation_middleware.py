@@ -7,6 +7,7 @@ Validates requests before reaching controllers.
 
 import json
 import logging
+import re
 from typing import Callable
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -26,7 +27,7 @@ from ..dependencies.auth_dependencies import (
 from ..utils.utils import create_error_response
 from ..exceptions.custom_exceptions import AppException
 from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
-from ..constants.app_constants import COMMON_API_HEADERS
+from ..constants.app_constants import COMMON_API_HEADERS, EMAIL_REGEX
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -111,7 +112,15 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     error_code="VAL_INPUT_001",
                     message=ErrorMessages.EMAIL_AND_PASSWORD_REQUIRED
                 )
-            
+
+            # Validate email format before hitting the database
+            if not re.match(EMAIL_REGEX, email):
+                return create_error_response(
+                    status_code=422,
+                    error_code=ERROR_CODES["INVALID_EMAIL_FORMAT"],
+                    message=ErrorMessages.INVALID_EMAIL
+                )
+
             # Validate using dependency function
             db = SessionLocal()
             try:

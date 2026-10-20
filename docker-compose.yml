@@ -36,7 +36,7 @@ services:
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
     container_name: mgscale-azurite
-    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
     ports:
       - "10000:10000"
       - "10001:10001"
@@ -112,8 +112,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      - ALERT_API_BASE_URL=http://backend:8000
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - ALERT_API_BASE_URL=${ALERT_API_BASE_URL:-http://host.docker.internal:8000}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-CHANGE_ME_TO_A_SECURE_RANDOM_STRING}
       - EVENT_HUB_CONNECTION_STRING=Endpoint=sb://eventhub-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
       - EVENT_HUB_NAME=telemetry-events
     networks:

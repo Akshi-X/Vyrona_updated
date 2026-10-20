@@ -5,8 +5,9 @@ Optimized for Azure Functions with error handling, idempotency, and connection p
 
 import json
 import logging
+import re
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -28,6 +29,28 @@ from shared.idempotency import generate_message_id, try_mark_message_processing
 from shared.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
+
+
+def parse_iso_timestamp(ts_str: Any) -> datetime:
+    """Safely parse ISO timestamp string, normalizing 'Z' and non-standard subseconds for Python 3.10."""
+    if not ts_str:
+        return datetime.now(timezone.utc)
+    if isinstance(ts_str, datetime):
+        return ts_str
+    ts_str = str(ts_str).strip()
+    if ts_str.endswith("Z") or ts_str.endswith("z"):
+        ts_str = ts_str[:-1] + "+00:00"
+    # Python 3.10 fromisoformat requires exactly 3 or 6 fractional digits if dot is present
+    m = re.search(r"\.(\d+)", ts_str)
+    if m:
+        frac = m.group(1)
+        if len(frac) not in (3, 6):
+            frac_6 = (frac + "000000")[:6]
+            ts_str = ts_str[:m.start(1)] + frac_6 + ts_str[m.end(1):]
+    try:
+        return datetime.fromisoformat(ts_str)
+    except Exception:
+        return datetime.now(timezone.utc)
 
 # Cache for patient IDs (loaded once, reused across invocations)
 _patient_ids_cache: Optional[List[str]] = None
@@ -363,17 +386,7 @@ def process_tive_refrigerator(
     kpis = extract_tive_temperature_kpis(webhook_payload, timestamp)
     kpi_map = {kpi["name"]: kpi["value"] for kpi in kpis}
 
-    timestamp_str = timestamp
-    if isinstance(timestamp_str, str) and timestamp_str.endswith("Z"):
-        timestamp_str = timestamp_str[:-1] + "+00:00"
-    try:
-        raw_data_timestamp = (
-            datetime.fromisoformat(timestamp_str)
-            if isinstance(timestamp_str, str)
-            else datetime.now()
-        )
-    except (TypeError, ValueError):
-        raw_data_timestamp = datetime.now()
+    raw_data_timestamp = parse_iso_timestamp(timestamp)
 
     # Insert raw data (always) — archive the full Tive webhook payload so the
     # raw audit trail exists even when KPI extraction yields nothing.
@@ -472,13 +485,7 @@ def process_custom_incubator_iot(
         )
         return False
 
-    if timestamp_str.endswith("Z"):
-        timestamp_str = timestamp_str[:-1] + "+00:00"
-    try:
-        timestamp = datetime.fromisoformat(timestamp_str)
-    except (TypeError, ValueError):
-        logger.warning(f"Invalid timestamp_utc_iso in CUSTOM_INCUBATOR_IOT payload: {timestamp_str}")
-        return False
+    timestamp = parse_iso_timestamp(timestamp_str)
 
     incubator_info = find_incubator_by_device_id(db_session, device_id)
     if incubator_info is None:
@@ -1596,9 +1603,10 @@ def check_ln2_alert_conditions(
     if state_step and state_step.new_state.value == "OPEN":
         if last_state_change:
             try:
-                last_change_dt = datetime.fromisoformat(last_state_change)
+                last_change_dt = parse_iso_timestamp(last_state_change)
+                now_dt = datetime.now(timezone.utc) if last_change_dt.tzinfo else datetime.now()
                 duration_minutes = (
-                    datetime.now() - last_change_dt
+                    now_dt - last_change_dt
                 ).total_seconds() / 60
                 alerts["lid_open_beyond_threshold"] = duration_minutes > 30
             except (ValueError, TypeError) as e:
@@ -1724,10 +1732,8 @@ def process_custom_iot_ln2(
             logger.warning("Missing required CUSTOM_IOT fields (deviceid or timestamp)")
             return False
 
-        # Handle ISO timestamp with 'Z' suffix
-        if timestamp_str.endswith("Z"):
-            timestamp_str = timestamp_str[:-1] + "+00:00"
-        timestamp = datetime.fromisoformat(timestamp_str)
+        # Safely parse ISO timestamp (handles Z and variable subseconds in Python 3.10)
+        timestamp = parse_iso_timestamp(timestamp_str)
 
         # 2. Load DeviceConfig
         cfg = get_ln2_device_config(db_session, device_code)
@@ -2284,9 +2290,7 @@ def process_custom_composite_iot(
             )
             return False
 
-        if timestamp_str.endswith("Z"):
-            timestamp_str = timestamp_str[:-1] + "+00:00"
-        timestamp = datetime.fromisoformat(timestamp_str)
+        timestamp = parse_iso_timestamp(timestamp_str)
 
         cfg = get_ln2_device_config(db_session, device_code)
         if cfg is None:

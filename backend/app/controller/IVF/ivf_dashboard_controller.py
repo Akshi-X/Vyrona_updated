@@ -45,6 +45,11 @@ def get_dashboard_branch_filter(request: Request) -> tuple:
         - branch_id: Branch ID to filter by, or None if no filtering
         - role: User's role, or None if not an IVF user
     """
+    # Hospital-user tokens must carry their scope claims; a token missing
+    # hospital_id or branch_id is not authorized for dashboard metrics.
+    if getattr(request.state, "hospital_id", None) is None or getattr(request.state, "branch_id", None) is None:
+        raise HTTPException(status_code=401, detail="Token missing hospital or branch scope")
+
     # Use the shared helper function with is_quality_tracking=False
     # This ensures Managers see all branches (not filtered to their own branch)
     return get_branch_filter_info(request, branch_id_override=None, is_quality_tracking=False)

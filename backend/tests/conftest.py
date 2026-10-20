@@ -43,6 +43,12 @@ def fix_missing_columns():
         conn.execute(text(
             "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS zone_id VARCHAR(255);"
         ))
+        conn.execute(text(
+            "ALTER TABLE incubators ADD COLUMN IF NOT EXISTS pressure_mmhg NUMERIC(6,2);"
+        ))
+        conn.execute(text(
+            "ALTER TABLE incubators ADD COLUMN IF NOT EXISTS hco3_mm NUMERIC(6,2);"
+        ))
         conn.commit()
 
 

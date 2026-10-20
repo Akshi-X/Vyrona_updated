@@ -991,7 +991,52 @@ def list_kpi_config(
     }
 
 
-@router.post("/kpi-config")
+def _parse_kpi_numeric(val, field_name: str) -> Optional[float]:
+    if val is None:
+        return None
+    if isinstance(val, bool):
+        raise HTTPException(status_code=400, detail={"error": f"Invalid {field_name}: must be a number"})
+    if isinstance(val, (int, float)):
+        return float(val)
+    if isinstance(val, str):
+        s = val.strip()
+        if not s:
+            raise HTTPException(status_code=400, detail={"error": f"Invalid {field_name}: cannot be empty string"})
+        try:
+            return float(s)
+        except ValueError:
+            raise HTTPException(status_code=400, detail={"error": f"Invalid {field_name}: must be a number"})
+    raise HTTPException(status_code=400, detail={"error": f"Invalid {field_name}: must be a number"})
+
+
+def _validate_kpi_thresholds(kpi_name: str, min_val: Optional[float], max_val: Optional[float]):
+    kpi = (kpi_name or "").strip()
+    if kpi in ("external_temperature", "internal_temperature", "evaporation_rate_ln2", "shock_detection"):
+        if min_val is None or max_val is None:
+            raise HTTPException(status_code=400, detail={"error": "Both min and max are required"})
+        if min_val > max_val:
+            raise HTTPException(status_code=400, detail={"error": "Min must be ≤ Max"})
+
+    elif kpi == "ln2_level":
+        if min_val is not None and min_val < 0:
+            raise HTTPException(status_code=400, detail={"error": "Min cannot be negative"})
+
+    elif kpi == "battery_level":
+        if min_val is not None and min_val < 0:
+            raise HTTPException(status_code=400, detail={"error": "Min cannot be negative"})
+        if max_val is not None and max_val < 0:
+            raise HTTPException(status_code=400, detail={"error": "Max cannot be negative"})
+        if min_val is not None and min_val > 100:
+            raise HTTPException(status_code=400, detail={"error": "Min cannot exceed 100"})
+        if max_val is not None and max_val > 100:
+            raise HTTPException(status_code=400, detail={"error": "Max cannot exceed 100"})
+        if max_val is not None and max_val == 0:
+            raise HTTPException(status_code=400, detail={"error": "Max cannot be zero"})
+        if min_val is not None and max_val is not None and min_val > max_val:
+            raise HTTPException(status_code=400, detail={"error": "Max must be ≥ Min"})
+
+
+@router.post("/kpi-config", status_code=201)
 def create_kpi_config(
     request: Request,
     db: Session = Depends(get_db),
@@ -1021,6 +1066,10 @@ def create_kpi_config(
     if branch_id is not None and branch_id_val != branch_id:
         raise HTTPException(status_code=403, detail="Cannot create config for another branch")
 
+    min_val = _parse_kpi_numeric(body.get("min"), "min")
+    max_val = _parse_kpi_numeric(body.get("max"), "max")
+    _validate_kpi_thresholds(str(body["kpi_name"]), min_val, max_val)
+
     quality_service = QualityService(db)
     row = quality_service.create_kpi_config(
         hospital_id=hospital_id,
@@ -1032,8 +1081,8 @@ def create_kpi_config(
         zone_id=None if refrigerator_id_val else body.get("zone_id"),
         kpi_name=str(body["kpi_name"]),
         alert_name=body.get("alert_name"),
-        min_val=body.get("min") if body.get("min") is not None else None,
-        max_val=body.get("max") if body.get("max") is not None else None,
+        min_val=min_val,
+        max_val=max_val,
         unit=body.get("unit"),
         alert_type=body.get("alert_type"),
         cooldown_minutes=int(body["cooldown_minutes"]) if body.get("cooldown_minutes") is not None else None,
@@ -1362,13 +1411,21 @@ def update_kpi_config(
     if not existing:
         raise HTTPException(status_code=404, detail="KPI config not found")
     before_state = _kpi_config_metadata(existing)
+    min_val = _parse_kpi_numeric(body.get("min"), "min") if "min" in body else None
+    max_val = _parse_kpi_numeric(body.get("max"), "max") if "max" in body else None
+    effective_min = min_val if "min" in body else (float(existing.min) if existing.min is not None else None)
+    effective_max = max_val if "max" in body else (float(existing.max) if existing.max is not None else None)
+    effective_kpi = (body.get("kpi_name") or existing.kpi_name or "").strip()
+    if "min" in body or "max" in body or "kpi_name" in body:
+        _validate_kpi_thresholds(effective_kpi, effective_min, effective_max)
+
     row = quality_service.update_kpi_config(
         config_id=config_id,
         branch_id=branch_id,
         kpi_name=body.get("kpi_name"),
         alert_name=body.get("alert_name"),
-        min_val=body.get("min") if body.get("min") is not None else None,
-        max_val=body.get("max") if body.get("max") is not None else None,
+        min_val=min_val,
+        max_val=max_val,
         unit=body.get("unit"),
         alert_type=body.get("alert_type"),
         cooldown_minutes=int(body["cooldown_minutes"])

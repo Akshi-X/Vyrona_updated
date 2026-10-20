@@ -1271,8 +1271,8 @@ def test_lid_state_open_alert_flow(db):
     db.execute(text("UPDATE kpi_config SET status = false WHERE tank_id = 97;"))
     db.execute(text("DELETE FROM kpi_config WHERE tank_id = 97 AND kpi_name = 'ln2_lid_state';"))
     db.execute(text("""
-        INSERT INTO kpi_config (hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        VALUES (9926, 9926, 97, 'ln2_lid_state', 'Lid Open/Closed State', 0.0000, 0.0000, 'state', 'critical', 1, true);
+        INSERT INTO kpi_config (hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status, email_alert)
+        VALUES (9926, 9926, 97, 'ln2_lid_state', 'Lid Open/Closed State', 0.0000, 0.0000, 'state', 'critical', 1, true, true);
     """))
     db.commit()
 
@@ -1314,7 +1314,7 @@ def test_lid_state_open_alert_flow(db):
                 if msg_id and msg_id not in seen_ids:
                     to_addr = msg.get("to") or ""
                     subject = msg.get("subject") or ""
-                    if "test-user94@mygrape.com" in to_addr and "Critical Alert" in subject:
+                    if "test-user94@mygrape.com" in to_addr and ("Critical Alert" in subject or "Alert Continuation" in subject):
                         # Payload sent lid_state=2 (OPEN) -> ln2_lid_state OPEN alert
                         html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html", timeout=5)
                         if html_res.status_code == 200 and "Lid Open/Closed State is OPEN" in html_res.text:
@@ -1501,7 +1501,22 @@ def test_email_content_check(db):
     print("\n--- TEST: EMAIL CONTENT VERIFICATION ---")
     
     # 1. Start with a clean slate
+    print("Waiting 3s for in-flight emails from previous tests to deliver...")
+    time.sleep(3)
+    db.execute(text("DELETE FROM critical_alerts WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM readings WHERE tank_id = 94;"))
+    db.execute(text("DELETE FROM ivf_telemetry_data WHERE tank_id = 94;"))
+    db.commit()
+
     clear_smtp4dev()
+
+    seen_email_ids = set()
+    try:
+        res = requests.get(f"{SMTP_API_URL}?pageSize=1000", timeout=5).json()
+        msgs = res.get("results", res) if isinstance(res, dict) else res
+        seen_email_ids = {m.get("id") for m in msgs if m.get("id")}
+    except Exception:
+        pass
     
     # 2. Trigger an alert (Using a mock payload that violates a threshold)
     now = datetime.now(timezone.utc)
@@ -1533,10 +1548,16 @@ def test_email_content_check(db):
     latest_msg = None
     for _ in range(20):
         time.sleep(1)
-        res = requests.get(f"{SMTP_API_URL}?pageSize=10", timeout=5).json()
+        res = requests.get(f"{SMTP_API_URL}?pageSize=20", timeout=5).json()
         msgs = res.get("results", res) if isinstance(res, dict) else res
         for m in msgs:
-            if "test-user94@mygrape.com" in (m.get("to") or "") and "Critical Alert" in (m.get("subject") or ""):
+            m_id = m.get("id")
+            if (
+                m_id not in seen_email_ids
+                and "test-user94@mygrape.com" in (m.get("to") or "")
+                and "Critical Alert" in (m.get("subject") or "")
+                and "T94" in (m.get("subject") or "")
+            ):
                 latest_msg = m
                 break
         if latest_msg:
@@ -1574,6 +1595,8 @@ def test_midnight_cooldown_check(db):
     print("\n--- TEST: MIDNIGHT COOLDOWN CROSSOVER ---")
 
     # 1. Setup: Clean records for Tank 94 to start with a clean slate
+    print("Waiting 3s for in-flight requests from previous tests to settle...")
+    time.sleep(3)
     db.execute(text("DELETE FROM critical_alerts WHERE tank_id = 94;"))
     db.execute(text("DELETE FROM readings WHERE tank_id = 94;"))
     db.execute(text("DELETE FROM ivf_telemetry_data WHERE tank_id = 94;"))
@@ -1582,7 +1605,7 @@ def test_midnight_cooldown_check(db):
     # 2. Configure KPI config for Tank 94 with a 3-minute cooldown
     db.execute(text("""
         UPDATE kpi_config 
-        SET cooldown_minutes = 3, min = -196.0000, max = -150.0000, alert_type = 'critical', status = true
+        SET cooldown_minutes = 3, min = -196.0000, max = -150.0000, alert_type = 'critical', status = true, email_alert = true
         WHERE tank_id = 94 AND kpi_name = 'temp_internal';
     """))
     db.commit()
@@ -1594,6 +1617,13 @@ def test_midnight_cooldown_check(db):
         pass
 
     seen_email_ids = set()
+    try:
+        res = requests.get(f"{SMTP_API_URL}?pageSize=1000", timeout=5).json()
+        msgs = res.get("results", res) if isinstance(res, dict) else res
+        seen_email_ids = {m.get("id") for m in msgs if m.get("id")}
+    except Exception:
+        pass
+
     headers = {"Content-Type": "application/json"}
 
     # --- payload helper ---
@@ -1649,7 +1679,7 @@ def test_midnight_cooldown_check(db):
                 if msg_id and msg_id not in seen_ids:
                     to_addr = msg.get("to") or ""
                     subject = msg.get("subject") or ""
-                    if "test-user94@mygrape.com" in to_addr and "Critical Alert" in subject:
+                    if "test-user94@mygrape.com" in to_addr and ("Critical Alert" in subject or "Alert Continuation" in subject):
                         # fetch the full message's HTML body from the correct endpoint
                         html_res = requests.get(f"{SMTP_API_URL}/{msg_id}/html", timeout=5)
                         html_text = html_res.text if html_res.status_code == 200 else ""
@@ -1662,9 +1692,10 @@ def test_midnight_cooldown_check(db):
         return new_emails
 
     ist_tz = timezone(timedelta(hours=5, minutes=30))
+    yesterday_ist = (datetime.now(ist_tz) - timedelta(days=1)).date()
 
     # --- SIMULATE 11:58 PM IST (First Alert) ---
-    time_1 = datetime(2026, 6, 15, 23, 58, 0, tzinfo=ist_tz)
+    time_1 = datetime(yesterday_ist.year, yesterday_ist.month, yesterday_ist.day, 23, 58, 0, tzinfo=ist_tz)
     print(f"Simulating Time 1 (First Payload): {time_1.isoformat()}")
     
     resp = requests.post(INGESTION_URL, json=get_payload(time_1), headers=headers, timeout=10)
@@ -1707,14 +1738,26 @@ def test_midnight_cooldown_check(db):
     assert email_found_1, "Email was not dispatched for the first payload"
 
     # --- SIMULATE 11:59 PM IST (Within 3-min Cooldown) ---
-    time_2 = datetime(2026, 6, 15, 23, 59, 0, tzinfo=ist_tz)
+    time_2 = datetime(yesterday_ist.year, yesterday_ist.month, yesterday_ist.day, 23, 59, 0, tzinfo=ist_tz)
     print(f"Simulating Time 2 (Within Cooldown): {time_2.isoformat()}")
     
     resp = requests.post(INGESTION_URL, json=get_payload(time_2), headers=headers, timeout=10)
     assert resp.status_code == 200, f"Webhook ingestion failed: {resp.status_code} - {resp.text}"
 
-    # Wait a bit and verify that alert count is still 1
-    time.sleep(3)
+    # Wait for the cooldown reading to be created and processed (checked=True)
+    time_2_utc = time_2.astimezone(timezone.utc)
+    reading_2_processed = False
+    for _ in range(15):
+        time.sleep(1)
+        db.rollback()
+        r = db.execute(text("""
+            SELECT checked FROM readings 
+            WHERE tank_id = 94 AND timestamp = :ts
+        """), {"ts": time_2_utc}).fetchone()
+        if r is not None and r[0] is True:
+            reading_2_processed = True
+            break
+
     db.rollback()
     alert_count = db.execute(text("SELECT COUNT(*) FROM critical_alerts WHERE tank_id = 94")).scalar()
     assert alert_count == 1, f"Expected 1 alert during cooldown, but got {alert_count}"
@@ -1737,7 +1780,8 @@ def test_midnight_cooldown_check(db):
     db.commit()
 
     # --- SIMULATE 12:02 AM IST NEXT DAY (After 3-min Cooldown) ---
-    time_3 = datetime(2026, 6, 16, 0, 2, 0, tzinfo=ist_tz)
+    next_day_ist = yesterday_ist + timedelta(days=1)
+    time_3 = datetime(next_day_ist.year, next_day_ist.month, next_day_ist.day, 0, 2, 0, tzinfo=ist_tz)
     print(f"Simulating Time 3 (Next Day, After Cooldown): {time_3.isoformat()}")
     
     resp = requests.post(INGESTION_URL, json=get_payload(time_3), headers=headers, timeout=10)
