@@ -47,7 +47,6 @@ import {
   Inbox,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
-import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import CriticalAlertsModal from "../../components/CriticalAlertsModal";
 import MyTasksModal, { type MyTask } from "../../components/MyTasksModal";
 import StakeholderChatsModal from "../../components/StakeholderChatsModal";
@@ -354,7 +353,6 @@ const CardRangeSelect: React.FC<{ value: CardRange; onChange: (v: CardRange) => 
 
 const DashboardHospital8: React.FC = () => {
   const { isAuthenticated, userRole } = useAuth();
-  const isOnboarding = useOnboardingMode();
 
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
@@ -487,7 +485,7 @@ const DashboardHospital8: React.FC = () => {
   const {
     unreadCount: wsUnreadCount,
     refresh: refreshUnread,
-  } = useDashboardChatWebSocket({ enabled: !isOnboarding });
+  } = useDashboardChatWebSocket({ enabled: true });
 
   // ── Modal data fetchers ─────────────────────────────────────────────
   const fetchStakeholderChats = async () => {
@@ -1384,7 +1382,7 @@ const DashboardHospital8: React.FC = () => {
             </DashboardCard>
 
             {/* Operations card */}
-            <div id="onboarding-dashboard-alerts" className="pointer-events-auto h-full order-3 col-span-5">
+            <div className="pointer-events-auto h-full order-3 col-span-5">
               <DashboardCard accent="violet" className="group h-full">
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <Inbox size={12} style={{ color: "#8b3ad6" }} />

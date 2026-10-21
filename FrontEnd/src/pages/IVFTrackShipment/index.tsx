@@ -5,7 +5,6 @@ import PageLayout from '../../components/PageLayout';
 import PageBreadcrumb from '../../components/PageBreadcrumb';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/CryocanDarkN.svg';
 import { useAuth } from '../../contexts/AuthContext';
-// import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
 import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
 import IVFQualityTrackingChart from './sections/IVFQualityTrackingChart';
@@ -468,7 +467,7 @@ export default function IVFTrackShipmentPage() {
                 </div>
             </div>
             {/* Critical Alerts */}
-            <div id="onboarding-ivf-critical-alerts-icon" className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
+            <div className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
                 <div className="relative">
                     <img className="w-[28px] h-[28px]" alt="Critical Alerts" src={CriticalAlertsIcon} />
                     {criticalAlertsCount > 0 && (
@@ -480,7 +479,7 @@ export default function IVFTrackShipmentPage() {
                 <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Alerts</span>
             </div>
             {/* Stakeholder Chats */}
-            <div id="onboarding-ivf-stakeholder-chats-icon" className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => setShowStakeholderChatScreen(true)}>
+            <div className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => setShowStakeholderChatScreen(true)}>
                 <div className="relative">
                     <img className="w-[28px] h-[28px]" alt="Stakeholder Chats" src={StakeholderChatsIcon} />
                     {stakeholderChatCount > 0 && (
@@ -492,7 +491,7 @@ export default function IVFTrackShipmentPage() {
                 <span className="text-[10px] font-semibold text-gray-500 whitespace-nowrap">Messages</span>
             </div>
             {/* My Tasks */}
-            <div id="onboarding-ivf-my-tasks-icon" className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
+            <div className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
                 <div className="relative">
                     <img className="w-[28px] h-[28px]" alt="My Tasks" src={MyTasksIcon} />
                     {myTasksCount > 0 && (
@@ -641,7 +640,6 @@ export default function IVFTrackShipmentPage() {
 
             {/* Modals */}
             <CriticalAlertsModal
-                id="onboarding-ivf-critical-alerts-modal"
                 isOpen={showCriticalAlerts}
                 onClose={() => setShowCriticalAlerts(false)}
                 alerts={criticalAlerts.map((a) => ({
@@ -690,7 +688,6 @@ export default function IVFTrackShipmentPage() {
                 }}
             />
             <MyTasksModal
-                id="onboarding-my-tasks-modal"
                 isOpen={showMyTasks}
                 onClose={() => setShowMyTasks(false)}
                 tasks={myTasks.map((task) => {

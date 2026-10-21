@@ -222,17 +222,13 @@ export function BentoCard({
     className = "",
     children,
     delay = 0,
-    id,
 }: {
     className?: string;
     children: ReactNode;
     delay?: number;
-    /** Onboarding tour anchor, e.g. "onboarding-alert-kpi-temp_internal". */
-    id?: string;
 }) {
     return (
         <div
-            id={id}
             className={`cryo-in relative md:overflow-hidden rounded-none md:rounded-[20px] border-0 md:border md:border-gray-100 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${className}`}
             style={{ animationDelay: `${delay}ms`, color: INK } as CSSProperties}
         >
@@ -377,7 +373,6 @@ export function ChannelBar({
                     <button
                         type="button"
                         aria-pressed={on && draft.whatsapp_alert}
-                        id={`onboarding-alert-whatsapp-${kpiName}`}
                         aria-label="WhatsApp alerts"
                         title={locked ? `Select ${lockNoun} first` : on ? "WhatsApp alerts" : "Turn the alert on first"}
                         disabled={!on || locked}
@@ -400,7 +395,6 @@ export function ChannelBar({
                     <button
                         type="button"
                         aria-pressed={on && draft.email_alert}
-                        id={`onboarding-alert-email-${kpiName}`}
                         aria-label="Email alerts"
                         title={locked ? `Select ${lockNoun} first` : on ? "Email alerts" : "Turn the alert on first"}
                         disabled={!on || locked}
@@ -429,7 +423,6 @@ export function ChannelBar({
                         type="button"
                         role="switch"
                         aria-checked={on}
-                        id={`onboarding-alert-toggle-${kpiName}`}
                         aria-label="Alert on/off"
                         disabled={locked}
                         onClick={() =>
@@ -685,7 +678,7 @@ function EscalationInput({
 }) {
     const v = draft.unack_escalation_threshold ?? null;
     return (
-        <div id={`onboarding-alert-escalation-${kpiName}`} className="relative h-9 flex items-center justify-between gap-2 mt-1.5 px-3 rounded-xl bg-orange-50 border border-orange-100">
+        <div className="relative h-9 flex items-center justify-between gap-2 mt-1.5 px-3 rounded-xl bg-orange-50 border border-orange-100">
             <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-orange-800">Mail Escalation</span>
             <div className="flex items-center gap-1.5">
                 <input
@@ -711,10 +704,9 @@ function EscalationInput({
     );
 }
 
-function EscalationHint({ message, dim = false, id }: { message: string; dim?: boolean; id?: string }) {
+function EscalationHint({ message, dim = false }: { message: string; dim?: boolean }) {
     return (
         <div
-            id={id}
             className={`relative mt-1.5 px-3 py-2 @min-[25.625rem]:h-9 @min-[25.625rem]:py-0 rounded-xl border border-dashed flex items-center gap-2 ${
                 dim ? "bg-gray-100 border-gray-200" : "bg-primary-bg/60 border-primary-ring"
             }`}
@@ -794,7 +786,6 @@ export function EscalationRow({
                 <EscalationInput kpiName={kpiName} draft={draft} onDraft={onDraft} />
             ) : (
                 <EscalationHint
-                    id={`onboarding-alert-escalation-${kpiName}`}
                     dim={!draft.enabled}
                     message={
                         draft.enabled
@@ -872,7 +863,7 @@ function InternalTemperatureCard({
     onDraft: (kpiName: string, patch: Partial<KpiDraft>) => void;
 }) {
     return (
-        <BentoCard delay={0} id={`onboarding-alert-kpi-${KPI.TEMP_INTERNAL}`} className="col-span-12 @min-[70rem]:col-span-5 md:min-h-[402px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
+        <BentoCard delay={0} className="col-span-12 @min-[70rem]:col-span-5 md:min-h-[402px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
             <Thermometer strokeWidth={1.25} className="absolute top-4 right-4 w-24 h-24 text-[#6B3A7E] opacity-[0.12]" />
             <div className="relative">
                 <CardTitle>Internal temperature:</CardTitle>
@@ -903,7 +894,7 @@ function Ln2LevelCard({
     l2Pct: number | null;
 }) {
     return (
-        <BentoCard delay={60} id={`onboarding-alert-kpi-${KPI.LN2_LEVEL}`} className="col-span-12 @min-[70rem]:col-span-7 md:min-h-[402px] pt-4 px-0 pb-4 md:p-4 flex flex-row gap-4">
+        <BentoCard delay={60} className="col-span-12 @min-[70rem]:col-span-7 md:min-h-[402px] pt-4 px-0 pb-4 md:p-4 flex flex-row gap-4">
             <div className="relative flex-1 min-w-0 flex flex-col items-start gap-2">
                 <div className="relative">
                     <CardTitle>LN2 level:</CardTitle>
@@ -968,7 +959,7 @@ function LidStateCard({
     const known = live.lidOpen != null;
     const open = live.lidOpen === true;
     return (
-        <BentoCard delay={120} id={`onboarding-alert-kpi-${KPI.LID_STATE}`} className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[402px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
+        <BentoCard delay={120} className="col-span-12 @4xl:col-span-6 @min-[81rem]:col-span-4 md:min-h-[402px] pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2">
             {/* lid_state.svg is white-only art; mask + backgroundColor tints it like the other decos */}
             <span
                 aria-hidden
@@ -1063,7 +1054,7 @@ export function EditableKpiCard({
     currentReading?: number | null;
 }) {
     return (
-        <BentoCard delay={delay} id={`onboarding-alert-kpi-${kpiName}`} className={`${className} pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2`}>
+        <BentoCard delay={delay} className={`${className} pt-4 px-0 pb-4 md:p-4 flex flex-col gap-2`}>
             {deco}
             <div className="relative">
                 <CardTitle>{title}</CardTitle>
@@ -1502,7 +1493,6 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                                 {otherTanks.length > 0 && configRows.length > 0 && (
                                     <div className="relative">
                                         <button
-                                            id="onboarding-alert-copy-tanks"
                                             type="button"
                                             onClick={() => setShowCopyDropdown((v) => !v)}
                                             disabled={savingCopy}
@@ -1585,7 +1575,6 @@ const CryoBentoGrid = forwardRef<CryoBentoGridHandle, {
                                     </button>
                                 )}
                                 <button
-                                    id="onboarding-alert-save-btn"
                                     type="button"
                                     onClick={handleSave}
                                     disabled={saving || dirtyKpis.length === 0}

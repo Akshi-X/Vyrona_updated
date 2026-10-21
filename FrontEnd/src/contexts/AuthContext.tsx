@@ -9,7 +9,6 @@ import type { ReactNode } from "react";
 import { authUtils } from "../utils/auth";
 import { authService } from "../services/authService";
 import { userService } from "../services/userService";
-import { runAuthenticatedHealthCheck } from "../utils/variantHealthCheck";
 import { unsubscribeFromPushOnLogout } from "../utils/push";
 
 interface AuthContextType {
@@ -17,14 +16,10 @@ interface AuthContextType {
     token: string | undefined;
     isLoading: boolean;
     userRole?: string;
-    /** undefined = profile not yet fetched; true/false = known value */
-    onboardingCompleted: boolean | undefined;
     isEmailNotificationsEnabled: boolean;
     setIsEmailNotificationsEnabled: (enabled: boolean) => void;
-    login: (token: string, role?: string, rememberMe?: boolean, onboardingCompleted?: boolean) => void;
+    login: (token: string, role?: string, rememberMe?: boolean) => void;
     logout: () => void;
-    /** Mark onboarding complete in-session (e.g. after the final level) without a reload. */
-    markOnboardingComplete: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,12 +39,10 @@ export const useAuth = () => {
             token: undefined,
             isLoading: false,
             userRole: undefined,
-            onboardingCompleted: undefined,
             isEmailNotificationsEnabled: true,
             setIsEmailNotificationsEnabled: () => {},
             login: () => {},
             logout: () => {},
-            markOnboardingComplete: () => {},
         } as AuthContextType;
     }
     return context;
@@ -63,11 +56,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [token, setToken] = useState<string | undefined>(undefined);
     const [userRole, setUserRole] = useState<string | undefined>(undefined);
-    // Always start undefined so the onboarding redirect waits for the authoritative
-    // profile fetch. A cached value can be stale (e.g. it was false at session start
-    // but the user has since completed onboarding / it was set true), which would
-    // wrongly redirect a completed user back into onboarding on reload.
-    const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | undefined>(undefined);
     const [isLoading, setIsLoading] = useState(true);
     const [rememberMe, setRememberMe] = useState<boolean>(false);
     const sessionTimeoutRef = useRef<number | null>(null);
@@ -223,8 +211,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
     }, []);
 
-    // Fetch profile once per authenticated session to hydrate userRole and onboardingCompleted.
-    // Runs whenever authenticated — decoupled from userRole so onboardingCompleted is always fresh.
+    // Fetch profile once per authenticated session to hydrate userRole.
     useEffect(() => {
         if (!isAuthenticated) return;
         if (!token) return;
@@ -240,11 +227,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     setUserRole(role);
                     try { localStorage.setItem("user_role", role); } catch {}
                 }
-                const completed = profile?.onboarding_completed ?? true;
-                setOnboardingCompleted(completed);
             } catch {
-                // Profile fetch failed — default to completed so user isn't stuck
-                setOnboardingCompleted(true);
+                // Profile fetch failed — role stays from cache/login.
             }
         })();
     }, [isAuthenticated, token]);
@@ -322,7 +306,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         newToken: string,
         role?: string,
         rememberMe: boolean = false,
-        onboardingCompleted?: boolean,
     ) => {
         authUtils.setToken(newToken, rememberMe);
         setToken(newToken);
@@ -333,16 +316,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             localStorage.setItem("user_role", role);
         }
 
-        if (onboardingCompleted !== undefined) {
-            setOnboardingCompleted(onboardingCompleted);
-        }
-
         // Set session timeout
         setSessionTimeoutHandler(rememberMe);
-    };
-
-    const markOnboardingComplete = () => {
-        setOnboardingCompleted(true);
     };
 
     const logout = () => {
@@ -359,7 +334,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         authService.logout();
         setToken(undefined);
         setUserRole(undefined);
-        setOnboardingCompleted(undefined);
         setIsAuthenticated(false);
         localStorage.clear();
     };
@@ -369,22 +343,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         token,
         isLoading,
         userRole,
-        onboardingCompleted,
         isEmailNotificationsEnabled,
         setIsEmailNotificationsEnabled,
         login,
         logout,
-        markOnboardingComplete,
     };
-
-    // Run variant health check once the user becomes authenticated (dev/staging only).
-    // This ensures the health check never fires on the login page or any
-    // unauthenticated route, because it calls authenticated server endpoints.
-    useEffect(() => {
-        if (isAuthenticated) {
-            runAuthenticatedHealthCheck();
-        }
-    }, [isAuthenticated]);
 
     return (
         <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

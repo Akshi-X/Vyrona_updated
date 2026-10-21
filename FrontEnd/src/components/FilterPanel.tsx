@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { useTourNavContext } from "../contexts/TourNavContext";
 
 // --- FilterSelect ---
 type FilterOption = string | { label: string; value: string };
@@ -11,8 +10,6 @@ type FilterSelectProps = {
     onChange: (val: string) => void;
     options: FilterOption[];
     allLabel?: string;
-    buttonId?: string;
-    listId?: string;
 };
 
 const getOptionValue = (o: FilterOption) => typeof o === "string" ? o : o.value;
@@ -24,12 +21,9 @@ export const FilterSelect = ({
     onChange,
     options,
     allLabel = "All",
-    buttonId,
-    listId,
 }: FilterSelectProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
-    const tourNavCtx = useTourNavContext();
 
     const selectedLabel = value === "All"
         ? allLabel
@@ -37,14 +31,13 @@ export const FilterSelect = ({
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
-            if (tourNavCtx?.isTourActive) return;
             if (ref.current && !ref.current.contains(e.target as Node)) {
                 setIsOpen(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [tourNavCtx?.isTourActive]);
+    }, []);
 
     return (
         <div>
@@ -53,7 +46,6 @@ export const FilterSelect = ({
             </label>
             <div className="relative" ref={ref}>
                 <button
-                    id={buttonId}
                     type="button"
                     onClick={(e) => {
                         e.stopPropagation();
@@ -79,14 +71,13 @@ export const FilterSelect = ({
                     </svg>
                 </button>
                 {isOpen && (
-                    <div id={listId} className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                    <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                         {options.map((option) => {
                             const optVal = getOptionValue(option);
                             const optLabel = getOptionLabel(option);
                             return (
                                 <button
                                     key={optVal}
-                                    id={listId ? `${listId}-${optVal}` : undefined}
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();

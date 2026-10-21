@@ -1,27 +1,29 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import VariantRoute from './VariantRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { useCapabilities } from '../contexts/CapabilityContext';
 import ConfirmDialog from './ConfirmDialog';
+
+const SidebarRefrigeratorOnly = lazy(() => import('../variants/hospital-8/Sidebar'));
 
 export default function SidebarLayout() {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { isRefrigeratorOnly } = useCapabilities();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+  const onLogout = () => setShowLogoutConfirm(true);
 
   return (
     <div className="bg-surface flex w-full h-dvh overflow-hidden">
-      <VariantRoute
-        routePath="/_sidebar"
-        defaultComponent={<Sidebar onLogout={() => setShowLogoutConfirm(true)} />}
-        componentProps={{ onLogout: () => setShowLogoutConfirm(true) }}
-      />
+      {isRefrigeratorOnly
+        ? <Suspense fallback={null}><SidebarRefrigeratorOnly onLogout={onLogout} /></Suspense>
+        : <Sidebar onLogout={onLogout} />}
       <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
         <Outlet />
       </div>

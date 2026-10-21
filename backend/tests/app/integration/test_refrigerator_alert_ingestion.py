@@ -67,7 +67,7 @@ from app.config.database import SessionLocal
 # INGESTION_URL = os.environ.get("INGESTION_URL", "http://iot-ingestion-service/api/tive/webhook")
 # SMTP_API_URL = os.environ.get("SMTP4DEV_API", "http://smtp4dev/api/Messages")
 INGESTION_URL = "http://localhost:7072/api/tive/webhook"
-SMTP_API_URL = "http://localhost:5005/api/Messages"
+SMTP_API_URL = "http://localhost:5000/api/Messages"
 # ── Fixed test ids (deterministic cleanup) ─────────────────────────────────────
 HOSPITAL_ID = 9927
 BRANCH_ID = 9927
@@ -109,9 +109,11 @@ def setup_refrigerator_ingestion(db):
     _clean(db)
 
     db.execute(text("""
-        INSERT INTO hospitals (hospital_id, hospital_name, created_at, updated_at, is_email_notifify, is_whatsapp_notify)
-        VALUES (:hid, 'Fridge Ingest Hospital', NOW(), NOW(), true, false)
-        ON CONFLICT (hospital_id) DO UPDATE SET is_email_notifify = EXCLUDED.is_email_notifify;
+        INSERT INTO hospitals (hospital_id, hospital_name, created_at, updated_at, is_email_notifify, is_whatsapp_notify, is_push_notify)
+        VALUES (:hid, 'Fridge Ingest Hospital', NOW(), NOW(), true, false, false)
+        ON CONFLICT (hospital_id) DO UPDATE SET 
+            is_email_notifify = EXCLUDED.is_email_notifify,
+            is_push_notify = EXCLUDED.is_push_notify;
     """), {"hid": HOSPITAL_ID})
 
     db.execute(text("""
@@ -134,14 +136,14 @@ def setup_refrigerator_ingestion(db):
 
     # zone_id is concrete here so the telemetry lookup (refrigerator_id + zone_id + kpi_name) resolves it.
     db.execute(text("""
-        INSERT INTO kpi_config (hospital_id, branch_id, refrigerator_id, zone_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status)
-        VALUES (:hid, :bid, :rid, :zone, 'refrigerator_temp', 'Zone Temp Critical', 2.0, 8.0, '°C', 'critical', 1, true)
+        INSERT INTO kpi_config (hospital_id, branch_id, refrigerator_id, zone_id, kpi_name, alert_name, min, max, unit, alert_type, cooldown_minutes, status, email_alert)
+        VALUES (:hid, :bid, :rid, :zone, 'refrigerator_temp', 'Zone Temp Critical', 2.0, 8.0, '°C', 'critical', 1, true, true)
     """), {"hid": HOSPITAL_ID, "bid": BRANCH_ID, "rid": REFRIGERATOR_ID, "zone": ZONE_ID})
 
     db.execute(text("""
-        INSERT INTO users (user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, created_at, updated_at)
-        VALUES (:uid, :email, 'dummy_hash', 'Fridge', 'User', 'User', true, 'approved', :hid, :bid, 'IVF', false, NOW(), NOW())
-        ON CONFLICT (email) DO UPDATE SET branch_id = EXCLUDED.branch_id, hospital_id = EXCLUDED.hospital_id;
+        INSERT INTO users (user_id, email, password_hash, first_name, last_name, role, status, approved_status, hospital_id, branch_id, department, onboarding_completed, push_enabled, created_at, updated_at)
+        VALUES (:uid, :email, 'dummy_hash', 'Fridge', 'User', 'User', true, 'approved', :hid, :bid, 'IVF', false, true, NOW(), NOW())
+        ON CONFLICT (email) DO UPDATE SET branch_id = EXCLUDED.branch_id, hospital_id = EXCLUDED.hospital_id, push_enabled = EXCLUDED.push_enabled;
     """), {"uid": USER_ID, "email": USER_EMAIL, "hid": HOSPITAL_ID, "bid": BRANCH_ID})
 
     db.commit()
@@ -404,11 +406,11 @@ def test_refrigerator_alert_escalation(setup_refrigerator_ingestion, db):
     """
     db.execute(text("""
         INSERT INTO users (user_id, email, password_hash, first_name, last_name, role, status,
-            approved_status, hospital_id, branch_id, department, onboarding_completed, created_at, updated_at)
+            approved_status, hospital_id, branch_id, department, onboarding_completed, push_enabled, created_at, updated_at)
         VALUES (:uid, :email, 'dummy_hash', 'Fridge', 'Admin', 'Admin', true, 'approved',
-            :hid, :bid, 'IVF', false, NOW(), NOW())
+            :hid, :bid, 'IVF', false, true, NOW(), NOW())
         ON CONFLICT (email) DO UPDATE
-            SET role = 'Admin', branch_id = EXCLUDED.branch_id, hospital_id = EXCLUDED.hospital_id;
+            SET role = 'Admin', branch_id = EXCLUDED.branch_id, hospital_id = EXCLUDED.hospital_id, push_enabled = EXCLUDED.push_enabled;
     """), {"uid": ADMIN_USER_ID, "email": ADMIN_USER_EMAIL, "hid": HOSPITAL_ID, "bid": BRANCH_ID})
 
     db.execute(text("""

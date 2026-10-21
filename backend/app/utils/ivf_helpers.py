@@ -193,9 +193,13 @@ def get_branch_filter_info(request: Request, branch_id_override: Optional[int] =
         raise HTTPException(status_code=401, detail="User not authenticated")
     
     user: User = request.state.current_user
-    
+
     # Strict department isolation: only IVF users can access IVF endpoints.
-    if not is_specific_department(user.department, "IVF"):
+    # The authenticated request's department comes from the token claim
+    # (request.state.department); fall back to the DB user when absent.
+    token_department = getattr(request.state, "department", None)
+    effective_department = token_department or user.department
+    if not is_specific_department(effective_department, "IVF"):
         raise HTTPException(
             status_code=403,
             detail="Access denied: This endpoint is for IVF users only"

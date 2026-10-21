@@ -1198,34 +1198,52 @@ def test_update_feedback_status_email_exception(db_session, mock_feedback, mock_
 # Tests for get_all_feedback
 # ==========================================
 
-def test_get_all_feedback_success(db_session, mock_feedback):
+def test_get_all_feedback_success(db_session, mock_feedback, mock_user):
     """Test getting all feedback successfully"""
-    # Mock the query chain: query().filter().order_by().all()
+    # Real query chain: query(Feedback, User, Hospital, HospitalBranch)
+    #   .join().outerjoin().outerjoin().order_by().all() -> list of 4-tuples
+    mock_hospital = MagicMock()
+    mock_hospital.hospital_name = "Test Hospital"
+    mock_branch = MagicMock()
+    mock_branch.branch_name = "Main Branch"
+
     query_mock = MagicMock()
+    query_mock.join.return_value.outerjoin.return_value.outerjoin.return_value = query_mock
     query_mock.filter.return_value = query_mock
-    query_mock.order_by.return_value.all.return_value = [mock_feedback]
+    query_mock.order_by.return_value.all.return_value = [
+        (mock_feedback, mock_user, mock_hospital, mock_branch)
+    ]
     db_session.query.return_value = query_mock
-    
+
     result = feedback_service.get_all_feedback(db_session, None)
-    
+
     assert len(result) == 1
     assert result[0].feedback_id == "TK-2024-01-001"
 
 
-def test_get_all_feedback_with_filters(db_session, mock_feedback):
+def test_get_all_feedback_with_filters(db_session, mock_feedback, mock_user):
     """Test getting all feedback with filters"""
     filters = FeedbackFilterRequest(
         feedback_type=FeedbackType.BUG,
         status=FeedbackStatus.OPEN,
         from_date=datetime.now(timezone.utc)
     )
-    
-    feedback_query = MagicMock()
-    feedback_query.filter.return_value.filter.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_feedback]
-    db_session.query.return_value = feedback_query
-    
+
+    mock_hospital = MagicMock()
+    mock_hospital.hospital_name = "Test Hospital"
+    mock_branch = MagicMock()
+    mock_branch.branch_name = "Main Branch"
+
+    query_mock = MagicMock()
+    query_mock.join.return_value.outerjoin.return_value.outerjoin.return_value = query_mock
+    query_mock.filter.return_value = query_mock
+    query_mock.order_by.return_value.all.return_value = [
+        (mock_feedback, mock_user, mock_hospital, mock_branch)
+    ]
+    db_session.query.return_value = query_mock
+
     result = feedback_service.get_all_feedback(db_session, filters)
-    
+
     assert len(result) == 1
 
 

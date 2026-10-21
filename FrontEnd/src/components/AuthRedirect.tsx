@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { userService } from '../services/userService';
 
 export const AuthRedirect: React.FC = () => {
-  const { isAuthenticated, isLoading, userRole, onboardingCompleted } = useAuth();
+  const { isAuthenticated, isLoading, userRole } = useAuth();
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [isCheckingDepartment, setIsCheckingDepartment] = useState(true);
 
@@ -48,9 +48,8 @@ export const AuthRedirect: React.FC = () => {
     fetchDepartment();
   }, [isAuthenticated]);
 
-  // Show loading spinner while checking authentication, department, or the
-  // authoritative onboarding flag (same source RoleBasedRoute uses).
-  if (isLoading || isCheckingDepartment || (isAuthenticated && onboardingCompleted === undefined)) {
+  // Show loading spinner while checking authentication or department.
+  if (isLoading || isCheckingDepartment) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -60,10 +59,6 @@ export const AuthRedirect: React.FC = () => {
 
   // Redirect based on authentication and role
   if (isAuthenticated) {
-    if (!onboardingCompleted) {
-      return <Navigate to="/onboarding/dashboard" replace />;
-    }
-
     // Check if user is IVF Admin (IVF department + Admin role)
     const isIVFAdmin = userDepartment === 'IVF' && userRole?.toLowerCase() === 'admin';
     

@@ -18,7 +18,7 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
   restrictIVFAdmin = false,
   requireControlTower = false
 }) => {
-  const { isAuthenticated, isLoading, userRole, onboardingCompleted } = useAuth();
+  const { isAuthenticated, isLoading, userRole } = useAuth();
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [isCheckingDepartment, setIsCheckingDepartment] = useState(true);
 
@@ -62,9 +62,8 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
     fetchDepartment();
   }, [isAuthenticated]);
 
-  // Show loading spinner while checking authentication, department, or onboarding status.
-  // Only wait for onboardingCompleted when authenticated — unauthenticated users redirect to login below.
-  if (isLoading || isCheckingDepartment || (isAuthenticated && onboardingCompleted === undefined)) {
+  // Show loading spinner while checking authentication or department.
+  if (isLoading || isCheckingDepartment) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -75,11 +74,6 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
-  }
-
-  // Redirect to onboarding if user hasn't completed it yet
-  if (!onboardingCompleted) {
-    return <Navigate to="/onboarding/dashboard" replace />;
   }
 
   // IVF Admin on restricted page → redirect to approval screen (pending list)

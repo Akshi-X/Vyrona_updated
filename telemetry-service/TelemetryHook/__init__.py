@@ -124,9 +124,10 @@ def main(eventhub_message: List[func.EventHubEvent]):
                             or payload.get("source") == "CUSTOM-IOT"
                         ):
                             logger.debug(f"Received Custom IoT Device Payload: {payload}")
-                            payload["timestamp"] = body_json.get(
-                                "receivedAt", None
-                            )  # Add timestamp from outer body if available
+                            if not payload.get("timestamp"):
+                                payload["timestamp"] = body_json.get(
+                                    "receivedAt", None
+                                )  # Add timestamp from outer body if available
                     else:
                         # If no 'payload' field, use entire body as payload
                         payload = body_json

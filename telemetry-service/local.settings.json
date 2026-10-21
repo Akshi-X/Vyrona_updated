@@ -21,6 +21,6 @@
     "ALERT_API_BASE_URL": "https://mgscale-backend-service-dev-h8f7bhcbagh5gyez.westeurope-01.azurewebsites.net",
     "ALERT_API_ENDPOINT": "/api/internal/alerts/send-immediate",
     "ALERT_API_TIMEOUT": "5",
-    "INTERNAL_API_KEY": "CHANGE_ME_TO_A_SECURE_RANDOM_STRING"
+    "INTERNAL_API_KEY": "9ff7caade698a967ec4305d776ebda2e6ade1a4d21632958"
   }
 }

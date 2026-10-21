@@ -641,13 +641,13 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         : '#22C55E'; // Green if at or above L1
 
   return (
-    <div id="onboarding-ivf-quality-parameters" className="@container bg-white border border-line rounded-lg p-4 flex flex-col gap-4 h-full min-h-0">
+    <div className="@container bg-white border border-line rounded-lg p-4 flex flex-col gap-4 h-full min-h-0">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-black text-[16px]">Current Quality Status</h3>
         <div className="flex items-center justify-end gap-5 flex-wrap ml-auto">
           {/* Battery */}
-          <div id="onboarding-kpi-battery" className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5">
           <div className="pr-2">
             {isBatteryLoading ? (
               <div className="relative overflow-hidden h-3.5 w-16 rounded-md bg-gray-200">
@@ -688,7 +688,6 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         <div className="flex flex-col gap-3 justify-start pt-6 @max-[505px]:order-2 @max-[505px]:pt-0 @max-[505px]:w-full @max-[505px]:flex-row @max-[505px]:flex-wrap @max-[505px]:justify-center">
           {(isInitialLoading || hasAlert('ln2_lid_state')) && (
             <KpiTile
-              id="onboarding-kpi-lid"
               icon={<LockIcon className="text-primary" />}
               label="Lid State"
               value={lidLabel}
@@ -699,7 +698,6 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
           )}
           {(isInitialLoading || hasAlert('temp_internal')) && (
             <KpiTile
-              id="onboarding-kpi-internal-temp"
               icon={<ThermometerIcon className="text-primary" />}
               label="Internal Temperature"
               value={internalTemperatureValue}
@@ -715,7 +713,6 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         {/* Tank SVG */}
         <div className="shrink-0 @max-[505px]:order-1">
           <svg
-            id="onboarding-cryocan-svg"
             width="220"
             height="320"
             viewBox="0 0 240 320"
@@ -818,7 +815,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             <rect x="30" y={tankBodyTop} width="140" height={tankBodyHeight} rx="30" fill="none" stroke="var(--color-primary)" strokeWidth="1" opacity="0.1" />
 
             {/* L1 Level Marker */}
-            <g id="onboarding-cryocan-l1-marker">
+            <g>
               {l1Y != null && (
                 <>
                   <line x1="150" y1={l1Y} x2="185" y2={l1Y} stroke="var(--color-primary)" strokeWidth="2" strokeDasharray="4,2" />
@@ -832,7 +829,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             
             {/* L2 Level Marker */}
             {l2Y != null && (
-              <g id="onboarding-cryocan-l2-marker">
+              <g>
                 <line x1="150" y1={l2Y} x2="185" y2={l2Y} stroke="var(--color-primary)" strokeWidth="2" strokeDasharray="4,2" />
                 <g transform={`translate(192, ${l2Y - 9})`}>
                   <AlertIcon color={alertColor} />
@@ -842,7 +839,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             )}
 
             {/* Level percentage display on tank */}
-            <g id="onboarding-cryocan-level-text">
+            <g>
               <text
                 x="100"
                 y="175"
@@ -872,7 +869,6 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         <div className="flex flex-col gap-3 pt-6 @max-[505px]:order-3 @max-[505px]:pt-0 @max-[505px]:w-full @max-[505px]:flex-row @max-[505px]:flex-wrap @max-[505px]:justify-center">
           {(isInitialLoading || hasAlert('temp_external')) && (
             <KpiTile
-              id="onboarding-kpi-external-temp"
               icon={<SunIcon className="text-primary" />}
               label="External Temperature"
               value={externalTemperatureValue}
@@ -885,7 +881,6 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
           )}
           {(isInitialLoading || hasAlert('ln2_evaporation_rate')) && (
             <KpiTile
-              id="onboarding-kpi-evap-rate"
               icon={<EvaporationIcon className="text-primary" />}
               label="Evaporation Rate"
               value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
