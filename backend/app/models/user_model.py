@@ -99,12 +99,12 @@ class User(Base):
 
     # Onboarding
     onboarding_completed = sqlalchemy.Column(
-        sqlalchemy.Boolean, nullable=False, default=True
+        sqlalchemy.Boolean, nullable=False, default=True, server_default=sqlalchemy.text("true")
     )  # True = has seen/skipped onboarding; default True for all existing users
 
     # Web Push - account-wide opt-out (per-device toggles live on PushSubscription)
     push_enabled = sqlalchemy.Column(
-        sqlalchemy.Boolean, nullable=False, default=True
+        sqlalchemy.Boolean, nullable=False, default=True, server_default=sqlalchemy.text("true")
     )
 
     # Invite token (used when an admin invites a user via email link)

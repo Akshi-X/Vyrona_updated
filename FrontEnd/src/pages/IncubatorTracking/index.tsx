@@ -290,7 +290,6 @@ export default function IncubatorTrackingDashboardPage() {
 
                     <div className="flex justify-end gap-3">
                         <button
-                            id="onboarding-modal-cancel-btn"
                             type="button"
                             onClick={() => navigate('/dashboard')}
                             className="px-5 py-2.5 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200"
@@ -298,7 +297,6 @@ export default function IncubatorTrackingDashboardPage() {
                             Cancel
                         </button>
                         <button
-                            id="onboarding-modal-track-btn"
                             type="submit"
                             className="px-5 py-2.5 rounded-md bg-[#650458] text-white hover:opacity-95 disabled:opacity-50"
                             disabled={!selectedIncubatorId}

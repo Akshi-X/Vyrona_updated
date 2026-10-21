@@ -9,7 +9,7 @@ import "@fontsource/open-sans";
 import router from "./routes";
 import { AuthProvider } from "./contexts/AuthContext";
 import { GoogleMapsProvider } from "./contexts/GoogleMapsProvider";
-import { UIVariantProvider } from "./contexts/UIVariantContext";
+import { CapabilityProvider } from "./contexts/CapabilityContext";
 import { SidebarProvider } from "./contexts/SidebarContext";
 import { InstallPromptProvider } from "./contexts/InstallPromptContext";
 import { PushNotificationProvider } from "./contexts/PushNotificationContext";
@@ -17,7 +17,7 @@ import { PushNotificationProvider } from "./contexts/PushNotificationContext";
 createRoot(document.getElementById("root")!).render(
     <StrictMode>
         <AuthProvider>
-            <UIVariantProvider>
+            <CapabilityProvider>
                 <GoogleMapsProvider>
                     <SidebarProvider>
                         <InstallPromptProvider>
@@ -28,7 +28,7 @@ createRoot(document.getElementById("root")!).render(
                         </InstallPromptProvider>
                     </SidebarProvider>
                 </GoogleMapsProvider>
-            </UIVariantProvider>
+            </CapabilityProvider>
         </AuthProvider>
     </StrictMode>,
 );

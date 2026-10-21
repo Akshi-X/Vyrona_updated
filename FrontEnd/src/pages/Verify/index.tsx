@@ -49,7 +49,6 @@ const VerifyOtp: React.FC = () => {
     // State to track if OTP was successfully verified
     const [otpVerified, setOtpVerified] = useState(false);
     const [verifiedRole, setVerifiedRole] = useState<string | undefined>(undefined);
-    const [verifiedOnboardingCompleted, setVerifiedOnboardingCompleted] = useState<boolean>(true);
 
     const [otp, setOtp] = useState("");
     const [error, setError] = useState("");
@@ -249,10 +248,7 @@ const VerifyOtp: React.FC = () => {
             const targetPath = fromPathRef.current;
 
             setTimeout(() => {
-                // Onboarding-pending users always go to onboarding, regardless of fromPath
-                if (!verifiedOnboardingCompleted) {
-                    navigate("/onboarding/dashboard", { replace: true });
-                } else if (targetPath && typeof targetPath === "string" && targetPath.trim() !== "") {
+                if (targetPath && typeof targetPath === "string" && targetPath.trim() !== "") {
                     navigate(targetPath, { replace: true });
                 } else if (verifiedRole?.toLowerCase() === "mygrape_admin") {
                     navigate("/user-profile", { replace: true });
@@ -261,7 +257,7 @@ const VerifyOtp: React.FC = () => {
                 }
             }, 500);
         }
-    }, [otpVerified, isAuthenticated, verifiedRole, verifiedOnboardingCompleted, navigate]);
+    }, [otpVerified, isAuthenticated, verifiedRole, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -304,7 +300,7 @@ const VerifyOtp: React.FC = () => {
                     // Set token with proper expiration based on rememberMe setting
                     const shouldRemember = rememberMe === true;
                     authUtils.setToken(response.auth_token, shouldRemember);
-                    login(response.auth_token, response.role, shouldRemember, response.onboarding_completed ?? true);
+                    login(response.auth_token, response.role, shouldRemember);
                 }
                 // Persist user id for pages that need it (e.g., My Tickets)
                 try {
@@ -314,7 +310,6 @@ const VerifyOtp: React.FC = () => {
                 // Set flags to trigger redirect in useEffect
                 setOtpVerified(true);
                 setVerifiedRole(response.role);
-                setVerifiedOnboardingCompleted(response.onboarding_completed ?? true);
             } else {
                 setError(response.message || "Invalid OTP");
             }

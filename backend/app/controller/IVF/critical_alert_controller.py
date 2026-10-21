@@ -200,7 +200,10 @@ def acknowledge_alert(
         
         user = request.state.current_user
         user_id = user.user_id
-        
+
+        # Enforce IVF-department access (raises 403 for non-IVF tokens).
+        get_branch_filter_info(request)
+
         service = CriticalAlertService(db)
         result = service.acknowledge_alert(request_data.alert_id, user_id, request_data.acknowledgment_reason)
         alert = (
@@ -241,7 +244,10 @@ def acknowledge_alert(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        msg = str(e)
+        if "not found" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
     except Exception as e:
         # Check if it's an AppException
         if isinstance(e, AppException):

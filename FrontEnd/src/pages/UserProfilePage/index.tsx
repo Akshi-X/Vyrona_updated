@@ -6,8 +6,6 @@ import { feedbackApi, type UserTicketSummary } from '../../api/feedbackApi';
 import { userService, type UserProfileDto } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePushNotifications } from '../../contexts/PushNotificationContext';
-import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
-import { useHasVariant } from '../../components/VariantRoute';
 import PageLayout from '../../components/PageLayout';
 import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
 import { COUNTRIES, DEFAULT_COUNTRY_ISO, findCountryByIso, findCountryByPhone, flagEmoji } from '../../constants/countryCodes';
@@ -114,11 +112,7 @@ const UserProfilePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const isOnboarding = useOnboardingMode();
-  // Refrigerator-only hospitals (gated via "/user-profile#hide-onboarding" variant flag)
-  // don't use the guided tour, so hide the onboarding card.
-  const hideOnboardingCard = useHasVariant('/user-profile#hide-onboarding');
-  const { isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token, onboardingCompleted } = useAuth();
+  const { isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token } = useAuth();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
   const push = usePushNotifications();
   const [pushBusy, setPushBusy] = useState(false);
@@ -479,7 +473,7 @@ const UserProfilePage: React.FC = () => {
   };
  
   const handleSubmitRequest = () => {
-    navigate(isOnboarding ? '/onboarding/support' : '/support', {
+    navigate('/support', {
       state: {
         readonly: false,
         hideAttach: false,
@@ -494,7 +488,7 @@ const UserProfilePage: React.FC = () => {
  
  
   const navigateToTicketPrefilled = (ticket: Ticket) => {
-    navigate(isOnboarding ? '/onboarding/support' : '/support', {
+    navigate('/support', {
       state: {
         readonly: true,
         hideAttach: true,
@@ -512,13 +506,6 @@ const UserProfilePage: React.FC = () => {
     });
   };
  
-  // Onboarding: open edit mode via event so tour can walk through edit fields
-  useEffect(() => {
-    const fn = () => setIsEditingProfile(true);
-    document.addEventListener("onboarding:open-edit-profile", fn);
-    return () => document.removeEventListener("onboarding:open-edit-profile", fn);
-  }, []);
-
   // Don't render anything until auth is verified
   // This prevents the UI flicker when redirecting to login
   if (isLoading || !isAuthChecked || !isAuthenticated) {
@@ -538,12 +525,11 @@ const UserProfilePage: React.FC = () => {
       <div className="w-full max-w-6xl mx-auto space-y-8">
 
         {/* Basic Information Section */}
-        <div id="onboarding-profile-basic-info" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Basic Information</h2>
             {!isEditingProfile ? (
               <button
-                id="onboarding-profile-edit-btn"
                 onClick={handleEditProfile}
                 className="inline-flex items-center px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors duration-200 bg-white"
               >
@@ -553,9 +539,8 @@ const UserProfilePage: React.FC = () => {
                 Edit Profile
               </button>
             ) : (
-              <div id="onboarding-profile-edit-actions" className="flex gap-3">
+              <div className="flex gap-3">
                 <button
-                  id="onboarding-profile-save-btn"
                   onClick={handleSaveProfile}
                   disabled={isSaving}
                   className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -588,7 +573,7 @@ const UserProfilePage: React.FC = () => {
           </div>
  
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div id="onboarding-profile-first-name">
+            <div>
               <label className="block text-sm font-bold text-black mb-2">First Name</label>
               <input
                 type="text"
@@ -617,7 +602,7 @@ const UserProfilePage: React.FC = () => {
               />
               {firstNameError && (<p className="mt-1 text-xs text-red-600">{firstNameError}</p>)}
             </div>
-            <div id="onboarding-profile-last-name">
+            <div>
               <label className="block text-sm font-bold text-black mb-2">Last Name</label>
               <input
                 type="text"
@@ -646,7 +631,7 @@ const UserProfilePage: React.FC = () => {
               />
               {lastNameError && (<p className="mt-1 text-xs text-red-600">{lastNameError}</p>)}
             </div>
-            <div id="onboarding-profile-email">
+            <div>
               <label className="block text-sm font-bold text-black mb-2">Email Address</label>
               <input
                 type="email"
@@ -655,13 +640,13 @@ const UserProfilePage: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
               />
             </div>
-            <div id="onboarding-profile-role">
+            <div>
               <label className="block text-sm font-bold text-black mb-2">Role</label>
               <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-700">
                 {role || 'User'}
               </div>
             </div>
-            <div id="onboarding-profile-phone">
+            <div>
               <label className="flex items-center gap-1.5 text-sm font-bold text-black mb-2">
                 Phone Number <span className="text-gray-400 font-normal">(optional)</span>
                 <span className="relative group inline-flex">
@@ -725,34 +710,12 @@ const UserProfilePage: React.FC = () => {
           )}
         </div>
 
-        {onboardingCompleted && !isOnboarding && !hideOnboardingCard && !isMygrapeAdmin && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sm:p-8 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 xl:gap-6 text-center xl:text-left">
-            <div className="flex flex-col xl:flex-row items-center gap-4 xl:gap-5 min-w-0">
-              <img src="/genie/explaining_casual.webp" alt="" className="w-28 h-28 sm:w-32 sm:h-32 object-contain shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900">You know your way around Vyrona</p>
-                <p className="text-xs text-gray-500 mt-1 leading-relaxed">All onboarding levels completed. Drop back in anytime to revisit a workflow, explore advanced features, or walk a new team member through the tour.</p>
-              </div>
-            </div>
-            <button
-              onClick={() => navigate("/onboarding/dashboard")}
-              className="shrink-0 w-full xl:w-auto flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 xl:py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              Go to Onboarding
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        )}
-
         {/* Support Activity Section */}
-        <div id="onboarding-profile-support-activity" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Support Activity</h2>
             <div className="flex flex-col sm:flex-row gap-3">
               <button
-                id="onboarding-profile-submit-request"
                 onClick={handleSubmitRequest}
                 className="px-4 py-3 bg-primary text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
               >
@@ -922,7 +885,7 @@ const UserProfilePage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div id="onboarding-profile-support-table" className="w-full bg-white rounded-[10px] overflow-hidden border border-line">
+            <div className="w-full bg-white rounded-[10px] overflow-hidden border border-line">
               <div
                 className="max-h-[415px] overflow-y-auto"
                 style={{
@@ -1036,11 +999,11 @@ const UserProfilePage: React.FC = () => {
         </div>
  
         {/* Notifications Section */}
-        <div id="onboarding-profile-notifications" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-8">Notifications</h2>
          
           <div className="space-y-6">
-            <div id="onboarding-profile-notif-ticket" className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-gray-900">Email me when my ticket is updated</h3>
                 <p className="text-sm text-gray-500 mt-1">Get notifications about ticket status changes</p>
@@ -1059,7 +1022,7 @@ const UserProfilePage: React.FC = () => {
               </button>
             </div>
  
-            <div id="onboarding-profile-notif-updates" className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-gray-900">Include me in Vyrona feature update emails</h3>
                 <p className="text-sm text-gray-500 mt-1">Stay informed about new features and improvements</p>
@@ -1076,7 +1039,7 @@ const UserProfilePage: React.FC = () => {
             </div>
 
             <div className="border-t border-gray-100 pt-6">
-              <div id="onboarding-profile-notif-push" className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <h3 className="text-sm font-bold text-gray-900">Push alerts on this browser</h3>
                   <p className="text-sm text-gray-500 mt-1">

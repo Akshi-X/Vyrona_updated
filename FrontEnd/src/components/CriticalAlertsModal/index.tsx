@@ -279,19 +279,6 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
     const getAcknowledgementGroupId = (alert: CriticalAlert): string =>
         alert.status === "Acknowledged" ? "acknowledged" : "active";
 
-    let firstActiveGroupKey: string | undefined;
-    outerLoop: for (const dateGroups of Object.values(groupedAlerts)) {
-        for (const alert of dateGroups) {
-            if (alert.status === "Active") {
-                const tankGroupId = getTankGroupId(alert);
-                const kpiConfigId = getKpiConfigId(alert);
-                const label = getDateLabel(alert.timestamp);
-                firstActiveGroupKey = `${label}__${tankGroupId}__${kpiConfigId}__active`;
-                break outerLoop;
-            }
-        }
-    }
-
     const groupedByDateAndKpi = Object.entries(groupedAlerts).reduce<
         Record<
             string,
@@ -854,7 +841,6 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                         isLidStateGroup ? (
                                                             latestAlert.status === "Active" ? (
                                                                 <button
-                                                                    id={group.groupKey === firstActiveGroupKey ? "onboarding-critical-alert-ack-btn" : undefined}
                                                                     onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(latestAlert.id); }}
                                                                     disabled={acknowledgingIds.has(latestAlert.id)}
                                                                     className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${acknowledgingIds.has(latestAlert.id) ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-primary text-white hover:bg-[#5a0f66]"}`}
@@ -867,7 +853,6 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                         ) : (
                                                             activeGroupAlertIds.length > 0 ? (
                                                                 <button
-                                                                    id={group.groupKey === firstActiveGroupKey ? "onboarding-critical-alert-ack-btn" : undefined}
                                                                     onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(activeGroupAlertIds); }}
                                                                     disabled={isAcknowledgingGroup}
                                                                     className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${isAcknowledgingGroup ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-primary text-white hover:bg-[#5a0f66]"}`}
@@ -978,7 +963,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 )?.message;
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                        <div id="onboarding-critical-alert-confirm-dialog" className="w-full max-w-md rounded-xl bg-white border border-line shadow-xl p-5">
+                        <div className="w-full max-w-md rounded-xl bg-white border border-line shadow-xl p-5">
                             <h4 className="text-base font-semibold text-[#1f2937]">
                                 {pendingAcknowledgeAlertIds.length > 1
                                     ? "Acknowledge alerts"
@@ -1023,7 +1008,6 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                     Cancel
                                 </button>
                                 <button
-                                    id="onboarding-critical-alert-confirm-btn"
                                     type="button"
                                     onClick={handleAcknowledgeConfirm}
                                     disabled={hasPendingLidState && pendingAcknowledgmentReason.trim() === ""}

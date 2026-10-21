@@ -105,83 +105,6 @@ class KPI_NAMES:
             return ""
 
 
-def compute_incubator_ph(co2_pct, temp_c, pressure_mmhg, hco3_mm):
-    """Derived (not directly probed) culture-media pH via Henderson-Hasselbalch,
-    from live CO2%/temperature sensor readings plus two per-incubator
-    calibration constants (Incubator.pressure_mmhg, Incubator.hco3_mm).
-
-    This is the one and only pH estimation method in use — do not substitute
-    another approach. Returns None (never a guessed/defaulted value) when any
-    input is missing, so a mis-calibrated or uncalibrated incubator silently
-    produces no incubator_ph reading rather than a wrong one.
-
-    Caveats (apply to every value this returns, not just edge cases):
-    - pKa(T)'s -0.01/°C slope is from mammalian blood plasma studies, not
-      media-specific data — an approximation.
-    - alpha(T) is anchored to the known 37°C plasma solubility value, not
-      independently verified for this specific culture media.
-    - Assumes hco3_mm was correctly back-calculated for the media brand
-      actually in use in this incubator.
-    """
-    if co2_pct is None or temp_c is None or pressure_mmhg is None or hco3_mm is None:
-        return None
-
-    co2_pct = float(co2_pct)
-    temp_c = float(temp_c)
-    pressure_mmhg = float(pressure_mmhg)
-    hco3_mm = float(hco3_mm)
-
-    p_co2 = (co2_pct / 100) * pressure_mmhg
-    alpha_t = 0.03 * math.exp(2400 * (1 / (temp_c + 273.15) - 1 / 310.15))
-    pka_t = 6.1 + (-0.01) * (temp_c - 37)
-    ph = pka_t + math.log10(hco3_mm / (alpha_t * p_co2))
-
-    return {
-        "pH": round(ph, 4),
-        "pCO2": round(p_co2, 4),
-        "alpha_T": round(alpha_t, 4),
-        "pKa_T": round(pka_t, 4),
-    }
-
-    """
-    quality_data = {
-        "tank_id": ivf_shipment_info.get("tank_id"),
-        "tank_code": ivf_shipment_info.get("tank_code"),
-        "canister_number": ivf_shipment_info.get("canister_number"),
-        "shipment_id": shipment_id,
-        "device_id": ivf_shipment_info.get("device_id"),
-        "temp_internal": parameters.get("temp_internal"),
-        "temp_internal_fahrenheit": parameters.get("temp_internal_fahrenheit"),
-        "temp_external": parameters.get("temp_external"),
-        "temp_external_fahrenheit": parameters.get("temp_external_fahrenheit"),
-        "shock": parameters.get("shock"),
-        "latitude": latitude,
-        "longitude": longitude,
-        "battery_percentage": battery_percentage,
-        "ship_from": {
-            "latitude": ship_from_latitude,
-            "longitude": ship_from_longitude
-        },
-        "ship_to": {
-            "latitude": ship_to_latitude,
-            "longitude": ship_to_longitude
-        },
-        "timestamp": timestamp,
-        "thresholds": thresholds,
-        "threshold_violations": threshold_violations,
-        "violated_parameters": violated_parameters,
-        "quality_loss": quality_loss,
-        "quality_status": quality_status,
-        "quality_percentage": quality_percentage,
-        "kpi_scores": kpi_scores,
-        "kpi_statuses": kpi_statuses,
-        "magnitude_results": magnitude_results,
-        "frequency_results": frequency_results,
-        "duration_results": duration_results,
-        "kpi_visualization": kpi_visualization
-    }
-    """
-
     def convert_custom_iot_payload_to_kpi_names_mapped_array(payload: dict) -> list:
         """
         Convert a CUSTOM_IOT payload to a list of KPI name-value-unit mappings.
@@ -442,6 +365,46 @@ def compute_incubator_ph(co2_pct, temp_c, pressure_mmhg, hco3_mm):
                     "unit": KPI_NAMES.get_unit_for_kpi(KPI_NAMES.IVF_LN2_LID_STATE)
                 })
         return kpi_data
+
+
+def compute_incubator_ph(co2_pct, temp_c, pressure_mmhg, hco3_mm):
+    """Derived (not directly probed) culture-media pH via Henderson-Hasselbalch,
+    from live CO2%/temperature sensor readings plus two per-incubator
+    calibration constants (Incubator.pressure_mmhg, Incubator.hco3_mm).
+
+    This is the one and only pH estimation method in use — do not substitute
+    another approach. Returns None (never a guessed/defaulted value) when any
+    input is missing, so a mis-calibrated or uncalibrated incubator silently
+    produces no incubator_ph reading rather than a wrong one.
+
+    Caveats (apply to every value this returns, not just edge cases):
+    - pKa(T)'s -0.01/°C slope is from mammalian blood plasma studies, not
+      media-specific data — an approximation.
+    - alpha(T) is anchored to the known 37°C plasma solubility value, not
+      independently verified for this specific culture media.
+    - Assumes hco3_mm was correctly back-calculated for the media brand
+      actually in use in this incubator.
+    """
+    if co2_pct is None or temp_c is None or pressure_mmhg is None or hco3_mm is None:
+        return None
+
+    co2_pct = float(co2_pct)
+    temp_c = float(temp_c)
+    pressure_mmhg = float(pressure_mmhg)
+    hco3_mm = float(hco3_mm)
+
+    p_co2 = (co2_pct / 100) * pressure_mmhg
+    alpha_t = 0.03 * math.exp(2400 * (1 / (temp_c + 273.15) - 1 / 310.15))
+    pka_t = 6.1 + (-0.01) * (temp_c - 37)
+    ph = pka_t + math.log10(hco3_mm / (alpha_t * p_co2))
+
+    return {
+        "pH": round(ph, 4),
+        "pCO2": round(p_co2, 4),
+        "alpha_T": round(alpha_t, 4),
+        "pKa_T": round(pka_t, 4),
+    }
+
 
 class KPIConstants:
     KPI_NAMES = KPI_NAMES

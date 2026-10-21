@@ -163,7 +163,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
   }, []);
 
   return (
-    <div id="onboarding-ivf-container-data" className="bg-white border border-line rounded-lg p-4 h-[398px] flex flex-col">
+    <div className="bg-white border border-line rounded-lg p-4 h-[398px] flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-black text-[13px] md:text-[16px]">Container Data</h3>
         <div className="flex items-center gap-4">

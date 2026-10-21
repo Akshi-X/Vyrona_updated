@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { MessageSquarePlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useOnboardingMode } from "../contexts/OnboardingModeContext";
 
 interface FeedbackButtonProps {
     /** Feedback type enum value, e.g. "ux_workflow_improvement" */
@@ -43,7 +42,6 @@ const FeedbackButton = ({
     className = "",
 }: FeedbackButtonProps) => {
     const navigate = useNavigate();
-    const isOnboarding = useOnboardingMode();
     const [expanded, setExpanded] = useState(variant !== "icon");
     const [glow, setGlow] = useState(variant === "auto");
 
@@ -65,7 +63,7 @@ const FeedbackButton = ({
             title,
         });
         if (focusField) params.set("focus", focusField);
-        navigate(`${isOnboarding ? "/onboarding/support" : "/support"}?${params.toString()}`);
+        navigate(`/support?${params.toString()}`);
     };
 
     const showText = variant === "text" || (variant === "auto" && expanded);
