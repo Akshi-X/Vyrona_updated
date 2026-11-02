@@ -20,93 +20,158 @@ A production-grade supply chain intelligence and clinical tracking platform engi
 
 ## 🏛️ System Architecture
 
-### Visual Architecture Diagram
+Vyrona is organized across **four core architectural layers** deployed inside containerized environments (Docker Compose / AWS EC2), decoupling telemetry ingestion, real-time KPI threshold evaluation, and user-facing operational applications.
 
-![Vyrona System Architecture](architecture-diagram.png)
+### 📐 Text-Based Architecture Schematic
 
-### High-Level Architecture Flow
+```text
+===================================================================================================
+1. SOURCE LAYER
+   ┌─────────────────────────────────────────┐         ┌ - - - - - - - - - - - - - - - - - - - - ┐
+   │        Live Deviation Simulator         │         │     IoT Edge Sensors (Tive Trackers,    │
+   │  [Python, local test / telemetry demo]  │         │     Cryotanks & Refrigerator Probes)    │
+   │      (scripts/simulate_live_deviation)  │         │               (Planned)                 │
+   └────────────────────┬────────────────────┘         └ - - - - - - - - - - ┬ - - - - - - - - - ┘
+                        │                                                    │
+========================╪====================================================╪=====================
+2. INGESTION & EVENTS   │                                                    │
+   ┌────────────────────▼────────────────────┐                               │
+   │      IoT Ingestion Function (:7071)     │◄──────────────────────────────┘
+   │ [tive-ingestion-function / HTTP webhook]│
+   └────────────────────┬────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │           Event Hub Emulator            │
+   │    [Azure Event Hubs / pub-sub buffer]  │
+   └────────────────────┬────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────┐         ┌─────────────────────────────────────────┐
+   │        Telemetry Function (:7072)       │◄───────►│                 Azurite                 │
+   │     [Validate payload, match asset]     │         │     [Azure Blob storage emulator]       │
+   └────────────────────┬────────────────────┘         │          (ivf-media container)          │
+                        │                              └─────────────────────────────────────────┘
+========================╪==========================================================================
+3. DATA & LOGIC LAYER   │
+   ┌────────────────────▼────────────────────┐         ┌─────────────────────────────────────────┐
+   │      KPI Evaluation & Alert Engine      │◄───────►│              Redis Cache                │
+   │   [Threshold rules, loss/spike checks]  │         │      (:6379, pub/sub & fast state)      │
+   └────────────────────┬────────────────────┘         └─────────────────────────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │           PostgreSQL (:5432)            │
+   │  [Assets, shipments, KPIs, telemetry]   │
+   └────────────────────┬────────────────────┘
+                        ▲
+                        │ (Queries / State Persistence)
+========================╪==========================================================================
+4. APPLICATION & AWS INFRASTRUCTURE (Docker Compose Stack / AWS EC2: 16.113.114.79)
+                        │
+   ┌────────────────────▼────────────────────┐
+   │           Backend REST API              │─────────► 📡 AWS SNS Service (Emergency SMS & Alerts)
+   │     [FastAPI, port :8000, Uvicorn]      │              - Topic ARN: arn:aws:sns:ap-south-2:...
+   │    - Auth, JWT, RBAC & scope checks     │              - Direct E.164 phone SMS delivery
+   │    - IVF tracking & canister management │
+   │    - Critical alert escalation engine   │─────────► ✉️ SMTP / Amazon SES (:587, Notifications)
+   └────────────────────▲────────────────────┘              - Escalation & OTP transactional emails
+                        │
+                        │ (REST & WebSocket / Proxy via Nginx)
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │       React + Vite Web Dashboard        │
+   │    [Port :5173 (Dev) / Nginx :80 (EC2)] │
+   │    - Control Tower Map (Google Maps JS) │
+   │    - Cryocan LN2 & Refrigerator charts  │
+   │    - AI Embryo Grading & Reports        │
+   └────────────────────▲────────────────────┘
+                        │
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │            Authorized Staff             │
+   │ [Clinicians, Embryologists, Couriers]   │
+   └─────────────────────────────────────────┘
+===================================================================================================
+```
+
+---
+
+### 📊 Layered System Architecture Flow
 
 ```mermaid
-flowchart TD
+graph TD
+  classDef source fill:#eff6ff,stroke:#3b82f6,stroke-width:2px;
+  classDef ingestion fill:#1e293b,stroke:#0f172a,stroke-width:2px,color:#ffffff;
+  classDef data fill:#f8fafc,stroke:#0284c7,stroke-width:2px;
+  classDef app fill:#f0fdf4,stroke:#16a34a,stroke-width:2px;
+  classDef cloud fill:#fffbeb,stroke:#d97706,stroke-width:2px;
+  classDef user fill:#faf5ff,stroke:#9333ea,stroke-width:2px;
 
-subgraph group_client["Web Application (React 19 + TypeScript)"]
-  node_webapp["React Application<br/>[App.tsx]"]
-  node_routes["Routing & Navigation<br/>[routes/index.tsx]"]
-  node_controltower["Control Tower Map<br/>[ControlTowerMap.tsx]"]
-  node_tracking["Shipment Tracking<br/>[Track/index.tsx]"]
-  node_ivftracking["IVF Specimen Tracking<br/>[IVFTrackShipment]"]
-  node_coldstorage["Cold Storage & Cryocan<br/>[RefrigeratorTracking]"]
-  node_embryo["AI Embryo Grading<br/>[EmbryoGrading]"]
-  node_dashboard["Executive Dashboard<br/>[Dashboard/index.tsx]"]
-  node_authui["Auth & RBAC Client<br/>[authService.ts]"]
-end
+  subgraph LAYER1["1. SOURCE"]
+    SIM["Live Simulator<br/>(Python script, local)"]:::source
+    IOT[/"IoT Devices<br/>(Tive sensors, cryotanks - planned)"/]:::source
+  end
 
-subgraph group_api["API Gateway & Domain Services (FastAPI)"]
-  node_api["FastAPI Core Application<br/>[backend/app/main.py]"]
-  node_authcontroller["Authentication & RBAC<br/>[auth.py]"]
-  node_shipmentcontroller["Shipment Endpoints<br/>[shipment_controller.py]"]
-  node_ivfcontroller["IVF Quality Endpoints<br/>[ivf_quality_controller.py]"]
-  node_alertcontroller["Critical Alert Engine<br/>[critical_alert_controller.py]"]
-  node_chatcontroller["Stakeholder Messaging<br/>[chat_controller.py]"]
-  node_qualityservice["Quality Monitoring Service<br/>[quality_service.py]"]
-end
+  subgraph LAYER2["2. INGESTION & EVENTS"]
+    INGEST["IoT Ingestion Function<br/>:7071"]:::ingestion
+    HUB["Event Hub Emulator<br/>(Publish / Consume Buffer)"]:::ingestion
+    TELEM["Telemetry Function<br/>:7072"]:::ingestion
+  end
 
-subgraph group_notifications["Alerting & Notification Infrastructure"]
-  node_awssns["AWS SNS Service<br/>(SMS Broadcast & Topics)"]
-  node_emailservice["Email Service<br/>(HTML Notifications & OTP)"]
-end
+  subgraph LAYER3["3. DATA & LOGIC"]
+    AZURITE[("Azurite<br/>Blob Storage Emulator")]:::data
+    REDIS[("Redis Cache<br/>:6379")]:::data
+    KPI["KPI Evaluation & Alerts<br/>(Threshold Rules)"]:::data
+    PG[("PostgreSQL<br/>:5432 (Assets, Telemetry, KPIs)")]:::data
+  end
 
-subgraph group_persistence["Persistence Layer"]
-  node_database[("PostgreSQL Database<br/>[SQLAlchemy 2]")]
-  node_redis[("Redis 7<br/>[Pub/Sub & Cache]")]
-  node_azurite[("Azure Blob / Azurite<br/>[Media & Specimen Storage]")]
-end
+  subgraph LAYER4["4. APPLICATION & AWS INFRASTRUCTURE (Docker Compose on EC2)"]
+    API["Backend API<br/>FastAPI :8000<br/>(Auth, Roles, Scope Checks)"]:::app
+    DASH["React Dashboard<br/>Vite :5173 / Nginx :80<br/>(Control Tower & Telemetry)"]:::app
+    SNS["AWS SNS Service<br/>(Emergency SMS Broadcast & Topics)"]:::cloud
+    SMTP["SMTP / SES Service<br/>(:587 / :5000 Notifications)"]:::cloud
+  end
 
-subgraph group_telemetry["Telemetry Ingestion & Edge Devices"]
-  node_tive["Tive IoT Sensors & Trackers"]
-  node_webhook["Tive Webhook Receiver<br/>[tive-ingestion-function]"]
-  node_telemetryservice["Telemetry Stream Worker<br/>[telemetry-service]"]
-  node_simulator["Live Deviation Simulator<br/>[simulate_live_deviation.py]"]
-end
+  STAFF["Authorized Staff<br/>(Clinicians, Couriers, Admins)"]:::user
 
-%% User interactions
-node_user(("Platform User")) -->|"Uses"| node_webapp
-node_hms(("Hospital System (HMS)")) -.->|"API Integration"| node_authcontroller
+  %% Ingestion & Event pipeline
+  SIM --> INGEST
+  IOT -.-> INGEST
+  INGEST --> HUB
+  HUB --> TELEM
+  TELEM <--> AZURITE
+  TELEM --> KPI
 
-%% Client internals
-node_webapp --> node_routes
-node_routes --> node_controltower
-node_routes --> node_tracking
-node_routes --> node_ivftracking
-node_routes --> node_coldstorage
-node_routes --> node_embryo
-node_routes --> node_dashboard
-node_authui -->|"Bearer Token"| node_api
+  %% Data & Logic pipeline
+  KPI <--> REDIS
+  KPI --> PG
+  PG <--> API
 
-%% API routing
-node_api --> node_authcontroller
-node_api --> node_shipmentcontroller
-node_api --> node_ivfcontroller
-node_api --> node_alertcontroller
-node_api --> node_chatcontroller
-node_api --> node_qualityservice
-
-%% Notifications
-node_alertcontroller --> node_awssns
-node_alertcontroller --> node_emailservice
-
-%% Persistence
-node_api --> node_database
-node_qualityservice --> node_redis
-node_api --> node_azurite
-
-%% Telemetry flow
-node_tive -.->|"HTTP Webhooks"| node_webhook
-node_webhook --> node_telemetryservice
-node_telemetryservice --> node_redis
-node_telemetryservice --> node_api
-node_simulator -.->|"Simulated Sensor Ingestion"| node_alertcontroller
+  %% Application, Cloud Alerts & Dashboard
+  API --> SNS
+  API --> SMTP
+  API <--> DASH
+  DASH <--> STAFF
 ```
+
+---
+
+### 🧩 Layer Breakdown Matrix
+
+| Layer | Component | Port / Interface | Role & Implementation |
+| :--- | :--- | :--- | :--- |
+| **1. Source** | **Live Deviation Simulator** | CLI / Python | Generates simulated live sensor telemetry, GPS breadcrumbs, and temperature spikes. |
+| | **IoT Devices (Tive Trackers)** | Cellular / BLE | Planned physical edge sensors deployed on liquid nitrogen cryotanks and lab refrigerators. |
+| **2. Ingestion & Events** | **IoT Ingestion Function** | `:7071` (HTTP) | Azure Function receiver validating incoming tracker webhooks and formatting events. |
+| | **Event Hub Emulator** | AMQP / Kafka | Local Azure Event Hubs emulator acting as the ingestion buffer and message distributor. |
+| | **Telemetry Function** | `:7072` | Event-driven stream processor matching incoming device IDs to registered clinic assets. |
+| | **Azurite** | `:10000` | Local Azure Blob Storage emulator storing raw payloads, specimen photos, and media. |
+| **3. Data & Logic** | **KPI Evaluation Engine** | In-Process | Evaluates real-time threshold breaches (e.g. LN2 temp > -150°C, tilt, vibration, route deviation). |
+| | **Redis Cache** | `:6379` | Fast in-memory state store, Pub/Sub channel for live deviation feeds, and token caching. |
+| | **PostgreSQL** | `:5432` | System of record for users, hospital clinics, tanks, canisters, shipments, and telemetry logs. |
+| **4. Application & Cloud** | **FastAPI Backend API** | `:8000` | REST API layer handling JWT authentication, RBAC, domain entities, and alert triggers. |
+| | **React + Vite Dashboard** | `:5173` / `:80` | High-fidelity frontend containing Control Tower Google Map, Cryocan views, and reports. |
+| | **AWS SNS Service** | Cloud (AWS) | Critical multi-channel notification engine dispatching instant SMS to on-call embryologists. |
+| | **SMTP / Amazon SES** | `:587` / `:5000` | Transactional email delivery for OTPs, weekly SLA reports, and incident escalation notices. |
+| | **AWS EC2 Host** | `16.113.114.79` | Production cloud host running the containerized Docker Compose stack behind Nginx. |
 
 ---
 
