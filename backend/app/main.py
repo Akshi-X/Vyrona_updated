@@ -191,6 +191,7 @@ async def startup_event():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,  # From environment variable
+    allow_origin_regex=r"^https?://.*$",  # Dynamic origin matching across IP changes
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

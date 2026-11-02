@@ -21,22 +21,15 @@ const MAP_LIBRARIES: ("geometry" | "maps" | "marker")[] = ["geometry", "maps", "
 export const GoogleMapsProvider: React.FC<GoogleMapsProviderProps> = ({ children }) => {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-  if (!apiKey) {
-    throw new Error(
-      'VITE_GOOGLE_MAPS_API_KEY is not defined in environment variables. ' +
-      'Please ensure the .env file exists in the FrontEnd directory and restart the dev server.'
-    );
-  }
-
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: apiKey,
+    googleMapsApiKey: apiKey || '',
     libraries: MAP_LIBRARIES,
     preventGoogleFontsLoading: true
   });
 
   return (
-    <GoogleMapsContext.Provider value={{ isLoaded, loadError }}>
+    <GoogleMapsContext.Provider value={{ isLoaded: apiKey ? isLoaded : true, loadError }}>
       {children}
     </GoogleMapsContext.Provider>
   );

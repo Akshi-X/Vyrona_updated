@@ -25,7 +25,7 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 
 # ---------- Install dependencies ----------
-RUN poetry install --only main --no-interaction --no-ansi
+RUN poetry install --only main --no-interaction --no-ansi && pip install --no-cache-dir boto3
 
 # ---------- Copy application code ----------
 COPY . .

@@ -181,7 +181,7 @@ def send_email_via_smpt(
         msg['From'] = settings.SENDER_EMAIL  # Using same from email for consistency
         msg['To'] = recipient_email
         msg['Subject'] = subject
-        msg.attach(MIMEText(html_body, 'html'))
+        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
 
         # Only attach what the HTML actually references: an unreferenced part is shown
         # by Gmail as a downloadable attachment instead of an inline image. Parsed as
@@ -202,7 +202,8 @@ def send_email_via_smpt(
                                image_path, exc)
                 continue
             part.add_header('Content-ID', f'<{content_id}>')
-            part.add_header('Content-Disposition', 'inline', filename=Path(image_path).name)
+            part.add_header('X-Attachment-Id', content_id)
+            part.add_header('Content-Disposition', 'inline')
             msg.attach(part)
         
         # Connect to SMTP server and send email
