@@ -196,6 +196,13 @@ class Settings(BaseSettings):
     VAPID_PUBLIC_KEY: Optional[str] = None
     VAPID_PRIVATE_KEY: Optional[str] = None
     VAPID_SUBJECT: Optional[str] = None  # e.g. "mailto:alerts@mygrape.io"
+    # AWS SNS (Simple Notification Service - for emergency SMS & broadcast alerts)
+    AWS_REGION: str = "ap-south-2"
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_SNS_TOPIC_ARN: Optional[str] = None
+    AWS_SNS_PHONE_NUMBER: Optional[str] = None
+    AWS_SNS_ENABLED: bool = True
     # ============================================
     # COMPUTED/DERIVED VALUES
     # ============================================

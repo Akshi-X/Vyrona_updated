@@ -59,6 +59,7 @@ from ...service.push_notification_service import (
     send_web_push,
 )
 from ...service.redis_service import get_redis
+from ...service.aws_sns_service import sns_service
 from ...service.activity_log_service import (
     ActivityLogService,
     build_system_actor,
@@ -2558,6 +2559,29 @@ class CriticalAlertService:
                     get_redis().delete(dedup_key)
                 except Exception:
                     pass
+
+        # Broadcast via AWS SNS (Emergency SMS & Topic)
+        self._send_alert_sns(alert, ctx)
+
+    def _send_alert_sns(self, alert: CriticalAlert, ctx: dict):
+        """Broadcast critical alert through AWS SNS topic and emergency SMS."""
+        try:
+            device_label = ctx.get("device_label", "Storage Device")
+            sns_result = sns_service.publish_critical_alert(alert, device_label=device_label)
+            ActivityLogService(self.db).log_activity(
+                action="sns.critical_alert_published",
+                outcome=ActivityOutcome.SUCCESS.value,
+                actor=build_system_actor("critical_alert"),
+                target=build_target("alert", alert.alert_id, device_label),
+                metadata={
+                    "alert_id": alert.alert_id,
+                    "severity": alert.severity,
+                    "device_label": device_label,
+                    "sns_result": sns_result,
+                },
+            )
+        except Exception as exc:
+            logger.warning("AWS SNS dispatch failed for alert_id=%s: %s", alert.alert_id, exc)
 
     def _send_alert_push(self, alert: CriticalAlert):
         """Send a web push notification for critical (High severity) alerts only.
