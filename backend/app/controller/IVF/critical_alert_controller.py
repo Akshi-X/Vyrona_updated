@@ -2,14 +2,21 @@
 Critical Alert Controller
 Handles API endpoints for critical alerts in IVF system
 """
+import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, Path
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
+from app.config.config import settings
 from app.config.database import get_db
+from app.models import Readings, KpiConfig
 from app.models.IVF.tank_model import Tank
 from app.models.IVF.critical_alert_model import CriticalAlert
 from app.models.IVF.hospital_branch_model import HospitalBranch
+from app.models.IVF.refrigerator_model import Refrigerator
+from app.models.IVF.incubator_model import Incubator
+from app.service.aws_sns_service import sns_service
 from app.service.IVF.critical_alert_service import CriticalAlertService
 from app.exceptions.custom_exceptions import AppException
 from app.schemas.IVF.critical_alert_schema import (
@@ -25,9 +32,11 @@ from app.schemas.IVF.critical_alert_schema import (
     HospitalAlertsResponse
 )
 from app.utils.ivf_helpers import get_branch_filter_info
-from app.constants.enums import AlertStatus
+from app.constants.enums import AlertStatus, AlertType, AlertSource, AlertSeverity, AlertTriggeredBy
 from app.service.activity_log_service import ActivityLogService, build_actor_from_user, build_target
 from app.constants.enums import ActivityOutcome
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ivf/alerts", tags=["IVF Critical Alerts"])
 
@@ -485,3 +494,252 @@ def check_and_create_alerts(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking and creating alerts: {str(e)}")
+
+
+class SimulateDeviationRequest(BaseModel):
+    device_type: str = "tank"  # "tank" | "refrigerator" | "incubator"
+    device_id: int = 4
+    metric_name: str = "temp_internal"
+    breach_value: float = -110.0
+    phone_number: Optional[str] = None
+    recipient_email: Optional[str] = "steezyadopted@gmail.com"
+
+
+@router.post("/simulate_deviation")
+def simulate_live_deviation(
+    payload: SimulateDeviationRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Live Deviation Trigger Endpoint.
+    Simulates a live sensor breach, ingests the reading, triggers deviation evaluation,
+    creates a CriticalAlert in PostgreSQL, and dispatches multi-channel notifications (Email, Web Push, AWS SNS).
+    """
+    try:
+        now_utc = datetime.now(timezone.utc)
+        created_alerts = []
+        device_label = f"{payload.device_type.capitalize()} #{payload.device_id}"
+        service = CriticalAlertService(db)
+
+        if payload.device_type.lower() == "tank":
+            tank = db.query(Tank).filter(Tank.tank_id == payload.device_id).first()
+            if not tank:
+                raise HTTPException(status_code=404, detail=f"Tank with ID {payload.device_id} not found")
+            device_label = tank.tank_code or f"Tank #{tank.tank_id}"
+
+            # Look up branch and hospital
+            branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+            hospital_id = branch.hospital_id if branch else 1
+            branch_id = tank.branch_id or (branch.branch_id if branch else 1)
+
+            # Look up matching KPI config
+            kpi = (
+                db.query(KpiConfig)
+                .filter(
+                    KpiConfig.hospital_id == hospital_id,
+                    KpiConfig.kpi_name == payload.metric_name,
+                    KpiConfig.status == True,
+                )
+                .first()
+            )
+            if not kpi:
+                kpi = (
+                    db.query(KpiConfig)
+                    .filter(
+                        KpiConfig.kpi_name == payload.metric_name,
+                        KpiConfig.status == True,
+                    )
+                    .first()
+                )
+            if not kpi:
+                kpi = (
+                    db.query(KpiConfig)
+                    .filter(
+                        KpiConfig.hospital_id == hospital_id,
+                        KpiConfig.status == True,
+                    )
+                    .first()
+                )
+            kpi_id = kpi.id if kpi else 2
+
+            # Insert reading with deviation = True, checked = False
+            reading = Readings(
+                hospital_id=hospital_id,
+                branch_id=branch_id,
+                tank_id=tank.tank_id,
+                kpi_config_id=kpi_id,
+                kpi_value=payload.breach_value,
+                deviation=True,
+                checked=False,
+                timestamp=now_utc,
+            )
+            db.add(reading)
+            db.commit()
+
+            # Trigger real-time deviation check & alert creation pipeline
+            created_alerts = service.check_and_create_alert_for_kpi_deviations(tank.tank_id)
+
+            # If cooldown suppressed duplicate creation, fetch existing active alert or generate simulated alert
+            if not created_alerts:
+                existing_active = (
+                    db.query(CriticalAlert)
+                    .filter(
+                        CriticalAlert.tank_id == tank.tank_id,
+                        CriticalAlert.status == AlertStatus.ACTIVE.value,
+                    )
+                    .order_by(CriticalAlert.created_at.desc())
+                    .first()
+                )
+                if existing_active:
+                    created_alerts = [existing_active]
+                else:
+                    alert, _ = service._create_alert(
+                        tank_id=tank.tank_id,
+                        alert_type=AlertType.DEVIATION_ALERT,
+                        source=AlertSource.KPI,
+                        severity=AlertSeverity.HIGH,
+                        message=service._frame_alert_message(
+                            kpi,
+                            payload.breach_value,
+                            branch_name=branch.branch_name if branch else "Main Branch",
+                            device_noun="Tank",
+                            device_label=device_label,
+                            tank_id=tank.tank_id,
+                        ),
+                        occurred_at=now_utc,
+                        triggered_by=AlertTriggeredBy.SYSTEM,
+                        extra_info=str(kpi_id),
+                    )
+                    if alert:
+                        created_alerts = [alert]
+
+        elif payload.device_type.lower() == "refrigerator":
+            refrig = db.query(Refrigerator).filter(Refrigerator.refrigerator_id == payload.device_id).first()
+            if not refrig:
+                raise HTTPException(status_code=404, detail=f"Refrigerator with ID {payload.device_id} not found")
+            device_label = refrig.refrigerator_code or f"Refrigerator #{refrig.refrigerator_id}"
+            created_alerts = service.check_and_create_alert_for_refrigerator_kpi_deviations(refrig.refrigerator_id)
+            if not created_alerts:
+                existing_active = (
+                    db.query(CriticalAlert)
+                    .filter(
+                        CriticalAlert.refrigerator_id == refrig.refrigerator_id,
+                        CriticalAlert.status == AlertStatus.ACTIVE.value,
+                    )
+                    .order_by(CriticalAlert.created_at.desc())
+                    .first()
+                )
+                if existing_active:
+                    created_alerts = [existing_active]
+
+        elif payload.device_type.lower() == "incubator":
+            incub = db.query(Incubator).filter(Incubator.incubator_id == payload.device_id).first()
+            if not incub:
+                raise HTTPException(status_code=404, detail=f"Incubator with ID {payload.device_id} not found")
+            device_label = incub.incubator_code or f"Incubator #{incub.incubator_id}"
+            created_alerts = service.check_and_create_alert_for_incubator_kpi_deviations(incub.incubator_id)
+            if not created_alerts:
+                existing_active = (
+                    db.query(CriticalAlert)
+                    .filter(
+                        CriticalAlert.incubator_id == incub.incubator_id,
+                        CriticalAlert.status == AlertStatus.ACTIVE.value,
+                    )
+                    .order_by(CriticalAlert.created_at.desc())
+                    .first()
+                )
+                if existing_active:
+                    created_alerts = [existing_active]
+
+        else:
+            raise HTTPException(status_code=400, detail="Invalid device_type. Supported: tank, refrigerator, incubator")
+
+        # Always trigger AWS SNS broadcast (Topic subscribers + direct SMS if phone provided)
+        sns_dispatch_result = None
+        if created_alerts:
+            latest_alert = created_alerts[-1]
+            sns_dispatch_result = sns_service.publish_critical_alert(
+                latest_alert,
+                device_label=device_label,
+                target_phone=payload.phone_number,
+            )
+
+        # Dispatch rich HTML email template via configured SMTP
+        email_dispatch_result = None
+        target_email = payload.recipient_email or settings.SENDER_EMAIL or "steezyadopted@gmail.com"
+        if created_alerts and target_email and settings.SMTP_SERVER:
+            try:
+                latest_alert = created_alerts[-1]
+                from collections import namedtuple
+                MockUser = namedtuple("MockUser", ["user_id", "email", "name"])
+                mock_user = MockUser(user_id="SIM-USER-1", email=target_email, name="Steezy / Lab Director")
+                branch, ctx = service._resolve_alert_email_context(latest_alert)
+                if not branch:
+                    branch = db.query(HospitalBranch).first()
+                if not ctx:
+                    ctx = {
+                        "device_label": device_label,
+                        "device_noun": "Tank",
+                        "device_code": device_label,
+                        "zone_name": "Storage Area",
+                        "is_cryotank": True,
+                    }
+                service._dispatch_alert_emails(
+                    latest_alert,
+                    [mock_user],
+                    branch,
+                    ctx,
+                    alert_name=payload.metric_name,
+                    kpi_name=payload.metric_name,
+                    first_alert_value=f"{payload.breach_value:.2f}°C",
+                    current_value=f"{payload.breach_value:.2f}°C",
+                )
+                email_dispatch_result = {"status": "sent", "recipient": target_email, "template": "critical_alert_email.html"}
+            except Exception as mail_exc:
+                logger.error("Failed to send rich HTML alert email: %s", mail_exc)
+                email_dispatch_result = {"status": "failed", "error": str(mail_exc)}
+
+        logger.info(
+            "\n"
+            "======================================================================\n"
+            "🚨 LIVE DEVIATION SIMULATED & TRIGGERED\n"
+            "----------------------------------------------------------------------\n"
+            "Device:       %s\n"
+            "Metric:       %s (Breach Value: %s)\n"
+            "Timestamp:    %s\n"
+            "Alerts Raised: %s\n"
+            "======================================================================",
+            device_label,
+            payload.metric_name,
+            payload.breach_value,
+            now_utc.isoformat(),
+            len(created_alerts),
+        )
+
+        return {
+            "status": "success",
+            "message": f"Live deviation triggered for {device_label}",
+            "device": device_label,
+            "metric": payload.metric_name,
+            "breach_value": payload.breach_value,
+            "timestamp": now_utc.isoformat(),
+            "alerts_created": len(created_alerts),
+            "alerts": [
+                {
+                    "alert_id": getattr(a, "alert_id", str(a)),
+                    "alert_type": getattr(a, "alert_type", "Deviation alert"),
+                    "severity": getattr(a, "severity", "High"),
+                    "message": getattr(a, "message", ""),
+                    "status": getattr(a, "status", "Active"),
+                }
+                for a in created_alerts
+            ],
+            "sns_dispatch": sns_dispatch_result or {"topic_published": False, "mode": "simulated"},
+            "email_dispatch": email_dispatch_result or {"status": "skipped", "reason": "No target email or smtp4dev active"},
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to simulate live deviation: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error simulating live deviation: {str(e)}")
+

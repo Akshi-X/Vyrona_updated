@@ -5,87 +5,25 @@ import React, {
     useState,
     useRef,
 } from "react";
-import {
-    GoogleMap,
-    Polyline,
-    OverlayView,
-    useGoogleMap,
-} from "@react-google-maps/api";
-
-// Minimal AdvancedMarkerElement wrapper — used inside <GoogleMap> like the old <Marker>
-interface AdvancedMarkerProps {
-    position: google.maps.LatLngLiteral;
-    iconUrl?: string;
-    dotColor?: string;
-    title?: string;
-    id?: string;
-    onClick?: () => void;
-    onMouseEnter?: () => void;
-    onMouseLeave?: () => void;
-}
-
-const AdvancedMarker: React.FC<AdvancedMarkerProps> = ({
-    position, iconUrl, dotColor, title, id, onClick, onMouseEnter, onMouseLeave,
-}) => {
-    const map = useGoogleMap();
-
-    React.useEffect(() => {
-        if (!map) return;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const AdvancedMarkerElement = (google.maps as any).marker?.AdvancedMarkerElement;
-        if (!AdvancedMarkerElement) return;
-
-        let content: HTMLElement;
-        if (iconUrl) {
-            const img = document.createElement("img");
-            img.src = iconUrl;
-            img.style.cssText = "width:28px;height:28px;display:block;";
-            content = img;
-        } else if (dotColor) {
-            const dot = document.createElement("div");
-            dot.style.cssText = `width:12px;height:12px;border-radius:50%;background:${dotColor};border:2px solid #fff;box-sizing:border-box;`;
-            content = dot;
-        } else {
-            return;
-        }
-
-        const marker = new AdvancedMarkerElement({ map, position, content, title });
-        if (id && marker.element) marker.element.id = id;
-        if (onClick) marker.addListener("gmp-click", onClick);
-        if (onMouseEnter) marker.element?.addEventListener("mouseenter", onMouseEnter);
-        if (onMouseLeave) marker.element?.addEventListener("mouseleave", onMouseLeave);
-
-        return () => { marker.map = null; };
-    // position/iconUrl/dotColor changes are handled by React key on the parent — keep deps minimal
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [map]);
-
-    return null;
-};
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { shipmentService } from "../services/shipmentService";
 import MarkerGreen from "../assets/ControlTower/MarkerGreen.svg";
 import MarkerRed from "../assets/ControlTower/MarkerRed.svg";
 import MarkerYellow from "../assets/ControlTower/MarkerYellow.svg";
-import { useGoogleMaps } from "../contexts/GoogleMapsProvider";
-import InfoPopup from "./InfoPopup";
+
+// 100% Free, open-source OpenFreeMap dark vector style (no API keys, billing, or watermarks)
+const OPEN_FREE_MAP_DARK_STYLE = "https://tiles.openfreemap.org/styles/dark";
 
 type MapRoute = {
     shipment_id: number | string;
-
     patient_id: string;
-
     source_location: string;
-
     destination_location: string;
-
     source_latitude: number;
-
     source_longitude: number;
-
     destination_latitude: number;
-
     destination_longitude: number;
-
     route_status?: string;
 };
 
@@ -115,14 +53,10 @@ interface ControlTowerMapFilters {
 interface ControlTowerMapProps {
     filters?: ControlTowerMapFilters;
     direction?: "inbound" | "outbound";
-    zoomToLocation?: google.maps.LatLngLiteral | null;
-    // Optional: zoom to IVF branch by name (used for canister list clicks)
+    zoomToLocation?: { lat: number; lng: number } | null;
     zoomToBranchName?: string | null;
-    // Optional: notify parent when an IVF branch marker is clicked
     onBranchSelect?: (branchName: string) => void;
-    // Optional: indicates branch filter came from map click
     isBranchFilterFromMap?: boolean;
-    // Optional: clear branch filter action
     onClearBranchFilter?: () => void;
 }
 
@@ -138,7 +72,7 @@ const toFiniteNumber = (value: unknown): number | null => {
 const toValidLatLng = (
     latitude: unknown,
     longitude: unknown,
-): google.maps.LatLngLiteral | null => {
+): { lat: number; lng: number } | null => {
     const lat = toFiniteNumber(latitude);
     const lng = toFiniteNumber(longitude);
     if (lat === null || lng === null) return null;
@@ -201,7 +135,6 @@ const getBranchStatusMapFromActiveCanisters = (
     return statusMap;
 };
 
-
 const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
     filters,
     direction = "outbound",
@@ -211,73 +144,96 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
     isBranchFilterFromMap = false,
     onClearBranchFilter,
 }) => {
+    const mapContainerRef = useRef<HTMLDivElement | null>(null);
+    const mapRef = useRef<maplibregl.Map | null>(null);
+    const markersRef = useRef<maplibregl.Marker[]>([]);
+    const popupRef = useRef<maplibregl.Popup | null>(null);
+
     const [routes, setRoutes] = useState<MapRoute[]>([]);
-
-    const [error, setError] = useState<string | null>(null);
-
-    const [mapRef, setMapRef] = useState<google.maps.Map | null>(null);
-
-    const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-    const [tooltipPosition, setTooltipPosition] = useState<
-        Map<string, google.maps.LatLngLiteral>
-    >(new Map());
-    const polylinesRef = useRef<Map<string, google.maps.Polyline>>(new Map());
-    const shouldLoadRoutes = true;
-    const [isMapDataLoading, setIsMapDataLoading] = useState(false);
     const [ivfBranches, setIvfBranches] = useState<IVFBranch[]>([]);
     const [highestBranchCountCountry, setHighestBranchCountCountry] = useState<
         string | null
     >(null);
-    const [pendingBranchZoomName, setPendingBranchZoomName] = useState<
-        string | null
-    >(null);
+
+    const getRouteColor = useCallback((routeStatus?: string): string => {
+        if (!routeStatus) return "#22DC0E";
+        const status = routeStatus.toLowerCase();
+        if (status === "safe") return "#22DC0E";
+        if (status === "high_risk" || status === "failed") return "#E80000";
+        if (status === "delayed") return "#FFD901";
+        return "#22DC0E";
+    }, []);
+
+    const getBranchMarkerIcon = useCallback((branchStatus?: string): string => {
+        if (!branchStatus) return MarkerGreen;
+        const status = branchStatus.toLowerCase();
+        if (status === "safe") return MarkerGreen;
+        if (status === "critical" || status === "risk") return MarkerRed;
+        if (status === "delayed" || status === "medium") return MarkerYellow;
+        return MarkerGreen;
+    }, []);
+
+    const getBranchStatusColor = useCallback((branchStatus?: string): string => {
+        if (!branchStatus) return "#22DC0E";
+        const status = branchStatus.toLowerCase();
+        if (status === "safe") return "#22DC0E";
+        if (status === "critical" || status === "risk") return "#E80000";
+        if (status === "delayed" || status === "medium") return "#FFD901";
+        return "#22DC0E";
+    }, []);
 
     const displayedIvfBranches = useMemo(() => {
         let branches = ivfBranches;
-
         if (filters?.selectedBranch && filters.selectedBranch !== "All") {
             branches = branches.filter(
                 (b) => b.branch_name === filters.selectedBranch,
             );
         }
-
         return branches;
     }, [ivfBranches, filters?.selectedBranch]);
 
-    const { isLoaded } = useGoogleMaps();
-
+    // Initialize MapLibre GL map
     useEffect(() => {
-        // Only load routes and IVF markers if the flag is enabled
-        if (!shouldLoadRoutes) {
-            return;
-        }
+        if (!mapContainerRef.current) return;
 
-        let mounted = true;
-        setIsMapDataLoading(true);
-
-        // Clear existing polylines when filters or direction change
-        polylinesRef.current.forEach((polyline) => {
-            try {
-                google.maps.event.clearInstanceListeners(polyline);
-                polyline.setMap(null);
-            } catch (error) {
-                return;
-            }
+        const map = new maplibregl.Map({
+            container: mapContainerRef.current,
+            style: OPEN_FREE_MAP_DARK_STYLE,
+            center: [78.9629, 20.5937], // Centered on India
+            zoom: 3.5,
+            attributionControl: false,
         });
-        polylinesRef.current.clear();
 
-        // Immediately clear routes and IVF branches state to prevent old data from being rendered
+        // Add standard navigation controls (zoom in / zoom out)
+        map.addControl(
+            new maplibregl.NavigationControl({ showCompass: false }),
+            "bottom-right",
+        );
+
+        popupRef.current = new maplibregl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            className: "vyrona-map-popup",
+        });
+
+        mapRef.current = map;
+
+        return () => {
+            markersRef.current.forEach((m) => m.remove());
+            markersRef.current = [];
+            popupRef.current?.remove();
+            map.remove();
+            mapRef.current = null;
+        };
+    }, []);
+
+    // Load data based on direction and filters
+    useEffect(() => {
+        let mounted = true;
         setRoutes([]);
         setIvfBranches([]);
-        // Clear tooltip state to prevent stale tooltips
-        setActiveTooltip(null);
-        setTooltipPosition(new Map());
-        // Clear any previous errors
-        setError(null);
 
-        // Load data based on direction
         if (direction === "inbound") {
-            // Only skip IVF data when department is explicitly non-IVF
             let department: string | null = null;
             try {
                 department = localStorage.getItem("department");
@@ -287,11 +243,9 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
             if (department && department.toUpperCase() !== "IVF") {
                 setIvfBranches([]);
                 setHighestBranchCountCountry(null);
-                setIsMapDataLoading(false);
                 return;
             }
 
-            // Fetch IVF Control Tower data for inbound
             (async () => {
                 try {
                     const [controlTowerResult, activeCanistersResult] =
@@ -300,9 +254,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                             shipmentService.getActiveCanisters(),
                         ]);
 
-                    if (controlTowerResult.status !== "fulfilled") {
-                        throw controlTowerResult.reason;
-                    }
+                    if (controlTowerResult.status !== "fulfilled") return;
 
                     const data = controlTowerResult.value;
                     const branchStatusByName =
@@ -312,21 +264,11 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                               )
                             : new Map<string, string>();
 
-                    if (activeCanistersResult.status === "rejected") {
-                        console.warn(
-                            "Failed to load IVF active canisters for branch status override:",
-                            (activeCanistersResult as PromiseRejectedResult)
-                                .reason?.message,
-                        );
-                    }
-
                     if (mounted && data.states) {
-                        // Extract highest branch count country
                         const highestCountry =
                             data.highest_branch_count_country || null;
                         setHighestBranchCountCountry(highestCountry);
 
-                        // Transform the nested state structure into a flat array of branches
                         let branches: IVFBranch[] = [];
                         Object.entries(data.states).forEach(
                             ([stateName, stateBranches]) => {
@@ -360,7 +302,6 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                             },
                         );
 
-                        // Filter by status if filter is set
                         if (
                             filters?.selectedStatus &&
                             filters.selectedStatus !== "All"
@@ -370,10 +311,6 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                             branches = branches.filter((b) => {
                                 const branchStatus =
                                     b.branch_status?.toLowerCase() || "";
-                                // Map filter status to branch status
-                                // Filter "Safe" -> show branches with status "safe"
-                                // Filter "Risk" -> show branches with status "risk" or "critical"
-                                // Filter "Critical" -> show branches with status "critical"
                                 if (normalizedFilterStatus === "safe") {
                                     return branchStatus === "safe";
                                 } else if (normalizedFilterStatus === "risk") {
@@ -393,22 +330,12 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                         setIvfBranches(branches);
                     }
                 } catch (e: any) {
-                    // Silently fail for IVF data - it's optional
-                    if (mounted) {
-                        console.warn(
-                            "Failed to load IVF control tower data:",
-                            e?.message,
-                        );
-                    }
-                } finally {
-                    if (mounted) setIsMapDataLoading(false);
+                    console.warn("Failed to load IVF control tower data:", e);
                 }
             })();
         } else {
-            // Fetch routes for outbound
             (async () => {
                 try {
-                    // Map UI status labels to API route_status values: safe, delayed, high_risk
                     const normalizeStatusForApi = (
                         status: string | undefined,
                     ) => {
@@ -420,7 +347,6 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                         return undefined;
                     };
 
-                    // Build filter object for API call
                     const apiFilters = {
                         region:
                             filters?.selectedRegion &&
@@ -443,17 +369,13 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                         );
 
                     if (mounted) {
-                        // Handle both direct array and object with routes property
                         const routesData = Array.isArray(data)
                             ? data
                             : (data as any)?.routes || [];
                         setRoutes(routesData);
                     }
                 } catch (e: any) {
-                    if (mounted)
-                        setError(e?.message || "Failed to load map routes");
-                } finally {
-                    if (mounted) setIsMapDataLoading(false);
+                    console.warn("Failed to load map routes:", e);
                 }
             })();
         }
@@ -462,276 +384,259 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
             mounted = false;
         };
     }, [
-        shouldLoadRoutes,
         direction,
         filters?.selectedRegion,
         filters?.selectedStatus,
         filters?.selectedCarrier,
     ]);
 
-    const mapCenter = useMemo<google.maps.LatLngLiteral>(
-        () => ({ lat: 15, lng: 20 }),
-        [],
-    );
+    // Render IVF Markers (Inbound)
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || direction !== "inbound") return;
 
-    const mapOptions = useMemo<google.maps.MapOptions>(
-        () => ({
-            disableDefaultUI: true,
+        // Clear existing markers
+        markersRef.current.forEach((m) => m.remove());
+        markersRef.current = [];
 
-            zoomControl: false,
+        if (displayedIvfBranches.length === 0) return;
 
-            mapTypeControl: false,
+        const bounds = new maplibregl.LngLatBounds();
+        let hasValidCoords = false;
 
-            streetViewControl: false,
+        displayedIvfBranches.forEach((branch) => {
+            const { latitude, longitude } = branch.geoLocation;
+            if (
+                latitude == null ||
+                longitude == null ||
+                isNaN(latitude) ||
+                isNaN(longitude)
+            )
+                return;
 
-            fullscreenControl: false,
+            const markerEl = document.createElement("div");
+            markerEl.className =
+                "cursor-pointer transform hover:scale-125 transition-transform duration-200";
+            markerEl.id = `map-marker-${branch.branch_name}`;
 
-            mapId: import.meta.env.VITE_GOOGLE_MAP_ID,
-            colorScheme: "DARK" as google.maps.ColorScheme,
+            const img = document.createElement("img");
+            img.src = getBranchMarkerIcon(branch.branch_status);
+            img.style.width = "28px";
+            img.style.height = "28px";
+            img.style.display = "block";
+            markerEl.appendChild(img);
 
-            gestureHandling: "greedy",
+            const popupContent = `
+                <div style="background:#272626;color:#ffffff;padding:10px 14px;border-radius:8px;font-family:sans-serif;font-size:12px;box-shadow:0 10px 25px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);min-width:180px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="width:10px;height:10px;border-radius:50%;background:${getBranchStatusColor(branch.branch_status)};display:inline-block;flex-shrink:0;"></span>
+                        <div style="font-weight:700;font-size:14px;color:#ffffff;">${branch.address.district || branch.branch_name}</div>
+                    </div>
+                    <div style="font-size:11px;color:#9ca3af;margin-top:4px;margin-left:18px;">
+                        ${branch.branch_name} | ${new Date().toLocaleDateString("en-GB")}
+                    </div>
+                </div>
+            `;
 
-            minZoom: 2,
+            markerEl.addEventListener("mouseenter", () => {
+                if (popupRef.current) {
+                    popupRef.current
+                        .setLngLat([longitude, latitude])
+                        .setHTML(popupContent)
+                        .addTo(map);
+                }
+            });
 
-            maxZoom: 9,
+            markerEl.addEventListener("mouseleave", () => {
+                popupRef.current?.remove();
+            });
 
-            backgroundColor: "#272626",
-        }),
-        [],
-    );
+            markerEl.addEventListener("click", () => {
+                map.flyTo({ center: [longitude, latitude], zoom: 9, duration: 1000 });
+                onBranchSelect?.(branch.branch_name);
+            });
 
-    // Force remount of GoogleMap when filters, direction, or route set changes to ensure
-    // any stale polylines/markers are fully removed from the map instance.
-    const mapInstanceKey = useMemo(
-        () =>
-            [
-                direction || "outbound",
-                filters?.selectedRegion || "all-region",
-                filters?.selectedStatus || "all-status",
-                filters?.selectedCarrier || "all-carrier",
-            ].join("|"),
-        [
-            direction,
-            filters?.selectedRegion,
-            filters?.selectedStatus,
-            filters?.selectedCarrier,
-        ],
-    );
+            const marker = new maplibregl.Marker({ element: markerEl })
+                .setLngLat([longitude, latitude])
+                .addTo(map);
 
-    const handleLoad = useCallback((map: google.maps.Map) => {
-        const g = (window as any).google;
+            markersRef.current.push(marker);
+            bounds.extend([longitude, latitude]);
+            hasValidCoords = true;
+        });
 
-        if (g?.maps?.ControlPosition) {
-            map.setOptions({
-                zoomControlOptions: {
-                    position: g.maps.ControlPosition.LEFT_CENTER,
+        if (hasValidCoords && !filters?.selectedBranch) {
+            if (highestBranchCountCountry) {
+                const countryBranches = displayedIvfBranches.filter(
+                    (b) => b.country_name === highestBranchCountCountry,
+                );
+                if (countryBranches.length > 0) {
+                    const countryBounds = new maplibregl.LngLatBounds();
+                    countryBranches.forEach((b) =>
+                        countryBounds.extend([b.geoLocation.longitude, b.geoLocation.latitude]),
+                    );
+                    map.fitBounds(countryBounds, { padding: 60, maxZoom: 8, duration: 800 });
+                    return;
+                }
+            }
+            map.fitBounds(bounds, { padding: 60, maxZoom: 8, duration: 800 });
+        }
+    }, [
+        displayedIvfBranches,
+        direction,
+        highestBranchCountCountry,
+        getBranchMarkerIcon,
+        getBranchStatusColor,
+        onBranchSelect,
+        filters?.selectedBranch,
+    ]);
+
+    // Render Routes & Markers (Outbound)
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || direction !== "outbound") return;
+
+        markersRef.current.forEach((m) => m.remove());
+        markersRef.current = [];
+
+        const updateLayers = () => {
+            // Remove existing route layers/sources if present
+            if (map.getLayer("routes-line")) map.removeLayer("routes-line");
+            if (map.getSource("routes-source")) map.removeSource("routes-source");
+
+            if (routes.length === 0) return;
+
+            const features: any[] = [];
+            const bounds = new maplibregl.LngLatBounds();
+            let hasValidCoords = false;
+
+            routes.forEach((r) => {
+                const origin = toValidLatLng(r.source_latitude, r.source_longitude);
+                const dest = toValidLatLng(r.destination_latitude, r.destination_longitude);
+                if (!origin || !dest) return;
+
+                const color = getRouteColor(r.route_status);
+                features.push({
+                    type: "Feature",
+                    properties: {
+                        color,
+                        description: `${r.source_location} → ${r.destination_location}`,
+                    },
+                    geometry: {
+                        type: "LineString",
+                        coordinates: [
+                            [origin.lng, origin.lat],
+                            [dest.lng, dest.lat],
+                        ],
+                    },
+                });
+
+                // Origin dot
+                const originEl = document.createElement("div");
+                originEl.style.cssText = `width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-sizing:border-box;cursor:pointer;`;
+                const originMarker = new maplibregl.Marker({ element: originEl })
+                    .setLngLat([origin.lng, origin.lat])
+                    .addTo(map);
+                markersRef.current.push(originMarker);
+
+                // Dest dot
+                const destEl = document.createElement("div");
+                destEl.style.cssText = `width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-sizing:border-box;cursor:pointer;`;
+                const destMarker = new maplibregl.Marker({ element: destEl })
+                    .setLngLat([dest.lng, dest.lat])
+                    .addTo(map);
+                markersRef.current.push(destMarker);
+
+                bounds.extend([origin.lng, origin.lat]);
+                bounds.extend([dest.lng, dest.lat]);
+                hasValidCoords = true;
+            });
+
+            map.addSource("routes-source", {
+                type: "geojson",
+                data: {
+                    type: "FeatureCollection",
+                    features,
                 },
             });
-        }
 
-        setMapRef(map);
-    }, []);
+            map.addLayer({
+                id: "routes-line",
+                type: "line",
+                source: "routes-source",
+                layout: {
+                    "line-join": "round",
+                    "line-cap": "round",
+                },
+                paint: {
+                    "line-color": ["get", "color"],
+                    "line-width": 3,
+                    "line-opacity": 0.95,
+                },
+            });
 
-    // Auto-zoom to highest branch count country when inbound
-    useEffect(() => {
-        if (
-            direction === "inbound" &&
-            mapRef &&
-            highestBranchCountCountry &&
-            ivfBranches.length > 0
-        ) {
-            // Filter branches by the highest branch count country
-            const countryBranches = ivfBranches.filter(
-                (b) => b.country_name === highestBranchCountCountry,
-            );
-
-            if (countryBranches.length > 0) {
-                // Calculate bounds for all branches in that country
-                const bounds = new google.maps.LatLngBounds();
-                let hasValidCoordinates = false;
-                countryBranches.forEach((branch) => {
-                    const position = toValidLatLng(
-                        branch.geoLocation.latitude,
-                        branch.geoLocation.longitude,
-                    );
-                    if (!position) return;
-                    hasValidCoordinates = true;
-                    bounds.extend(position);
-                });
-                if (!hasValidCoordinates) return;
-
-                // Fit bounds with padding
-                mapRef.fitBounds(bounds, {
-                    top: 50,
-                    right: 50,
-                    bottom: 50,
-                    left: 50,
-                });
+            if (hasValidCoords) {
+                map.fitBounds(bounds, { padding: 50, maxZoom: 6, duration: 800 });
             }
+        };
+
+        if (map.isStyleLoaded()) {
+            updateLayers();
+        } else {
+            map.once("style.load", updateLayers);
         }
-    }, [direction, mapRef, highestBranchCountCountry, ivfBranches]);
+    }, [routes, direction, getRouteColor]);
 
-    // Handle zoom to location from table row click
+    // Handle zoom to location (e.g., from table row click)
     useEffect(() => {
-        if (zoomToLocation && mapRef) {
-            mapRef.panTo(zoomToLocation);
-            mapRef.setZoom(9);
+        if (zoomToLocation && mapRef.current) {
+            mapRef.current.flyTo({
+                center: [zoomToLocation.lng, zoomToLocation.lat],
+                zoom: 9,
+                duration: 1000,
+            });
         }
-    }, [zoomToLocation, mapRef]);
+    }, [zoomToLocation]);
 
-    // Handle zoom to IVF branch by branch name (for canister list clicks)
+    // Handle zoom to branch name
     useEffect(() => {
-        if (!zoomToBranchName || !mapRef || ivfBranches.length === 0) return;
-
-        const branch = ivfBranches.find(
-            (b) => b.branch_name === zoomToBranchName,
-        );
+        if (!zoomToBranchName || !mapRef.current || ivfBranches.length === 0) return;
+        const branch = ivfBranches.find((b) => b.branch_name === zoomToBranchName);
         if (!branch) return;
+        const pos = toValidLatLng(branch.geoLocation.latitude, branch.geoLocation.longitude);
+        if (!pos) return;
+        mapRef.current.flyTo({ center: [pos.lng, pos.lat], zoom: 9, duration: 1000 });
+    }, [zoomToBranchName, ivfBranches]);
 
-        const position = toValidLatLng(
-            branch.geoLocation.latitude,
-            branch.geoLocation.longitude,
-        );
-        if (!position) return;
-
-        mapRef.panTo(position);
-        mapRef.setZoom(9);
-    }, [zoomToBranchName, ivfBranches, mapRef]);
-
-    // Auto zoom to selected branch from inbound branch filter
+    // Handle filter branch zoom
     useEffect(() => {
-        if (direction !== "inbound" || !mapRef) return;
-
+        if (direction !== "inbound" || !mapRef.current) return;
         const selectedBranch = filters?.selectedBranch;
 
-        // Reset to full view when "All Branches" is selected
         if (!selectedBranch || selectedBranch === "All") {
             if (ivfBranches.length === 0) return;
-            const bounds = new google.maps.LatLngBounds();
+            const bounds = new maplibregl.LngLatBounds();
             let hasValid = false;
             ivfBranches.forEach((b) => {
                 const pos = toValidLatLng(b.geoLocation.latitude, b.geoLocation.longitude);
                 if (!pos) return;
+                bounds.extend([pos.lng, pos.lat]);
                 hasValid = true;
-                bounds.extend(pos);
             });
-            if (!hasValid) return;
-            mapRef.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+            if (hasValid) {
+                mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 8, duration: 800 });
+            }
             return;
         }
 
-        // When branch selection comes from map click, skip this effect to
-        // avoid a second delayed zoom animation from parent filter update.
         if (isBranchFilterFromMap) return;
 
-        const branch = ivfBranches.find(
-            (b) => b.branch_name === selectedBranch,
-        );
+        const branch = ivfBranches.find((b) => b.branch_name === selectedBranch);
         if (!branch) return;
-
-        const position = toValidLatLng(
-            branch.geoLocation.latitude,
-            branch.geoLocation.longitude,
-        );
-        if (!position) return;
-
-        mapRef.panTo(position);
-        mapRef.setZoom(9);
-    }, [
-        direction,
-        filters?.selectedBranch,
-        ivfBranches,
-        mapRef,
-        isBranchFilterFromMap,
-    ]);
-
-    // One-shot zoom for branch marker clicks to guarantee first-click zoom
-    // even if map re-renders during filter application.
-    useEffect(() => {
-        if (!pendingBranchZoomName || !mapRef || ivfBranches.length === 0) {
-            return;
-        }
-
-        const branch = ivfBranches.find(
-            (b) => b.branch_name === pendingBranchZoomName,
-        );
-        if (!branch) return;
-
-        const position = toValidLatLng(
-            branch.geoLocation.latitude,
-            branch.geoLocation.longitude,
-        );
-        if (!position) return;
-
-        mapRef.panTo(position);
-        mapRef.setZoom(9);
-        setPendingBranchZoomName(null);
-    }, [pendingBranchZoomName, ivfBranches, mapRef]);
-
-    // Cleanup polylines on unmount
-    useEffect(() => {
-        return () => {
-            polylinesRef.current.forEach((polyline) => {
-                try {
-                    google.maps.event.clearInstanceListeners(polyline);
-                    polyline.setMap(null);
-                } catch (error) {
-                    return;
-                }
-            });
-            polylinesRef.current.clear();
-        };
-    }, []);
-
-    const handleUnmount = useCallback(() => {
-        setMapRef(null);
-    }, []);
-
-    // Helper function to get color based on route status
-    const getRouteColor = useCallback((routeStatus?: string): string => {
-        if (!routeStatus) return "#22DC0E"; // Default to safe (green)
-        const status = routeStatus.toLowerCase();
-        if (status === "safe") return "#22DC0E"; // Green
-        if (status === "high_risk" || status === "failed") return "#E80000"; // Red
-        if (status === "delayed") return "#FFD901"; // Yellow
-        return "#22DC0E"; // Default to safe (green)
-    }, []);
-
-    // Helper function to get marker image based on branch status
-    const getBranchMarkerIcon = useCallback((branchStatus?: string): string => {
-        if (!branchStatus) return MarkerGreen; // Default to safe (green)
-        const status = branchStatus.toLowerCase();
-        if (status === "safe") return MarkerGreen;
-        if (status === "critical" || status === "risk") return MarkerRed;
-        if (status === "delayed" || status === "medium") return MarkerYellow;
-        return MarkerGreen; // Default to safe (green)
-    }, []);
-
-    // Helper function to get status color for dot indicator
-    const getBranchStatusColor = useCallback(
-        (branchStatus?: string): string => {
-            if (!branchStatus) return "#22DC0E"; // Default to safe (green)
-            const status = branchStatus.toLowerCase();
-            if (status === "safe") return "#22DC0E"; // Green
-            if (status === "critical" || status === "risk") return "#E80000"; // Red
-            if (status === "delayed" || status === "medium") return "#FFD901"; // Yellow
-            return "#22DC0E"; // Default to safe (green)
-        },
-        [],
-    );
-
-    // Helper function to zoom in to a marker position
-    const zoomToMarker = useCallback(
-        (position: google.maps.LatLngLiteral) => {
-            if (!mapRef) return;
-
-            // Pan to position and zoom
-            mapRef.panTo(position);
-            mapRef.setZoom(9);
-        },
-        [mapRef],
-    );
-
+        const pos = toValidLatLng(branch.geoLocation.latitude, branch.geoLocation.longitude);
+        if (!pos) return;
+        mapRef.current.flyTo({ center: [pos.lng, pos.lat], zoom: 9, duration: 1000 });
+    }, [direction, filters?.selectedBranch, ivfBranches, isBranchFilterFromMap]);
 
     return (
         <div className="bg-white border border-line rounded-lg relative overflow-hidden w-full h-full lg:min-h-[544px]">
@@ -754,390 +659,20 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                         )}
 
                     {/* Network Status overlay (top-right) */}
-
                     <div className="absolute top-3 right-3 bg-white/15 backdrop-blur-sm border border-white/30 rounded-lg px-3 py-2 shadow-sm z-10">
                         <div className="flex items-center justify-between gap-6">
                             <div className="text-[12px] font-medium text-[#FFFFFF]">
-                                Last updated: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                Last updated:{" "}
+                                {new Date().toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                })}
                             </div>
                         </div>
                     </div>
 
-                    {isLoaded ? (
-                        <GoogleMap
-                            key={mapInstanceKey}
-                            mapContainerStyle={{
-                                width: "100%",
-                                height: "100%",
-                            }}
-                            center={mapCenter}
-                            zoom={3}
-                            options={mapOptions}
-                            onLoad={handleLoad}
-                            onUnmount={handleUnmount}
-                        >
-                            {/* Render Routes (Outbound only) */}
-                            {direction === "outbound" &&
-                                routes.map((r) => {
-                                    const origin = toValidLatLng(
-                                        r.source_latitude,
-                                        r.source_longitude,
-                                    );
-
-                                    const dest = toValidLatLng(
-                                        r.destination_latitude,
-                                        r.destination_longitude,
-                                    );
-
-                                    if (!origin || !dest) return null;
-
-                                    const routeKey = `${r.shipment_id}-${r.patient_id}`;
-                                    // Calculate midpoint for tooltip position
-                                    const midpoint = {
-                                        lat:
-                                            (origin.lat + dest.lat) / 2,
-                                        lng:
-                                            (origin.lng + dest.lng) / 2,
-                                    } as google.maps.LatLngLiteral;
-
-                                    // Get color based on route status
-                                    const routeColor = getRouteColor(
-                                        r.route_status,
-                                    );
-
-                                    return (
-                                        <React.Fragment key={routeKey}>
-                                            <AdvancedMarker
-                                                key={`${routeKey}-origin`}
-                                                position={origin}
-                                                dotColor={routeColor}
-                                                onClick={() => zoomToMarker(origin)}
-                                                onMouseEnter={() => {
-                                                    setTooltipPosition((prev) => { const m = new Map(prev); m.set(routeKey, origin); return m; });
-                                                    setActiveTooltip(routeKey);
-                                                }}
-                                                onMouseLeave={() => setActiveTooltip(null)}
-                                            />
-                                            <AdvancedMarker
-                                                key={`${routeKey}-dest`}
-                                                position={dest}
-                                                dotColor={routeColor}
-                                                onClick={() => zoomToMarker(dest)}
-                                                onMouseEnter={() => {
-                                                    setTooltipPosition((prev) => { const m = new Map(prev); m.set(routeKey, dest); return m; });
-                                                    setActiveTooltip(routeKey);
-                                                }}
-                                                onMouseLeave={() => setActiveTooltip(null)}
-                                            />
-                                            <Polyline
-                                                path={[origin, dest]}
-                                                options={{
-                                                    strokeColor: routeColor,
-                                                    strokeOpacity: 0.95,
-                                                    strokeWeight: 3,
-                                                    clickable: true,
-                                                    zIndex: 1,
-                                                }}
-                                                onLoad={(polyline) => {
-                                                    if (polyline) {
-                                                        polylinesRef.current.set(
-                                                            routeKey,
-                                                            polyline,
-                                                        );
-                                                        google.maps.event.addListener(
-                                                            polyline,
-                                                            "mouseover",
-                                                            (
-                                                                e: google.maps.PolyMouseEvent,
-                                                            ) => {
-                                                                if (e.latLng) {
-                                                                    const hoverPosition =
-                                                                        {
-                                                                            lat: e.latLng.lat(),
-                                                                            lng: e.latLng.lng(),
-                                                                        } as google.maps.LatLngLiteral;
-                                                                    setTooltipPosition(
-                                                                        (
-                                                                            prev,
-                                                                        ) => {
-                                                                            const newMap =
-                                                                                new Map(
-                                                                                    prev,
-                                                                                );
-                                                                            newMap.set(
-                                                                                routeKey,
-                                                                                hoverPosition,
-                                                                            );
-                                                                            return newMap;
-                                                                        },
-                                                                    );
-                                                                    setActiveTooltip(
-                                                                        routeKey,
-                                                                    );
-                                                                }
-                                                            },
-                                                        );
-                                                        google.maps.event.addListener(
-                                                            polyline,
-                                                            "mousemove",
-                                                            (
-                                                                e: google.maps.PolyMouseEvent,
-                                                            ) => {
-                                                                if (e.latLng) {
-                                                                    const hoverPosition =
-                                                                        {
-                                                                            lat: e.latLng.lat(),
-                                                                            lng: e.latLng.lng(),
-                                                                        } as google.maps.LatLngLiteral;
-                                                                    setTooltipPosition(
-                                                                        (
-                                                                            prev,
-                                                                        ) => {
-                                                                            const newMap =
-                                                                                new Map(
-                                                                                    prev,
-                                                                                );
-                                                                            newMap.set(
-                                                                                routeKey,
-                                                                                hoverPosition,
-                                                                            );
-                                                                            return newMap;
-                                                                        },
-                                                                    );
-                                                                }
-                                                            },
-                                                        );
-                                                        google.maps.event.addListener(
-                                                            polyline,
-                                                            "mouseout",
-                                                            () => {
-                                                                setActiveTooltip(
-                                                                    null,
-                                                                );
-                                                            },
-                                                        );
-                                                    }
-                                                }}
-                                            />
-                                            {activeTooltip === routeKey &&
-                                                mapRef && (
-                                                    <OverlayView
-                                                        position={
-                                                            tooltipPosition.get(
-                                                                routeKey,
-                                                            ) || midpoint
-                                                        }
-                                                        mapPaneName={
-                                                            OverlayView.FLOAT_PANE
-                                                        }
-                                                        getPixelPositionOffset={(
-                                                            width,
-                                                            height,
-                                                        ) => ({
-                                                            x: -(width / 2),
-                                                            y: -(height + 10),
-                                                        })}
-                                                    >
-                                                        <div
-                                                            className="bg-[#272626] text-white px-3 py-2 rounded text-xs whitespace-nowrap min-w-[200px] pointer-events-none shadow-lg"
-                                                            style={{
-                                                                zIndex: 9999,
-                                                            }}
-                                                        >
-                                                            {r.source_location}{" "}
-                                                            →{" "}
-                                                            {
-                                                                r.destination_location
-                                                            }
-                                                        </div>
-                                                    </OverlayView>
-                                                )}
-                                        </React.Fragment>
-                                    );
-                                })}
-
-                            {/* IVF Branch Markers + Tooltips */}
-                            {direction === "inbound" &&
-                                displayedIvfBranches.map((branch) => {
-                                    const branchKey = `ivf-${branch.state}-${branch.branch_name}`;
-                                    const branchPosition = toValidLatLng(
-                                        branch.geoLocation.latitude,
-                                        branch.geoLocation.longitude,
-                                    );
-                                    if (!branchPosition) return null;
-
-                                    return (
-                                        <React.Fragment key={branchKey}>
-                                            <AdvancedMarker
-                                                position={branchPosition}
-                                                iconUrl={getBranchMarkerIcon(branch.branch_status)}
-                                                title={branch.branch_name}
-                                                id={`map-marker-${branch.branch_name}`}
-                                                onClick={() => {
-                                                    setPendingBranchZoomName(branch.branch_name);
-                                                    onBranchSelect?.(branch.branch_name);
-                                                    zoomToMarker(branchPosition);
-                                                }}
-                                                onMouseEnter={() => {
-                                                    setTooltipPosition((prev) => { const m = new Map(prev); m.set(branchKey, branchPosition); return m; });
-                                                    setActiveTooltip(branchKey);
-                                                }}
-                                                onMouseLeave={() => setActiveTooltip(null)}
-                                            />
-                                            {activeTooltip === branchKey &&
-                                                mapRef && (
-                                                    <OverlayView
-                                                        position={
-                                                            tooltipPosition.get(
-                                                                branchKey,
-                                                            ) || branchPosition
-                                                        }
-                                                        mapPaneName={
-                                                            OverlayView.FLOAT_PANE
-                                                        }
-                                                        getPixelPositionOffset={(
-                                                            width,
-                                                            height,
-                                                        ) => ({
-                                                            x: -(width / 2),
-                                                            y: -(height + 10),
-                                                        })}
-                                                    >
-                                                        <div
-                                                            className="bg-white text-black px-3 py-2 rounded text-xs whitespace-nowrap min-w-[200px] pointer-events-none shadow-lg"
-                                                            style={{
-                                                                zIndex: 9999,
-                                                            }}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <span
-                                                                    className="w-2 h-2 rounded-full flex-shrink-0"
-                                                                    style={{
-                                                                        backgroundColor:
-                                                                            getBranchStatusColor(
-                                                                                branch.branch_status,
-                                                                            ),
-                                                                    }}
-                                                                />
-                                                                <div className="font-semibold text-base">
-                                                                    {
-                                                                        branch
-                                                                            .address
-                                                                            .district
-                                                                    }
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-[10px] text-gray-600 mt-1 ml-4">
-                                                                {
-                                                                    branch.branch_name
-                                                                }{" "}
-                                                                |{" "}
-                                                                {new Date().toLocaleDateString(
-                                                                    "en-GB",
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </OverlayView>
-                                                )}
-                                        </React.Fragment>
-                                    );
-                                })}
-                        </GoogleMap>
-                    ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-white text-xs">
-                            Loading map...
-                        </div>
-                    )}
-
-                    {isLoaded && isMapDataLoading && (
-                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/25">
-                            <div className="flex items-center gap-2 rounded-md bg-black/60 px-3 py-2 text-xs text-white">
-                                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                                Updating map...
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Legend — (i) popup on mobile, always visible on desktop */}
-                    {(() => {
-                        const legendContent = (
-                            <div className="text-white bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl shadow-lg px-4 py-3 w-[200px]">
-                                <div className="text-sm font-semibold mb-3">Cryocan Quality Status</div>
-                                <div className="flex flex-col gap-2">
-                                    <div className="flex items-center gap-3">
-                                        <span className="inline-block w-4 h-1.5 rounded-full bg-[#22DC0E]" />
-                                        <span className="text-[12px]">Safe</span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="inline-block w-4 h-1.5 rounded-full bg-[#E80000]" />
-                                        <span className="text-[12px]">Critical</span>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                        return (
-                            <>
-                                {/* Mobile: (i) toggle, bottom-right */}
-                                <div className="absolute bottom-6 right-6 z-10 lg:hidden">
-                                    <InfoPopup align="right">{legendContent}</InfoPopup>
-                                </div>
-                                {/* Desktop: always visible, bottom-left */}
-                                <div className="absolute bottom-6 left-6 z-10 hidden lg:block">
-                                    {legendContent}
-                                </div>
-                            </>
-                        );
-                    })()}
-
-                    {/* Custom zoom controls */}
-
-                    <div className="absolute left-6 bottom-6 lg:bottom-[140px] z-10">
-                        <div className="flex flex-col items-stretch rounded-xl border border-white/40 shadow-[0_2px_10px_rgba(0,0,0,0.45)] overflow-hidden backdrop-blur-sm w-[38px] h-[69px] bg-gradient-to-b from-white/[0.28] to-white/[0.08]">
-                            <button
-                                type="button"
-                                aria-label="Zoom in"
-                                className="w-full flex-1 text-white text-[20px] leading-none flex items-center justify-center hover:bg-white/10"
-                                onClick={() => {
-                                    if (!mapRef) return;
-
-                                    const next = Math.min(
-                                        (mapRef.getZoom() ?? 3) + 1,
-                                        9,
-                                    );
-
-                                    mapRef.setZoom(next);
-                                }}
-                            >
-                                +
-                            </button>
-
-                            <div className="h-px bg-white/40 mx-2" />
-
-                            <button
-                                type="button"
-                                aria-label="Zoom out"
-                                className="w-full flex-1 text-white text-[20px] leading-none flex items-center justify-center hover:bg-white/10"
-                                onClick={() => {
-                                    if (!mapRef) return;
-
-                                    const next = Math.max(
-                                        (mapRef.getZoom() ?? 3) - 1,
-                                        2,
-                                    );
-
-                                    mapRef.setZoom(next);
-                                }}
-                            >
-                                –
-                            </button>
-                        </div>
-                    </div>
-
-                    {error && (
-                        <div className="absolute bottom-4 left-4 text-xs text-red-300 bg-black/50 px-2 py-1 rounded z-10">
-                            {error}
-                        </div>
-                    )}
+                    {/* MapLibre GL Map Canvas */}
+                    <div ref={mapContainerRef} className="w-full h-full" />
                 </div>
             </div>
         </div>
