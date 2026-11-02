@@ -11,3 +11,5 @@ docs/
 ml/
 ml.zip
 telemetry-service/.venv/
+.github/workflows/
+grading-service/
