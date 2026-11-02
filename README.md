@@ -18,11 +18,11 @@ A production-grade supply chain intelligence and clinical tracking platform engi
 
 ---
 
-## 🏛️ System Architecture
+## System Architecture
 
 Vyrona is organized across **four core architectural layers** deployed inside containerized environments (Docker Compose / AWS EC2), decoupling telemetry ingestion, real-time KPI threshold evaluation, and user-facing operational applications.
 
-### 📐 Text-Based Architecture Schematic
+### Text-Based Architecture Schematic
 
 ```text
 ===================================================================================================
@@ -90,71 +90,8 @@ Vyrona is organized across **four core architectural layers** deployed inside co
    │ [Clinicians, Embryologists, Couriers]   │
    └─────────────────────────────────────────┘
 ===================================================================================================
-```
 
----
-
-### 📊 Layered System Architecture Flow
-
-```mermaid
-graph TD
-  classDef source fill:#eff6ff,stroke:#3b82f6,stroke-width:2px;
-  classDef ingestion fill:#1e293b,stroke:#0f172a,stroke-width:2px,color:#ffffff;
-  classDef data fill:#f8fafc,stroke:#0284c7,stroke-width:2px;
-  classDef app fill:#f0fdf4,stroke:#16a34a,stroke-width:2px;
-  classDef cloud fill:#fffbeb,stroke:#d97706,stroke-width:2px;
-  classDef user fill:#faf5ff,stroke:#9333ea,stroke-width:2px;
-
-  subgraph LAYER1["1. SOURCE"]
-    SIM["Live Simulator<br/>(Python script, local)"]:::source
-    IOT[/"IoT Devices<br/>(Tive sensors, cryotanks - planned)"/]:::source
-  end
-
-  subgraph LAYER2["2. INGESTION & EVENTS"]
-    INGEST["IoT Ingestion Function<br/>:7071"]:::ingestion
-    HUB["Event Hub Emulator<br/>(Publish / Consume Buffer)"]:::ingestion
-    TELEM["Telemetry Function<br/>:7072"]:::ingestion
-  end
-
-  subgraph LAYER3["3. DATA & LOGIC"]
-    AZURITE[("Azurite<br/>Blob Storage Emulator")]:::data
-    REDIS[("Redis Cache<br/>:6379")]:::data
-    KPI["KPI Evaluation & Alerts<br/>(Threshold Rules)"]:::data
-    PG[("PostgreSQL<br/>:5432 (Assets, Telemetry, KPIs)")]:::data
-  end
-
-  subgraph LAYER4["4. APPLICATION & AWS INFRASTRUCTURE (Docker Compose on EC2)"]
-    API["Backend API<br/>FastAPI :8000<br/>(Auth, Roles, Scope Checks)"]:::app
-    DASH["React Dashboard<br/>Vite :5173 / Nginx :80<br/>(Control Tower & Telemetry)"]:::app
-    SNS["AWS SNS Service<br/>(Emergency SMS Broadcast & Topics)"]:::cloud
-    SMTP["SMTP / SES Service<br/>(:587 / :5000 Notifications)"]:::cloud
-  end
-
-  STAFF["Authorized Staff<br/>(Clinicians, Couriers, Admins)"]:::user
-
-  %% Ingestion & Event pipeline
-  SIM --> INGEST
-  IOT -.-> INGEST
-  INGEST --> HUB
-  HUB --> TELEM
-  TELEM <--> AZURITE
-  TELEM --> KPI
-
-  %% Data & Logic pipeline
-  KPI <--> REDIS
-  KPI --> PG
-  PG <--> API
-
-  %% Application, Cloud Alerts & Dashboard
-  API --> SNS
-  API --> SMTP
-  API <--> DASH
-  DASH <--> STAFF
-```
-
----
-
-### 🧩 Layer Breakdown Matrix
+### Layer Breakdown Matrix
 
 | Layer | Component | Port / Interface | Role & Implementation |
 | :--- | :--- | :--- | :--- |
@@ -358,6 +295,7 @@ Automated deployment tooling is provided in `deploy.sh` to update an AWS EC2 hos
 ## 👥 Authors
 
 - **Akshith Mahesh K** ([@Akshi-X](https://github.com/Akshi-X))
+- **Hareekshith AS** ([@Hareekshith](https://github.com/Hareekshith))
 
 ---
 
